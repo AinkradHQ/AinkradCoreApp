@@ -28,7 +28,6 @@ final class SetupTourModel {
     enum Detour { case you, look }
 
     /// The first Core version that has `PUT /brain/me/profile`. The coordinator renumbers it at integration.
-    static let profileMinor = 95
 
     private(set) var step: Step?
     private(set) var detour: Detour?

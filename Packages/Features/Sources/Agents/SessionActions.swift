@@ -74,17 +74,17 @@ struct SessionActions: View {
     /// End session; on a finished one Wake, Start again (and the budget ways out).
     @ViewBuilder private var state: some View {
         if session.live {
-            Button(action: { model.confirmEnd(session.id) }) {
+            Button(action: { model.end(session.id) }) {
                 if compact {
-                    Image(systemName: "stop").accessibilityLabel("End Session…")
+                    Image(systemName: "stop").accessibilityLabel("End Session")
                 } else {
-                    Label("End Session…", systemImage: "stop").lineLimit(1)
+                    Label("End Session", systemImage: "stop").lineLimit(1)
                 }
             }
             // Neutral at rest, red only on hover: occasional and destructive, never the loudest thing on screen.
             .buttonStyle(EndButtonStyle(iconOnly: compact))
             .disabled(model.stopping[session.id] != nil)
-            .help("End Session… (⇧⌘E): the CLI exits and the transcript stays. Esc stops only the current turn.")
+            .help("End Session (⇧⌘E): the CLI exits and the transcript stays. Esc stops only the current turn.")
             .keyHint(.endSession)
         } else if session.state != .lost {
             if session.stoppedByBudget {

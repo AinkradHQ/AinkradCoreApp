@@ -5,6 +5,7 @@ import SwiftUI
 /// Settings, Security, Lockouts: who is locked out after too many failed tries, with a live countdown. One lock is the
 /// cursor (↑ ↓); ⌫ clears it now (Touch ID), R reads again. Locks end by themselves.
 struct LockoutsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     @State private var cursor: String?
     @FocusState private var focus: Bool
@@ -65,7 +66,7 @@ struct LockoutsSection: View {
                 .foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s3)
-            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+            AppActionTile(title: "Read now", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)) {
                 Task { await model.reload() }
             }
         }

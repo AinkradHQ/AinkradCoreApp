@@ -25,7 +25,8 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Shell", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
+            name: "Shell",
+            dependencies: [.product(name: "CoreUI", package: "CoreUI"), .product(name: "CoreKit", package: "CoreKit")],
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
@@ -132,7 +133,7 @@ let package = Package(
             ],
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
-        .testTarget(name: "ShellTests", dependencies: ["Shell"]),
+        .testTarget(name: "ShellTests", dependencies: ["Shell", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(
             name: "TerminalsTests",
             dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),

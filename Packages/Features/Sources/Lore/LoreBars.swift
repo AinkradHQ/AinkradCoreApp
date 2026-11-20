@@ -5,12 +5,13 @@ import SwiftUI
 
 /// Shown on a note that came from an AI session's `.md` file: edits save back to that file.
 struct LoreAIBanner: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: LoreModel
     let doc: LoreSessionDoc
 
     var body: some View {
         HStack(spacing: Space.s2) {
-            Image(systemName: "sparkles").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.blue)
+            Image(systemName: "sparkles").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.accent(paneAccent))
                 .accessibilityHidden(true)
             Text("From session “\(doc.sessionTitle ?? "an AI session")” · edits save back to the file \(doc.fileName)")
                 .coreFont(size: MacTextSize.meta + 1).lineLimit(1).truncationMode(.middle)
@@ -26,7 +27,7 @@ struct LoreAIBanner: View {
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
         .frame(maxWidth: LoreView.pageWidth)
-        .background(GlassInk.blue.opacity(0.14), in: coreShape(Radius.cardMac))
+        .background(GlassInk.accent(paneAccent).opacity(0.14), in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lore-ai-banner")
     }

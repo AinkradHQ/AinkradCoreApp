@@ -7,7 +7,7 @@ import Foundation
 // Swift flags when the client is synced. Until then a Core call falls back to the protocol defaults (not offered).
 #if CORE_CLIENT_95
 extension LiveAgentsAPI {
-    public func hasSessionTools() async -> Bool { await connection.serverSupports(minor: 95) }
+    public func hasSessionTools() async -> Bool { await connection.serverSupports(minor: coreMinorV010) }
 
     public func folder(_ id: String, dir: String) async throws -> FolderListing {
         try await run {

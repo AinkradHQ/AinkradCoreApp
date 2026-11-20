@@ -127,7 +127,7 @@ struct LiveCoreService: CoreService {
     }
     func elevatedUntil() async -> Date? { await connection.elevatedUntil }
     func stepUp(reason: String) async throws -> Date { try await connection.stepUp(reason: reason) }
-    var supportsUnlock: Bool { get async { await connection.serverSupports(minor: CoreConnection.unlockMinor) } }
+    var supportsUnlock: Bool { get async { await connection.serverSupports(minor: coreMinorV010) } }
     func unlock(reason: String) async throws -> Date { try await connection.unlock(reason: reason) }
     func beatUnlock() async throws { try await connection.beatUnlock() }
     func endUnlock() async { await connection.endUnlock() }
@@ -213,7 +213,7 @@ struct LiveCoreService: CoreService {
     /// runner's enrolment file on this disk). Only that runner can then be given a real shell. A Core before minor 95 has no
     /// such route and no real-shell rule to satisfy, so nothing is sent.
     func attestBundledRunner(_ runner: String) async throws {
-        guard await connection.serverSupports(minor: 95) else { return }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return }
         try await run {
             switch try await client.attestBundledRunner(path: .init(id: runner)) {
             case .ok: return

@@ -3,7 +3,7 @@ import Foundation
 import Observation
 
 // What the rail tabs show beyond the project itself (Core 0.10, E11-3): per-repo code facts, AI usage, who changed what, what the
-// Brain knows of the project's place, the AI documents and the fetch tuning. Every call is gated by `serverSupports(minor: 95)` in
+// Brain knows of the project's place, the AI documents and the fetch tuning. Every call is gated by `serverSupports(minor: coreMinorV010)` in
 // `ProjectsModel.insightsService`. Security model: only counts, names, short summaries and costs are read; nothing here is a
 // secret, and a Brain record's text is shown as plain text.
 

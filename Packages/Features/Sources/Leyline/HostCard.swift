@@ -5,6 +5,7 @@ import SwiftUI
 /// A host in the gallery (mockup 14): its tile, name and system, how it is reached and whether it is a runner.
 /// Same bones as a project card (well, hover lift, rise on arrival); a tap opens the host's space.
 struct HostCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: LeylineModel
     let host: HostItem
     let index: Int
@@ -24,7 +25,7 @@ struct HostCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                IconTile("server.rack", hue: GlassInk.blue, size: Space.s8 + Space.s2)
+                IconTile("server.rack", hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s2)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(host.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                     Text(host.os ?? host.login).foregroundStyle(GlassInk.secondary).lineLimit(1)
@@ -58,8 +59,8 @@ struct HostCard: View {
         .coreWell(radius: Radius.pane, active: lit || picked)
         .contentShape(coreShape(Radius.pane))
         .onTapGesture { model.openHost(host.id) }
-        .coreScaleEffect(lit ? 1.01 : 1)
-        .coreRise(settled, index)
+        .coreScaleEffect(lit && LeylineOptions.calmOn ? 1.01 : 1)
+        .coreRise(settled || !LeylineOptions.calmOn, index)
         .animation(Motion.out(Motion.hover), value: lit)
         .onHover { hovering = $0 }
         .contextMenu {

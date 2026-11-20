@@ -5,6 +5,7 @@ import SwiftUI
 /// One runner's page (N18, N19): a header, then Now, What it offers, Machine, Who may use it and Actions. Plain words, no
 /// internal codes; what the Core does not report says "Not reported yet".
 struct HardwarePage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: TerminalsModel
     let runner: RunnerItem
     @Environment(\.corePalette) var palette

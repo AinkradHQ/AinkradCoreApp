@@ -7,6 +7,7 @@ import Testing
 
 @MainActor
 final class FakeHost: AdminHost {
+    func open(_ url: URL) {}  // never a real browser in a test
     let shell = ShellModel()
     var pausedReason: String?
     var elevationNotice: AdminNotice?
@@ -64,7 +65,8 @@ struct BrainModelTests {
         await m.inspect("ainkrad")
         let task = Task { await m.inspect("initech") }
         await Task.yield()
-        #expect(m.inspected == nil)  // cleared before the new answer arrives
+        // Never the first room: cleared, or already the new answer (a fast parallel run may get there first).
+        #expect(m.inspected?.room.id != "ainkrad")
         await task.value
         #expect(m.inspected?.room.id == "initech")
     }

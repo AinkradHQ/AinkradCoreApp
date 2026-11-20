@@ -11,7 +11,12 @@ public struct HomeSnapshot: Sendable {
         /// Host load samples, 0...1, oldest first.
         public let load: [Double]
         public var loadPercent: Int { Int(((load.last ?? 0) * 100).rounded()) }
-        public init(id: String, os: String, online: Bool, slots: Int, used: Int, load: [Double] = []) {
+        /// The runner's device id (`runner.tool_install` events carry it); `id` is its name.
+        public let runnerID: String
+        public init(
+            id: String, os: String, online: Bool, slots: Int, used: Int, load: [Double] = [], runnerID: String = ""
+        ) {
+            self.runnerID = runnerID
             self.load = load
             self.id = id
             self.os = os

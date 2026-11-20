@@ -191,13 +191,13 @@ struct ModelTests {
         #expect(!m.canSend(running))
     }
 
-    @Test func cancelAsksFirstAndRunsOnConfirm() async throws {
+    @Test func cancelActsAtOnceAndTheToastHasNoUndo() async throws {
         let (m, api, _, _) = await make()
         let id = "as_01JC4X7Q3MZ8N5V2K9R001"
-        m.confirmCancel(id)
-        let sheet = try #require(m.shell.sheet)
-        #expect(sheet.actions.map(\.label) == ["Keep running", "Cancel session"])
-        sheet.actions[1].run()
+        m.cancel(id)
+        #expect(m.shell.sheet == nil, "no question")
+        let toast = try #require(m.shell.toast)
+        #expect(toast.message.contains("Cancelling") && toast.undo == nil, "it cannot be taken back")
         #expect(await until { m.sessions.session(id)?.over == true })
         #expect(api.calls.contains("cancel"))
     }
@@ -207,8 +207,7 @@ struct ModelTests {
         api.cancelEndsSession = false
         let (m, _, _, _) = await make(api)
         let id = "as_01JC4X7Q3MZ8N5V2K9R001"
-        m.confirmCancel(id)
-        try #require(m.shell.sheet).actions[1].run()
+        m.cancel(id)
         #expect(m.stopping[id] == .cancelling, "shown at once, before the Core answers")
         #expect(await until { api.calls.contains("cancel") })
         await m.reloadAll()  // the Core has answered the cancel and the list is read again
@@ -269,8 +268,25 @@ struct ModelTests {
         #expect(api.calls.contains("stopTurn"))
         #expect(m.canWrite(m.sessions.session(id)!) && !m.canStopTurn(m.sessions.session(id)!))
         m.end(id)
+        #expect(m.shell.sheet == nil, "ending asks nothing")
         #expect(await until { m.sessions.session(id)?.live == false })
         #expect(api.calls.contains("end"))
+        #expect(m.shell.toast?.message.contains("Ended") == true && m.shell.toast?.undo == nil)
+    }
+
+    @Test func theEndShortcutAsksFirstAndOnlyConfirmingEnds() async throws {
+        let (m, api, _, _) = await make()
+        let id = "as_01JC4X7Q3MZ8N5V2K9R004"
+        api.update(id) { $0.state = .running }
+        await m.reloadAll()
+        m.confirmEnd(id)
+        let sheet = try #require(m.shell.sheet)
+        #expect(sheet.title == "End this session?" && !api.calls.contains("end"))
+        sheet.actions.first { $0.label == "Keep running" }?.run()
+        #expect(!api.calls.contains("end"))
+        m.confirmEnd(id)
+        m.shell.sheet?.actions.first { $0.primary }?.run()
+        #expect(await until { api.calls.contains("end") })
     }
 
     @Test func aNewLiveSessionOpensWithNoPromptAndWaits() async throws {

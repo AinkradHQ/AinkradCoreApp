@@ -36,6 +36,7 @@ struct LayersIsland: View {
 }
 
 private struct LayerRowView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let editor: DesignEditor
     let row: LayerRow
     @State private var height: CGFloat = MacSize.controlLg
@@ -71,7 +72,9 @@ private struct LayerRowView: View {
         .accessibilityAction(named: "Move Backward") { editor.step(layer.id, up: false) }
     }
 
-    private var bar: some View { coreShape(1).fill(GlassInk.blue).frame(height: 2).padding(.horizontal, Space.s2) }
+    private var bar: some View {
+        coreShape(1).fill(GlassInk.accent(paneAccent)).frame(height: 2).padding(.horizontal, Space.s2)
+    }
 
     @ViewBuilder private var chevron: some View {
         if row.hasChildren {

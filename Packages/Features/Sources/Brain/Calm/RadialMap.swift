@@ -14,6 +14,7 @@ struct RadialNode: Identifiable {
 /// the dashes crawl and small packets flow along each line toward the centre, and the cards float gently. Reduce Motion, a pane
 /// that is not on screen, or an idle Brain: lines static, no packets, no float (the timeline is paused, not just ignored).
 struct RadialMap: View {
+    @Environment(\.coreAccent) private var paneAccent
     let nodes: [RadialNode]
     let working: Bool
     let label: String
@@ -90,7 +91,7 @@ struct RadialMap: View {
                 let fade = sin(u * .pi)
                 gc.fill(
                     Path(roundedRect: CGRect(x: pt.x - 3, y: pt.y - 3, width: 6, height: 6), cornerRadius: 2),
-                    with: .color(GlassInk.blue.opacity(0.9 * fade)))
+                    with: .color(GlassInk.accent(paneAccent).opacity(0.9 * fade)))
             }
         }
     }
@@ -100,7 +101,7 @@ struct RadialMap: View {
     private func halo(_ t: Double, _ k: Int) -> some View {
         let u = animating ? (t / 4 + Double(k) * 0.5).truncatingRemainder(dividingBy: 1) : 0.3 + Double(k) * 0.35
         return coreShape(Radius.cardMac + 4)
-            .stroke(GlassInk.blue.opacity(animating ? 0.45 * (1 - u) : 0.16), lineWidth: 1.5)
+            .stroke(GlassInk.accent(paneAccent).opacity(animating ? 0.45 * (1 - u) : 0.16), lineWidth: 1.5)
             .frame(width: Space.s8 * 2, height: Space.s8 * 2)
             .scaleEffect(1 + 0.7 * u)
             .accessibilityHidden(true)
@@ -113,7 +114,7 @@ struct RadialMap: View {
                 halo(t, 0)
                 halo(t, 1)
                 Image(systemName: "brain").font(.system(size: 28)).frame(width: Space.s8 * 2, height: Space.s8 * 2)
-                    .background(GlassInk.blue.opacity(0.18), in: coreShape(Radius.cardMac))
+                    .background(GlassInk.accent(paneAccent).opacity(0.18), in: coreShape(Radius.cardMac))
                     .accessibilityHidden(true)
             }
             HStack(spacing: Space.s1) {
@@ -141,7 +142,8 @@ struct RadialMap: View {
                     Text("\(node.count)").coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
                         .contentTransition(.numericText())
                     if node.today > 0 {
-                        Text("+\(node.today) today").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.blue)
+                        Text("+\(node.today) today").coreFont(size: MacTextSize.meta).foregroundStyle(
+                            GlassInk.accent(paneAccent))
                     }
                 }
                 Text(node.line).lineLimit(2).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)

@@ -3,6 +3,7 @@ import SwiftUI
 /// A switch drawn as rounded rectangles (track and knob), never a pill or a circle. The knob slides on the UI ease; under
 /// Reduce Motion it jumps. Space or a click flips it. On is the theme blue (a setting, not a status).
 public struct CoreSwitch: View {
+    @Environment(\.coreAccent) private var accent
     let title: String
     @Binding var isOn: Bool
     @Environment(\.corePalette) private var palette
@@ -85,7 +86,7 @@ public struct CoreSwitch: View {
         return coreShape(Radius.chip)
             .fill(
                 on
-                    ? GlassInk.blue.opacity(lit ? 0.9 : 1)
+                    ? GlassInk.accent(accent).opacity(lit ? 0.9 : 1)
                     : GlassInk.adaptive(
                         .white.opacity(lit ? 0.32 : 0.24), day: GlassInk.dayInk.opacity(lit ? 0.22 : 0.16))
             )

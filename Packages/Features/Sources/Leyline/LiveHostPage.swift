@@ -133,7 +133,7 @@ extension LiveLeylineService {
     }
 
     func checkHost(address: String, port: Int) async throws -> HostCheck {
-        guard await connection.serverSupports(minor: 95) else { throw LeylineFailure.notYet }
+        guard await connection.serverSupports(minor: coreMinorV010) else { throw LeylineFailure.notYet }
         struct Body: Encodable {
             let address: String
             let port: Int

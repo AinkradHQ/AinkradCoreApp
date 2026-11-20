@@ -33,6 +33,7 @@ struct ChangeRows: View {
 }
 
 private struct ChangeRowView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let row: ChangeRow
     let kept: Bool
     /// An AI-proposed set: a memory with no cited source is said so, not left blank.
@@ -41,7 +42,7 @@ private struct ChangeRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                BrainChip(row.verb, row.verb == "Removed" ? GlassInk.red : GlassInk.blue)
+                BrainChip(row.verb, row.verb == "Removed" ? GlassInk.red : GlassInk.accent(paneAccent))
                 Text((row.after ?? row.before)?.type.capitalized ?? "").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
                 if kept {

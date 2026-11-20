@@ -111,7 +111,7 @@ struct AgentChainsSection: View {
                 .frame(width: Space.s8 * 8)
                 .disabled(busy || model.bindingsReadOnly)
                 .accessibilityLabel("Chain for \(agent)")
-                Button("Unbind") { model.confirmUnbind(agent) }
+                Button("Unbind") { Task { await model.unbind(agent) } }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     .disabled(bound == nil || busy || model.bindingsReadOnly)
                     .opacity(bound == nil ? 0 : 1)

@@ -25,6 +25,7 @@ final class SameProjectList {
 }
 
 struct SameProjectSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let list: SameProjectList
 
     /// Nothing remembered: no section at all. The owner reads the list (`.task` on an empty view never runs).
@@ -32,7 +33,7 @@ struct SameProjectSection: View {
         if !list.aliases.isEmpty || list.notice != nil {
             GlassSection(
                 "Same project", sub: "Rooms the Core files under another name.", symbol: "arrow.triangle.merge",
-                hue: GlassInk.blue, index: 3
+                hue: GlassInk.accent(paneAccent), index: 3
             ) {
                 VStack(alignment: .leading, spacing: 2) {
                     if let n = list.notice {

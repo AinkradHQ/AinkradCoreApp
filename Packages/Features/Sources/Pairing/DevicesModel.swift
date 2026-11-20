@@ -51,6 +51,11 @@ final class DevicesModel {
         return admins.count == 1 ? admins[0] : nil
     }
 
+    /// The device that would best become the second admin: not a runner, has a step-up key, not already an admin.
+    func nextAdmin(besides only: DeviceInfo) -> DeviceInfo? {
+        active.first { $0.id != only.id && $0.kind != "runner" && $0.stepup != false && !$0.scopes.contains("admin") }
+    }
+
     var myID: String? { host?.service?.deviceID }
     var active: [DeviceInfo] { items.filter { !$0.revoked } }
     var revoked: [DeviceInfo] { items.filter(\.revoked) }

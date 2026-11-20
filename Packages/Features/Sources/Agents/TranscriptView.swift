@@ -5,6 +5,7 @@ import SwiftUI
 /// The streamed transcript: a lazy column, one row per entry with the seq as its identity, so an appended entry adds a row and
 /// leaves the rest alone. It follows the end while you are at the end; scrolling up loads earlier entries.
 struct TranscriptView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let store: TranscriptStore?
     let session: AgentSessionInfo
@@ -151,7 +152,7 @@ struct TranscriptView: View {
     private func marked(_ e: TranscriptEntry, @ViewBuilder _ c: () -> some View) -> some View {
         c().background {
             if e.seq == focus {
-                coreShape(Radius.control).fill(GlassInk.blue.opacity(0.16)).padding(-Space.s1)
+                coreShape(Radius.control).fill(GlassInk.accent(paneAccent).opacity(0.16)).padding(-Space.s1)
             }
         }
     }

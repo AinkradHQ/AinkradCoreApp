@@ -14,6 +14,21 @@ public protocol AdminHost: AnyObject {
     /// Runs `op` elevated: Touch ID first when needed, once more when the Core still says `step_up_required`. Throws
     /// `AdminDeclined` when the person did not elevate (`elevationNotice` says why).
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T
+    /// With `force`, Touch ID is asked even when the session is already elevated (a route that wants a proof from the last
+    /// seconds, like the secrets export).
+    func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
+        async throws -> T
     /// The Core answered 429: the shell shows its banner with the wait.
     func rateLimited(retryAfter: TimeInterval?)
+    /// Opens a link in the person's browser. No default: a test host records it, so no test ever opens a real browser.
+    func open(_ url: URL)
+}
+
+extension AdminHost {
+    /// A host that cannot force (a test double) elevates as usual.
+    public func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, force: Bool, _ op: () async throws -> T)
+        async throws -> T
+    {
+        try await elevated(reason, done: done, keepsEdit: keepsEdit, op)
+    }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Brain: what it knows, what waits for you, and the one memory it asks about (keep or drop, in place).
 struct BrainBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     let size: WidgetSize
 
@@ -47,7 +48,7 @@ struct BrainBody: View {
                 let done = p.now.map { $0.rawValue > i } ?? true
                 HStack(spacing: Space.s2) {
                     Image(systemName: done ? "checkmark" : symbols[i])
-                        .foregroundStyle(now ? GlassInk.blue : done ? GlassInk.green : GlassInk.secondary)
+                        .foregroundStyle(now ? GlassInk.accent(paneAccent) : done ? GlassInk.green : GlassInk.secondary)
                         .frame(width: 18).accessibilityHidden(true)
                     Text(names[i]).coreFont(size: MacTextSize.body, weight: now ? .semibold : .regular)
                         .foregroundStyle(now ? GlassInk.primary : GlassInk.secondary)
@@ -132,6 +133,7 @@ struct BrainBody: View {
 
 /// Today note: the title, a line of text and the checklist. A tick writes back to the note.
 struct TodayNoteBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     let size: WidgetSize
 
@@ -193,7 +195,7 @@ struct TodayNoteBody: View {
                 } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: t.done ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(t.done ? GlassInk.blue : GlassInk.secondary)
+                            .foregroundStyle(t.done ? GlassInk.accent(paneAccent) : GlassInk.secondary)
                             .accessibilityHidden(true)
                         Text(t.text).coreFont(size: MacTextSize.body).lineLimit(1)
                             .strikethrough(t.done).foregroundStyle(t.done ? GlassInk.secondary : GlassInk.primary)

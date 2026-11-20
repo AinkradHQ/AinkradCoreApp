@@ -2,19 +2,55 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// The desktop background (Ahmed, 2026-11-15): Settings, Appearance. Twelve wallpapers, six photos and six rendered
-/// landscapes, each with a night and a day version; Sky, Plain and the person's own picture after them.
+/// The desktop background (Ahmed, 2026-11-15): Settings, Appearance. Twenty-four wallpapers, twelve photos and twelve
+/// rendered landscapes, each with a night and a day version; Sky, Plain and the person's own picture after them.
 /// Images live in the app's `Wallpapers/` folder as `wall-<name>-<day|night>.heic` (5K) and `-thumb.jpg`.
+///
+/// Added in 0.10 (E2-7, D-12). Photos: free to use under the Unsplash License (unsplash.com/license), no people, graded
+/// to a night and a day version and cropped to 16:10. Source page, photographer:
+/// - reef: unsplash.com/photos/HYHYGLs-Rp8, NEOM (images.unsplash.com/photo-1708649290066-5f617003b93f)
+/// - lavender: unsplash.com/photos/nD9tEn63suc, Antony BEC (photo-1600759487717-62bbb608106e)
+/// - glacier: unsplash.com/photos/9K7780JqW5Q, Pavol Svantner (photo-1619165822011-f5f9e5f7bd97)
+/// - bloom: unsplash.com/photos/TzoWpI57mGw, Fred Amini (photo-1774479341808-def72e8236ac)
+/// - aurora: unsplash.com/photos/LtnPejWDSAY, Lightscape (photo-1531366936337-7c912a4589a7)
+/// - canyon: unsplash.com/photos/RYtiT3b7XW4, Peter Olexa (photo-1599496507927-9056debd0f0a)
+/// Rendered (dusk, lagoon, ember, zenith, orchid, crimson) are procedural, made by `scripts/gen-wallpapers.py`.
 public enum CoreWallpaper: String, CaseIterable, Sendable {
-    case ridge, lake, mirage, forest, tide, coast, meadow, peaks, mirror, dunes, mesa, hills, sky, plain, picture
+    case ridge, lake, mirage, forest, tide, coast, meadow, peaks, mirror, dunes, mesa, hills
+    case reef, lavender, glacier, bloom, aurora, canyon, dusk, lagoon, ember, zenith, orchid, crimson
+    case sky, plain, picture
 
     public static let standard = CoreWallpaper.ridge
     /// Everything but the custom picture, in the order Settings shows them.
     public static let presets = allCases.filter { $0 != .picture }
 
     public var title: String { self == .picture ? "Your picture" : rawValue.capitalized }
+    /// Which tab of Settings, Appearance, Wallpaper lists it (E2-4).
+    public var group: WallpaperGroup {
+        switch self {
+        case .picture: .picture
+        case .lake, .forest, .coast, .peaks, .dunes, .hills, .reef, .lavender, .glacier, .bloom, .aurora, .canyon:
+            .photos
+        default: .generated
+        }
+    }
+    /// The wallpapers of one tab, in the order Settings shows them.
+    public static func presets(in group: WallpaperGroup) -> [CoreWallpaper] { allCases.filter { $0.group == group } }
+
     /// The two wallpapers drawn from files: every case but Sky, Plain and the picture.
     var isFile: Bool { ![.sky, .plain, .picture].contains(self) }
+}
+
+/// The tabs of the wallpaper page: photos, the ones drawn for Ainkrad (and Sky and Plain), and the person's own picture.
+public enum WallpaperGroup: String, CaseIterable, Sendable {
+    case photos, generated, picture
+    public var title: String {
+        switch self {
+        case .photos: "Photos"
+        case .generated: "Generated"
+        case .picture: "Your picture"
+        }
+    }
 }
 
 /// Decoded wallpapers, kept so a redraw never decodes again. Thumbnails are small; a full image is ~37 MB decoded, and
@@ -52,8 +88,13 @@ public final class WallpaperPrefs {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url, let image = NSImage(contentsOf: url), let dest = Self.target
-        else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        adoptPicture(at: url)
+    }
+
+    /// Keeps a copy of an image file and shows it (a chosen file, or one dropped on the page).
+    public func adoptPicture(at url: URL) {
+        guard let image = NSImage(contentsOf: url), let dest = Self.target else { return }
         try? FileManager.default.createDirectory(
             at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: dest)

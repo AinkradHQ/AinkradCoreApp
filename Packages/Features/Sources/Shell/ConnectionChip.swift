@@ -94,40 +94,10 @@ final class NetworkWatch {
     }
 }
 
-/// The chip in the status bar: a symbol and a word in a small rounded glass chip. A click opens `ConnectionPanel`.
-struct ConnectionChip: View {
-    @Bindable var shell: ShellModel
-    @Environment(\.corePalette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        if let state = shell.chipState {
-            let c = palette.tone(state.tone)
-            let title = state.title(core: shell.home.coreName)
-            Button {
-                shell.toggleConnectionPanel()
-            } label: {
-                HStack(spacing: Space.s1) {
-                    Image(systemName: state.symbol)
-                        .contentTransition(reduce ? .opacity : .symbolEffect(.replace))
-                        .accessibilityHidden(true)
-                    Text(title).lineLimit(1).contentTransition(.opacity)
-                }
-                .coreFont(size: MacTextSize.body)
-                .foregroundStyle(c.ink)
-                .padding(.horizontal, Space.s2)
-                .frame(minHeight: MacSize.controlMd)
-            }
-            .buttonStyle(StatusBarStyle(fill: c.fill))
-            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: state)
-            .help("\(state.popTitle). Click for details.")
-            .accessibilityLabel("\(shell.home.coreName), \(state.popTitle)")
-        }
-    }
-}
-
-/// What the chip opens: the state in words, last contact, the next try and a Reconnect now button (⌘R).
+/// The Core dropdown (E2-2, mockup `kit/topbar.js` core): how the Core is, three facts, the devices, the last backup, and
+/// Reconnect (only when the link is down) beside Core settings.
 struct ConnectionPanel: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
 
@@ -140,73 +110,101 @@ struct ConnectionPanel: View {
     }
 
     private func content(_ state: ConnectionChipState, now: Date) -> some View {
-        let ink = palette.tone(state.tone).ink
+        let health = shell.home.health
         return VStack(alignment: .leading, spacing: Space.s3) {
-            HStack(spacing: Space.s2) {
-                Image(systemName: state.symbol).coreFont(size: MacTextSize.title).foregroundStyle(ink)
-                    .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
-                Text(state.popTitle).coreFont(size: MacTextSize.title, weight: .semibold)
-            }
-            Text(state.say(core: shell.home.coreName, since: shell.lastLiveAt, now: now))
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            if case .reconnecting = state, let next = shell.nextRetryAt, let span = shell.retrySpan {
+            DropHead(
+                symbol: "cube", title: shell.home.coreName, meta: meta(state, now: now),
+                badge: DropBadge(state == .online ? "Healthy" : state.popTitle, tone: state.tone))
+            if state != .online, case .reconnecting = state, let next = shell.nextRetryAt, let span = shell.retrySpan {
                 CoreMeter(1 - max(0, next.timeIntervalSince(now)) / span, label: "Time to the next try")
             }
-            Grid(alignment: .leading, horizontalSpacing: Space.s3, verticalSpacing: Space.s1 + 2) {
-                row("Last contact", lastContact(state, now: now))
-                row("Next try", nextTry(state, now: now))
-                if state != .online { row("Meanwhile", "Showing the last data") }
-                if let h = shell.home.health {
-                    row("Core version", h.version)
-                    row("Up for", h.uptime)
-                    row(
-                        "Certificate",
-                        h.certificate.map { $0 + (h.certDaysLeft ?? 0 > 0 ? " left" : "") } ?? "Not reported yet")
-                    row("Last backup", h.backup(now: now) ?? "Not reported yet")
+            if let h = health {
+                HStack(spacing: Space.s2) {
+                    // Memory, disk and response when the Core says them; a Core that does not still shows its version and uptime.
+                    ForEach(stats(h), id: \.label) { DropStat($0.value, $0.label, share: $0.share, low: $0.low) }
                 }
             }
-            if state != .online {
-                // n14: a small blue button on the left with its key, not a full-width bar.
-                Button("Reconnect now") {
-                    shell.connectionPanelOpen = false
-                    shell.retryConnection?()
+            if shell.coreUpdate.visible {
+                CoreUpdatePanel(
+                    status: shell.coreUpdate, update: { shell.startCoreUpdate?() },
+                    news: { shell.coreUpdateNews?() }, what: { showWhatHappened() })
+            }
+            let devices = shell.devicesGlance?() ?? []
+            if !devices.isEmpty {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    Text("Devices").coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
+                        .padding(.horizontal, Space.s1)
+                    ForEach(devices.prefix(4)) { d in
+                        CoreRow(d.name, subtitle: d.sub, symbol: d.symbol, action: { open("devices") }) {
+                            DropBadge(d.online ? "Online" : "Away", tone: d.online ? .run : .queue)
+                        }
+                    }
                 }
-                .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                .environment(\.coreKeycap, "⌘R")
-                .disabled(shell.retryConnection == nil)
-                .help("Try to reach \(shell.home.coreName) now (⌘R)")
+            }
+            HStack(spacing: Space.s2) {
+                if state != .online {
+                    Button("Reconnect") {
+                        shell.topMenu = nil
+                        shell.retryConnection?()
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary))
+                    .environment(\.coreKeycap, "⌘R")
+                    .disabled(shell.retryConnection == nil)
+                    .help("Try to reach \(shell.home.coreName) now (⌘R)")
+                }
+                Spacer(minLength: 0)
+                Button("Core settings") { open("settings") }.buttonStyle(CoreButtonStyle(.plain))
             }
         }
         .padding(Space.s4)
-        .frame(width: Space.s8 * 10)
+        .frame(width: Space.s8 * 11)
         .corePanel(radius: Radius.pane, padding: 0, part: .popups)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Connection to \(shell.home.coreName)")
     }
 
-    private func row(_ k: String, _ v: String) -> some View {
-        GridRow {
-            Text(k).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            Text(v).coreFont(size: MacTextSize.body, weight: .medium).monospacedDigit()
-        }
+    private struct Stat {
+        let value: String
+        let label: String
+        var share: Double?
+        var low = false
     }
 
-    private func lastContact(_ state: ConnectionChipState, now: Date) -> String {
-        if state == .online { return "Just now" }
-        return shell.lastLiveAt.map { $0.formatted(date: .omitted, time: .standard) } ?? "Not yet"
+    /// The run's steps with their times, as the mockup's "What happened".
+    private func showWhatHappened() {
+        let lines = shell.coreUpdate.events.map { "\($0.at.formatted(date: .omitted, time: .shortened)) · \($0.text)" }
+        shell.presentSheet(
+            title: "What happened", message: (lines + [shell.coreUpdate.errorWords]).joined(separator: "\n"),
+            actions: [ShellSheetAction("Done", primary: true)])
     }
 
-    private func nextTry(_ state: ConnectionChipState, now: Date) -> String {
+    /// Memory, Disk and Response with a bar each when the Core says the share (the whole machine's memory, the disk, the
+    /// answer time against 150 ms); a Core that does not still shows what it has, then its version and uptime.
+    private func stats(_ h: CoreHealthFacts) -> [(value: String, label: String, share: Double?, low: Bool)] {
+        let ms = shell.responseMs
+        let all: [Stat?] = [
+            h.memoryPct.map { Stat(value: "\($0)%", label: "Memory", share: Double($0) / 100, low: $0 >= 90) }
+                ?? h.memory.map { Stat(value: $0, label: "Memory") },
+            h.diskUsedPct.map { Stat(value: "\($0)%", label: "Disk", share: Double($0) / 100, low: $0 >= 90) },
+            ms.map { Stat(value: "\($0) ms", label: "Response", share: min(1, Double($0) / 150), low: $0 >= 150) },
+            Stat(value: h.version, label: "Version"), Stat(value: h.uptime, label: "Up for"),
+        ]
+        return Array(all.compactMap { $0 }.prefix(3)).map { ($0.value, $0.label, $0.share, $0.low) }
+    }
+
+    /// "Up for 12 days · everything is fine", or what is wrong in a few words.
+    private func meta(_ state: ConnectionChipState, now: Date) -> String {
         switch state {
-        case .online: return "Not needed"
-        case .noNetwork: return "When the network is back"
-        default:
-            guard let next = shell.nextRetryAt else { return "Now" }
-            let s = Int(next.timeIntervalSince(now).rounded(.up))
-            if s <= 0 { return "Now" }
-            let base = s == 1 ? "In 1 second" : "In \(s) seconds"
-            if case .reconnecting(let n) = state, n > 0 { return base + " (try \(n))" }
-            return base
+        case .online:
+            return shell.home.health.map { "Up for \($0.uptime) · everything is fine" } ?? "Everything is fine"
+        case .reconnecting(let n): return n > 0 ? "Trying again by itself (try \(n))" : "Trying again by itself"
+        case .noNetwork: return "This Mac is not online"
+        case .coreNotAnswering: return "Your AI sessions keep working"
         }
+    }
+
+    private func open(_ id: String) {
+        shell.topMenu = nil
+        shell.launcher.entry(id)?.run()
     }
 }

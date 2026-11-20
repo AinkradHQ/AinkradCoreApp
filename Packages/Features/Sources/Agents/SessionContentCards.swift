@@ -15,13 +15,14 @@ extension EnvironmentValues {
 /// A plan the agent proposes (ExitPlanMode): titled, its Markdown in full (headings, steps, tables, code), and in a live
 /// session Go ahead / Change it.
 struct PlanCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let text: String
     @Environment(\.planActions) private var actions
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                IconTile("list.bullet.clipboard", hue: GlassInk.blue, size: MacSize.controlLg)
+                IconTile("list.bullet.clipboard", hue: GlassInk.accent(paneAccent), size: MacSize.controlLg)
                 Text("Plan").coreFont(size: MacTextSize.title, weight: .semibold)
                 Spacer(minLength: 0)
             }

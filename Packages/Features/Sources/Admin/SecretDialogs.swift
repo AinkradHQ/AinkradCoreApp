@@ -350,6 +350,7 @@ struct LeaseDialog: View {
 }
 
 struct DeleteDialog: View {
+    @Environment(\.coreAccent) private var paneAccent
     let admin: AdminModel
     let secret: SecretItem
     let close: () -> Void
@@ -363,7 +364,7 @@ struct DeleteDialog: View {
                 Text("This cannot be undone.").foregroundStyle(palette.text2)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     HStack(spacing: Space.s3) {
-                        IconTile("key.fill", hue: GlassInk.blue, size: 32)
+                        IconTile("key.fill", hue: GlassInk.accent(paneAccent), size: 32)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(secret.name).fontWeight(.semibold)
                             Text("\(SecretWords.versions(secret)) · \(SecretWords.lastUsed(secret))")

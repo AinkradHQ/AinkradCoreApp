@@ -105,6 +105,8 @@ struct RendezvousTests {
     @Test func theWaitMovesOnByItselfWhenTheLinkArrivesAndNeverConnectsByItself() async throws {
         let r = FakeRendezvous([])
         let m = wizard(r)
+        // This wait ends on the link, never on the clock: a short window could lapse between polls under load.
+        m.waitFor = .seconds(30)
         m.chooseNew()
         let s = try #require(m.rendezvous)
         r.answers = [.success(nil), .success(try seal(link, to: s))]

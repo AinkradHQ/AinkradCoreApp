@@ -7,6 +7,7 @@ import SwiftUI
 /// Add a runner (mockup 13): Where, Allow, Connect, Done. The pick screen is four big cards; connecting shows live lines and says
 /// in plain words why it failed.
 struct AddRunnerView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
     @Bindable var model: AddRunnerModel
     let close: () -> Void
@@ -179,7 +180,7 @@ struct AddRunnerView: View {
         } label: {
             VStack(alignment: .leading, spacing: Space.s2) {
                 HStack(spacing: Space.s3) {
-                    IconTile(symbol, hue: GlassInk.blue, size: Space.s8 + Space.s2)
+                    IconTile(symbol, hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s2)
                     Text(title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
@@ -207,7 +208,7 @@ struct AddRunnerView: View {
                 "Run AI sessions", sub: "Claude, Codex, OpenCode and Antigravity can work on it.", symbol: "sparkles",
                 isOn: $model.agents, fill: true)
             HStack(spacing: Space.s3) {
-                IconTile("arrow.down.circle", hue: GlassInk.blue, size: Space.s8)
+                IconTile("arrow.down.circle", hue: GlassInk.accent(paneAccent), size: Space.s8)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("AI tools are installed and kept up to date for you").coreFont(
                         size: MacTextSize.body, weight: .medium)
@@ -270,7 +271,7 @@ struct AddRunnerView: View {
     private func hue(_ s: AddRunnerModel.Check.State) -> Color {
         switch s {
         case .done: palette.tone(.run).ink
-        case .current: GlassInk.blue
+        case .current: GlassInk.accent(paneAccent)
         case .pending: GlassInk.slate
         case .bad: palette.tone(.fail).ink
         }
@@ -442,7 +443,7 @@ struct AddRunnerView: View {
         -> some View
     {
         HStack(spacing: Space.s3) {
-            IconTile(symbol, hue: GlassInk.blue, size: Space.s8)
+            IconTile(symbol, hue: GlassInk.accent(paneAccent), size: Space.s8)
             VStack(alignment: .leading, spacing: 0) {
                 Text(title).coreFont(size: MacTextSize.body, weight: .medium)
                 Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)

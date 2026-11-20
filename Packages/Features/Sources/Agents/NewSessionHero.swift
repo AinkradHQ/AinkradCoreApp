@@ -5,6 +5,7 @@ import SwiftUI
 /// what it runs with, Advanced… for the rest, and recent projects to start in instead. The composer below takes the first
 /// message, like typing `claude` in a terminal.
 struct NewSessionHero: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     @Environment(\.corePalette) private var palette
@@ -14,7 +15,7 @@ struct NewSessionHero: View {
     var body: some View {
         let places = ConversationWords.recentPlaces(model.sessions.items)
         VStack(spacing: Space.s3) {
-            IconTile("bubble.left", hue: GlassInk.blue, size: Space.s8 + Space.s5)
+            IconTile("bubble.left", hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s5)
                 .accessibilityHidden(true)
             Text("New AI session").coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(
                 .isHeader)
