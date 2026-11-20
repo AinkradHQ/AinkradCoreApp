@@ -39,6 +39,8 @@ public final class DesignModel {
     private(set) var images: [String: NSImage] = [:]
     @ObservationIgnored private var fetching: Set<String> = []
     private(set) var readOnly = false
+    /// The Core can draw three directions from a prompt (API minor 95, E11-4).
+    private(set) var composeSupported = false
     /// The open item's Projects menu.
     var projectsMenuOpen = false
     /// The editor chrome of each design whose canvas was built (V3-04), by doc id.
@@ -65,6 +67,7 @@ public final class DesignModel {
     public func attach(connection: CoreConnection) {
         mockups = LiveMockupSource(connection: connection)
         self.connection = connection
+        Task { composeSupported = await connection.serverSupports(minor: 95) }
         use(LiveDesignService(connection: connection))
     }
 
@@ -87,6 +90,7 @@ public final class DesignModel {
         openID = nil
         editors = [:]
         readOnly = false
+        composeSupported = false
     }
 
     public var isConnected: Bool { service != nil }
@@ -294,6 +298,14 @@ public final class DesignModel {
         }
     }
 
+    /// Draw with AI: the composer on the open design; from the home, on a new blank design.
+    func drawWithAI(prompt: String = "") async {
+        if openID == nil { await quickNew() }
+        guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else { return }
+        let c = DesignComposer(model: self, doc: d.id, prompt: prompt)
+        host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
+    }
+
     /// New design (advanced): the sheet with name, kind and project.
     func openNew() {
         host.shell.present(ShellDialog(id: "new-design") { NewDesignView(model: self) })
@@ -335,6 +347,7 @@ public final class DesignModel {
             id: "design", title: "Design", sub: "Home Core", symbol: "paintbrush.pointed", minWidth: 760
         ) { DesignView(model: self) }
         spec.tab = "Design"
+        spec.fullScreenOnly = true
         host.shell.openPane(spec)
         Task { await reload() }
     }

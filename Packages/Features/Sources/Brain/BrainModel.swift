@@ -28,8 +28,33 @@ public final class BrainModel {
     /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
     public var apiMinor: Int? {
         didSet {
+            updateStatusPolling()
             importer?.review.canSameProject = remembersSameProject
             importer?.review.keepsInCommit = keepsInCommit
+        }
+    }
+    /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows it first; Explore is the console.
+    public let calm = BrainCalmModel()
+    public private(set) var exploring = false
+    public var calmAvailable: Bool { servesActivity && !isSample && service?.importRoutes != nil }
+    public func explore(_ on: Bool, tab: BrainTab? = nil) {
+        exploring = on
+        if let tab { self.tab = tab }
+        if !on { Task { await calm.reload() } }
+    }
+    /// The top-bar Brain icon's feed (E9-2).
+    public let status = BrainStatusModel()
+    /// The Core's status, areas and auto-import routes (API minor 95).
+    public var servesActivity: Bool { (apiMinor ?? 0) >= 95 }
+    private func updateStatusPolling() {
+        if servesActivity, let routes = service?.importRoutes, !isSample {
+            host.shell.brainStatus = { [weak self] in self?.status.chip }
+            host.shell.openBrain = { [weak self] in self?.show(.overview) }
+            status.start(routes)
+            calm.attach(routes: routes, service: service, rooms: { [weak self] in self?.rooms ?? [] })
+        } else {
+            host.shell.brainStatus = nil
+            status.stop()
         }
     }
     /// Import takes the ticked rooms in one call (Core API minor 73). The sample always has it.
@@ -90,11 +115,19 @@ public final class BrainModel {
         sync = SyncModel(host: host, service: service, sources: { sources() })
         registerActions()
         load = .loading
+        updateStatusPolling()
         Task { await reload() }
+    }
+
+    /// One sync of the Mac collectors without any screen (the background collector): reads the rooms, then syncs.
+    public func collectNow() async {
+        for _ in 0..<30 where sync == nil || load != .ready { try? await Task.sleep(for: .seconds(1)) }
+        await sync?.syncNow()
     }
 
     public func detach() {
         service = nil
+        updateStatusPolling()
         for id in Self.actionIDs { host.shell.launcher.unregister(id) }
         activity.reset()
         checks.reset()
@@ -122,6 +155,7 @@ public final class BrainModel {
     public var visibleTabs: [BrainTab] {
         if isSample { return BrainTab.allCases }
         var tabs: [BrainTab] = service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
+        if calmAvailable { tabs.insert(contentsOf: [.records, .evidence], at: 0) }
         if service?.servesChanges == true { tabs.append(.activity) }
         return tabs
     }
@@ -211,7 +245,10 @@ public final class BrainModel {
             if let sync, sync.status == nil {
                 await sync.reload()
                 // Real Cores only: the sample has no Mac collectors to run.
-                if service.importRoutes != nil, !service.isSample { sync.startTimer() }
+                if service.importRoutes != nil, !service.isSample {
+                    sync.startTimer()
+                    BackgroundCollect.ensure()
+                }
             }
             if service.servesCandidates { await candidates.load(quiet: true) }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }

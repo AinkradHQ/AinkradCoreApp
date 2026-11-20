@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 /// The generated client's agent routes, mapped to this module's types. Errors come out as `CoreError`.
 public struct LiveAgentsAPI: AgentsAPI {
     let connection: CoreConnection
-    private var client: Client { connection.client }
+    var client: Client { connection.client }
     public init(connection: CoreConnection) { self.connection = connection }
 
     public func runners() async throws -> [RunnerInfo] {
@@ -343,9 +343,9 @@ public struct LiveAgentsAPI: AgentsAPI {
 
     // MARK: mapping
 
-    private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
+    static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
 
-    private func run<T>(_ body: () async throws -> T) async throws -> T {
+    func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch {
             throw CoreFailure.of(error) ?? error
         }
@@ -387,6 +387,10 @@ public struct LiveAgentsAPI: AgentsAPI {
         info.turnCostMicros = s.turnCostUsdMicros
         info.turnCostApproximate = s.turnCostApproximate ?? false
         info.canStopSubagents = s.canStopSubagents ?? false
+        #if CORE_CLIENT_95
+        info.effort = s.effort
+        info.canSetEffort = s.canSetEffort ?? false
+        #endif
         return info
     }
 
@@ -415,7 +419,7 @@ public struct LiveAgentsAPI: AgentsAPI {
     }
 
     /// A status the contract does not list (502 `runner_failed`, 503 `runner_busy`): its error body, when it has one.
-    private static func status(_ code: Int, _ payload: UndocumentedPayload) async -> CoreError {
+    static func status(_ code: Int, _ payload: UndocumentedPayload) async -> CoreError {
         var code_ = "error"
         var message = "The Core could not do that (\(code))."
         if let body = payload.body, let data = try? await Data(collecting: body, upTo: 16 * 1024),
@@ -426,14 +430,14 @@ public struct LiveAgentsAPI: AgentsAPI {
         }
         return .http(status: code, code: code_, message: message)
     }
-    private static func fail(_ r: Components.Responses.Conflict) -> CoreError {
+    static func fail(_ r: Components.Responses.Conflict) -> CoreError {
         let b = try? r.body.json
         return .http(status: 409, code: b?.code ?? "conflict", message: b?.message ?? "The Core refused that.")
     }
-    private static func fail(_ r: Components.Responses.BadRequest) -> CoreError {
+    static func fail(_ r: Components.Responses.BadRequest) -> CoreError {
         .badRequest(message: (try? r.body.json)?.message ?? "The Core refused that.")
     }
-    private static func fail(_ r: Components.Responses.NotFound) -> CoreError {
+    static func fail(_ r: Components.Responses.NotFound) -> CoreError {
         .http(status: 404, code: "not_found", message: (try? r.body.json)?.message ?? "The Core does not know that.")
     }
 }

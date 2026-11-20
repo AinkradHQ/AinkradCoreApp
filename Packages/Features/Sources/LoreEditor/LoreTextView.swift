@@ -81,9 +81,12 @@ final class LoreTextView: NSTextView {
         let loc = selectedRange().location
         let inTable = loc < ts.length && ts.attribute(.loreTable, at: loc, effectiveRange: nil) != nil
         if inTable || caretWasInTable { needsDisplay = true }
+        if inTable != caretWasInTable { controller?.onTable?(inTable) }
         caretWasInTable = inTable
     }
     private var caretWasInTable = false
+    /// Text mode: tables always show their Markdown (E0-7), not a grid.
+    var tablesAsText = false
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()

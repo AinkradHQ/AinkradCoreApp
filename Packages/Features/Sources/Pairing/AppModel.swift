@@ -157,6 +157,10 @@ public final class AppModel {
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
+        agents.loreNotes = { [weak lore] session in lore?.notes(ofSession: session) ?? []
+        }
+        agents.openNoteInLore = { [weak lore] id in lore?.open(note: id) }
+        lore.openSession = { [weak agents] id in agents?.openSession(id) }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
@@ -206,6 +210,13 @@ public final class AppModel {
         guard let url = pendingURL else { return }
         pendingURL = nil
         open(url: url)
+    }
+
+    /// The background collector (E9-6): once the Core is live, one sync of the Mac collectors. Does nothing offline.
+    public func collectInBackground() async {
+        for _ in 0..<60 where shell.coreLink != .live { try? await Task.sleep(for: .seconds(1)) }
+        guard shell.coreLink == .live else { return }
+        await brain.collectNow()
     }
 
     public func start() async {
@@ -273,6 +284,15 @@ public final class AppModel {
             lore.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
             brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
+            if let feed = homeFeed {
+                feed.terminalFacts = { [weak model] in model?.homeFacts() ?? [] }
+                feed.brainService = { [weak self] in self?.brain.service }
+                shell.answerBrainQuestion = { [weak feed] id, room, keep in
+                    Task { await feed?.answer(id, room: room, keep: keep) }
+                }
+                shell.toggleNoteTodo = { [weak feed] i in Task { await feed?.toggleTodo(i) } }
+                model.changed = { [weak feed] in feed?.event(kind: "terminal.changed") }
+            }
         }
         if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop
@@ -963,6 +983,9 @@ extension AppModel: AgentsHost {
     public var thisMacRunnerID: String? { macRunner.runnerID }
 
     public func openTerminal(on runner: String, session: String?) { terminals?.open(on: runner, session: session) }
+    public func embeddedTerminal(on runner: String, session: String) -> AnyView? {
+        terminals.map { AnyView(EmbeddedTerminal(model: $0, runner: runner, session: session)) }
+    }
 
     /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
     public func elevate(reason: String, force: Bool) async -> InlineNotice? {

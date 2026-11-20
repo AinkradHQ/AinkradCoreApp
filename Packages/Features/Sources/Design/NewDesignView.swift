@@ -16,24 +16,44 @@ struct NewDesignView: View {
         _project = State(initialValue: model.project ?? "")
     }
 
+    /// The mockup's three kind tiles.
+    static let kinds: [(DesignDoc.Kind, String, String, String)] = [
+        (.design, "Design", "rectangle.dashed", "A screen or page"),
+        (.system, "Design system", "paintpalette", "Colours, type and parts"),
+        (.mockup, "Mockup", "iphone", "A design inside a device"),
+    ]
+
     private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
     private var valid: Bool { (1...100).contains(trimmed.count) }
 
     var body: some View {
-        CoreDialogPanel("New design", width: Space.s8 * 11) {
+        CoreDialogPanel("New design", width: Space.s8 * 14) {
             Text("It opens on a blank canvas. You can ask AI to draw on it any time.")
                 .foregroundStyle(GlassInk.secondary)
             CoreTextField("Name", placeholder: "Welcome screen", text: $name, autofocus: true) { create() }
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("What are you making?")
-                CoreSegmented(
-                    "What are you making?",
-                    segments: [
-                        CoreSegment(DesignDoc.Kind.design.rawValue, "Design"),
-                        CoreSegment(DesignDoc.Kind.system.rawValue, "Design system"),
-                        CoreSegment(DesignDoc.Kind.mockup.rawValue, "Mockup"),
-                    ],
-                    selection: $kind)
+                HStack(alignment: .top, spacing: Space.s2) {
+                    ForEach(Self.kinds, id: \.0.rawValue) { k, title, symbol, line in
+                        Button {
+                            kind = k.rawValue
+                        } label: {
+                            VStack(alignment: .leading, spacing: Space.s1) {
+                                Image(systemName: symbol).coreFont(size: MacTextSize.title)
+                                    .foregroundStyle(kind == k.rawValue ? Color.accentColor : GlassInk.secondary)
+                                Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
+                                Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                            .coreCard(
+                                kind == k.rawValue ? Color.accentColor.opacity(0.16) : GlassInk.well,
+                                radius: Radius.pane)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(kind == k.rawValue ? .isSelected : [])
+                    }
+                }
             }
             CoreSelect(
                 "Project", selection: $project,

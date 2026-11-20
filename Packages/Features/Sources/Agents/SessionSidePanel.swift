@@ -11,30 +11,51 @@ struct SessionSidePanel: View {
     var find: (() -> Void)?
     @Environment(\.sessionUI) private var ui
 
-    static let width: CGFloat = 304
+    static let width: CGFloat = 380
+
+    @AppStorage("agents.panel.tab") private var tabName = PanelTab.plan.rawValue
+
+    private var tab: Binding<PanelTab> {
+        Binding(get: { PanelTab(rawValue: tabName) ?? .plan }, set: { tabName = $0.rawValue })
+    }
 
     var body: some View {
         let entries = model.transcripts[session.id]?.entries ?? []
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                SessionCard(model: model, session: session, entries: entries)
-                ChangesCard(model: model, session: session, entries: entries, diff: diff)
-                let subs = SubAgentInfo.all(entries)
-                if !subs.isEmpty {
-                    SubAgentsCard(
-                        list: subs, again: model.canWrite(session) ? { runAgain($0) } : nil,
-                        stop: session.canStopSubagents ? { model.stopSubagent(session.id, $0.id) } : nil)
+        let changed = model.filesTouched(session.id).count
+        VStack(alignment: .leading, spacing: Space.s2) {
+            // Plan · Changes · Files · Terminal. The corner toggle sits over the right end, so the strip leaves room for it.
+            CoreSegmented(
+                "Panel",
+                segments: PanelTab.allCases.map {
+                    CoreSegment($0, $0 == .changes && changed > 0 ? "Changes \(changed)" : $0.title)
+                }, selection: tab
+            )
+            .padding(.trailing, Space.s8 + Space.s2)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    switch tab.wrappedValue {
+                    case .plan:
+                        PlanTab(
+                            model: model, session: session, entries: entries,
+                            again: model.canWrite(session) ? { runAgain($0) } : nil)
+                        SessionCard(model: model, session: session, entries: entries)
+                        ActivityCard(entries: entries)
+                        ApprovalsCard(model: model, session: session, entries: entries)
+                        UsageCard(model: model, session: session)
+                    case .changes:
+                        ChangesCard(model: model, session: session, entries: entries, diff: diff)
+                    case .files:
+                        FilesTab(model: model, session: session)
+                    case .terminal:
+                        TerminalTab(model: model, session: session)
+                    }
                 }
-                if let todos = TasksCard.latest(entries) { TasksCard(items: todos) }
-                ActivityCard(entries: entries)
-                ApprovalsCard(model: model, session: session, entries: entries)
-                UsageCard(model: model, session: session)
+                .padding(.bottom, Space.s6)
             }
-            .padding(.bottom, Space.s6)
+            .scrollIndicators(.never)
+            // A soft edge where the column runs past the window (the system's, not a mask: see TranscriptView).
+            .softScrollEdges()
         }
-        .scrollIndicators(.never)
-        // A soft edge where the column runs past the window (the system's, not a mask: see TranscriptView).
-        .softScrollEdges()
         .task(id: session.id) { await model.followRoute(session.id) }
     }
 

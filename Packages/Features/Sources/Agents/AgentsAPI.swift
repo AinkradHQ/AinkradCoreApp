@@ -100,6 +100,19 @@ extension AgentsAPI {
     public func accountName(_ id: Int64) async throws -> String? { nil }
     /// Ending a session is the Core's cancel until a dedicated route exists.
     public func end(_ id: String) async throws -> AgentSessionInfo { try await cancel(id) }
+    // A Core older than API 95 has none of these routes.
+    public func hasSessionTools() async -> Bool { false }
+    public func folder(_ id: String, dir: String) async throws -> FolderListing { throw CoreError.forbiddenScope }
+    public func revert(_ id: String, path: String) async throws -> AgentSessionInfo { throw CoreError.forbiddenScope }
+    public func setEffort(_ id: String, _ effort: String) async throws -> AgentSessionInfo {
+        throw CoreError.forbiddenScope
+    }
+    public func writeFile(_ id: String, path: String, content: String) async throws -> AgentSessionInfo {
+        throw CoreError.forbiddenScope
+    }
+    public func decideAlways(_ id: String, request: String) async throws -> AgentSessionInfo {
+        throw CoreError.forbiddenScope
+    }
 }
 
 /// Reading a transcript entry body (the runner's JSON) into words. Pure, so it is tested without a Core.
@@ -120,6 +133,7 @@ enum EntryParser {
             return status.hasPrefix("allowed")
                 ? .hidden : .note(type: type, detail: "this account has hit its usage limit for now")
         case "assistant_text": return .assistant(str("text") ?? "")
+        case "thinking": return (str("text") ?? "").isEmpty ? .hidden : .thinking(str("text") ?? "")
         case "tool_use":
             let name = str("name") ?? "tool"
             if let e = coreEdit(id: str("id") ?? "", name: name, b["edit"])

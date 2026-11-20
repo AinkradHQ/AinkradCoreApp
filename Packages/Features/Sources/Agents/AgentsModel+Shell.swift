@@ -110,7 +110,7 @@ extension AgentsModel {
     }
 
     func refreshHeads() {
-        for p in shell.panes where p.id.hasPrefix("agents.s-") {
+        for p in shell.allPanes where p.id.hasPrefix("agents.s-") {
             let id = String(p.id.dropFirst("agents.s-".count))
             if let s = sessions.session(id) {
                 let h = head(s)
@@ -168,7 +168,25 @@ extension AgentsModel {
 
     // MARK: launcher
 
+    /// "Ask AI about …" when the launcher finds nothing: a new session that starts with the words typed.
+    func askAI(_ prompt: String) {
+        Task { [weak self] in
+            guard let self, let n = await self.startLiveSession(prompt: prompt) else { return }
+            self.shell.presentSheet(
+                title: n.title, message: n.detail,
+                actions: [
+                    ShellSheetAction("Close"),
+                    ShellSheetAction("Advanced…", primary: true) { [weak self] in self?.openNewSession(advanced: true)
+                    },
+                ])
+        }
+    }
+
     func registerBase() {
+        shell.launcher.registerFallback(
+            LauncherFallback(id: "agents-ask", symbol: "sparkles", title: { "Ask AI about “\($0)”" }) { [weak self] q in
+                self?.askAI(q)
+            })
         shell.launcher.register(
             LauncherEntry(
                 id: "agents.list", title: "AI sessions", sub: "Your AI sessions", symbol: "text.cursor",

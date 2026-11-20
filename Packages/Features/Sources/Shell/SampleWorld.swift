@@ -39,6 +39,29 @@ extension HomeSnapshot {
 public enum SampleWorld {
     public static func install(into shell: ShellModel) {
         shell.home = .sample
+        shell.home.terminals = [
+            .init(
+                id: "t1", name: "build", place: "Sandbox", onThisMac: false,
+                lines: ["$ make test", "ok 38 passed", "$ _"]),
+            .init(
+                id: "t2", name: "notes", place: "This Mac", onThisMac: true,
+                lines: ["~/Notes $ ls", "ideas.md plan.md"]),
+        ]
+        shell.home.projects = [
+            .init(id: "harbor", name: "Harbor redesign", sessions: 2, updatedAt: Date().addingTimeInterval(-480)),
+            .init(id: "notes", name: "Release notes", sessions: 1, updatedAt: Date().addingTimeInterval(-120)),
+            .init(id: "photos", name: "Photo folders", sessions: 0, updatedAt: Date().addingTimeInterval(-86_400)),
+        ]
+        shell.home.usage = [
+            .init(provider: "anthropic", share: 0.62, resetsAt: Date().addingTimeInterval(11 * 86_400)),
+            .init(provider: "openai", share: 0.35), .init(provider: "google", share: 0.12),
+        ]
+        shell.home.brain = .init(
+            known: 1240, rooms: 24, waiting: 1, health: "Healthy",
+            question: .init(id: "c1", room: "r1", text: "Atlas is your main project"))
+        shell.home.note = .parse(
+            "# Plan the review\nWalk through the Harbor screens.\n- [x] Plan the review\n- [x] Reply to Birch\n- [ ] Pick the wallpaper"
+        )
         if !shell.profile.hasName { shell.profile.set("Sam") }
         for e in launcherEntries(shell) { shell.launcher.register(e) }
         shell.launcher.recents = ["core", "agents.list", "terminals"]

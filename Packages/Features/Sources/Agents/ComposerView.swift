@@ -52,6 +52,8 @@ struct ComposerView: View {
     @Environment(\.corePalette) private var palette
     @State private var pick = 0
     @State private var dropping = false
+    @State private var voice = Dictation()
+    @Environment(\.accessibilityReduceMotion) private var reduce
     private var files: [URL] { model.attachments[session.id] ?? [] }
 
     private var draft: Binding<String> {
@@ -62,6 +64,23 @@ struct ComposerView: View {
     private var over: Bool { bytes > AgentsModel.messageLimit }
     private var enabled: Bool { model.canWrite(session) }
     private var commands: [(name: String, help: String)] { enabled ? SlashCommands.matches(text) : [] }
+
+    /// The `@name` being typed, with the files it can mean (the Core's folder listing, one directory at a time).
+    private var mention: MentionToken? {
+        model.sessionTools && enabled && commands.isEmpty ? MentionToken.at(end: text) : nil
+    }
+    private var mentionEntries: [FolderEntry] {
+        guard let m = mention else { return [] }
+        return Array(model.mentionMatches(session.id, dir: m.dir, prefix: m.prefix).prefix(8))
+    }
+
+    /// Puts the picked name in place of what was typed: a folder keeps the picker open one level down.
+    private func take(_ e: FolderEntry) {
+        guard let m = mention else { return }
+        let keep = String(text.dropLast(m.length))
+        let base = m.dir.isEmpty ? e.name : m.dir + "/" + e.name
+        draft.wrappedValue = keep + "@" + base + (e.dir ? "/" : " ")
+    }
 
     private var placeholder: String { ConversationWords.placeholder(session) }
 
@@ -83,6 +102,11 @@ struct ComposerView: View {
         let on = focused.wrappedValue
         return VStack(alignment: .leading, spacing: Space.s2) {
             if !commands.isEmpty { palette(commands) }
+            if !mentionEntries.isEmpty {
+                MentionPicker(entries: mentionEntries, pick: min(pick, mentionEntries.count - 1), choose: take)
+            }
+            // The agent's own steps, one line above the composer (opens upward).
+            if let todos = TodoStrip.items(model.transcripts[session.id]?.entries ?? []) { TodoStrip(items: todos) }
             // What went wrong with the last send (or resume, wake...), right where you typed it.
             if let n = model.notices[session.id] {
                 CoreNotice(symbol: n.symbol, title: n.title, text: n.detail, tone: n.tone)
@@ -107,14 +131,19 @@ struct ComposerView: View {
                 HStack(spacing: Space.s2) {
                     CoreIconButton(symbol: "paperclip", label: "Attach a file") { attach() }
                         .disabled(!enabled).help("Attach a file: adds its path to the message (⇧⌘A)").keyHint(.attach)
-                    modelPicker
-                    ModeChip(model: model, session: session)
+                    // Icon-first (the mockup's): the chips show their words only while you write.
+                    modelPicker(labels: on)
+                    ModeChip(model: model, session: session, labels: on)
+                    if session.canSetEffort, enabled { effortChip(labels: on) }
                     Spacer(minLength: Space.s2)
+                    contextButton
+                    if Dictation.available, enabled { micButton }
                     if bytes > AgentsModel.messageLimit / 2 {
                         Text("\(coreDecimal(Double(bytes) / 1024, 1)) / 16 KiB")
                             .coreFont(size: MacTextSize.meta).monospacedDigit()
                             .foregroundStyle(over ? palette.tone(.fail).ink : palette.text2)
                     }
+                    if enabled, model.canStopTurn(session), canSteer { steerButton }
                     if enabled || model.canStopTurn(session) { actionButton }
                 }
             }
@@ -146,7 +175,17 @@ struct ComposerView: View {
         }
         .readingColumn()
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
-        .onChange(of: text) { _, _ in pick = 0 }
+        .task(id: mention?.dir) {
+            if let m = mention { await model.listFolder(session.id, dir: m.dir) }
+        }
+        .onChange(of: text) { _, new in
+            pick = 0
+            DraftStore.save(session.id, new)
+        }
+        .onAppear {
+            // A draft kept from last time comes back into an empty field.
+            if text.isEmpty { draft.wrappedValue = DraftStore.load(session.id) }
+        }
         .onChange(of: ui?.attach) { _, _ in if enabled { attach() } }
     }
 
@@ -200,7 +239,7 @@ struct ComposerView: View {
 
     /// The tool and its model; for Claude Code a menu that switches the model with the tool's own `/model` command. Other
     /// tools show their model as a label (they have no in-session switch the app can send).
-    @ViewBuilder private var modelPicker: some View {
+    @ViewBuilder private func modelPicker(labels: Bool) -> some View {
         let label = AgentWords.toolName(session.harness) + " · " + (session.model ?? "default model")
         if session.harness == "claude", enabled {
             CoreDropdown(
@@ -212,17 +251,103 @@ struct ComposerView: View {
                 isPresented: Binding(get: { ui?.modelMenu ?? false }, set: { ui?.modelMenu = $0 })
             ) {
                 HStack(spacing: Space.s1) {
-                    Text(label)
-                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                    Image(systemName: "sparkles")
+                    if labels {
+                        Text(label)
+                        Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                    }
                 }
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: labels)
                 .coreFont(size: MacTextSize.meta, weight: .medium)
                 .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
                 .background(GlassInk.well, in: coreShape(Radius.chip))
             }
             .help("Switch the model for the rest of this session (⇧⌘M)").keyHint(.model)
         } else {
-            CoreChip(label)
+            CoreChip(labels ? label : "", symbol: "sparkles", minWidth: 0).help(label)
         }
+    }
+
+    /// The context meter (the mockup's): a small bar of how much of the window the conversation fills; it turns amber near
+    /// the end, and a click offers /compact. The window size is a table in `ContextWindow` (the Core exposes none).
+    @ViewBuilder private var contextButton: some View {
+        if let used = session.usage?.tokens, used > 0 {
+            let ctx = ConversationWords.context(used: used, window: ContextWindow.tokens(model: session.model))
+            Button {
+                if enabled, ctx.fill > 0.7 { draft.wrappedValue = "/compact " } else { focused.wrappedValue = true }
+            } label: {
+                CoreMeter(ctx.fill, low: ctx.fill > 0.8, label: "Context used").frame(width: 44)
+                    .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            }
+            .buttonStyle(CoreQuietPressStyle(radius: Radius.chip, scale: 0.97, hoverFill: true))
+            .help(
+                "\(Int(ctx.fill * 100))% of the context is used (\(ctx.text))"
+                    + (ctx.fill > 0.7 ? ". Click to compact." : "")
+            )
+            .accessibilityLabel("Context used: \(Int(ctx.fill * 100)) percent")
+        }
+    }
+
+    /// Dictation, on this Mac only. The first press asks for the microphone and speech recognition.
+    private var micButton: some View {
+        let listening = voice.state == .listening
+        return CoreIconButton(
+            symbol: listening ? "mic.fill" : "mic", label: listening ? "Stop dictating" : "Dictate", selected: listening
+        ) {
+            let base = text
+            Task {
+                await voice.toggle { phrase in
+                    draft.wrappedValue = base + (base.isEmpty || base.hasSuffix(" ") ? "" : " ") + phrase
+                }
+            }
+        }
+        .help(listening ? "Stop dictating" : "Dictate: speech is recognised on this Mac, nothing is sent out")
+        .onChange(of: voice.state) { _, now in
+            if case .blocked(let why) = now {
+                model.note(session.id, InlineNotice(title: "Dictation is off", detail: why, tone: .warn))
+            }
+        }
+        .onDisappear { voice.stop() }
+    }
+
+    /// How hard the tool thinks, for the tools that take it (the Core says which): a menu of the four levels.
+    private func effortChip(labels: Bool) -> some View {
+        CoreDropdown(
+            items: Effort.all.map { e in
+                CoreDropdownItem(e.title, checked: session.effort == e.id, note: e.note) {
+                    Task { await model.setEffort(session.id, e.id) }
+                }
+            }
+        ) {
+            HStack(spacing: Space.s1) {
+                Image(systemName: "gauge.with.dots.needle.67percent")
+                if labels {
+                    Text(Effort.title(session.effort))
+                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                }
+            }
+            .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(SessionInk.text2)
+            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
+            .background(SessionInk.row, in: coreShape(Radius.chip))
+        }
+        .help("Effort: \(Effort.title(session.effort)). How hard the tool thinks before it answers.")
+        .accessibilityLabel("Effort: \(Effort.title(session.effort))")
+    }
+
+    /// Steer needs the tool to take an interrupt (every tool the Core can stop a turn of).
+    private var canSteer: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.canSend(session.id)
+    }
+
+    /// Redirect now: stop the running turn and send this message as the next one.
+    private var steerButton: some View {
+        Button {
+            Task { await model.steer(session.id) }
+        } label: {
+            Label("Steer", systemImage: "arrow.turn.down.right")
+        }
+        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        .help("Stop the turn now and send this message instead (the queue waits)")
     }
 
     static let claudeModels: [(id: String, title: String, note: String?)] = [
@@ -235,6 +360,10 @@ struct ComposerView: View {
     private var keys: ComposerKeys {
         ComposerKeys(
             submit: { shift in
+                if !shift, !mentionEntries.isEmpty {
+                    take(mentionEntries[min(pick, mentionEntries.count - 1)])
+                    return true
+                }
                 switch ComposerReturn.action(shift: shift, text: text, commands: commands, pick: pick) {
                 case .newline: return false
                 case .fill(let name): draft.wrappedValue = name + " "
@@ -243,6 +372,10 @@ struct ComposerView: View {
                 return true
             },
             up: {
+                if !mentionEntries.isEmpty {
+                    pick = max(0, pick - 1)
+                    return true
+                }
                 if !commands.isEmpty {
                     pick = max(0, pick - 1)
                     return true
@@ -258,11 +391,19 @@ struct ComposerView: View {
                 return true
             },
             down: {
+                if !mentionEntries.isEmpty {
+                    pick = min(mentionEntries.count - 1, pick + 1)
+                    return true
+                }
                 guard !commands.isEmpty else { return false }
                 pick = min(commands.count - 1, pick + 1)
                 return true
             },
             tab: {
+                if !mentionEntries.isEmpty {
+                    take(mentionEntries[min(pick, mentionEntries.count - 1)])
+                    return true
+                }
                 // Tab takes the highlighted command; otherwise the field moves focus on (KeyTextView).
                 guard !commands.isEmpty else { return false }
                 draft.wrappedValue = commands[min(pick, commands.count - 1)].name + " "

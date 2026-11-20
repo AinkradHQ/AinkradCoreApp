@@ -26,13 +26,18 @@ public struct PaneSpec: Identifiable {
     public var chip: PaneChip?
     /// Panes with their own sidebar (Citadel, Core, admin) ask for more room than a list or terminal.
     public var minWidth: CGFloat
+    /// The least height the app works in; no app is squeezed below it (a taller window is asked for, never a shorter pane).
+    public var minHeight: CGFloat
+    /// Design, Lore and Projects need the whole screen: they open in a workspace of their own and nothing else tiles beside them.
+    public var fullScreenOnly: Bool
     public let content: AnyView
     /// What ⌘N does while this pane is the active one; nil leaves ⌘N to start an AI session.
     public var onNew: (@MainActor () -> Void)?
 
     public init<V: View>(
         id: String, title: String, sub: String? = nil, symbol: String, chip: PaneChip? = nil,
-        minWidth: CGFloat? = nil, @ViewBuilder content: () -> V
+        minWidth: CGFloat? = nil, minHeight: CGFloat? = nil, fullScreenOnly: Bool = false,
+        @ViewBuilder content: () -> V
     ) {
         self.id = id
         self.title = title
@@ -40,6 +45,8 @@ public struct PaneSpec: Identifiable {
         self.symbol = symbol
         self.chip = chip
         self.minWidth = max(minWidth ?? 0, ShellMetrics.paneMinWidth)
+        self.minHeight = max(minHeight ?? 0, ShellMetrics.paneMinHeight)
+        self.fullScreenOnly = fullScreenOnly
         self.content = AnyView(content())
     }
 }
@@ -141,10 +148,26 @@ public enum AppLock: Equatable, Sendable {
 @MainActor @Observable
 public final class ShellModel {
     public var surface: ShellSurface = .home
-    /// The open panes, in reading order of the tiling tree.
-    public private(set) var panes: [PaneSpec] = []
-    /// How the open panes are tiled (`tiles.js`): an N-ary split tree, equal columns until a seam is dragged or a pane is dropped.
-    private(set) var tree = TileTree()
+    /// Every open pane in every workspace. All of them stay in the view tree (the others folded away) so a terminal in another
+    /// workspace keeps its AppKit view.
+    public internal(set) var allPanes: [PaneSpec] = []
+    /// The workspaces, in order. The current one's pane state lives in `tree`, `activePane` and `focusedPane`; the saved copy here is
+    /// refreshed when it is left.
+    public internal(set) var spaces: [Workspace] = []
+    public internal(set) var currentSpace = UUID()
+    var paneSpace: [String: UUID] = [:]
+    /// The width the workspace has for panes; set by the workspace view. Zero means not measured yet, and everything fits.
+    public var workspaceWidth: CGFloat = 0
+    /// Why the newest workspace was opened (the note card says it once).
+    public var spaceNote: SpaceNote?
+    /// The workspace switcher strip (⌃↑).
+    public var spacesOpen = false
+    /// Set while the launcher opens something with ⌘↵: the app comes next to the current one, even from another workspace.
+    public var openBeside = false
+    /// The open panes of the current workspace, in reading order of the tiling tree.
+    public var panes: [PaneSpec] { allPanes.filter { paneSpace[$0.id] == currentSpace } }
+    /// How the open panes of the current workspace are tiled (`tiles.js`): an N-ary split tree, equal columns until a seam is dragged or a pane is dropped.
+    var tree = TileTree()
     /// Panes closed from the head, the menu or the keyboard, newest last (⇧⌘T brings the last one back). They keep running.
     public private(set) var closedPanes: [PaneSpec] = []
     /// Focus mode shows this one pane full size.
@@ -168,9 +191,13 @@ public final class ShellModel {
     public var toast: ToastItem?
     public var sheet: ShellSheet?
     public var home = HomeSnapshot.empty
+    /// Home widgets that act on the Core: the app sets them. The Brain question is kept (true) or dropped (false), and a
+    /// task on today's note is ticked or unticked by its place in the note.
+    public var answerBrainQuestion: (@MainActor (_ id: String, _ room: String, _ keep: Bool) -> Void)?
+    public var toggleNoteTodo: (@MainActor (_ index: Int) -> Void)?
     public private(set) var widgets: WidgetLayout
     public let profile: UserProfile
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
     static let layoutKey = "ainkrad.core.home.widgets"
     public var editingWidgets = false
     public var addingWidget = false
@@ -225,6 +252,11 @@ public final class ShellModel {
     /// The AI session counts the status chip shows, from the same index as the AI Sessions list and its sidebar (review
     /// 2026-11-16: the chip, the sidebar and the groups disagreed). Nil until Agents is up: the home feed stands in.
     public var sessionCounts: (@MainActor () -> (running: Int, needYou: Int))?
+    /// The Brain icon's state (E9-2), supplied by Brain from the Core's status call. Nil hides the icon (an older Core, or no Brain).
+    public var brainStatus: (@MainActor () -> BrainChip?)?
+    /// Opens the Brain from the icon's panel.
+    public var openBrain: (@MainActor () -> Void)?
+    public var brainPanelOpen = false
     public var waitingOnYou: Int {
         guard let source = waitingSource else { return bell.items.filter { $0.kind == .approval }.count }
         return source() + joinRequests
@@ -270,6 +302,8 @@ public final class ShellModel {
         widgets = defaults.data(forKey: Self.layoutKey).flatMap(WidgetLayout.decoded) ?? .standard()
         if !WidgetKind.boardShown { widgets.items.removeAll { $0.kind == .board } }
         showActivityChip = defaults.object(forKey: Self.activityChipKey) as? Bool ?? true
+        spaces = [Workspace(id: currentSpace)]
+        launcher.attach(defaults)
         installBuiltInSettings()
         NSApp?.appearance = theme.appearance
         // Follow the sun changes sides at 07:00 and 18:00: look again every minute.
@@ -313,6 +347,16 @@ public final class ShellModel {
                 self?.show(.home)
                 self?.editingWidgets = true
             })
+        launcher.register(
+            LauncherEntry(
+                id: "workspaces.new", title: "New Workspace", sub: "An empty space for more apps",
+                symbol: "rectangle.on.rectangle", keywords: ["workspace", "space", "desktop"], isAction: true
+            ) { [weak self] in self?.newSpace() })
+        launcher.register(
+            LauncherEntry(
+                id: "workspaces.all", title: "All Workspaces", sub: "See and switch workspaces",
+                symbol: "square.grid.2x2", keywords: ["workspace", "space", "overview"], isAction: true
+            ) { [weak self] in self?.toggleSpaces() })
     }
 
     // MARK: panes (Mac.openPane / closePane / updatePane)
@@ -320,10 +364,13 @@ public final class ShellModel {
     /// Opens a pane, or focuses it when it is already open; either way the workspace comes up.
     public func openPane(_ spec: PaneSpec) {
         animate {
-            if panes.contains(where: { $0.id == spec.id }) {
+            if let home = paneSpace[spec.id] {
+                if openBeside && home != currentSpace { bringHere(spec.id) } else { enterSpace(home) }
                 if focusedPane != nil { focusedPane = spec.id }
             } else {
-                panes.append(spec)
+                if needsNewSpace(for: spec) { openSpace(for: spec) }
+                allPanes.append(spec)
+                paneSpace[spec.id] = currentSpace
                 tree.open(spec.id)
                 focusedPane = nil
             }
@@ -335,11 +382,15 @@ public final class ShellModel {
     /// Shows `spec` in the place of pane `oldID` (switching what a pane shows, as the session sidebar does): same tab position,
     /// same tile. When `spec` is already open elsewhere it is focused instead, and `oldID` stays.
     public func replacePane(_ oldID: String, with spec: PaneSpec) {
-        guard let i = panes.firstIndex(where: { $0.id == oldID }), !panes.contains(where: { $0.id == spec.id }) else {
+        guard paneSpace[oldID] == currentSpace, paneSpace[spec.id] == nil,
+            let i = allPanes.firstIndex(where: { $0.id == oldID })
+        else {
             openPane(spec)
             return
         }
-        panes[i] = spec
+        allPanes[i] = spec
+        paneSpace[oldID] = nil
+        paneSpace[spec.id] = currentSpace
         tree.rename(oldID, to: spec.id)
         if focusedPane == oldID { focusedPane = spec.id }
         activePane = spec.id
@@ -348,19 +399,32 @@ public final class ShellModel {
 
     /// Closes a pane without a trace (a feature closing its own pane). People closing a pane use `dismissPane`.
     public func closePane(_ id: String) {
-        guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
+        guard let home = paneSpace[id], let all = allPanes.firstIndex(where: { $0.id == id }) else { return }
         animate {
-            panes.remove(at: i)
-            tree.remove(id)
-            if focusedPane == id { focusedPane = panes.first?.id }
-            if activePane == id { activePane = panes.isEmpty ? nil : panes[min(i, panes.count - 1)].id }
-            if panes.isEmpty { focusedPane = nil }
+            if home == currentSpace {
+                let i = panes.firstIndex { $0.id == id } ?? 0
+                allPanes.remove(at: all)
+                paneSpace[id] = nil
+                tree.remove(id)
+                let left = panes
+                if focusedPane == id { focusedPane = left.first?.id }
+                if activePane == id { activePane = left.isEmpty ? nil : left[min(i, left.count - 1)].id }
+                if left.isEmpty { focusedPane = nil }
+            } else if let k = spaces.firstIndex(where: { $0.id == home }) {
+                allPanes.remove(at: all)
+                paneSpace[id] = nil
+                spaces[k].tree.remove(id)
+                if spaces[k].focused == id { spaces[k].focused = nil }
+                if spaces[k].active == id { spaces[k].active = spaces[k].tree.leaves.first }
+                // Nobody is looking at it and nothing is in it: it just goes.
+                if spaces[k].tree.leaves.isEmpty { spaces.remove(at: k) }
+            }
         }
     }
 
     /// A person closing a pane: it keeps running, a toast offers Undo and ⇧⌘T reopens it (ten deep).
     public func dismissPane(_ id: String) {
-        guard let spec = panes.first(where: { $0.id == id }) else { return }
+        guard let spec = allPanes.first(where: { $0.id == id }) else { return }
         closePane(id)
         closedPanes.append(spec)
         if closedPanes.count > 10 { closedPanes.removeFirst() }
@@ -381,7 +445,9 @@ public final class ShellModel {
 
     public func closeAllPanes() {
         animate {
-            panes = []
+            allPanes = []
+            paneSpace = [:]
+            spaces = [Workspace(id: currentSpace)]
             tree = TileTree()
             focusedPane = nil
             activePane = nil
@@ -393,10 +459,10 @@ public final class ShellModel {
     public func setPaneMenu(_ id: String, _ items: @escaping @MainActor () -> [PaneMenuItem]) { paneMenus[id] = items }
 
     public func updatePane(_ id: String, title: String? = nil, sub: String?? = nil, chip: PaneChip?? = nil) {
-        guard let i = panes.firstIndex(where: { $0.id == id }) else { return }
-        if let title { panes[i].title = title }
-        if let sub { panes[i].sub = sub }
-        if let chip { panes[i].chip = chip }
+        guard let i = allPanes.firstIndex(where: { $0.id == id }) else { return }
+        if let title { allPanes[i].title = title }
+        if let sub { allPanes[i].sub = sub }
+        if let chip { allPanes[i].chip = chip }
     }
 
     /// Moves a pane to a place in reading order (drag to reorder, ⌃⌥← / →).
@@ -424,8 +490,8 @@ public final class ShellModel {
     }
 
     private func syncOrder() {
-        let order = tree.leaves
-        panes.sort { (order.firstIndex(of: $0.id) ?? 0) < (order.firstIndex(of: $1.id) ?? 0) }
+        let mine = tree.leaves.compactMap { id in allPanes.first { $0.id == id } }
+        allPanes = allPanes.filter { paneSpace[$0.id] != currentSpace } + mine
     }
 
     /// ⌘N: the active pane's own "new" (connect, new budget...), else a new AI session.
@@ -467,11 +533,16 @@ public final class ShellModel {
     // MARK: surfaces and overlays
 
     public func show(_ surface: ShellSurface) { animate { self.surface = surface } }
-    public func toggleSurface() { show(surface == .home ? .workspace : .home) }
+    /// ⌘0: Home, and back to the workspace you left. With nothing open there is no workspace to go back to.
+    public func toggleSurface() {
+        if surface == .home && allPanes.isEmpty { return }
+        show(surface == .home ? .workspace : .home)
+    }
 
     public func toggleLauncher() {
         bellOpen = false
         connectionPanelOpen = false
+        if !launcherOpen { launcher.refreshPicks() }
         launcherOpen.toggle()
     }
 
@@ -500,6 +571,8 @@ public final class ShellModel {
             connectionPanelOpen = false
         } else if launcherOpen {
             launcherOpen = false
+        } else if spacesOpen {
+            spacesOpen = false
         } else if actionsOpen {
             actionsOpen = false
         } else if overviewOpen {
@@ -649,4 +722,21 @@ public final class ShellModel {
 
     /// Layout changes animate with the move curve; Reduce Motion keeps the fade only (the views drop the travel).
     func animate(_ body: () -> Void) { withAnimation(Motion.out(Motion.move), body) }
+}
+
+/// What the top-bar Brain icon and its panel say.
+public struct BrainChip: Equatable, Sendable {
+    /// `locked`, `needs_you`, `working` or `idle`.
+    public var state: String
+    public var line: String
+    /// What Brain waits on, in words. Empty when nothing.
+    public var needs: [String]
+    /// A distil or overview failed in the last day.
+    public var attention: Bool
+    public init(state: String, line: String, needs: [String], attention: Bool) {
+        self.state = state
+        self.line = line
+        self.needs = needs
+        self.attention = attention
+    }
 }

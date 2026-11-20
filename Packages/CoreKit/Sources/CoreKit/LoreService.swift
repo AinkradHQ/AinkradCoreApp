@@ -30,6 +30,8 @@ public struct LoreNote: Equatable, Sendable {
     }
 }
 
+extension LoreNote: Identifiable {}
+
 /// What a save did (T2): `saved`, `merged` (both sides kept, `note.text` is the merge), `conflict` or `base_lost`
 /// (the client's lines won, the old head is kept as `version`).
 public struct LoreSaveResult: Equatable, Sendable {
@@ -148,6 +150,44 @@ public struct LoreVersion: Equatable, Sendable, Identifiable, Decodable {
     }
 }
 
+/// A tag of a live note and how many notes carry it (`GET /tags`, minor 95).
+public struct LoreTagCount: Equatable, Sendable, Decodable, Identifiable {
+    public var tag: String
+    public var count: Int
+    public var id: String { tag }
+    public init(tag: String, count: Int) {
+        self.tag = tag
+        self.count = count
+    }
+}
+
+/// A note imported from a file an AI session wrote (`GET /session-docs`, minor 95, D-28). Edits to the note are
+/// written back to `path` in the session's folder. `sessionTitle` is the session's first prompt line.
+public struct LoreSessionDoc: Equatable, Sendable, Decodable, Identifiable {
+    public var note: String
+    public var session: String
+    public var path: String
+    public var title: String
+    public var sessionTitle: String?
+    public var project: String?
+    public var updatedAt: String
+    public var id: String { note }
+    public init(
+        note: String, session: String, path: String, title: String = "", sessionTitle: String? = nil,
+        project: String? = nil, updatedAt: String = ""
+    ) {
+        self.note = note
+        self.session = session
+        self.path = path
+        self.title = title
+        self.sessionTitle = sessionTitle
+        self.project = project
+        self.updatedAt = updatedAt
+    }
+    /// The file's name without its folders.
+    public var fileName: String { path.split(separator: "/").last.map(String.init) ?? path }
+}
+
 /// What the Lore space asks of the Core. Errors are `CoreError` (`http(404/501)` = no Lore module on this Core).
 public protocol LoreService: Sendable {
     /// The daily note of `day` (`YYYY-MM-DD`), created empty on first use.
@@ -178,10 +218,21 @@ public protocol LoreService: Sendable {
     func restore(_ id: String, version: String) async throws -> LoreSaveResult
     /// Moves a note to a project (nil = personal).
     func move(_ id: String, project: String?) async throws -> LoreNote
+    /// Puts a note in the trash (30 days, restorable). `PATCH /notes/{id}`.
+    func trash(_ id: String) async throws -> LoreNote
+    /// Tags of live notes with their counts, most used first. `GET /tags` (Core minor 95).
+    func tags() async throws -> [LoreTagCount]
+    /// Notes imported from AI session files, newest first. `GET /session-docs` (Core minor 95).
+    func sessionDocs() async throws -> [LoreSessionDoc]
 }
 
 /// A Core (or a test double) without these routes answers "not implemented", like an old Core does.
 extension LoreService {
+    public func trash(_ id: String) async throws -> LoreNote {
+        throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot trash notes.")
+    }
+    public func tags() async throws -> [LoreTagCount] { [] }
+    public func sessionDocs() async throws -> [LoreSessionDoc] { [] }
     public func search(_ query: String, filter: LoreFilter, limit: Int) async throws -> LoreSearchResult {
         throw CoreError.http(status: 501, code: "not_implemented", message: "This Core cannot search notes.")
     }
@@ -276,11 +327,14 @@ public struct LiveLoreService: LoreService {
     }
 
     public func list(filter: LoreFilter) async throws -> [LoreNote] {
-        // The list route has no `tag`.
-        var f = filter
-        f.tag = nil
-        return try await call("GET", "/notes?" + String(Self.filterQuery(f).dropFirst()), as: [NoteWire].self).map(
+        // Core minor 95 filters the list by `tag`; an older Core ignores it and answers every note.
+        try await call("GET", "/notes?" + String(Self.filterQuery(filter).dropFirst()), as: [NoteWire].self).map(
             \.note)
+    }
+
+    public func trash(_ id: String) async throws -> LoreNote {
+        struct Body: Encodable { let trashed: Bool }
+        return try await call("PATCH", "/notes/\(Self.seg(id))", Body(trashed: true), as: NoteWire.self).note
     }
 
     public func restore(_ id: String) async throws -> LoreNote {
@@ -333,6 +387,14 @@ public struct LiveLoreService: LoreService {
             enum Keys: String, CodingKey { case project }
         }
         return try await call("PATCH", "/notes/\(Self.seg(id))", Body(project: project), as: NoteWire.self).note
+    }
+
+    public func tags() async throws -> [LoreTagCount] {
+        try await call("GET", "/tags", as: [LoreTagCount].self)
+    }
+
+    public func sessionDocs() async throws -> [LoreSessionDoc] {
+        try await call("GET", "/session-docs", as: [LoreSessionDoc].self)
     }
 
     func call<T: Decodable>(_ method: String, _ path: String, _ body: (any Encodable)? = nil, as: T.Type)

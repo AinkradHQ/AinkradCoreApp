@@ -26,7 +26,7 @@ extension ReviewModel {
     /// The AI was not sure (API minor 72): it changed nothing, so there is nothing to undo or list.
     public var tidyDeclined: Bool { semanticState == "ready" && semantic?.aiTidy?.state == "declined" }
 
-    /// The person undid the tidy; Re-sort runs it again.
+    /// The person undid the tidy.
     public var tidyUndone: Bool { semanticState == "ready" && semantic?.aiTidy?.state == "undone" }
 
     /// Opens the list of changes in place of the rooms and reads it, with the items it names.

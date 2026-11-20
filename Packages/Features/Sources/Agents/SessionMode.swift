@@ -113,6 +113,8 @@ extension AgentsModel {
 struct ModeChip: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
+    /// False: the icon alone (the composer shows words only while you write).
+    var labels = true
 
     var body: some View {
         if let mode = SessionMode.of(session) {
@@ -129,8 +131,10 @@ struct ModeChip: View {
             ) {
                 HStack(spacing: Space.s1) {
                     Image(systemName: mode.symbol)
-                    Text(mode.title)
-                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                    if labels {
+                        Text(mode.title)
+                        Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta - 1)
+                    }
                 }
                 .coreFont(size: MacTextSize.meta, weight: .medium)
                 .foregroundStyle(mode == .plan ? SessionInk.text : SessionInk.text2)

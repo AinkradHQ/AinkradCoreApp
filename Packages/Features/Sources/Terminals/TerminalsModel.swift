@@ -63,6 +63,8 @@ public final class TerminalsModel {
     var runnerFilter: RunnerFacts.Live?
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
+    /// Why the last embedded terminal did not open.
+    var embedError: String?
     /// Terminals whose bell rang since they were last opened.
     private(set) var rang: Set<String> = []
     /// Host load (1 minute average per core) of each runner, as this Mac read it on each look, oldest first. The Core reports
@@ -82,6 +84,7 @@ public final class TerminalsModel {
     let service: any TerminalService
     private var reloading: Task<Void, Never>?
     private var registeredRunners: Set<String> = []
+    @ObservationIgnored private var registeredTerminals: Set<String> = []
 
     public convenience init(host: any TerminalHost, connection: CoreConnection) {
         self.init(
@@ -133,6 +136,22 @@ public final class TerminalsModel {
         runners.first { $0.id == id }.map { [.ok, .busy].contains(RunnerFacts(runner: $0).status) }
     }
 
+    /// Called after every look at the Core's terminals, so Home can refresh its Terminals widget.
+    public var changed: (@MainActor () -> Void)?
+
+    /// What the Home Terminals widget shows: the live terminals, where each runs, and the last lines of the ones this
+    /// Mac has open (the Core keeps no screen, so the others show none).
+    public func homeFacts() -> [HomeSnapshot.TerminalFact] {
+        items.filter { !$0.isEnded }.map { t in
+            let mac = t.runner == host.thisMacRunnerID
+            let lines = (sessions[t.id]?.surface.visibleText() ?? "").split(whereSeparator: \.isNewline)
+                .map { String($0.trimmingCharacters(in: .whitespaces).prefix(80)) }.filter { !$0.isEmpty }.suffix(3)
+            return .init(
+                id: t.id, name: displayName(ofTerminal: t.id) ?? t.id, place: mac ? "This Mac" : name(of: t.runner),
+                onThisMac: mac, lines: Array(lines))
+        }
+    }
+
     public func displayName(ofTerminal id: String) -> String? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
         return shell.tabNames["terminal-\(id)"] ?? name(of: item.runner)
@@ -172,6 +191,8 @@ public final class TerminalsModel {
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
             syncRunners()
+            syncLauncherTerminals()
+            changed?()
         } catch { load = .failed(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription) }
     }
 
@@ -251,6 +272,22 @@ public final class TerminalsModel {
                 id: "runners", title: "Runners", sub: "Load, drivers and isolation of each runner",
                 symbol: "server.rack", keywords: ["runner", "machine", "load"]
             ) { [weak self] in self?.openRunners() })
+    }
+
+    /// One launcher entry per terminal that is still there (⌘K → Terminals), opening its pane.
+    private func syncLauncherTerminals() {
+        let live = items.filter { ["created", "running"].contains($0.status) }
+        let ids = Set(live.map(\.id))
+        for gone in registeredTerminals.subtracting(ids) { shell.launcher.unregister("terminal-\(gone)") }
+        for t in live {
+            shell.launcher.register(
+                LauncherEntry(
+                    id: "terminal-\(t.id)", title: displayName(ofTerminal: t.id) ?? "Terminal",
+                    sub: "On \(name(of: t.runner))", symbol: "terminal",
+                    keywords: ["terminal", "shell", name(of: t.runner)]
+                ) { [weak self] in self?.openTerminal(t.id) })
+        }
+        registeredTerminals = ids
     }
 
     /// One launcher entry per runner, and a bell item for each runner that is off or slow.
@@ -429,7 +466,7 @@ public final class TerminalsModel {
 
     /// The pane went away (its close button, ⌘W): detach, never stop the terminal.
     func paneClosed(_ id: String) {
-        guard !shell.panes.contains(where: { $0.id == "terminal-\(id)" }) else { return }
+        guard !shell.allPanes.contains(where: { $0.id == "terminal-\(id)" }) else { return }
         sessions[id]?.shutDown()
         sessions[id] = nil
         Task { await reload() }
@@ -479,6 +516,37 @@ public final class TerminalsModel {
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }
+        }
+    }
+
+    /// A terminal for an embedded view (an AI session's Terminal tab): created in `session`'s folder on `runner` and attached, with
+    /// no pane of its own. nil when it could not open (the reason is in `embedError`).
+    func embed(on runner: String, session: String) async -> TerminalSession? {
+        embedError = nil
+        if runners.isEmpty { await reload() }
+        let form = NewTerminalModel(model: self, runner: runner)
+        form.session = session
+        guard form.canOpen else {
+            embedError = form.blockedReason
+            return nil
+        }
+        do {
+            let t = try await host.elevated(
+                "Open a terminal in this AI session's folder. This approval covers this terminal only.", done: "opened",
+                keepsEdit: true
+            ) { try await self.service.create(runner: runner, program: nil, session: session, rows: 30, cols: 100) }
+            items.insert(t, at: 0)
+            let s = TerminalSession(item: t, runner: self.runner(t.runner), service: service, host: host)
+            s.onBell = { [weak self] in self?.bell(t.id) }
+            s.onChange = { [weak self] in self?.paneChanged(t.id) }
+            sessions[t.id] = s
+            await s.attach()
+            return s
+        } catch is ElevationDeclined {
+            return nil
+        } catch {
+            embedError = NewTerminalModel.refusal(CoreError.unwrapping(error), runner: name(of: runner)).title
+            return nil
         }
     }
 

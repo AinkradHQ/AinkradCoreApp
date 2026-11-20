@@ -158,8 +158,8 @@ private func ready(_ s: FakeService) async -> DesignModel {
     }
 
     @Test func everySectionSharesThePageColumns() {
-        // 1,648 pt fits six 256 pt columns, whatever a section holds.
-        #expect(DesignWall.columns(width: 1648).count == 6)
+        // 1,648 pt fits eight 192 pt columns (the card width of E11-1), whatever a section holds.
+        #expect(DesignWall.columns(width: 1648).count == 8)
         #expect(DesignWall.columns(width: 200).count == 1)
     }
 

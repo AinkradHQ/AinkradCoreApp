@@ -16,6 +16,7 @@ extension BrainModel {
         }
         importer?.review.canSameProject = remembersSameProject
         importer?.review.keepsInCommit = keepsInCommit
+        importer?.autoSort = calmAvailable
         guard let importer, await importer.reviewExisting(run) else {
             sync?.notice = "Finish the import in progress first."
             return
@@ -43,6 +44,7 @@ extension BrainModel {
         }
         importer?.review.canSameProject = remembersSameProject
         importer?.review.keepsInCommit = keepsInCommit
+        importer?.autoSort = calmAvailable
         guard let importer else { return }
         let shell = host.shell
         shell.present(
@@ -60,6 +62,7 @@ struct ImportWizard: View {
     let close: () -> Void
 
     static let steps = ["Sources", "Collect", "Review", "Import", "Done"]
+    static let autoSteps = ["Pick", "Collect", "Sort", "Learn", "Done"]
 
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
@@ -68,16 +71,27 @@ struct ImportWizard: View {
                     Text("Import into the Brain").coreFont(size: MacTextSize.title + 2, weight: .semibold)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: Space.s3)
-                    StepTrack(Self.steps, at: model.step.rawValue, hue: GlassInk.blue)
+                    StepTrack(model.autoSort ? Self.autoSteps : Self.steps, at: model.step.rawValue, hue: GlassInk.blue)
                         .accessibilityIdentifier("brain-import-step")
                 }
                 Group {
                     switch model.step {
                     case .sources: SourcesStep(model: model, close: close)
                     case .collecting: CollectStep(model: model, close: close)
-                    case .review: ReviewStep(model: model, close: close)
-                    case .importing: ImportingStep(model: model)
-                    case .done: DoneStep(brain: brain, model: model, close: close)
+                    case .review:
+                        if model.autoSort {
+                            SortStep(model: model, close: close)
+                        } else {
+                            ReviewStep(model: model, close: close)
+                        }
+                    case .importing:
+                        if model.autoSort { LearnStep(model: model) } else { ImportingStep(model: model) }
+                    case .done:
+                        if model.autoSort {
+                            AutoDoneStep(brain: brain, model: model, close: close)
+                        } else {
+                            DoneStep(brain: brain, model: model, close: close)
+                        }
                     }
                 }
                 .transition(.opacity)

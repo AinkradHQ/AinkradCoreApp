@@ -114,6 +114,7 @@ struct ChangesCard: View {
         case .toReview: SessionInk.selected
         case .accepted: SessionInk.ink.opacity(0.75)
         case .revertAsked: GlassInk.amberInk
+        case .reverted: SessionInk.text2
         }
     }
 

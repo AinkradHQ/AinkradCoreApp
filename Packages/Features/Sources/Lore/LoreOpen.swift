@@ -262,8 +262,9 @@ final class LoreFinder {
 
 /// ⌘O.
 enum LoreOpenSheet {
-    @MainActor static func open(_ model: LoreModel) {
+    @MainActor static func open(_ model: LoreModel, query: String = "") {
         let finder = LoreFinder(lore: model)
+        finder.query = query
         finder.refresh(wait: false)
         finder.backToOpen()
     }

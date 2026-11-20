@@ -141,3 +141,36 @@ struct DesignCardSkeleton: View {
         .accessibilityHidden(true)
     }
 }
+
+/// The first card of the grid (mockup `d20-new`): a soft accent well with a plus; a tap makes a blank design and opens it.
+struct NewDesignCard: View {
+    let model: DesignModel
+    let settled: Bool
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(spacing: Space.s3) {
+            Image(systemName: "plus").coreFont(size: MacTextSize.title, weight: .semibold)
+                .foregroundStyle(.white).frame(
+                    width: MacSize.controlLg + Space.s2, height: MacSize.controlLg + Space.s2
+                )
+                .background(coreShape(Radius.cardMac).fill(Color.accentColor)).accessibilityHidden(true)
+            VStack(spacing: Space.s1) {
+                Text("New design").coreFont(size: MacTextSize.headline, weight: .semibold)
+                Text("Start blank or let AI draw it").foregroundStyle(GlassInk.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: Space.s8 * 5 + Space.s8).padding(Space.s2)
+        .coreWell(radius: Radius.pane, active: hovering)
+        .contentShape(coreShape(Radius.pane))
+        .onTapGesture { Task { await model.quickNew() } }
+        .coreRise(settled, 0)
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .onHover { hovering = $0 }
+        .disabled(model.readOnly)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .coreActivates { Task { await model.quickNew() } }
+        .accessibilityIdentifier("design-new-card")
+    }
+}

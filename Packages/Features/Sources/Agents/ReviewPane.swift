@@ -1,15 +1,17 @@
 import CoreUI
+import Foundation
 import SwiftUI
 
-/// Where a changed file stands in the review. Kept only on this Mac: there is no server call behind it.
-enum ReviewState: Equatable {
-    case toReview, accepted, revertAsked
+/// Where a changed file stands in the review. Accept is a mark kept on this Mac (it survives a relaunch); Revert is the Core's.
+enum ReviewState: String, Equatable {
+    case toReview, accepted, revertAsked, reverted
 
     var label: String {
         switch self {
         case .toReview: "To review"
         case .accepted: "Accepted"
         case .revertAsked: "Revert asked"
+        case .reverted: "Reverted"
         }
     }
     var tone: Tone {
@@ -17,29 +19,43 @@ enum ReviewState: Equatable {
         case .toReview: .queue
         case .accepted: .done
         case .revertAsked: .warn
+        case .reverted: .queue
         }
     }
     var symbol: String {
         switch self {
         case .toReview: "circle.dashed"
         case .accepted: "checkmark"
-        case .revertAsked: "arrow.uturn.backward"
+        case .revertAsked, .reverted: "arrow.uturn.backward"
         }
     }
 }
 
-/// Review marks per session. ponytail: in memory, lost on relaunch; persist if reviews must outlive the app.
+/// Review marks per session, kept in UserDefaults so an Accept survives a relaunch.
 @MainActor @Observable
 final class ReviewStore {
     static let shared = ReviewStore()
     private var marks: [String: [String: ReviewState]] = [:]
 
-    func state(_ session: String, _ path: String) -> ReviewState { marks[session]?[path] ?? .toReview }
-    func set(_ session: String, _ path: String, _ s: ReviewState) { marks[session, default: [:]][path] = s }
+    private func key(_ session: String) -> String { "agents.review." + session }
+
+    func state(_ session: String, _ path: String) -> ReviewState {
+        if marks[session] == nil {
+            let saved = UserDefaults.standard.dictionary(forKey: key(session)) as? [String: String] ?? [:]
+            marks[session] = saved.compactMapValues(ReviewState.init(rawValue:))
+        }
+        return marks[session]?[path] ?? .toReview
+    }
+
+    func set(_ session: String, _ path: String, _ s: ReviewState) {
+        _ = state(session, path)
+        marks[session, default: [:]][path] = s
+        UserDefaults.standard.set(marks[session]?.mapValues(\.rawValue), forKey: key(session))
+    }
 }
 
 /// The Codex-style review: changed files on top, the selected file's diff below, then Accept, Revert and a comment.
-/// Everything goes through the conversation (`model.say`); Accept is only a mark.
+/// Accept marks a file reviewed; Revert goes to the Core, which restores the file from this session's recorded edits.
 struct ReviewPane: View {
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
@@ -129,16 +145,13 @@ struct ReviewPane: View {
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small)).fixedSize()
                 .help("Accept every changed file")
             Button("Revert all") {
-                for f in files { store.set(session.id, f.path, .revertAsked) }
-                let list = files.map { "`\($0.path)`" }.joined(separator: ", ")
                 let id = session.id
-                Task {
-                    await model.say(id, "Please revert your changes to \(list) and tell me when it is done.")
-                }
+                let paths = files.map(\.path)
+                Task { await model.revert(id, paths: paths) }
             }
             .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).fixedSize()
             .disabled(!model.canWrite(session))
-            .help("Ask for every change to be reverted")
+            .help("Put every changed file back as it was")
         }
     }
 
@@ -174,14 +187,9 @@ struct ReviewPane: View {
             HStack(spacing: Space.s2) {
                 Button("Accept") { store.set(id, f.path, .accepted) }
                     .buttonStyle(CoreButtonStyle(.prominent, size: .small)).help("Mark this file as reviewed")
-                Button("Revert") {
-                    store.set(id, f.path, .revertAsked)
-                    Task {
-                        await model.say(id, "Please revert your changes to `\(f.path)` and tell me when it is done.")
-                    }
-                }
-                .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(!writable)
-                .help("Ask \(AgentWords.toolName(session.harness)) to revert this file")
+                Button("Revert") { Task { await model.revert(id, paths: [f.path]) } }
+                    .buttonStyle(CoreButtonStyle(.quietDanger, size: .small)).disabled(!writable)
+                    .help("Put this file back as it was before this session's edits")
             }
             CoreTextArea(
                 nil, placeholder: "Comment on this file", text: $comment, minHeight: Space.s8, maxHeight: Space.s8 * 3)

@@ -21,6 +21,7 @@ struct StatusCluster: View {
                 ) { shell.toggleFocusMode() }
             }
             activity
+            brain
             StatusButton(
                 title: shell.bell.count > 0 ? "\(shell.bell.count)" : nil, symbol: "bell",
                 label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
@@ -41,6 +42,18 @@ struct StatusCluster: View {
         .frame(height: ShellMetrics.topBar, alignment: .center)
         .frame(maxWidth: .infinity, alignment: .trailing)
         .task { shell.watchNetwork() }
+    }
+
+    /// The Brain icon (E9-2): its state in the symbol and tone, and a panel with what it is doing and what it needs.
+    @ViewBuilder private var brain: some View {
+        if let chip = shell.brainStatus?() {
+            StatusButton(
+                title: chip.needs.isEmpty ? nil : "\(chip.needs.count)", symbol: "brain",
+                label: "Brain. \(chip.line)", on: shell.brainPanelOpen,
+                bounce: reduce || chip.state != "working" ? nil : 1
+            ) { shell.brainPanelOpen.toggle() }
+            .popover(isPresented: $shell.brainPanelOpen, arrowEdge: .bottom) { BrainPanel(shell: shell, chip: chip) }
+        }
     }
 
     /// "2 running · 1 waiting" (Settings → Activity can hide it). A click opens the bell, where the waiting items are.
@@ -137,4 +150,29 @@ struct StatusBarStyle: ButtonStyle {
 /// m:ss, as the prototype's `mmss`.
 public enum Countdown {
     public static func text(_ seconds: Int) -> String { coreClock(seconds) }
+}
+
+/// The panel under the Brain icon: one line of what it does, what it needs (only an AI account, a runner, a local model or the
+/// unlock), and a way into the Brain. Counts and the Core's own words only.
+private struct BrainPanel: View {
+    let shell: ShellModel
+    let chip: BrainChip
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            Text("Brain").coreFont(size: MacTextSize.headline, weight: .semibold)
+            Text(chip.line).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+            ForEach(chip.needs, id: \.self) { Label($0, systemImage: "key").coreFont(size: MacTextSize.body) }
+            if chip.attention {
+                Text("Something failed in the last day. Brain tries again by itself.")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+            Button("Open Brain") {
+                shell.brainPanelOpen = false
+                shell.openBrain?()
+            }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        }
+        .padding(Space.s4)
+        .frame(width: Space.s8 * 6, alignment: .leading)
+    }
 }
