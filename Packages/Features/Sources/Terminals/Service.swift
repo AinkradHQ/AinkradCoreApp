@@ -181,68 +181,41 @@ extension TerminalService {
         (policy, false)
     }
     func installTool(_ runner: String, tool: String) async throws -> String { "op" }
-    func hardware() async -> [HardwareItem]? { nil }
-    func hardwarePool() async -> HardwarePoolItem? { nil }
-    func jobs() async -> [JobItem] { [] }
-    func pauseHardware(_ id: String?, until: Date?) async throws {}
-}
-
-struct LiveTerminalService: TerminalService {
-    let connection: CoreConnection
-    /// The runner on this Mac, if the app runs one (the local path).
-    var localRunner: @Sendable () async -> LocalRunner? = { nil }
-    private var client: Client { connection.client }
-
-    func terminals() async throws -> [TerminalItem] {
-        try await run { try await client.listTerminals().ok.body.json.map(Self.item) }
-    }
-
-    func terminal(_ id: String) async throws -> TerminalItem {
-        try await run {
-            switch try await client.getTerminal(path: .init(id: id)) {
-            case .ok(let o): return Self.item(try o.body.json)
-            case .notFound(let r): throw Self.fail(404, try? r.body.json)
-            case .undocumented(let status, let p): throw await Self.fail(status, p)
-            default: throw Self.unknown
-            }
-        }
-    }
-
-    func runners() async throws -> [RunnerItem] {
-        var out = try await run { try await client.listRunners().ok.body.json.map(Self.runner) }
-        // The runners' own report (tool install, home, last error) is API minor 95; read it beside the generated list.
-        if await connection.serverSupports(minor: 95), let extra = await reported() {
-            for i in out.indices { if let e = extra[out[i].id] { e.apply(to: &out[i]) } }
-        }
-        return out
-    }
-
     func hardware() async -> [HardwareItem]? {
         guard await connection.serverSupports(minor: 95) else { return nil }
-        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/hardware") else {
-            return nil
-        }
-        return try? HardwareWire.decoder.decode([HardwareItem].self, from: data)
+        guard case .ok(let o)? = try? await client.listHardware(), let list = try? o.body.json else { return nil }
+        return list.map(Self.hardware)
     }
 
     func hardwarePool() async -> HardwarePoolItem? {
-        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/hardware/pool") else {
-            return nil
-        }
-        return try? HardwareWire.decoder.decode(HardwarePoolItem.self, from: data)
+        guard case .ok(let o)? = try? await client.getHardwarePool(), let p = try? o.body.json else { return nil }
+        return HardwarePoolItem(loadPct: Int(p.loadPct), jobs: Int(p.jobs), sessions: Int(p.sessions), paused: p.paused)
     }
 
     func jobs() async -> [JobItem] {
-        guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/jobs?limit=50") else {
-            return []
-        }
-        return (try? HardwareWire.decoder.decode([JobItem].self, from: data)) ?? []
+        guard case .ok(let o)? = try? await client.listJobs(query: .init(limit: 50)), let list = try? o.body.json
+        else { return [] }
+        return list.map(Self.job)
     }
 
     func pauseHardware(_ id: String?, until: Date?) async throws {
-        let target = id.map { "/api/v1/hardware/\($0)/pause" } ?? "/api/v1/hardware/pause"
-        _ = try await run {
-            try await connection.signedRequest(method: "PUT", target: target, body: HardwareWire.pauseBody(until))
+        let body = Components.Schemas.HardwarePause(until: until)
+        try await run {
+            if let id {
+                switch try await client.pauseHardware(path: .init(id: id), body: .json(body)) {
+                case .ok: return
+                case .notFound(let r): throw Self.fail(404, try? r.body.json)
+                case .badRequest(let r): throw Self.fail(400, try? r.body.json)
+                case .undocumented(let status, let p): throw await Self.fail(status, p)
+                default: throw Self.unknown
+                }
+            }
+            switch try await client.pauseAllHardware(body: .json(body)) {
+            case .ok: return
+            case .badRequest(let r): throw Self.fail(400, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
+            default: throw Self.unknown
+            }
         }
     }
 

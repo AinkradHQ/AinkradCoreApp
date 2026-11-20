@@ -1,3 +1,4 @@
+import AinkradClient
 import Foundation
 import Shell
 import Testing
@@ -24,7 +25,8 @@ import Testing
     }
 
     @Test func theCoresHardwareJsonDecodesAndSaysItInWords() throws {
-        let list = try HardwareWire.decoder.decode([HardwareItem].self, from: Data(Self.json.utf8))
+        let wire = try HardwareWire.decoder.decode([Components.Schemas.Hardware].self, from: Data(Self.json.utf8))
+        let list = wire.map(LiveTerminalService.hardware)
         let f = HardwareFacts(list[0])
         #expect(list[0].jobs.first?.label == "cargo build")
         #expect(f.gateWords == "On battery: takes no jobs")

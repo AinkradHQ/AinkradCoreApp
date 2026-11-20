@@ -1,14 +1,15 @@
+import AinkradClient
 import Foundation
 import Shell
 
-/// What `GET /hardware` says about one machine (E15 §3.4). Read straight from the JSON, like `RunnerReportWire`, so the app
-/// builds before the generated client carries the hardware routes. Unknown words stay as strings.
-struct HardwareItem: Identifiable, Equatable, Sendable, Decodable {
-    struct Battery: Equatable, Sendable, Decodable {
+/// What `GET /hardware` says about one machine (E15 §3.4), flattened from the generated `Components.Schemas.Hardware`:
+/// the generated enums are wrapped (`value1` known, `value2` a word this build does not know), so the words stay strings.
+struct HardwareItem: Identifiable, Equatable, Sendable {
+    struct Battery: Equatable, Sendable {
         var onBattery: Bool
         var percent: Int
     }
-    struct Job: Identifiable, Equatable, Sendable, Decodable {
+    struct Job: Identifiable, Equatable, Sendable {
         let id: String
         var project: Int?
         var label: String
@@ -37,7 +38,7 @@ struct HardwareItem: Identifiable, Equatable, Sendable, Decodable {
 }
 
 /// `GET /hardware/pool`: the top bar's load.
-struct HardwarePoolItem: Equatable, Sendable, Decodable {
+struct HardwarePoolItem: Equatable, Sendable {
     var loadPct: Int
     var jobs: Int
     var sessions: Int
@@ -45,7 +46,7 @@ struct HardwarePoolItem: Equatable, Sendable, Decodable {
 }
 
 /// One job of `GET /jobs`, for the "Ran on" chips.
-struct JobItem: Identifiable, Equatable, Sendable, Decodable {
+struct JobItem: Identifiable, Equatable, Sendable {
     let id: String
     var project: Int?
     var session: String?
@@ -65,10 +66,9 @@ struct JobItem: Identifiable, Equatable, Sendable, Decodable {
 }
 
 enum HardwareWire {
+    /// RFC 3339 UTC with milliseconds, as the Core sends it (the generated client reads it itself; tests decode JSON with this).
     static let decoder: JSONDecoder = {
         let d = JSONDecoder()
-        d.keyDecodingStrategy = .convertFromSnakeCase
-        // RFC 3339 UTC with exactly milliseconds; a second-only stamp is read too.
         d.dateDecodingStrategy = .custom { dec in
             let s = try dec.singleValueContainer().decode(String.self)
             let f = ISO8601DateFormatter()
@@ -80,14 +80,6 @@ enum HardwareWire {
         }
         return d
     }()
-
-    /// `{"until": "…Z"}`, or `{"until": null}` to lift a pause.
-    static func pauseBody(_ until: Date?) -> Data {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let v: Any = until.map { f.string(from: $0) } ?? NSNull()
-        return (try? JSONSerialization.data(withJSONObject: ["until": v])) ?? Data()
-    }
 }
 
 /// A machine's capacity and gate in plain words. Pure, so the words are tested without a view.
@@ -160,5 +152,32 @@ struct HardwareFacts: Equatable {
         let s = hw.sessions == 1 ? "1 AI session" : "\(hw.sessions) AI sessions"
         let j = hw.jobs.count == 1 ? "1 job" : "\(hw.jobs.count) jobs"
         return "\(s) · \(j)"
+    }
+}
+
+extension LiveTerminalService {
+    /// A generated enum wrapper's word: the known case, else the word a newer Core sent.
+    private static func word<E: RawRepresentable>(_ known: E?, _ other: String?) -> String? where E.RawValue == String {
+        known?.rawValue ?? other
+    }
+
+    static func hardware(_ h: Components.Schemas.Hardware) -> HardwareItem {
+        HardwareItem(
+            id: h.id, name: h.name, kind: word(h.kind.value1, h.kind.value2) ?? "runner", online: h.online,
+            degraded: h.degraded, pausedUntil: h.pausedUntil, gate: word(h.gate.value1, h.gate.value2) ?? "off",
+            os: h.os, arch: h.arch, cores: Int(h.cores), cpuPct: Int(h.cpuPct), memTotalMb: Int(h.memTotalMb),
+            memFreeMb: Int(h.memFreeMb),
+            battery: h.battery.map { .init(onBattery: $0.onBattery, percent: Int($0.percent)) },
+            toolchains: h.toolchains.additionalProperties, sessions: Int(h.sessions),
+            jobs: h.jobs.map {
+                .init(id: $0.id, project: $0.project.map(Int.init), label: $0.label, startedAt: $0.startedAt)
+            }, jobSlots: Int(h.jobSlots))
+    }
+
+    static func job(_ j: Components.Schemas.Job) -> JobItem {
+        JobItem(
+            id: j.id, project: j.project.map(Int.init), session: j.session, terminal: j.terminal, label: j.label,
+            deviceName: j.deviceName, placeReason: word(j.placeReason.value1, j.placeReason.value2) ?? "runner",
+            missing: j.missing, state: word(j.state.value1, j.state.value2) ?? "ended", startedAt: j.startedAt)
     }
 }
