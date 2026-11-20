@@ -141,8 +141,9 @@ private struct BlockCursor: View {
 /// "This Mac" (a real shell, amber: it can change your files) or "Sandbox" (blue: a safe room).
 struct MachineChip: View {
     let real: Bool
+    @Environment(\.coreAccent) private var paneAccent
     var body: some View {
-        let hue = real ? GlassInk.amber : GlassInk.blue
+        let hue = real ? GlassInk.amber : GlassInk.accent(paneAccent)
         Label(real ? "This Mac" : "Sandbox", systemImage: real ? "laptopcomputer" : "shield")
             .labelStyle(.titleAndIcon).coreFont(size: MacTextSize.meta, weight: .medium)
             .foregroundStyle(GlassInk.ink(hue)).lineLimit(1).fixedSize()

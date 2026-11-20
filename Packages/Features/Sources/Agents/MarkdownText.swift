@@ -325,6 +325,7 @@ private struct MarkdownImage: View {
 /// The last paragraph of an answer that is still being written: its text and a calm caret that breathes between faint and full
 /// about every 0.6 s. Reduce Motion: the caret stays, still and full.
 private struct CaretParagraph: View {
+    @Environment(\.coreAccent) private var paneAccent
     let text: AttributedString
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -341,7 +342,7 @@ private struct CaretParagraph: View {
 
     private func paragraph(on: Bool) -> some View {
         var caret = AttributedString(" \u{258D}")
-        caret.foregroundColor = GlassInk.blue.opacity(on ? 1 : 0.25)
+        caret.foregroundColor = GlassInk.accent(paneAccent).opacity(on ? 1 : 0.25)
         return Text(text + caret).lineSpacing(6).textSelection(.enabled)
     }
 }

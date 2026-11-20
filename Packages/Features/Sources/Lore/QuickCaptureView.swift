@@ -5,6 +5,7 @@ import SwiftUI
 /// The quick capture bar (mockup 19): a note tile and the text, which grows with it; the destination chip, the word
 /// count and the keys. After Return it says where the note went, with Undo.
 struct QuickCaptureView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: QuickCapture
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -29,9 +30,12 @@ struct QuickCaptureView: View {
 
     @ViewBuilder private var editing: some View {
         HStack(alignment: .top, spacing: Space.s3) {
-            Image(systemName: "note.text").coreFont(size: MacTextSize.title).foregroundStyle(GlassInk.blue)
-                .frame(width: MacSize.controlLg, height: MacSize.controlLg)
-                .background(GlassInk.blue.opacity(0.16), in: coreShape(Radius.control)).accessibilityHidden(true)
+            Image(systemName: "note.text").coreFont(size: MacTextSize.title).foregroundStyle(
+                GlassInk.accent(paneAccent)
+            )
+            .frame(width: MacSize.controlLg, height: MacSize.controlLg)
+            .background(GlassInk.accent(paneAccent).opacity(0.16), in: coreShape(Radius.control)).accessibilityHidden(
+                true)
             CoreTextArea(
                 nil, placeholder: "Write a note…", text: $model.text, error: model.error, size: MacTextSize.title,
                 minHeight: MacSize.controlLg, maxHeight: Space.s8 * 7.5, autofocus: true, focus: $focused)

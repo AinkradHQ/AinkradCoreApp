@@ -4,11 +4,6 @@ import Foundation
 // HAND-WRITTEN WIRE for Core 0.10 (E7-1, E7-2). The generated client does not know these routes yet; the coordinator runs
 // `make clients` at integration and this file then shrinks to the mapping. Every call is gated by API minor 95.
 
-/// The API minor that carries the 0.10 account routes. The coordinator renumbers it at integration.
-enum CoreMinor {
-    static let v010: Int32 = 95
-}
-
 /// One account of an order (`GET /api/v1/ai-order`).
 struct AIOrderEntry: Codable, Equatable, Sendable {
     let account: Int64
@@ -81,7 +76,7 @@ extension AccountsService {
 }
 
 extension LiveAccountsService {
-    func aiOrderSupported() async -> Bool { await connection.serverSupports(minor: CoreMinor.v010) }
+    func aiOrderSupported() async -> Bool { await connection.serverSupports(minor: coreMinorV010) }
 
     func aiOrder() async throws -> AIOrderDoc {
         try JSONDecoder().decode(

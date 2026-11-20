@@ -2,7 +2,7 @@ import CoreKit
 import Foundation
 
 // Run configurations and environments (Core 0.10, E11-3): the Core's `/projects/{id}/run-configs`, `/run-envs` and `/runs`
-// routes. Calls are gated by `serverSupports(minor: 95)` in `ProjectsModel`. Security model: no route returns a secret's
+// routes. Calls are gated by `serverSupports(minor: coreMinorV010)` in `ProjectsModel`. Security model: no route returns a secret's
 // value, and a plain variable's value comes only from `reveal`, on request; nothing here keeps one longer than the view that
 // asked.
 

@@ -1,5 +1,6 @@
 import Admin
 import AppKit
+import CoreKit
 import Foundation
 import Observation
 import Shell
@@ -47,7 +48,7 @@ public final class BrainModel {
     /// The top-bar Brain icon's feed (E9-2).
     public let status = BrainStatusModel()
     /// The Core's status, areas and auto-import routes (API minor 95).
-    public var servesActivity: Bool { (apiMinor ?? 0) >= 95 }
+    public var servesActivity: Bool { (apiMinor ?? 0) >= Int(coreMinorV010) }
     private func updateStatusPolling() {
         if servesActivity, let routes = service?.importRoutes, !isSample {
             host.shell.brainStatus = { [weak self] in self?.status.chip }

@@ -2,9 +2,6 @@ import CoreUI
 import Foundation
 import SwiftUI
 
-/// The first API minor of Core 0.10 (the same number as the Core page's `CoreMinor.v010`).
-enum ProjectsMinor { static let v010: Int32 = 95 }
-
 /// What a run gets unless a project says otherwise: the Core's `GET/PUT /api/v1/projects/defaults`. Saving sets every project.
 struct ProjectLimits: Equatable, Sendable {
     var cpus: Double

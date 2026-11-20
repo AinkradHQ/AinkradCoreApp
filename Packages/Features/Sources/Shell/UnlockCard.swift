@@ -4,6 +4,7 @@ import SwiftUI
 /// The Unlock card (E1-1, mockup 01): the app is blurred behind one glass card until Touch ID. It shows at open and again after the
 /// Mac locks or wakes. The system Touch ID sheet (and its password fallback) comes on top when a button is pressed.
 struct UnlockCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
@@ -19,10 +20,12 @@ struct UnlockCard: View {
                 .accessibilityHidden(true)
             VStack(spacing: Space.s2) {
                 ZStack {
-                    coreShape(Radius.pane).fill(GlassInk.blue.opacity(checking ? 0.3 : breathe ? 0.34 : 0.18))
-                        .frame(width: 96, height: 96)
+                    coreShape(Radius.pane).fill(
+                        GlassInk.accent(paneAccent).opacity(checking ? 0.3 : breathe ? 0.34 : 0.18)
+                    )
+                    .frame(width: 96, height: 96)
                     Image(systemName: "touchid").font(.system(size: 48, weight: .light))
-                        .foregroundStyle(GlassInk.blue)
+                        .foregroundStyle(GlassInk.accent(paneAccent))
                         .symbolEffect(.pulse, options: .repeating, isActive: checking && !reduce)
                 }
                 .padding(.top, Space.s1).padding(.bottom, Space.s3)

@@ -101,7 +101,7 @@ struct BrainPane: View {
         }
         let ready = model.setup == .ready && model.load == .ready
         if model.calmAvailable {
-            AppActionTile(title: "Back to Brain", symbol: "brain", key: "⌘0", hue: GlassInk.blue) {
+            AppActionTile(title: "Back to Brain", symbol: "brain", key: "⌘0", hue: GlassInk.accent(paneAccent)) {
                 model.explore(false)
             }
             .keyboardShortcut("0", modifiers: .command)

@@ -104,7 +104,7 @@ public final class ProjectsModel {
         runService = LiveProjectRunService(connection: connection)
         catalog = LiveRepoCatalog(connection: connection)
         Task { [weak self] in
-            let ok = await connection.serverSupports(minor: 95)
+            let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
             self?.insightsService = ok ? LiveProjectInsightsService(connection: connection) : nil

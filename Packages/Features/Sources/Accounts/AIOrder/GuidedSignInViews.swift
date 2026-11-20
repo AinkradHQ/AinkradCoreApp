@@ -77,6 +77,7 @@ struct GuidedTerminal: View {
 
 /// Which runner the account will live on, when more than one can sign in. Online runners only; the first is picked.
 struct RunnerPickView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let provider: String
     let choice: RunnerChoice
     let pick: (String) -> Void
@@ -97,7 +98,7 @@ struct RunnerPickView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
                 ForEach(choice.eligible) { r in
                     AccPick(
-                        title: r.name, sub: "Online", symbol: "server.rack", hue: GlassInk.blue,
+                        title: r.name, sub: "Online", symbol: "server.rack", hue: GlassInk.accent(paneAccent),
                         on: choice.selected == r.id
                     ) {
                         pick(r.id)
@@ -167,6 +168,7 @@ struct RunnerBoundNote: View {
 /// "Waiting for you to finish…" as in the mockup: five small rounded squares that lift one after another. With Reduce Motion
 /// they stand still, the first three lit.
 struct WaitingDots: View {
+    @Environment(\.coreAccent) private var paneAccent
     let text: String
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -196,7 +198,7 @@ struct WaitingDots: View {
         HStack(spacing: 5) {
             ForEach(0..<5, id: \.self) { i in
                 let (o, y) = f(i)
-                coreShape(3).fill(GlassInk.blue).frame(width: 8, height: 8).opacity(o).offset(y: y)
+                coreShape(3).fill(GlassInk.accent(paneAccent)).frame(width: 8, height: 8).opacity(o).offset(y: y)
             }
         }
         .accessibilityHidden(true)

@@ -39,7 +39,9 @@ struct TerminalsListView: View {
                 model.openNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
-            AppActionTile(title: "New terminal", symbol: "plus", key: "⌘T", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(
+                title: "New terminal", symbol: "plus", key: "⌘T", hue: GlassInk.accent(paneAccent), prominent: true
+            ) {
                 model.quickNew()
             }
             .keyboardShortcut("t", modifiers: .command)
@@ -107,7 +109,8 @@ struct TerminalsListView: View {
             HStack(spacing: Space.s3) {
                 IconTile(
                     mac ? "laptopcomputer" : runner?.builtIn == true ? "diamond" : "server.rack",
-                    hue: mac ? GlassInk.amber : GlassInk.blue, size: Space.s8 - Space.s1, bounce: g.items.count)
+                    hue: mac ? GlassInk.amber : GlassInk.accent(paneAccent), size: Space.s8 - Space.s1,
+                    bounce: g.items.count)
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(about).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
                 Spacer(minLength: 0)
@@ -129,7 +132,7 @@ struct TerminalsListView: View {
 
     private var empty: some View {
         VStack(spacing: Space.s3) {
-            IconTile("terminal", hue: GlassInk.blue, size: 64)
+            IconTile("terminal", hue: GlassInk.accent(paneAccent), size: 64)
             Text("No terminals yet").coreFont(size: MacTextSize.title, weight: .semibold)
             Text(
                 "Open a terminal in a safe sandbox, or a real one on this Mac. They show up here with a live look at what they are doing."

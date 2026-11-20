@@ -5,9 +5,6 @@ import Foundation
 // counts. They go through the signed transport until the generated client has them, and only when the Core speaks API minor 95;
 // an older Core keeps today's screens.
 
-/// The first API minor of Core 0.10 (the same number as the Core page's `CoreMinor.v010`).
-enum ActivityMinor { static let v010: Int32 = 95 }
-
 /// A value the Core handed over to be shown. It never prints: a log line or a debugger shows a fixed word.
 struct RevealedValue: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     let name: String
@@ -73,7 +70,7 @@ extension AdminService {
 }
 
 extension LiveAdminService {
-    func supportsV010() async -> Bool { await connection.serverSupports(minor: ActivityMinor.v010) }
+    func supportsV010() async -> Bool { await connection.serverSupports(minor: coreMinorV010) }
 
     /// E1's `POST /secrets/{id}/reveal`: no body, and the answer is just `{value}`. The screen keeps the name it asked for, a
     /// text kind (a file secret is never shown, `canShow`), and its own 15 seconds.

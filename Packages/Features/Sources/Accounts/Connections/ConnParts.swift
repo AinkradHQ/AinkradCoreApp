@@ -21,13 +21,14 @@ struct ConnLogo: View {
 
 /// The five steps as small rounded bars: done and current in the accent, the rest quiet.
 struct ConnSteps: View {
+    @Environment(\.coreAccent) private var paneAccent
     let at: ConnStep
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         HStack(spacing: Space.s1) {
             ForEach(ConnStep.allCases, id: \.rawValue) { s in
                 coreShape(2)
-                    .fill(s.rawValue <= at.rawValue ? GlassInk.blue : GlassInk.track)
+                    .fill(s.rawValue <= at.rawValue ? GlassInk.accent(paneAccent) : GlassInk.track)
                     .frame(width: s == at ? Space.s5 : Space.s2, height: Space.s1 + 2)
             }
         }
@@ -39,6 +40,7 @@ struct ConnSteps: View {
 
 /// Five small squares hopping from the service to Core. No pointer input; under Reduce Motion the first three rest lit.
 struct ConnLink: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         TimelineView(.animation(paused: reduce)) { ctx in
@@ -47,7 +49,7 @@ struct ConnLink: View {
                 ForEach(0..<5, id: \.self) { i in
                     let p = reduce ? 0 : max(0, sin((t * 3.9) - Double(i) * 0.6))
                     let lit = reduce ? i < 3 : p > 0.5
-                    coreShape(3).fill(GlassInk.blue)
+                    coreShape(3).fill(GlassInk.accent(paneAccent))
                         .frame(width: 9, height: 9)
                         .opacity(lit ? 1 : 0.28)
                         .offset(y: reduce ? 0 : -3 * p)  // grid: ok motion only, a hop

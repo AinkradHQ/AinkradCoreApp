@@ -4,6 +4,7 @@ import SwiftUI
 /// Add account (E7-2): three steps. Pick a provider card, paste a key or sign in, done. The cards come from the Core's
 /// provider list, so a provider the Core adds (a preset, a new subscription) appears here with no change to this view.
 struct AddAccountDialog: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let provider: String?
     let close: () -> Void
@@ -14,7 +15,7 @@ struct AddAccountDialog: View {
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 18) {
             VStack(alignment: .leading, spacing: Space.s4) {
-                StepTrack(["Pick", "Add", "Done"], at: flow.stepper.number - 1, hue: GlassInk.blue)
+                StepTrack(["Pick", "Add", "Done"], at: flow.stepper.number - 1, hue: GlassInk.accent(paneAccent))
                 Group {
                     switch flow.stepper.step {
                     case .pick: pick

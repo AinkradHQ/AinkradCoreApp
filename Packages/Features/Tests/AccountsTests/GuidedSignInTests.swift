@@ -238,6 +238,10 @@ struct GuidedSignInModelTests {
         }
         #expect(!flow.needsConsent)
         #expect(svc.log.contains { $0.hasPrefix("startLogin opencode-sub") }, "it started without asking")
+        // Wait for the page to reach the host before closing, or a slow parallel run cancels first.
+        for _ in 0..<400 where (m.host as? FakeHost)?.opened.isEmpty != false {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
         await m.cancelSignIn()  // closing the dialog ends the follow
         await choosing.value
         #expect((m.host as? FakeHost)?.opened.isEmpty == false, "the sign-in page went to the host, not a browser")

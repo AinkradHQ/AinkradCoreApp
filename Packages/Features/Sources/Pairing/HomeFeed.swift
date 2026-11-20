@@ -173,7 +173,7 @@ struct LiveHomeSource: HomeSource {
     }
 
     func brainPipeline() async throws -> HomeSnapshot.BrainGlance.Pipeline? {
-        guard await connection.serverSupports(minor: 95) else { return nil }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return nil }
         let a = try await BrainRoutes(transport: LiveBrainTransport(connection: connection)).activity()
         let done = a.lastDoneAt.flatMap { ISO8601DateFormatter.withFraction.date(from: $0) }
         return .init(
@@ -184,7 +184,7 @@ struct LiveHomeSource: HomeSource {
 
     /// `GET /terminals/{id}/tail` (E6): 1 to 20 lines of plain text, oldest first; empty for a terminal that is not a private sandbox.
     func terminalTail(_ id: String, lines: Int) async throws -> [String]? {
-        guard await connection.serverSupports(minor: 95) else { return nil }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return nil }
         struct Tail: Decodable { var lines: [String] }
         let data = try await run {
             try await connection.signedRequest(
@@ -194,7 +194,7 @@ struct LiveHomeSource: HomeSource {
     }
 
     func usageSeries(days: Int) async throws -> [Double]? {
-        guard await connection.serverSupports(minor: 95) else { return nil }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return nil }
         let data = try await run {
             try await connection.signedRequest(method: "GET", target: "/api/v1/costs/series?days=\(days)", body: Data())
         }
