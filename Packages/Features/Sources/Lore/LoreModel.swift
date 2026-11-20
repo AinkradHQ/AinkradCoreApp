@@ -64,6 +64,10 @@ public final class LoreModel {
     var sideNotes: [LoreNote] = []
     var sideTags: [LoreTagCount] = []
     var sessionDocs: [LoreSessionDoc] = []
+    /// The notes an AI session wrote in its folder, for the AI Sessions screen (a note id each).
+    public func notes(ofSession session: String) -> [String] {
+        sessionDocs.filter { $0.session == session }.map(\.note)
+    }
     var sideVersions: [LoreVersion] = []
     var outline: [LoreHeading] = []
     var wordCount = 0
