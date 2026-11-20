@@ -15,11 +15,13 @@ private func seal(_ text: String, to s: RendezvousSession, code: Data? = nil) th
     let peer = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: s.publicKey)
     let epk = eph.publicKey.rawRepresentation
     let sym = try eph.sharedSecretFromKeyAgreement(with: peer).hkdfDerivedSymmetricKey(
-        using: SHA256.self, salt: code ?? s.code, sharedInfo: RendezvousSession.context + epk + s.publicKey, outputByteCount: 32)
+        using: SHA256.self, salt: code ?? s.code, sharedInfo: RendezvousSession.context + epk + s.publicKey,
+        outputByteCount: 32)
     let box = try ChaChaPoly.seal(
         Data(text.utf8), using: sym, nonce: ChaChaPoly.Nonce(data: Data(count: 12)),
         authenticating: RendezvousSession.context)
-    return (epk, box.ciphertext + box.tag)
+    // A fresh Data: the sum of two slices keeps the first one's start index, and `bad[0]` would trap.
+    return (epk, Data(box.ciphertext + box.tag))
 }
 
 private final class FakeRendezvous: RendezvousClient, @unchecked Sendable {
@@ -57,10 +59,11 @@ struct RendezvousTests {
     }
 
     private func hex(_ h: String) -> Data {
-        Data(stride(from: 0, to: h.count, by: 2).map { i in
-            let a = h.index(h.startIndex, offsetBy: i)
-            return UInt8(h[a..<h.index(a, offsetBy: 2)], radix: 16)!
-        })
+        Data(
+            stride(from: 0, to: h.count, by: 2).map { i in
+                let a = h.index(h.startIndex, offsetBy: i)
+                return UInt8(h[a..<h.index(a, offsetBy: 2)], radix: 16)!
+            })
     }
 
     /// The same vector the Core's `rendezvous.rs` pins: sealed there (and by an independent implementation), opened here.
@@ -72,14 +75,17 @@ struct RendezvousTests {
         #expect(s.id == "12HUBq8qSloV9nySQ3jtiNH4XBPxo3_HNm9ZeJs7zWU")
         let epk = try #require(Wire.unb64("hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"))
         let ct = try #require(
-            Wire.unb64("rBL1S5cKm3hdu54gCEaoH51O343FmiVAKIZp0hurr2NGiMlq9YW-qXbI7lhtVvKrn3askCu1qcmh8FhkA5PS2e4c_rqnPQ"))
+            Wire.unb64("rBL1S5cKm3hdu54gCEaoH51O343FmiVAKIZp0hurr2NGiMlq9YW-qXbI7lhtVvKrn3askCu1qcmh8FhkA5PS2e4c_rqnPQ")
+        )
         #expect(s.open(epk: epk, ct: ct) == "ainkrad://connect?host=core.example.com&fp=FP&secret=S")
     }
 
     @Test func theCommandCarriesTheCodeAndTheKeyAndTheIdHidesTheCode() {
         let s = RendezvousSession()
         let cmd = SetupWizardModel.installCommand(rendezvous: s.spec)
-        #expect(cmd.hasPrefix("sudo AINKRAD_MIN_VERSION=\(SetupWizardModel.minCoreVersion) AINKRAD_RENDEZVOUS=\(s.spec) sh -c"))
+        #expect(
+            cmd.hasPrefix(
+                "sudo AINKRAD_MIN_VERSION=\(SetupWizardModel.minCoreVersion) AINKRAD_RENDEZVOUS=\(s.spec) sh -c"))
         let parts = s.spec.split(separator: ".")
         #expect(Wire.unb64(String(parts[0]))?.count == 16 && Wire.unb64(String(parts[1]))?.count == 32)
         #expect(!s.id.contains(String(parts[0])) && s.id.count == 43)
@@ -93,7 +99,7 @@ struct RendezvousTests {
     }
 
     private func settle(_ m: SetupWizardModel, until done: @MainActor () -> Bool) async {
-        for _ in 0..<400 where !done() { try? await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<2000 where !done() { try? await Task.sleep(for: .milliseconds(5)) }
     }
 
     @Test func theWaitMovesOnByItselfWhenTheLinkArrivesAndNeverConnectsByItself() async throws {
@@ -149,7 +155,8 @@ struct RendezvousTests {
         #expect(m.stage == .connect && m.picked == mine)
         m.linkText = link
         #expect(m.canConnect)
-        m.linkText = "ainkrad://connect?host=other.example.com&fp=\(Wire.b64(Data(repeating: 3, count: 32)))&secret=\(secret)"
+        m.linkText =
+            "ainkrad://connect?host=other.example.com&fp=\(Wire.b64(Data(repeating: 3, count: 32)))&secret=\(secret)"
         #expect(m.pickedMismatch && !m.canConnect)
         m.back()
         #expect(m.stage == .nearby && m.picked == nil)

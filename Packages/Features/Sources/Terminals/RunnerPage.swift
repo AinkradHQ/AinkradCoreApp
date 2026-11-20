@@ -53,7 +53,9 @@ struct RunnerPage: View {
 
     // MARK: header
 
-    private var isMac: Bool { model.host.thisMacRunnerID == runner.id || (runner.os ?? "").lowercased().contains("mac") }
+    private var isMac: Bool {
+        model.host.thisMacRunnerID == runner.id || (runner.os ?? "").lowercased().contains("mac")
+    }
 
     private var hero: some View {
         HStack(alignment: .center, spacing: Space.s4 + 2) {
@@ -76,7 +78,10 @@ struct RunnerPage: View {
                 Label(off ? "Check again" : "Test it", systemImage: "bolt")
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.noop[runner.id] == .running)
-            .help(off ? "Ask the Core whether \(runner.name) is back" : "Ask \(runner.name) to answer without starting work")
+            .help(
+                off
+                    ? "Ask the Core whether \(runner.name) is back"
+                    : "Ask \(runner.name) to answer without starting work")
             if !runner.builtIn {
                 Button("Remove") { model.confirmRevoke(runner) }
                     .buttonStyle(CoreButtonStyle(.quietDanger, size: .small))
@@ -93,7 +98,11 @@ struct RunnerPage: View {
         let since: String =
             off
             ? (facts.lastSeenWords ?? "never seen")
-            : (runner.connectedSince.map { "connected for " + $0.formatted(.relative(presentation: .numeric, unitsStyle: .wide)).replacingOccurrences(of: " ago", with: "") } ?? "online")
+            : (runner.connectedSince.map {
+                "connected for "
+                    + $0.formatted(.relative(presentation: .numeric, unitsStyle: .wide)).replacingOccurrences(
+                        of: " ago", with: "")
+            } ?? "online")
         return [facts.system ?? (isMac ? "Mac" : "Server"), runner.version.map { "Runner \($0)" }, since]
             .compactMap { $0 }.joined(separator: " · ")
     }
@@ -132,7 +141,10 @@ struct RunnerPage: View {
             ]
             : [
                 ("power", "Check that the machine is on"), ("wifi", "Check that it is online"),
-                ("server.rack", "Still offline after 5 minutes? Check that the Ainkrad runner service is running on it"),
+                (
+                    "server.rack",
+                    "Still offline after 5 minutes? Check that the Ainkrad runner service is running on it"
+                ),
             ]
     }
 
@@ -173,8 +185,10 @@ struct RunnerPage: View {
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Copy the folder path")
                 }
                 .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.control))
-                Text("Work happens in this folder. The runner can’t see anything else on the \(isMac ? "Mac" : "computer").")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                Text(
+                    "Work happens in this folder. The runner can’t see anything else on the \(isMac ? "Mac" : "computer")."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             } else {
                 Text("Not reported yet. A runner shows it once AI sessions are on.").foregroundStyle(palette.text2)
             }
@@ -229,7 +243,9 @@ struct RunnerPage: View {
             guard let version, !version.isEmpty else { return "Ready" }
             return "Version \(version.split(separator: ".").prefix(2).joined(separator: "."))"
         case .missing:
-            if let bad = model.installs[runner.id]?[key], bad.state == .failed { return bad.reason ?? "The install did not finish." }
+            if let bad = model.installs[runner.id]?[key], bad.state == .failed {
+                return bad.reason ?? "The install did not finish."
+            }
             return "Not installed yet"
         }
     }
@@ -395,7 +411,9 @@ struct RunnerPage: View {
     /// Tools found on the host, each with an Install button when missing and live progress while installing.
     private var tools: some View {
         card("Tools") {
-            ForEach(RunnerTools.all.filter { t in !RunnerFacts.aiTools.contains { $0.key == t.id } }, id: \.id) { t in toolRow(t) }
+            ForEach(RunnerTools.all.filter { t in !RunnerFacts.aiTools.contains { $0.key == t.id } }, id: \.id) { t in
+                toolRow(t)
+            }
         }
     }
 

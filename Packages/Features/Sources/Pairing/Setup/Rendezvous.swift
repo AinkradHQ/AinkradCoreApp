@@ -37,7 +37,9 @@ struct RendezvousSession: Sendable {
         else { return nil }
         let sym = shared.hkdfDerivedSymmetricKey(
             using: SHA256.self, salt: code, sharedInfo: Self.context + epk + publicKey, outputByteCount: 32)
-        guard let box = try? ChaChaPoly.SealedBox(nonce: nonce, ciphertext: ct.dropLast(16), tag: ct.suffix(16)),
+        guard
+            let box = try? ChaChaPoly.SealedBox(
+                nonce: nonce, ciphertext: Data(ct.dropLast(16)), tag: Data(ct.suffix(16))),
             let plain = try? ChaChaPoly.open(box, using: sym, authenticating: Self.context)
         else { return nil }
         return String(data: plain, encoding: .utf8)

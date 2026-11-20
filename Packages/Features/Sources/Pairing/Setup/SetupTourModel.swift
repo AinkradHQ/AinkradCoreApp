@@ -47,7 +47,8 @@ final class SetupTourModel {
     private(set) var pending = false
 
     init(
-        macRunner: MacRunnerModel?, profile userProfile: UserProfile? = nil, save: @escaping @MainActor ([SetupProfile.Item]) async -> Bool,
+        macRunner: MacRunnerModel?, profile userProfile: UserProfile? = nil,
+        save: @escaping @MainActor ([SetupProfile.Item]) async -> Bool,
         done: @escaping @MainActor () -> Void = {}
     ) {
         self.macRunner = macRunner
@@ -70,7 +71,8 @@ final class SetupTourModel {
 
     func begin() {
         if profile.name.isEmpty {
-            profile.name = userProfile?.name.nilIfEmpty ?? NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+            profile.name =
+                userProfile?.name.nilIfEmpty ?? NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
         }
         step = .role
     }
@@ -147,10 +149,11 @@ final class SetupTourModel {
     }
 
     var runnerLine: String {
-        macRunner?.isAvailable == true ? (macRunner?.useThisMac == true ? "Runner is on" : "Runner is off") : "Not in this build"
+        macRunner?.isAvailable == true
+            ? (macRunner?.useThisMac == true ? "Runner is on" : "Runner is off") : "Not in this build"
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+extension String {
+    fileprivate var nilIfEmpty: String? { isEmpty ? nil : self }
 }
