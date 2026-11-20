@@ -7,7 +7,10 @@ extension CoreUIGallery {
             "CoreAccent",
             "The one accent: selection, the main button, switches. Settings, Appearance; graphite by default."
         ) {
-            HStack(spacing: Space.s4) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 80), spacing: Space.s4, alignment: .top)],
+                alignment: .leading, spacing: Space.s4
+            ) {
                 ForEach(CoreAccent.allCases, id: \.self) { a in
                     GVariant(a.title + (accent.accent == a ? " (in use)" : "")) {
                         VStack(alignment: .leading, spacing: Space.s1) {
@@ -123,7 +126,8 @@ extension CoreUIGallery {
             }
         }
         GSpec(
-            "CoreWallpaper", "Twelve wallpapers plus Sky and Plain, each with a night (left) and a day (right) version."
+            "CoreWallpaper",
+            "Twenty-four wallpapers plus Sky and Plain, each with a night (left) and a day (right) version."
         ) {
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3, alignment: .top), count: 4),

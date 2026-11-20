@@ -10,7 +10,7 @@ struct ConnKind: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let say: String
-    let signIn: SignIn
+    var signIn: SignIn
     /// The word for what limits apply to: "repositories", "projects".
     let resource: String
     /// What may be allowed, in order; the first is on by default.
@@ -56,15 +56,16 @@ struct ConnItem: Identifiable, Equatable, Sendable {
     var lastUsed: Date?
     var lastChecked: Date?
     var users: Int
+    /// The sign-in itself stopped working (expired or refused): the row says "Sign in again", not just "needs a look".
+    var signInNeeded = false
+    /// `oauth` (signed in on the service's website), `token` or `app_install`: only the first can be signed in again.
+    var authMethod = "oauth"
 }
 
 /// Where a sign-in stands, read from the Core while the sheet is open.
 struct ConnFlow: Equatable, Sendable {
     enum Step: Equatable, Sendable {
         case waiting
-        /// GitHub: signed in, now choose repositories on GitHub (or skip).
-        /// `install` is GitHub's page for the Ainkrad app, where the person picks repositories.
-        case chooseResources(login: String, install: URL)
         /// Jira: approved, now pick a site.
         case pickSite([String])
         case connected(Int64)
@@ -84,6 +85,23 @@ struct ConnFlow: Equatable, Sendable {
         if case .connected = step { return true }
         return false
     }
+}
+
+/// One repository, project, team or channel a connection can reach, as the picker lists it.
+struct ConnPick: Identifiable, Equatable, Sendable {
+    /// What a grant's limit takes (`owner/name`, a project key, a channel id).
+    let id: String
+    let name: String
+    /// A short second line the Core knows (a project key, "14 people").
+    var detail: String?
+    /// When it last changed, when the service says.
+    var updatedAt: Date?
+}
+
+struct ConnPicks: Equatable, Sendable {
+    var items: [ConnPick]
+    /// The service has more than the Core read: the person searches to narrow it.
+    var truncated = false
 }
 
 struct ConnActivity: Identifiable, Equatable, Sendable {
@@ -137,6 +155,13 @@ enum ConnFilter: String, CaseIterable {
 }
 
 enum ConnLook {
+    /// The one letter on a service's logo tile.
+    static func letter(_ kind: String) -> String {
+        switch kind {
+        case "teams": "T"
+        default: kind.prefix(1).uppercased()
+        }
+    }
     static func symbol(_ kind: String) -> String {
         switch kind {
         case "github": "arrow.triangle.branch"
@@ -148,11 +173,18 @@ enum ConnLook {
     }
     static func hue(_ kind: String) -> Color {
         switch kind {
-        case "github": GlassInk.slate
-        case "jira": GlassInk.blue
-        case "linear", "slack": GlassInk.blue
+        case "github": Color(red: 0x9A / 255, green: 0xA3 / 255, blue: 0xB2 / 255)
+        case "jira": Color(red: 0x5B / 255, green: 0x93 / 255, blue: 0xE6 / 255)
+        case "linear": Color(red: 0x8A / 255, green: 0x7F / 255, blue: 0xE0 / 255)
+        case "slack": Color(red: 0xD0 / 255, green: 0x7A / 255, blue: 0xA6 / 255)
+        case "teams": Color(red: 0x77 / 255, green: 0x82 / 255, blue: 0xDD / 255)
         default: GlassInk.blue
         }
+    }
+    /// The chip on a row: connected, or what to do about it.
+    static func chip(_ c: ConnItem) -> (String, Tone, String) {
+        if c.status == .needsLook && c.signInNeeded { return ("Sign in again", .warn, "exclamationmark.triangle") }
+        return badge(c.status)
     }
     static func badge(_ s: ConnStatus) -> (String, Tone, String) {
         switch s {

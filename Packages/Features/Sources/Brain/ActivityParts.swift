@@ -77,6 +77,7 @@ struct ActivityDetail: View {
 
 /// One feed or egress row: when, what, who and where, why it was refused, and the result as a chip.
 struct ActivityRowView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let time: String
     let title: String
     let subtitle: String
@@ -114,7 +115,7 @@ struct ActivityRowView: View {
             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
             .background(
                 fresh && !reduce
-                    ? GlassInk.blue.opacity(0.2)
+                    ? GlassInk.accent(paneAccent).opacity(0.2)
                     : selected ? palette.navActive : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.cardMac)
             )

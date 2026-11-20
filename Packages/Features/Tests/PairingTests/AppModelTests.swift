@@ -48,7 +48,7 @@ struct AppModelTests {
         s.scopes = ["read"]
         let m = try app(s)
         await m.start()
-        #expect(m.shell.settings.hidden == Set(AppModel.adminOnly))
+        #expect(m.shell.settings.hidden == AppModel.hiddenSettings)
         #expect(m.shell.launcher.entry("lockouts") == nil && m.shell.launcher.entry("admin-ops") == nil)
         #expect(m.shell.launcher.entry("devices") != nil)
         m.showAdminPages(true)
@@ -175,7 +175,8 @@ struct AppModelTests {
         m.beatEvery = .milliseconds(20)
         await m.start()
         #expect(m.shell.lock == .open && s.unlocks == 1 && m.isUnlocked)
-        try await Task.sleep(for: .milliseconds(150))
+        // Polled, not one fixed sleep: under the parallel run the main actor is shared and a beat can come late.
+        for _ in 0..<1000 where s.beats < 2 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(s.beats >= 2, "the unlock is held by heartbeat")
         // The Mac locks or sleeps: the Core is told, the card covers the app.
         m.lockApp()
@@ -481,5 +482,38 @@ struct AppModelTests {
             d.status = status
             #expect(d.cutOff == cut)
         }
+    }
+}
+
+struct HubTabTests {
+    @Test func launcherEntriesLandOnTheRightTab() {
+        #expect(HubTab.forEntry("devices") == .devices)
+        #expect(HubTab.forEntry("add-device") == .devices)
+        #expect(HubTab.forEntry("devices-runners") == .devices)
+        #expect(HubTab.forEntry("runners") == .runners)
+        #expect(HubTab.forEntry("mac-runner") == .thisMac)
+        #expect(HubTab.forEntry("lockouts") == nil)
+    }
+}
+
+struct DeviceRoleTests {
+    @Test func scopesReadAsAdminMemberOrViewer() {
+        #expect(DeviceRole(scopes: ["read", "admin"]).title == "Admin")
+        #expect(DeviceRole(scopes: ["read", "approve", "agent"]).title == "Member")
+        #expect(DeviceRole(scopes: ["read", "approve", "agent"]).line == "Can approve AI actions, use your accounts")
+        #expect(DeviceRole(scopes: ["read"]).title == "Viewer")
+    }
+
+    @Test func makingAnAdminKeepsWhatItHadAndAddsAdminOnce() {
+        #expect(DeviceRole.withAdmin(["read", "approve"]) == ["read", "approve", "admin"])
+        #expect(DeviceRole.withAdmin(["read", "admin"]) == ["read", "admin"])
+    }
+}
+
+struct MacVitalsTests {
+    @Test func theShareIsBetweenNothingAndAll() {
+        let v = MacVitals.read()
+        #expect((0...1).contains(v.memory ?? 0.5) && (0...1).contains(v.disk ?? 0.5))
+        #expect(ThisMacView.percent(0.34) == "34%")
     }
 }

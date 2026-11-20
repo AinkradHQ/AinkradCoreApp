@@ -5,6 +5,7 @@ import SwiftUI
 /// One runner's page (N18, N19): a header, then Now, What it offers, Machine, Who may use it and Actions. Plain words, no
 /// internal codes; what the Core does not report says "Not reported yet".
 struct HardwarePage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: TerminalsModel
     let runner: RunnerItem
     @Environment(\.corePalette) var palette
@@ -284,7 +285,9 @@ struct HardwarePage: View {
                         }
                         .transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity))
                     }
-                    ForEach(jobs) { j in jobRow(j).transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity)) }
+                    ForEach(jobs) { j in
+                        jobRow(j).transition(reduce ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    }
                     ForEach(shownTerminals) { t in
                         workRow(
                             "terminal", "Terminal \(t.id)", t.attached == 0 ? "Not attached" : "\(t.attached) attached"
@@ -300,7 +303,8 @@ struct HardwarePage: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + jobs.map(\.id) + here.map(\.id))
+                .animation(
+                    Motion.calm(Motion.out(Motion.ui), reduce), value: work.map(\.id) + jobs.map(\.id) + here.map(\.id))
                 loadChart
             }
             if let n = model.noop[runner.id] { noopLine(n) }

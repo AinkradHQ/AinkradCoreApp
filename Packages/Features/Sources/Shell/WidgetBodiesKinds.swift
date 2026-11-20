@@ -10,11 +10,13 @@ struct WRow: View {
     let title: String
     var sub: String?
     var trailing: String?
-    var tint: Color = GlassInk.blue
+    var tint: Color?
+    @Environment(\.coreAccent) private var paneAccent
     var chevron = false
     var body: some View {
         HStack(spacing: Space.s3) {
-            Image(systemName: symbol).foregroundStyle(tint).frame(width: 20).accessibilityHidden(true)
+            Image(systemName: symbol).foregroundStyle(tint ?? GlassInk.accent(paneAccent)).frame(width: 20)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 if let sub { WCaption(sub) }
@@ -64,6 +66,7 @@ private func money(_ x: Double) -> String { x.formatted(.currency(code: "USD")) 
 // MARK: Running AI sessions
 
 struct RunningBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     let size: WidgetSize
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -102,7 +105,7 @@ struct RunningBody: View {
                                 // The bar runs from when it started to now, on one shared clock.
                                 GeometryReader { g in
                                     let w = g.size.width * Double(r.minutes) / longest
-                                    coreShape(3).fill(GlassInk.blue).frame(width: max(6, w), height: 6)
+                                    coreShape(3).fill(GlassInk.accent(paneAccent)).frame(width: max(6, w), height: 6)
                                         .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
                                 .frame(height: 6)

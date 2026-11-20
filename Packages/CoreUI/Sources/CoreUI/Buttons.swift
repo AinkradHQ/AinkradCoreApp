@@ -118,6 +118,7 @@ private struct CoreButtonBody: View {
 /// a soft blue tile, danger a soft red one, secondary a dark glass well; a light edge that brightens on hover.
 /// No glow and no scale on hover (D3): hover is a fill step and a brighter edge. Plain buttons stay quiet until hovered.
 private struct ButtonSurface: ViewModifier {
+    @Environment(\.coreAccent) private var accent
     let kind: CoreButtonKind
     let radius: CGFloat
     let fill: Color
@@ -128,7 +129,7 @@ private struct ButtonSurface: ViewModifier {
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         let hue: Color =
-            kind == .danger ? GlassInk.red : kind == .prominent ? GlassInk.blue : GlassInk.slate
+            kind == .danger ? GlassInk.red : kind == .prominent ? GlassInk.accent(accent) : GlassInk.slate
         content
             .background {
                 switch kind {

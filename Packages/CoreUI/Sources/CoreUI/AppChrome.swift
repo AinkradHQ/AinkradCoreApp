@@ -217,6 +217,7 @@ public struct AppHeader<Filters: View, Actions: View>: View {
 /// The one slider (Ahmed, 2026-11-05: unify): a glass track with a blue fill and a white knob, the two ends named,
 /// the value as a percentage at the right. Drag or click anywhere on the track; ← → step by 5 %.
 public struct GlassSlider: View {
+    @Environment(\.coreAccent) private var accent
     @Binding var value: Double
     let range: ClosedRange<Double>
     let low: String
@@ -251,7 +252,7 @@ public struct GlassSlider: View {
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.adaptive(.white.opacity(0.14), day: GlassInk.dayInk.opacity(0.12)))
                         .frame(height: 6)
-                    coreShape(3).fill(GlassInk.blue).frame(width: max(6, x), height: 6)
+                    coreShape(3).fill(GlassInk.accent(accent)).frame(width: max(6, x), height: 6)
                     CoreGlassKnob(width: 18, height: 18, radius: 6, active: dragging)
                         .offset(x: direction == .rightToLeft ? 9 - x : x - 9)
                 }
@@ -342,6 +343,7 @@ public struct SettingRow<Content: View>: View {
 /// Where something stands on a short way, as steps (e.g. Off → Test keys → Real keys): the steps passed join in the
 /// colour, the current one is lit, a closed one shows a lock.
 public struct StepTrack: View {
+    @Environment(\.coreAccent) private var accent
     let steps: [String]
     let at: Int
     let hue: Color
@@ -355,7 +357,9 @@ public struct StepTrack: View {
     public var body: some View {
         HStack(spacing: 6) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, name in
-                if i > 0 { coreShape(1).fill(i <= at ? GlassInk.blue : GlassInk.track).frame(width: 14, height: 2) }
+                if i > 0 {
+                    coreShape(1).fill(i <= at ? GlassInk.accent(accent) : GlassInk.track).frame(width: 14, height: 2)
+                }
                 HStack(spacing: 4) {
                     if locked.contains(i) { Image(systemName: "lock.fill").coreFont(size: 9) }
                     Text(name)
@@ -363,7 +367,7 @@ public struct StepTrack: View {
                 .coreFont(size: MacTextSize.meta, weight: i == at ? .semibold : .regular)
                 .foregroundStyle(i == at ? .white : GlassInk.secondary)
                 .padding(.horizontal, 8).frame(height: 24)
-                .background(i == at ? GlassInk.blue.opacity(0.75) : GlassInk.well, in: coreShape(Radius.chip))
+                .background(i == at ? GlassInk.accent(accent).opacity(0.75) : GlassInk.well, in: coreShape(Radius.chip))
             }
         }
         .fixedSize()

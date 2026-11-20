@@ -66,6 +66,7 @@ struct SessionRouteCues: View {
 
 /// Every attempt of one run: which account it held and how it ended. Open one to see its transcript.
 private struct AttemptList: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let attempts: [AgentSessionInfo]
     let current: String
@@ -80,7 +81,7 @@ private struct AttemptList: View {
                 } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: a.id == current ? "circle.inset.filled" : "square.stack")
-                            .foregroundStyle(a.id == current ? GlassInk.blueInk : GlassInk.secondary)
+                            .foregroundStyle(a.id == current ? GlassInk.accentInk(paneAccent) : GlassInk.secondary)
                         Text(SessionCues.attempt(a))
                         if let acc = a.route?.account, let n = model.accountNames[acc] {
                             Text("on \(n)").foregroundStyle(GlassInk.secondary)

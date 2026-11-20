@@ -73,6 +73,32 @@ protocol AccountsService: Sendable {
     /// A provider definition of your own (`admin`, Touch ID); replacing makes a new version, deleting refuses one in use.
     func saveProvider(_ p: ProviderDraft, replacing: Bool) async throws
     func deleteProvider(_ id: String) async throws
+    // E7-1 and E7-2 (API minor 95). Hand-written wire in `AIOrder/AIOrderWire.swift`; defaults say "not supported".
+    func aiOrderSupported() async -> Bool
+    func aiOrder() async throws -> AIOrderDoc
+    func setAIOrder(agent: String?, items: [AIOrderPut.Item]) async throws -> AIOrderDoc
+    func clearAIOrder(agent: String) async throws
+    /// How many models `GET /accounts/{id}/models` lists, nil when unknown.
+    func modelCount(account: Int64) async -> Int?
+    /// The device code of a runner-bound sign-in (Codex, OpenCode, Antigravity), nil when it has none.
+    func loginCode(_ id: String) async -> String?
+    // E7-5 (API minor 95): a guided sign-in is text on a screen and one typed line at a time. Wire in `AIOrder/GuidedLoginWire.swift`.
+    func loginScreen(_ id: String) async throws -> LoginScreen
+    func sendLoginInput(_ id: String, line: String) async throws
+    /// The runner each runner-bound account is pinned to, by account id (runner ids). Empty when the Core does not say.
+    func boundRunners() async -> [Int64: String]
+    /// What the Core says about leftovers and model enforcement, by account id. Empty when it says nothing.
+    func accountNotes() async -> [Int64: AccountNotes]
+    // 0.10 usage meters and model switches. Wire in `AIOrder/UsageWire.swift`; the defaults say "not supported".
+    // Requirements, not extension-only, so a conformer's own answer is the one `any AccountsService` calls.
+    func accountMeters() async -> [Int64: AccountMeterItem]
+    func accountModels(account: Int64) async -> [ModelRowItem]
+    func setModelAllowed(account: Int64, model: String, allowed: Bool) async throws
+    // E7-7 (API minor 95): remove with Undo. Wire in `AIOrder/AccountRemovalWire.swift`; the defaults say "not supported".
+    /// `DELETE /accounts/{id}`: soft delete. The time the Core keeps it for an Undo (nil when it does not say).
+    func removeAccount(_ id: Int64) async throws -> Date?
+    /// `POST /accounts/{id}/restore` (step-up): inside the window only.
+    func restoreAccount(_ id: Int64) async throws
 }
 
 /// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).
@@ -136,7 +162,8 @@ struct LiveAccountsService: AccountsService {
     private var client: Client { connection.client }
 
     func providers() async throws -> [ProviderItem] {
-        try await run { try await client.listProviders().ok.body.json.map(Self.provider) }
+        let list = try await run { try await client.listProviders().ok.body.json.map(Self.provider) }
+        return await withPresets(list)
     }
     func accounts() async throws -> [AccountItem] {
         try await run { try await client.listAccounts().ok.body.json.map(Self.account) }
@@ -325,9 +352,16 @@ struct LiveAccountsService: AccountsService {
     }
 
     func budgets() async throws -> [BudgetItem] {
-        try await run { try await client.listBudgets().ok.body.json.map(Self.budget) }
+        let list = try await run { try await client.listBudgets().ok.body.json.map(Self.budget) }
+        return await withMessages(list)
     }
     func setBudget(_ b: BudgetDraft) async throws {
+        // A message cap or a 5-hour period is new in 0.10: the generated body cannot say it yet.
+        if b.messageCap != nil || b.period == "hour5" {
+            let body = try JSONEncoder().encode(BudgetPut(b))
+            _ = try await connection.signedRequest(method: "PUT", target: "/api/v1/budgets", body: body)
+            return
+        }
         try await run {
             _ = try await client.setBudget(
                 body: .json(
@@ -371,20 +405,12 @@ struct LiveAccountsService: AccountsService {
     func usage() async throws -> [UsageItem] {
         try await run { try await client.accountsUsage().ok.body.json.map(Self.usage) }
     }
+    // Core 0.10 retired `PUT /accounts/{id}/limits`: a limit is a budget now (`PUT /budgets`).
     func setLimit(account: Int64, _ d: LimitDraft) async throws {
-        try await run {
-            _ = try await client.setAccountLimit(
-                path: .init(id: String(account)),
-                body: .json(.init(cap: d.cap, unit: d.unit, warnPercent: d.warnPercent, windowSecs: d.windowSecs))
-            ).ok
-        }
+        throw CoreError.invalidInput("Usage limits are budgets now. Set one under Limits in Advanced.")
     }
     func clearLimit(account: Int64, unit: String, windowSecs: Int64) async throws {
-        try await run {
-            _ = try await client.clearAccountLimit(
-                path: .init(id: String(account), unit: unit, windowSecs: windowSecs)
-            ).ok
-        }
+        throw CoreError.invalidInput("Usage limits are budgets now. Remove one under Limits in Advanced.")
     }
     func costs(account: Int64?) async throws -> [CostItem] {
         try await run {
@@ -423,15 +449,9 @@ struct LiveAccountsService: AccountsService {
         }
         return UsageItem(
             accountID: u.accountId, fiveHours: w(u.fiveHours), sevenDays: w(u.sevenDays),
-            limitShare: Double(u.maxUtilisationBps) / 10_000, limitsExhausted: u.limits.contains { $0.exhausted },
-            hasLimits: !u.limits.isEmpty, drops: u.recentDrops,
+            limitShare: 0, limitsExhausted: false, hasLimits: false, drops: u.recentDrops,
             companies: u.byCompany.map {
                 CompanyUsage(company: $0.company, fiveHours: w($0.fiveHours), sevenDays: w($0.sevenDays))
-            },
-            limits: u.limits.map {
-                LimitItem(
-                    unit: $0.unit, windowSecs: $0.windowSecs, cap: $0.cap, used: $0.used, warnPercent: $0.warnPercent,
-                    exhausted: $0.exhausted)
             })
     }
 

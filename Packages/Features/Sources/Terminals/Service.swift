@@ -181,6 +181,33 @@ extension TerminalService {
         (policy, false)
     }
     func installTool(_ runner: String, tool: String) async throws -> String { "op" }
+    func hardware() async -> [HardwareItem]? { nil }
+    func hardwarePool() async -> HardwarePoolItem? { nil }
+    func jobs() async -> [JobItem] { [] }
+    func pauseHardware(_ id: String?, until: Date?) async throws {}
+}
+
+struct LiveTerminalService: TerminalService {
+    let connection: CoreConnection
+    /// The runner on this Mac, if the app runs one (the local path).
+    var localRunner: @Sendable () async -> LocalRunner? = { nil }
+    private var client: Client { connection.client }
+
+    func terminals() async throws -> [TerminalItem] {
+        try await run { try await client.listTerminals().ok.body.json.map(Self.item) }
+    }
+
+    func terminal(_ id: String) async throws -> TerminalItem {
+        try await run {
+            switch try await client.getTerminal(path: .init(id: id)) {
+            case .ok(let o): return Self.item(try o.body.json)
+            case .notFound(let r): throw Self.fail(404, try? r.body.json)
+            case .undocumented(let status, let p): throw await Self.fail(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
     func hardware() async -> [HardwareItem]? {
         guard await connection.serverSupports(minor: 95) else { return nil }
         guard case .ok(let o)? = try? await client.listHardware(), let list = try? o.body.json else { return nil }
@@ -219,6 +246,15 @@ extension TerminalService {
         }
     }
 
+    func runners() async throws -> [RunnerItem] {
+        var out = try await run { try await client.listRunners().ok.body.json.map(Self.runner) }
+        // The runners' own report (tool install, home, last error) is API minor 95; read it beside the generated list.
+        if await connection.serverSupports(minor: coreMinorV010), let extra = await reported() {
+            for i in out.indices { if let e = extra[out[i].id] { e.apply(to: &out[i]) } }
+        }
+        return out
+    }
+
     private func reported() async -> [String: RunnerReportWire]? {
         guard let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/runners") else {
             return nil
@@ -235,7 +271,7 @@ extension TerminalService {
     }
 
     func tail(_ id: String, lines: Int) async throws -> [String] {
-        guard await connection.serverSupports(minor: 95) else { return [] }
+        guard await connection.serverSupports(minor: coreMinorV010) else { return [] }
         return try await run {
             switch try await client.tailTerminal(path: .init(id: id), query: .init(lines: Int32(lines))) {
             case .ok(let o): return try o.body.json.lines
@@ -258,7 +294,7 @@ extension TerminalService {
         runner: String, program: String?, session: String?, sandbox: String?, project: Int?, rows: Int, cols: Int
     ) async throws -> TerminalItem {
         // A Core before minor 95 ignores `sandbox` and would start a host-view shell: send nothing it cannot read.
-        let newCore = await connection.serverSupports(minor: 95)
+        let newCore = await connection.serverSupports(minor: coreMinorV010)
         let (sandbox, project) = newCore ? (sandbox, project) : (nil, nil)
         // A Core before minor 77 ignores `session` and opens in the home folder; say nothing it cannot read.
         let supported = await connection.serverSupports(minor: 77)

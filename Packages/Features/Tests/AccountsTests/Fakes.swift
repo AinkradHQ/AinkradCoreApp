@@ -7,6 +7,9 @@ import Shell
 
 @MainActor
 final class FakeHost: AdminHost {
+    /// Never a real browser: the links a test opened, in order.
+    private(set) var opened: [URL] = []
+    func open(_ url: URL) { opened.append(url) }
     let shell = ShellModel()
     var pausedReason: String?
     var elevationNotice: AdminNotice?
@@ -51,11 +54,66 @@ final class FakeService: AccountsService, @unchecked Sendable {
     var failure: (any Error)?
     /// What listing chains throws (a device without `admin`), apart from `failure`.
     var chainsFailure: (any Error)?
+    /// The AI order (API minor 95): off until a test turns it on.
+    var orderOn = false
+    var orderEntries: [AIOrderEntry] = []
+    var overrideList: [AIOrderOverride] = []
+    var modelsFound: Int?
+    /// 0.10: the usage meters, the model rows and what the switch was set to.
+    var meterList: [Int64: AccountMeterItem] = [:]
+    var modelRowList: [Int64: [ModelRowItem]] = [:]
     private var calls: [String] = []
     var log: [String] { lock.withLock { calls } }
     private func note(_ s: String) throws {
         lock.withLock { calls.append(s) }
         if let failure { throw failure }
+    }
+    func aiOrderSupported() async -> Bool { orderOn }
+    func aiOrder() async throws -> AIOrderDoc { AIOrderDoc(items: orderEntries, overrides: overrideList) }
+    func setAIOrder(agent: String?, items: [AIOrderPut.Item]) async throws -> AIOrderDoc {
+        try note("setAIOrder \(agent ?? "-") \(items.map { String($0.account) }.joined(separator: ","))")
+        let entries = items.map { AIOrderEntry(account: $0.account, provider: nil, harness: nil, model: $0.model) }
+        if let agent {
+            overrideList.removeAll { $0.agent == agent }
+            overrideList.append(AIOrderOverride(agent: agent, items: entries))
+        } else {
+            orderEntries = entries
+        }
+        return try await aiOrder()
+    }
+    func clearAIOrder(agent: String) async throws {
+        try note("clearAIOrder \(agent)")
+        overrideList.removeAll { $0.agent == agent }
+    }
+    /// 0.10 remove with Undo: what the Core says the window ends at, and what it holds for a restore.
+    var undoUntil: Date?
+    private var removedStash: [Int64: (item: AccountItem, entry: AIOrderEntry?)] = [:]
+    func removeAccount(_ id: Int64) async throws -> Date? {
+        try note("removeAccount \(id)")
+        if let item = accountList.first(where: { $0.id == id }) {
+            removedStash[id] = (item, orderEntries.first { $0.account == id })
+        }
+        accountList.removeAll { $0.id == id }
+        orderEntries.removeAll { $0.account == id }
+        return undoUntil
+    }
+    func restoreAccount(_ id: Int64) async throws {
+        try note("restoreAccount \(id)")
+        guard let r = removedStash.removeValue(forKey: id) else { throw CoreError.invalidInput("not removed") }
+        accountList.append(r.item)
+        // The Core gives the seat back last; the app puts it where it stood.
+        orderEntries.append(r.entry ?? AIOrderEntry(account: id, provider: nil, harness: nil, model: nil))
+    }
+    func modelCount(account: Int64) async -> Int? { modelsFound }
+    func accountMeters() async -> [Int64: AccountMeterItem] { meterList }
+    func accountModels(account: Int64) async -> [ModelRowItem] { modelRowList[account] ?? [] }
+    func setModelAllowed(account: Int64, model: String, allowed: Bool) async throws {
+        try note("setModelAllowed \(account) \(model) \(allowed)")
+        modelRowList[account] = modelRowList[account]?.map { r in
+            var r = r
+            if r.model == model { r.allowed = allowed }
+            return r
+        }
     }
     func providers() async throws -> [ProviderItem] { providerList }
     func accounts() async throws -> [AccountItem] { accountList }
@@ -166,6 +224,24 @@ final class FakeService: AccountsService, @unchecked Sendable {
         return loginItem
     }
     func cancelLogin(_ id: String) async throws { try note("cancelLogin \(id)") }
+    /// The guided sign-in: what the runner's screen says, the lines typed (kept so a test can see none was kept elsewhere).
+    var screen = LoginScreen(lines: ["Which provider?"], url: nil, code: nil)
+    var screenFailure: (any Error)?
+    var inputFailure: (any Error)?
+    var screenReads = 0
+    var bound: [Int64: String] = [:]
+    func loginScreen(_ id: String) async throws -> LoginScreen {
+        lock.withLock { screenReads += 1 }
+        if let screenFailure { throw screenFailure }
+        return screen
+    }
+    func sendLoginInput(_ id: String, line: String) async throws {
+        if let inputFailure { throw inputFailure }
+        try note("sendLoginInput \(id) \(line.count)")
+    }
+    func boundRunners() async -> [Int64: String] { bound }
+    var notes: [Int64: AccountNotes] = [:]
+    func accountNotes() async -> [Int64: AccountNotes] { notes }
     var runnerList = [AccountRunner(id: "r_1", name: "linux-01", online: true)]
     var lastKey = ""
     func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {
@@ -214,7 +290,8 @@ final class FakeService: AccountsService, @unchecked Sendable {
     var budgetList: [BudgetItem] = []
     func budgets() async throws -> [BudgetItem] { budgetList }
     func setBudget(_ b: BudgetDraft) async throws {
-        try note("setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)")
+        try note(
+            "setBudget \(b.kind) \(b.subject) \(b.period) \(b.tokenCap)\(b.messageCap.map { " msgs=\($0)" } ?? "")")
     }
     func deleteBudget(_ id: Int64) async throws { try note("deleteBudget \(id)") }
     func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {

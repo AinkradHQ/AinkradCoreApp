@@ -125,10 +125,12 @@ enum LoreInk {
 /// SF Pro at the writing sizes, scaled by Settings, Appearance, Text size.
 @MainActor enum Typeface {
     /// Body is the Mac title size (15 pt): a page for reading, not a form.
-    static var body: CGFloat { MacTextSize.scaled(MacTextSize.title) }
+    static var body: CGFloat { MacTextSize.scaled(MacTextSize.title) * userScale }
+    /// Lore's own Text size (Settings, Lore, Options): 0.9 small, 1 medium, 1.15 large, on top of Appearance's.
+    static var userScale: CGFloat = 1
     /// h1, h2, h3; h4–h6 draw as body-sized semibold.
     static func heading(_ n: Int) -> CGFloat {
-        MacTextSize.scaled([26, MacTextSize.large, 17][min(max(n, 1), 3) - 1])
+        MacTextSize.scaled([26, MacTextSize.large, 17][min(max(n, 1), 3) - 1]) * userScale
     }
     private static var cache: [String: NSFont] = [:]
 

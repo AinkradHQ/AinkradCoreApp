@@ -9,7 +9,15 @@ import SwiftUI
 // Started from `main.swift`, which also has the background collector mode (E9-6).
 struct AinkradCoreApp: App {
     @NSApplicationDelegateAdaptor(BackgroundDelegate.self) private var delegate
-    @State private var app = AinkradCoreApp.makeApp()
+    @State private var app: AppModel
+    @State private var updater: AppUpdater
+
+    init() {
+        let a = AinkradCoreApp.makeApp()
+        _app = State(initialValue: a)
+        _updater = State(initialValue: AppUpdater(shell: a.shell))
+        CrashReporter.shared.start()
+    }
 
     private var shell: ShellModel { app.shell }
 
@@ -29,10 +37,11 @@ struct AinkradCoreApp: App {
         .commands {
             ShellCommands(
                 shell: shell, paneCount: shell.panes.count, focusMode: shell.focusedPane != nil,
-                closedCount: shell.closedPanes.count, chipOn: shell.showActivityChip,
+                closedCount: shell.closedPanes.count,
                 coreOffline: shell.coreLink == .offline || shell.coreLink == .reconnecting,
                 paneTitles: shell.allPanes.map { ($0.id, $0.title) }, spaceCount: shell.spaces.count)
             QuitCommands(shell: shell)
+            CommandGroup(after: .appInfo) { Button("Check for Updates…") { updater.check() } }
             #if DEBUG
             DemoCommands(shell: shell)
             #endif

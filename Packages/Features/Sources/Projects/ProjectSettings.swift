@@ -184,7 +184,9 @@ struct SettingsPage: View {
                     GridRow {
                         label("Idle stop")
                         HStack(spacing: Space.s2) {
-                            Text("after \(project.idleMinutes) min with no visits")
+                            Text(
+                                model.limits?.idleNever == true
+                                    ? "never" : "after \(project.idleMinutes) min with no visits")
                             if let idle = project.live?.idle, project.tag == .running {
                                 Text("· \(idle)").foregroundStyle(GlassInk.secondary).monospacedDigit()
                             }

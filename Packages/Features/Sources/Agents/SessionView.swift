@@ -209,6 +209,7 @@ struct SessionView: View {
             // of bare wallpaper beside the conversation (Ahmed, 2026-11-16).
             .background(SessionInk.backing)
             .paneLook(AgentPrefs.shared.look)
+            .appLookTheme(AgentPrefs.shared.appLook)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {

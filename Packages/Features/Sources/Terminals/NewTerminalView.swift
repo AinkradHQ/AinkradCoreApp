@@ -5,6 +5,7 @@ import SwiftUI
 /// whether it opens in the sandbox home or a project's folder. ⌘T skips this sheet and opens on the last machine. A refusal
 /// lands inline with the Core's own code.
 struct NewTerminalView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     @Namespace private var pick
@@ -15,7 +16,7 @@ struct NewTerminalView: View {
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
             HStack(spacing: Space.s3) {
-                IconTile("terminal", hue: GlassInk.blue, size: 52, bounce: shown)
+                IconTile("terminal", hue: GlassInk.accent(paneAccent), size: 52, bounce: shown)
                 Text("New terminal").coreFont(size: MacTextSize.large + 4, weight: .bold)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
@@ -113,13 +114,14 @@ struct NewTerminalView: View {
             .foregroundStyle(mac ? GlassInk.ink(GlassInk.amber) : GlassInk.primary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
-            .background((mac ? GlassInk.amber : GlassInk.blue).opacity(0.14), in: coreShape(Radius.row))
+            .background((mac ? GlassInk.amber : GlassInk.accent(paneAccent)).opacity(0.14), in: coreShape(Radius.row))
             .coreRise(shown, 3)
     }
 }
 
 /// A machine to pick: its picture, name and what a terminal there is, a chip (This Mac or Sandbox), and why it can't be picked.
 private struct NewTerminalRunnerTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
     @Bindable var form: NewTerminalModel
     let runner: RunnerItem
@@ -146,11 +148,11 @@ private struct NewTerminalRunnerTile: View {
         } label: {
             HStack(spacing: Space.s3) {
                 Image(systemName: on ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(on ? GlassInk.blue : GlassInk.track)
+                    .foregroundStyle(on ? GlassInk.accent(paneAccent) : GlassInk.track)
                     .contentTransition(.symbolEffect(.replace)).accessibilityHidden(true)
                 IconTile(
                     mac ? "laptopcomputer" : runner.builtIn ? "diamond" : "server.rack",
-                    hue: mac ? GlassInk.amber : GlassInk.blue, size: 36, bounce: on)
+                    hue: mac ? GlassInk.amber : GlassInk.accent(paneAccent), size: 36, bounce: on)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(mac ? "This Mac" : runner.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                     Text(warn ?? about).coreFont(size: MacTextSize.meta)

@@ -100,10 +100,11 @@ private struct WMono: View {
 
 /// "Sandbox" is the Core's runner; "This Mac" is the runner inside the app. Always a word, never colour alone.
 private struct PlaceTag: View {
+    @Environment(\.coreAccent) private var paneAccent
     let fact: HomeSnapshot.TerminalFact
     var body: some View {
         Text(fact.place).coreFont(size: MacTextSize.meta, weight: .medium)
-            .foregroundStyle(fact.onThisMac ? GlassInk.blue : GlassInk.secondary).lineLimit(1)
+            .foregroundStyle(fact.onThisMac ? GlassInk.accent(paneAccent) : GlassInk.secondary).lineLimit(1)
     }
 }
 
@@ -190,6 +191,7 @@ struct TerminalsBody: View {
 
 /// Projects: what is open and which AI sessions work in it.
 struct ProjectsBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     let home: HomeSnapshot
     let size: WidgetSize
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -250,7 +252,7 @@ struct ProjectsBody: View {
                         ForEach(ps.prefix(5)) { p in
                             HStack(spacing: Space.s3) {
                                 Image(systemName: "folder")
-                                    .foregroundStyle(p.sessions > 0 ? GlassInk.blue : GlassInk.secondary)
+                                    .foregroundStyle(p.sessions > 0 ? GlassInk.accent(paneAccent) : GlassInk.secondary)
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text(p.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)

@@ -7,6 +7,7 @@ import SwiftUI
 
 /// The host's name, a way back, what it is, and the Advanced button.
 struct HostHero: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: LeylineModel
     let host: HostItem
     let state: HostPageState
@@ -16,7 +17,7 @@ struct HostHero: View {
         VStack(alignment: .leading, spacing: Space.s2) {
             BackButton("Hosts") { model.closeHost() }
             HStack(spacing: Space.s4) {
-                IconTile("server.rack", hue: GlassInk.blue, size: Space.s8 * 2)
+                IconTile("server.rack", hue: GlassInk.accent(paneAccent), size: Space.s8 * 2)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: Space.s3) {
                         Text(host.name).coreFont(size: MacTextSize.large + 6, weight: .semibold).lineLimit(1)
@@ -167,6 +168,7 @@ struct HostCards: View {
 
 /// One big card: symbol and title, one line, a live preview, and where it goes.
 struct HostBigCard<Preview: View>: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let title: String
     let text: String
@@ -183,7 +185,7 @@ struct HostBigCard<Preview: View>: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 HStack(spacing: Space.s3) {
-                    IconTile(symbol, hue: GlassInk.blue, size: Space.s8 + Space.s1)
+                    IconTile(symbol, hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s1)
                     Text(title).coreFont(size: MacTextSize.title, weight: .semibold)
                     Spacer(minLength: 0)
                     if let chip { StateBadge(chip, tone: chip == "Offline" ? .fail : .queue, symbol: "circle") }

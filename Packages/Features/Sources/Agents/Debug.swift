@@ -55,7 +55,7 @@ extension AgentsModel {
         case "refused":
             bindingNotices["atlas"] = InlineNotice(
                 title: "Binding did not go through.", detail: "The Core refused: that chain no longer exists.")
-        case "unbind": confirmUnbind("atlas")
+        case "unbind": Task { await unbind("atlas") }
         default: break
         }
     }

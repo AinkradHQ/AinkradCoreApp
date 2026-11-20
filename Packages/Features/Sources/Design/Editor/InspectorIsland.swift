@@ -97,10 +97,10 @@ struct InspectorIsland: View {
             }
             HStack(alignment: .top, spacing: Space.s2) {
                 NumberRow(label: "X", value: num(n, "x"), suffix: "pt", clearable: true) {
-                    editor.set("x", $0.map { .number($0) })
+                    editor.set("x", DesignOptions.snap($0).map { .number($0) })
                 }
                 NumberRow(label: "Y", value: num(n, "y"), suffix: "pt", clearable: true) {
-                    editor.set("y", $0.map { .number($0) })
+                    editor.set("y", DesignOptions.snap($0).map { .number($0) })
                 }
             }
         }
@@ -114,7 +114,7 @@ struct InspectorIsland: View {
             }
             if mode == "fixed" {
                 NumberRow(label: "\(label) in points", value: num(n, key), suffix: "pt") {
-                    editor.set(key, $0.map { .number(max(0, $0)) })
+                    editor.set(key, DesignOptions.snap($0).map { .number(max(0, $0)) })
                 }
             }
         }

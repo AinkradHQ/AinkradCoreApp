@@ -70,6 +70,7 @@ struct SetupChips: View {
 
 /// A big choice: symbol on a tile, a title and one line. Selected ones carry a check.
 struct SetupOption: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let title: String
     var sub: String = ""
@@ -81,7 +82,7 @@ struct SetupOption: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: Space.s2) {
-                IconTile(symbol, hue: on ? GlassInk.blue : GlassInk.slate, size: 40)
+                IconTile(symbol, hue: on ? GlassInk.accent(paneAccent) : GlassInk.slate, size: 40)
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
                 if !sub.isEmpty {
                     Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).multilineTextAlignment(
@@ -95,7 +96,9 @@ struct SetupOption: View {
             .overlay(alignment: .topTrailing) {
                 if on {
                     Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
-                        .frame(width: 18, height: 18).background(GlassInk.blue, in: coreShape(Radius.chip))
+                        .frame(width: 18, height: 18).background(
+                            GlassInk.accent(paneAccent), in: coreShape(Radius.chip)
+                        )
                         .padding(Space.s2)
                 }
             }

@@ -1,0 +1,75 @@
+# E12-4b (D-38, changed 2026-11-19): the app release runs ENTIRELY on GitHub. A tag `app-vX.Y.Z` runs on the hosted Xcode 27 image
+# (label `xcode-27`, arm64; see actions/runner-images README), imports the Developer ID from the secrets MACOS_CERT_P12_BASE64 and
+# MACOS_CERT_PASSWORD into a TEMPORARY keychain that is deleted at the end, signs inside out (helpers first, no --deep), notarizes
+# only if the App Store Connect API key secrets exist, signs the appcast and latest.json with SPARKLE_ED_PRIVATE_KEY, and uploads
+# the dmg first and the appcast last. No self-hosted runner. The `release` environment (tags app-v* only) holds every secret
+# (Runbooks/2026-11-19-github-release-secrets.md, "Scoping the secrets").
+name: release
+on:
+  push:
+    tags: ['app-v*']
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'AinkradHQ/AinkradCoreApp'
+    runs-on: xcode-27
+    environment: release
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - run: brew install xcodegen
+      - name: Import the Developer ID into a temporary keychain
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          KC="$RUNNER_TEMP/release.keychain-db"; PW=$(openssl rand -hex 24)
+          echo "KEYCHAIN=$KC" >> "$GITHUB_ENV"
+          security create-keychain -p "$PW" "$KC"
+          security set-keychain-settings -lut 7200 "$KC"
+          security unlock-keychain -p "$PW" "$KC"
+          printf '%s' "$MACOS_CERT_P12_BASE64" | base64 -D > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$PW" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+      - name: Build, sign, notarize (when the API key exists), appcast
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: scripts/release.sh --release
+      - name: Upload (dmg first, signed pointers, appcast last)
+        env:
+          RELEASE_UPLOAD_TOKEN_APP: ${{ secrets.RELEASE_UPLOAD_TOKEN_APP }}
+        run: |
+          set -euo pipefail
+          base=https://ainkrad.io/releases
+          put() { curl -fsS --proto '=https' --tlsv1.3 --retry 3 -X PUT -H "Authorization: Bearer $RELEASE_UPLOAD_TOKEN_APP" --data-binary "@$2" -o /dev/null "$base/upload/app/$1"; echo "uploaded app/$1"; }
+          for f in build/release/*.dmg; do put "$(basename "$f")" "$f"; done
+          put latest.json.sig build/release/latest.json.sig   # the signature first: the Worker verifies latest.json against it
+          put latest.json build/release/latest.json
+          put appcast.xml build/release/appcast.xml
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Signed. Updates arrive by themselves through Sparkle."
+          if [ "$(cat build/release/NOTARIZED)" != true ]; then
+            notes="$notes"$'\n\n'"**WARNING: this build is NOT notarized by Apple.** macOS will warn on first open (right-click, Open). Notarization needs the App Store Connect API key secrets."
+          fi
+          gh release create "$GITHUB_REF_NAME" build/release/*.dmg --title "Ainkrad ${GITHUB_REF_NAME#app-v}" --notes "$notes"
+      - name: Delete the temporary keychain
+        if: always()
+        run: |
+          security delete-keychain "${KEYCHAIN:-$RUNNER_TEMP/release.keychain-db}" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/cert.p12"

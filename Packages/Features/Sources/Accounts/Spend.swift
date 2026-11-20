@@ -9,7 +9,7 @@ struct BudgetItem: Identifiable, Equatable, Sendable {
     let kind: String
     let subject: String
     let company: String?
-    /// `day`, `week`, `month` or `total`.
+    /// `hour5`, `day`, `week`, `month` or `total`.
     let period: String
     let periodKey: String
     let tokenCap: Int64
@@ -22,11 +22,15 @@ struct BudgetItem: Identifiable, Equatable, Sendable {
     let warnAt: Int64
     let hardStop: Bool
     let exhausted: Bool
+    /// Messages per period and the count so far (0.10); nil is no message cap.
+    var messageCap: Int64? = nil
+    var messages: Int64 = 0
 
     /// Used against the cap plus what was raised, 0...1+ (nil when there is no such cap).
     var tokenShare: Double? { tokenCap > 0 ? Double(spent) / Double(tokenCap + raised) : nil }
     var usdShare: Double? { usdCap.map { Double(usdSpent) / Double(max(1, $0 + raisedUSD)) } }
-    var share: Double { max(tokenShare ?? 0, usdShare ?? 0) }
+    var messageShare: Double? { messageCap.map { Double(messages) / Double(max(1, $0)) } }
+    var share: Double { max(tokenShare ?? 0, usdShare ?? 0, messageShare ?? 0) }
 
     enum Standing: Equatable { case fine, warning, over, stopped }
     var standing: Standing {
@@ -44,15 +48,19 @@ struct BudgetDraft: Equatable, Sendable {
     var usdCap: Int64?
     var warnAt: Int64
     var hardStop: Bool
+    /// Messages per period (0.10); nil is none.
+    var messageCap: Int64? = nil
 }
 
 enum BudgetWords {
     static let periods: [(id: String, title: String)] = [
-        ("day", "Each day"), ("week", "Each week"), ("month", "Each month"), ("total", "In total"),
+        ("hour5", "Every 5 hours"), ("day", "Each day"), ("week", "Each week"), ("month", "Each month"),
+        ("total", "In total"),
     ]
 
     static func period(_ p: String) -> String {
         switch p {
+        case "hour5": "These 5 hours"
         case "day": "Today"
         case "week": "This week"
         case "month": "This month"
@@ -65,6 +73,7 @@ enum BudgetWords {
         switch k {
         case "account": "Account"
         case "pool": "Pool"
+        case "provider": "Provider"
         case "agent": "AI session"
         case "company": "Company"
         case "department": "Department"
@@ -79,6 +88,7 @@ enum BudgetWords {
         switch k {
         case "account": "creditcard.fill"
         case "pool": "square.grid.2x2.fill"
+        case "provider": "server.rack"
         case "agent": "person.fill"
         case "company": "building.2.fill"
         case "department": "person.3.fill"
@@ -116,6 +126,7 @@ extension AccountsModel {
         case "account": Int64(b.subject).flatMap(account)?.label ?? "Account \(b.subject)"
         case "pool":
             Int64(b.subject).flatMap(pool).map { "\($0.name) · \(providerName($0.provider))" } ?? "Pool \(b.subject)"
+        case "provider": ProviderCatalog.name(b.subject, fallback: providerName(b.subject))
         default: b.subject
         }
     }

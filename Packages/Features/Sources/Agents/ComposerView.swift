@@ -43,6 +43,7 @@ enum ComposerReturn: Equatable {
 /// message queues while a turn runs, ↑ on an empty field edits the last message, Esc stops the turn, "/" opens the commands
 /// (↑ ↓ pick, Return or Tab take one). The keys come from `ComposerTextView`, so they work whatever SwiftUI thinks has focus.
 struct ComposerView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     var focused: FocusState<Bool>.Binding
@@ -167,8 +168,10 @@ struct ComposerView: View {
             }
             .overlay {
                 if dropping {
-                    coreShape(Radius.cardMac).strokeBorder(GlassInk.blue, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                        .allowsHitTesting(false)
+                    coreShape(Radius.cardMac).strokeBorder(
+                        GlassInk.accent(paneAccent), style: StrokeStyle(lineWidth: 1.5, dash: [5])
+                    )
+                    .allowsHitTesting(false)
                 }
             }
             .coreDimWhenDisabled(enabled || session.over)

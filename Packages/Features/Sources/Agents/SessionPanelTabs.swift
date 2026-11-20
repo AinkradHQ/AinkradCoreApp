@@ -17,6 +17,7 @@ enum PanelTab: String, CaseIterable, Sendable {
 
 /// The todo list as rows: done struck through, the current one marked, the rest open boxes.
 struct TodoRows: View {
+    @Environment(\.coreAccent) private var paneAccent
     let items: [TodoItem]
 
     var body: some View {
@@ -27,7 +28,8 @@ struct TodoRows: View {
                         systemName: t.status == .completed
                             ? "checkmark.square.fill" : t.status == .inProgress ? "square.lefthalf.filled" : "square"
                     )
-                    .foregroundStyle(t.status == .pending ? SessionInk.text2 : GlassInk.blue).frame(width: Space.s4)
+                    .foregroundStyle(t.status == .pending ? SessionInk.text2 : GlassInk.accent(paneAccent)).frame(
+                        width: Space.s4)
                     Text(t.text).strikethrough(t.status == .completed)
                         .foregroundStyle(t.status == .completed ? SessionInk.text2 : SessionInk.text)
                         .fixedSize(horizontal: false, vertical: true)
@@ -131,6 +133,7 @@ struct PlanTab: View {
 /// The Files tab: the session's project as a tree, one folder at a time (the Core lists a level per call), with the files this
 /// session changed marked. A Core without the listing route shows just the files the session touched.
 struct FilesTab: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let session: AgentSessionInfo
     @State private var open: Set<String> = []
@@ -225,7 +228,8 @@ struct FilesTab: View {
                     .lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: Space.s2)
                 if changed {
-                    coreShape(2).fill(GlassInk.blue).frame(width: 6, height: 6).accessibilityLabel("Changed")
+                    coreShape(2).fill(GlassInk.accent(paneAccent)).frame(width: 6, height: 6).accessibilityLabel(
+                        "Changed")
                 }
             }
             .padding(.leading, CGFloat(l.depth) * Space.s4 + Space.s1).padding(.trailing, Space.s2)

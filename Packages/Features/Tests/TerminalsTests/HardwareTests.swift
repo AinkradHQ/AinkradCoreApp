@@ -139,6 +139,10 @@ import Testing
         #expect(
             deck.place(session: "as_2", runner: "d_box", placeReason: "overflow")?.words == "Overflow · ran on d_box")
         #expect(deck.place(session: "as_2", runner: "d_core", placeReason: "overflow") == nil)
+        // A runner the hardware list does not hold yet: the Core's own name for it (`placed_on`) stands in.
+        #expect(
+            deck.place(session: "as_3", runner: "d_new", placeReason: "overflow", placedOn: "studio")?.words
+                == "Overflow · ran on studio")
         // A step that ran t0 to t0 + 20 s owns the job that started at t0 + 5 s; one that ended before does not.
         #expect(deck.place(session: "as_1", from: t0, until: t0.addingTimeInterval(20))?.words == "Ran on box")
         #expect(deck.place(session: "as_1", from: t0.addingTimeInterval(-30), until: t0.addingTimeInterval(-10)) == nil)

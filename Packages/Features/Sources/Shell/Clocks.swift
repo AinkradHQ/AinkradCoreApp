@@ -9,6 +9,7 @@ import SwiftUI
 /// Second hand: Smooth sweeps (one linear turn a minute, run by the animation system, not a redraw per frame); Ticking
 /// jumps once a second; Off draws none. Reduce Motion, or Home hidden behind the workspace, turns Smooth into Ticking.
 struct AnalogDial: View {
+    @Environment(\.coreAccent) private var paneAccent
     var numbers = false
     @Environment(\.homeLive) private var live
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -26,10 +27,12 @@ struct AnalogDial: View {
                     TimelineView(homeTicks(1, live: live)) { ctx in
                         let a = ClockFace.angles(ctx.date, hand: hand)
                         ZStack {
-                            HandLine(tail: 0.08, length: 0.42, width: 0.06 * r, ink: GlassInk.blue).rotationEffect(
-                                .degrees(a.hour))
-                            HandLine(tail: 0.08, length: 0.70, width: 0.04 * r, ink: GlassInk.blue).rotationEffect(
-                                .degrees(a.minute))
+                            HandLine(tail: 0.08, length: 0.42, width: 0.06 * r, ink: GlassInk.accent(paneAccent))
+                                .rotationEffect(
+                                    .degrees(a.hour))
+                            HandLine(tail: 0.08, length: 0.70, width: 0.04 * r, ink: GlassInk.accent(paneAccent))
+                                .rotationEffect(
+                                    .degrees(a.minute))
                             if hand == .ticking {
                                 secondHand(r).rotationEffect(.degrees(a.second))
                             }
@@ -38,7 +41,7 @@ struct AnalogDial: View {
                     if hand == .smooth {
                         SweepHand { secondHand(r) }.id(minute.date)
                     }
-                    coreShape(0.03 * r).fill(GlassInk.blue).frame(width: 0.1 * r, height: 0.1 * r)
+                    coreShape(0.03 * r).fill(GlassInk.accent(paneAccent)).frame(width: 0.1 * r, height: 0.1 * r)
                 }
                 .frame(width: 2 * r, height: 2 * r)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -51,7 +54,7 @@ struct AnalogDial: View {
     }
 
     private func secondHand(_ r: CGFloat) -> some View {
-        HandLine(tail: 0.20, length: 0.80, width: 0.018 * r, ink: GlassInk.blueInk)
+        HandLine(tail: 0.20, length: 0.80, width: 0.018 * r, ink: GlassInk.accentInk(paneAccent))
     }
 
     /// Face, ticks and (Large) the four numbers. Drawn once; only the hands move.
@@ -208,6 +211,7 @@ private struct ClockLine: View {
 /// Clocks) follow the minutes in a smaller, secondary size. Digits change in place; Reduce Motion swaps them without
 /// the roll.
 struct DigitalClockBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     let size: WidgetSize
     @Environment(\.homeLive) private var live
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -313,7 +317,7 @@ struct DigitalClockBody: View {
                     Text(day.formatted(.dateTime.weekday(.abbreviated))).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                     Text(day.formatted(.dateTime.day())).coreFont(size: MacTextSize.body, weight: .semibold)
-                        .foregroundStyle(today ? GlassInk.blue : GlassInk.primary)
+                        .foregroundStyle(today ? GlassInk.accent(paneAccent) : GlassInk.primary)
                 }
                 .frame(maxWidth: .infinity)
                 .background(today ? GlassInk.wellEdge : .clear, in: coreShape(Radius.control))

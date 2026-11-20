@@ -5,6 +5,7 @@ import SwiftUI
 
 /// The first screen of a fresh Mac: set up a new Core, or use one that already runs. Both end on the same paste screen.
 struct SetupWizardView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: SetupWizardModel
     /// "Pair with a code" instead: the older flow for a Core whose first device already exists.
     let useCode: () -> Void
@@ -124,7 +125,7 @@ struct SetupWizardView: View {
     {
         Button(action: open) {
             VStack(spacing: Space.s1) {
-                IconTile(symbol, hue: GlassInk.blue, size: 36)
+                IconTile(symbol, hue: GlassInk.accent(paneAccent), size: 36)
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
                 Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
@@ -267,7 +268,7 @@ struct SetupWizardView: View {
                     model.pick(core)
                 } label: {
                     HStack(spacing: Space.s3) {
-                        IconTile("server.rack", hue: GlassInk.blue, size: 36)
+                        IconTile("server.rack", hue: GlassInk.accent(paneAccent), size: 36)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(core.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                             Text("Fingerprint \(core.fingerprintHint)").coreFont(

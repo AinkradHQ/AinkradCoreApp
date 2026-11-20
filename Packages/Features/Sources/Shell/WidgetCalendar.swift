@@ -65,6 +65,7 @@ public final class CalendarProvider {
 }
 
 struct CalendarBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     let size: WidgetSize
     @Environment(\.widgetPreview) private var preview
     @State private var picked: Date?
@@ -106,7 +107,7 @@ struct CalendarBody: View {
         HStack(spacing: Space.s3) {
             Text(e.allDay ? "All day" : e.start.formatted(.dateTime.hour().minute()))
                 .coreFont(size: MacTextSize.meta, weight: .medium).monospacedDigit()
-                .foregroundStyle(GlassInk.blue).frame(width: 52, alignment: .leading)
+                .foregroundStyle(GlassInk.accent(paneAccent)).frame(width: 52, alignment: .leading)
             Text(e.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
             Spacer(minLength: 0)
         }
@@ -135,7 +136,8 @@ struct CalendarBody: View {
                     VStack(spacing: 0) {
                         WCaption(d.formatted(.dateTime.weekday(.abbreviated)))
                         Text(d.formatted(.dateTime.day())).coreFont(size: MacTextSize.body, weight: .semibold)
-                            .foregroundStyle(cal.isDate(d, inSameDayAs: sel) ? GlassInk.blue : GlassInk.primary)
+                            .foregroundStyle(
+                                cal.isDate(d, inSameDayAs: sel) ? GlassInk.accent(paneAccent) : GlassInk.primary)
                     }
                     .frame(maxWidth: .infinity)
                     .background(
@@ -144,7 +146,9 @@ struct CalendarBody: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(d.formatted(.dateTime.weekday(.wide).day().month()))
                 .overlay(alignment: .bottom) {
-                    if !on(items, d).isEmpty { coreShape(1.5).fill(GlassInk.blue).frame(width: 12, height: 3) }
+                    if !on(items, d).isEmpty {
+                        coreShape(1.5).fill(GlassInk.accent(paneAccent)).frame(width: 12, height: 3)
+                    }
                 }
             }
         }
@@ -163,10 +167,12 @@ struct CalendarBody: View {
                 let d = cal.date(byAdding: .day, value: day - 1, to: first) ?? first
                 let today = cal.isDateInToday(d)
                 Text("\(day)").coreFont(size: MacTextSize.meta, weight: today ? .bold : .regular).monospacedDigit()
-                    .foregroundStyle(today ? GlassInk.blue : GlassInk.primary)
+                    .foregroundStyle(today ? GlassInk.accent(paneAccent) : GlassInk.primary)
                     .frame(maxWidth: .infinity, minHeight: 18)
                     .overlay(alignment: .bottom) {
-                        if !on(items, d).isEmpty { coreShape(1).fill(GlassInk.blue).frame(width: 8, height: 2) }
+                        if !on(items, d).isEmpty {
+                            coreShape(1).fill(GlassInk.accent(paneAccent)).frame(width: 8, height: 2)
+                        }
                     }
                     .accessibilityLabel(d.formatted(.dateTime.weekday(.wide).day().month()))
             }

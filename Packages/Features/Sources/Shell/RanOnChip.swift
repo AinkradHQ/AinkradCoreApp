@@ -152,8 +152,11 @@ public final class HardwareDeck {
 
     /// A session's place: how the Core placed it (`place_reason`: overflow, pinned…) when it is not on the Core, else its
     /// newest job's, else "ran on X" when its runner is not the Core.
-    public func place(session id: String, runner: String, placeReason: String? = nil) -> JobPlace? {
-        if let name = offCore[runner] {
+    /// `placedOn` (the Core's name for the machine) stands in for a runner the hardware list does not hold yet.
+    public func place(
+        session id: String, runner: String, placeReason: String? = nil, placedOn: String? = nil
+    ) -> JobPlace? {
+        if let name = offCore[runner] ?? placedOn {
             let why = placeReason.flatMap(JobPlace.Reason.init(rawValue:))
             if let why, why != .core { return JobPlace(deviceName: name, reason: why) }
         }

@@ -106,6 +106,8 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var cpuLimit = 2.0
     var memLimitMb: Int64 = 2048
     var idleMinutes = ProjectRules.idleMinutes
+    /// Set aside with Archive: it keeps its repos, secrets and notes but does not run.
+    var archived = false
 
     var link: String { ProjectRules.host(slug) }
 
@@ -128,18 +130,20 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
 
     /// The state as the design system's badge says it.
     var badge: (label: String, tone: Tone, symbol: String) {
-        switch tag {
-        case .running: ("Running", .run, "play.circle")
-        case .starting: ("Starting", .warn, "gearshape")
-        case .stopped: ("Stopped", .queue, "stop.circle")
-        case .failed: ("Failed", .fail, "exclamationmark.triangle")
-        case .settingUp: ("Setting up", .warn, "gearshape")
-        case .new: ("New", .queue, "sparkle")
+        if archived { return ("Archived", .queue, "archivebox") }
+        return switch tag {
+        case .running: ("Running", Tone.run, "play.circle")
+        case .starting: ("Starting", Tone.warn, "gearshape")
+        case .stopped: ("Stopped", Tone.queue, "stop.circle")
+        case .failed: ("Failed", Tone.fail, "exclamationmark.triangle")
+        case .settingUp: ("Setting up", Tone.warn, "gearshape")
+        case .new: ("New", Tone.queue, "sparkle")
         }
     }
 
     /// The line under the name: "Running · 5 services · 2 AI sessions".
     var subtitle: String {
+        if archived { return "Archived · \(Self.count(repos.count, "repo"))" }
         if let run {
             switch run.state {
             case .running:

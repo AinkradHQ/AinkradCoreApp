@@ -39,13 +39,15 @@ final class InviteDeviceModel {
     private var closing = false
 
     init(
-        host: AppModel, pasteboard: any LinkPasteboard = SystemLinkPasteboard(), clearAfter: Duration = .seconds(60)
+        host: AppModel, pasteboard: any LinkPasteboard = SystemLinkPasteboard(), clearAfter: Duration = .seconds(60),
+        quits: NotificationCenter = .default
     ) {
         self.host = host
         self.pasteboard = pasteboard
         self.clearAfter = clearAfter
-        // A copied link must not outlive the app.
-        NotificationCenter.default.addObserver(
+        // A copied link must not outlive the app. A test passes its own center: a quit posted to the shared one would
+        // end every other test's unlock too.
+        quits.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in MainActor.assumeIsolated { self?.takeBackLink() } }
     }
