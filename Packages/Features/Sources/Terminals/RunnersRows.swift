@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 // The Runners tab's parts (mockup 12): summary tiles, one-line runner cards, tool pills and the live motion. E2's Devices & Runners
-// app shows `RunnersTab(model:)` as its Runners tab; the rest of this file is private to the tab and the detail page.
+// app shows `HardwareTab(model:)` as its Runners tab; the rest of this file is private to the tab and the detail page.
 
 /// The colour of a live state, for tiles and the glow behind them.
 func liveHue(_ live: RunnerFacts.Live, _ palette: Palette) -> Color {
@@ -148,9 +148,8 @@ extension TerminalsModel {
     /// A runner's tools as pills: Terminals, then the four AI tools, each ready, installing (with progress) or missing.
     func toolPills(_ r: RunnerItem) -> [(name: String, symbol: String, kind: RunnerToolPill.Kind)] {
         let facts = RunnerFacts(runner: r)
-        var out: [(String, String, RunnerToolPill.Kind)] = [
-            ("Terminals", "terminal", facts.terminalsOn ? .ready : .missing)
-        ]
+        var out: [(String, String, RunnerToolPill.Kind)] =
+            hidesTerminals(r) ? [] : [("Terminals", "terminal", facts.terminalsOn ? .ready : .missing)]
         for t in RunnerFacts.aiTools {
             let inst = installs[r.id]?[t.key]
             if let inst, inst.state == .running {
@@ -198,6 +197,7 @@ struct RunnerRow: View {
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).clipped()
+                if let f = model.facts(runner.id) { HardwareGlance(facts: f) }
                 RunnerActivity(live: live)
                 StateBadge(live.chip, tone: liveTone(live), symbol: "circle").frame(width: 100, alignment: .trailing)
                 Image(systemName: "chevron.right").foregroundStyle(palette.text2).imageScale(.small)

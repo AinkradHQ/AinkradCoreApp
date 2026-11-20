@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Top right: Home/Workspace, layout, what is running, the admin-unlocked chip (only while unlocked), the bell, the Core connection chip, and the emblem.
+/// Top right: Home/Workspace, layout, what is running, the hardware load, the admin-unlocked chip (only while unlocked), the bell, the Core connection chip, and the emblem.
 struct StatusCluster: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
@@ -174,5 +174,63 @@ private struct BrainPanel: View {
         }
         .padding(Space.s4)
         .frame(width: Space.s8 * 6, alignment: .leading)
+    }
+}
+
+/// The hardware icon with the pool's load as a small bar and its words (E15 §10), and the pause menu under it: Pause all for
+/// an hour, until tomorrow or indefinitely, and each Mac by itself. Shown only once the Core answers `/hardware`.
+private struct HardwareStatus: View {
+    let deck: HardwareDeck
+    @State private var open = false
+    @State private var hovering = false
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        if let bar = deck.bar {
+            CoreDropdown(items: items(bar), isPresented: $open) {
+                HStack(spacing: Space.s1) {
+                    Image(systemName: bar.paused ? "pause" : "cpu").accessibilityHidden(true)
+                    Text(bar.paused ? "Paused" : "\(bar.loadPct)%").monospacedDigit()
+                        .contentTransition(.numericText())
+                    CoreMeter(Double(bar.loadPct) / 100, low: bar.loadPct >= 85 && !bar.paused, label: "Hardware load")
+                        .frame(width: Space.s6)
+                }
+                .coreFont(size: MacTextSize.body)
+                .padding(.horizontal, Space.s2)
+                .frame(minWidth: MacSize.controlMd, minHeight: MacSize.controlMd)
+                .background(fill, in: coreShape(Radius.control))
+                .contentShape(coreShape(Radius.control))
+                .onHover { hovering = $0 }
+                .animation(Motion.calm(Motion.out(Motion.hover), reduce), value: hovering)
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: bar.loadPct)
+            }
+            .help(
+                "Hardware: \(bar.jobs) job\(bar.jobs == 1 ? "" : "s"), "
+                    + "\(bar.sessions) AI session\(bar.sessions == 1 ? "" : "s")")
+            .accessibilityLabel(bar.paused ? "Hardware, paused" : "Hardware, \(bar.loadPct) percent busy")
+            .focusEffectDisabled()
+        }
+    }
+
+    private var fill: Color { open ? palette.navActive : hovering ? palette.navActive.opacity(0.5) : .clear }
+
+    private func items(_ bar: HardwareDeck.Bar) -> [CoreDropdownItem] {
+        var out: [CoreDropdownItem] = []
+        let pause = deck.pause
+        out.append(CoreDropdownItem("Pause all for 1 hour", symbol: "pause") { pause?(nil, .hour) })
+        out.append(CoreDropdownItem("Pause all until tomorrow", symbol: "moon") { pause?(nil, .tomorrow) })
+        out.append(CoreDropdownItem("Pause all indefinitely", symbol: "pause.rectangle") { pause?(nil, .indefinite) })
+        if bar.paused { out.append(CoreDropdownItem("Resume all", symbol: "play") { pause?(nil, .resume) }) }
+        for m in bar.macs {
+            out.append(
+                CoreDropdownItem(
+                    m.paused ? "Resume \(m.name)" : "Pause \(m.name)", symbol: m.paused ? "play" : "pause",
+                    indented: true
+                ) { pause?(m.id, m.paused ? .resume : .indefinite) })
+        }
+        let open = deck.open
+        out.append(CoreDropdownItem("Open Hardware", symbol: "server.rack") { open?() })
+        return out
     }
 }

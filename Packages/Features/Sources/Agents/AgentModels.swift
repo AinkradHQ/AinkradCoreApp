@@ -23,6 +23,8 @@ public struct AgentUsageInfo: Equatable, Sendable {
 public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public let id: String
     public var runner: String
+    /// Why the Core put it on that machine (`core`, `overflow`, `pinned`…); nil from a Core that does not say (E15).
+    public var placeReason: String?
     public var harness: String
     public var model: String?
     public var state: SessionState
@@ -166,7 +168,8 @@ public struct ChainOption: Identifiable, Equatable, Sendable {
 }
 
 public struct NewAgentSession: Equatable, Sendable {
-    public var runner: String
+    /// nil lets the Core place it (E15: no runner to choose).
+    public var runner: String?
     public var harness: String
     public var model: String?
     /// Empty opens a live session that waits for the first message, like typing `claude` in a terminal.
@@ -186,7 +189,7 @@ public struct NewAgentSession: Equatable, Sendable {
     public var chain: Int64?
     public var agent: String?
     public init(
-        runner: String, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
+        runner: String?, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
         secrets: [String] = [], chain: Int64? = nil, agent: String? = nil, project: String? = nil,
         branch: String? = nil,
         base: String? = nil

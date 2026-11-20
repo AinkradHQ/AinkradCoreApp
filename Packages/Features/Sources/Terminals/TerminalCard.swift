@@ -1,5 +1,6 @@
 import CoreKit
 import CoreUI
+import Shell
 import SwiftUI
 
 /// One terminal in the list (E6-3, `screens/08-terminals.html`): a live look at its screen, its name, whether it is a real
@@ -25,6 +26,7 @@ struct TerminalCard: View {
             HStack(spacing: Space.s2) {
                 Text(name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 MachineChip(real: thisMac)
+                RanOnChip(model.shell.hardwareDeck.jobByTerminal[item.id])
                 Spacer(minLength: Space.s2)
                 Text(item.isEnded ? "ended" : ago(item.createdAt)).coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary).lineLimit(1)

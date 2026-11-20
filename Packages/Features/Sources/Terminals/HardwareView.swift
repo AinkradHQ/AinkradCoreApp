@@ -1,11 +1,11 @@
 import CoreUI
 import SwiftUI
 
-/// The Runners pane: the machines that do the work for your Core, as cards, or one machine's page (N19). Only what runners
-/// report: state, what they offer, work slots, load per core.
-/// E2's Devices & Runners app shows this as its Runners tab: `RunnersView(model:)`, filling the tab body. It carries its own
-/// heading and Add runner button, and opens a runner's page in place (`model.runnerDetail`), so the tab needs no navigation.
-struct RunnersView: View {
+/// The Hardware pane: the machines that do the work for your Core, one row each, or one machine's page (N19). What runners
+/// report (state, what they offer, work slots) and, once the Core has hardware (E15), cores, memory, load, gate and pause.
+/// E2's Devices & Runners app shows this as its Hardware tab: `HardwareView(model:)`, filling the tab body. It carries its own
+/// heading and Add hardware button, and opens a machine's page in place (`model.runnerDetail`), so the tab needs no navigation.
+struct HardwareView: View {
     @Bindable var model: TerminalsModel
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -14,7 +14,7 @@ struct RunnersView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if let id = model.runnerDetail, let r = model.runner(id) {
-                    RunnerPage(model: model, runner: r)
+                    HardwarePage(model: model, runner: r)
                 } else {
                     fleet
                 }
@@ -56,22 +56,22 @@ struct RunnersView: View {
                 }
                 .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shown.map(\.id))
                 if shown.isEmpty {
-                    Text("No runners are \(model.runnerFilter?.rawValue.lowercased() ?? "here").").foregroundStyle(
+                    Text("No hardware is \(model.runnerFilter?.rawValue.lowercased() ?? "here").").foregroundStyle(
                         palette.text2)
                 }
                 Text(
-                    "Tap a runner to see what it is doing. Ainkrad installs and updates Claude, Codex, OpenCode and Antigravity on every runner for you."
+                    "Tap a machine to see what it is doing. Ainkrad installs and updates Claude, Codex, OpenCode and Antigravity on every runner for you."
                 )
                 .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
             }
         }
     }
 
-    /// "Runners", one sentence of what is going on, and Add runner.
+    /// "Hardware", one sentence of what is going on, and Add hardware.
     private var header: some View {
         HStack(alignment: .center, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Runners").coreFont(size: MacTextSize.large + 6, weight: .semibold).accessibilityAddTraits(
+                Text("Hardware").coreFont(size: MacTextSize.large + 6, weight: .semibold).accessibilityAddTraits(
                     .isHeader)
                 Text(summaryLine).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
             }
@@ -79,11 +79,11 @@ struct RunnersView: View {
             Button {
                 model.host.runnerHost?.addRunner()
             } label: {
-                Label("Add runner", systemImage: "plus")
+                Label("Add hardware", systemImage: "plus")
             }
             .buttonStyle(CoreButtonStyle(.prominent))
             .keyboardShortcut("n", modifiers: .command).environment(\.coreKeycap, "⌘N")
-            .help("Add a runner (⌘N)")
+            .help("Add hardware (⌘N)")
         }
     }
 
@@ -100,9 +100,9 @@ struct RunnersView: View {
 
     private var empty: some View {
         CoreStateCard(
-            symbol: "server.rack", title: "No runners yet",
-            line: "A runner is a machine that runs terminals and AI sessions for your Core. Add the first one.",
-            primary: CoreAction("Add runner") { model.host.runnerHost?.addRunner() }
+            symbol: "server.rack", title: "No hardware yet",
+            line: "Hardware is a machine that does work for your Core: AI sessions and heavy jobs. Add the first one.",
+            primary: CoreAction("Add hardware") { model.host.runnerHost?.addRunner() }
         )
         .frame(maxWidth: .infinity).padding(.top, Space.s8 * 4)
     }
@@ -146,6 +146,8 @@ struct RunnerSay: View {
 struct RunnerBars: View {
     let facts: RunnerFacts
     let terminalsHere: Int
+    /// False for remote hardware once the Core has hardware (E15): it opens no terminals, so it has no terminal bar.
+    var showTerminals = true
     var body: some View {
         let r = facts.runner
         HStack(alignment: .top, spacing: Space.s3) {
@@ -157,7 +159,7 @@ struct RunnerBars: View {
                     value: r.capacity > 0 ? Double(r.load) / Double(r.capacity) : 0,
                     warn: r.capacity > 0 && r.load >= r.capacity)
             }
-            if let t = facts.terminalBar(fallbackUsed: terminalsHere) {
+            if showTerminals, let t = facts.terminalBar(fallbackUsed: terminalsHere) {
                 RunnerBar(text: t.text, value: t.value)
             }
         }
@@ -190,8 +192,8 @@ struct RunnerBar: View {
 }
 
 /// The Runners tab for E2's Devices & Runners app shell: the heading, summary tiles, runner cards and the runner's own page.
-public struct RunnersTab: View {
+public struct HardwareTab: View {
     let model: TerminalsModel
     public init(model: TerminalsModel) { self.model = model }
-    public var body: some View { RunnersView(model: model) }
+    public var body: some View { HardwareView(model: model) }
 }

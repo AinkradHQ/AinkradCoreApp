@@ -388,6 +388,7 @@ public struct LiveAgentsAPI: AgentsAPI {
         info.turnCostApproximate = s.turnCostApproximate ?? false
         info.canStopSubagents = s.canStopSubagents ?? false
         #if CORE_CLIENT_95
+        // `place_reason` / `placed_on` arrive with Core #466: set `info.placeReason` from them once the client has them.
         info.effort = s.effort
         info.canSetEffort = s.canSetEffort ?? false
         #endif
