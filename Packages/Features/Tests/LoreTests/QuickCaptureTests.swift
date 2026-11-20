@@ -40,9 +40,12 @@ struct QuickCaptureTests {
 
     @Test func aSecondCaptureKeepsWhatAnAIAdded() async {
         core.put(LoreNote(id: "ln_cccccccccccc", kind: "daily", day: today, rev: 1, text: "# Day\n"))
+        capture.open()
         capture.text = "From the panel"
         await capture.submit()
         _ = core.append("ln_cccccccccccc", "AI line\n")
+        capture.close()  // the bar shows "Saved to …" until it closes; the next capture opens it again
+        capture.open()
         capture.text = "Second"
         await capture.submit()
         let text = core.notes["ln_cccccccccccc"]?.text ?? ""
@@ -59,12 +62,14 @@ struct QuickCaptureTests {
 
     @Test func inboxIsMadeOnceThenAppendedTo() async {
         capture.destination = .inbox
+        capture.open()
         capture.text = "First"
         await capture.submit()
         #expect(core.log() == ["list active note -", "create personal"])
         #expect(core.notes["ln_bbbbbbbbbbbb"]?.text.hasPrefix("# Inbox\n") == true)
         core.notes["ln_bbbbbbbbbbbb"]?.title = "Inbox"  // the Core derives it from the heading
         capture.close()
+        capture.open()
         capture.text = "Second"
         await capture.submit()
         #expect(core.notes["ln_bbbbbbbbbbbb"]?.text.contains("Second") == true)

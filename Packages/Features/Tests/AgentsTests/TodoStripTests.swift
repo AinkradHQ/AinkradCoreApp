@@ -3,6 +3,7 @@ import Testing
 
 @testable import Agents
 
+@MainActor
 struct TodoStripTests {
     private func todos(_ s: [TodoItem.Status]) -> [TranscriptEntry] {
         [

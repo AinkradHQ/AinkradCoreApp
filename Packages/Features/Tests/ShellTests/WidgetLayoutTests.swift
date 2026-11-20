@@ -164,7 +164,7 @@ struct WidgetLayoutTests {
         #expect(WidgetLayout.fits(WidgetItem(kind: .clock, size: .m, x: 4, y: 0)))
         // Moving, nudging, resizing, adding and dropping all stay off it.
         var l = WidgetLayout.standard()
-        let needs = try #require(l.items.first { $0.kind == .needs })
+        let needs = try #require(l.items.first)  // any widget: the standard desk changed with E4
         l.move(needs.id, to: 6, 2)
         #expect(!l.items.contains(where: onGreeting))
         let added = l.add(.clock, .s)
