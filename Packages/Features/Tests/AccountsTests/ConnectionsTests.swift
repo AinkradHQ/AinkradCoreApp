@@ -123,7 +123,7 @@ struct ConnectionsTests {
         #expect(LoopbackCatcher.code(in: "GET /callback?state=s1 HTTP/1.1\r\n", state: "s1") == nil)
     }
 
-    @Test func theLoopbackAnswersTheBrowserAndHandsOnTheCode() async throws {
+    @Test(.timeLimit(.minutes(1))) func theLoopbackAnswersTheBrowserAndHandsOnTheCode() async throws {
         let got = Got()
         let c = try LoopbackCatcher(state: "s1") { code in Task { await got.set(code) } }
         c.start()
