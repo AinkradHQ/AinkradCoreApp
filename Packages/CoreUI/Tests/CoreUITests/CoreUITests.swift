@@ -189,7 +189,7 @@ struct LookAssetTests {
     }
 }
 
-@MainActor struct AppLookPrefsTests {
+@MainActor struct AppLookPrefsBasicsTests {
     private func suite() -> UserDefaults {
         let name = "applook-test-\(UUID().uuidString)"
         let d = UserDefaults(suiteName: name)!
