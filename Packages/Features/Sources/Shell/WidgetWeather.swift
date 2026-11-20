@@ -128,12 +128,12 @@ public final class WeatherProvider: NSObject, CLLocationManagerDelegate {
 
     public nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
-            switch manager.authorizationStatus {
+            switch self.manager.authorizationStatus {
             case .denied, .restricted: state = .denied
             case .notDetermined: break
             default:
                 state = .loading
-                manager.requestLocation()
+                self.manager.requestLocation()
             }
         }
     }
