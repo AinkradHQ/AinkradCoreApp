@@ -84,7 +84,12 @@ public final class LauncherRegistry {
         entries.removeAll { $0.id == id }
         version += 1
     }
-    public func entry(_ id: String) -> LauncherEntry? { entries.first { $0.id == id } }
+    /// Old entry ids that now open another entry (`"runners"` opens Machines), so links and buttons naming them keep working.
+    public var aliases: [String: String] = [:]
+    public func entry(_ id: String) -> LauncherEntry? {
+        let id = aliases[id] ?? id
+        return entries.first { $0.id == id }
+    }
 
     func remember(_ id: String, at date: Date = Date()) {
         recents = Array(([id] + recents.filter { $0 != id }).prefix(3))

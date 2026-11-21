@@ -56,6 +56,13 @@ struct LauncherV2Tests {
         #expect(again.usage.stats["h"]?.count == 2)
     }
 
+    @Test func anOldIdOpensTheEntryThatReplacedIt() {
+        let reg = LauncherRegistry()
+        reg.register(entry("machines"))
+        reg.aliases["runners"] = "machines"
+        #expect(reg.entry("runners")?.id == "machines" && reg.entry("devices") == nil)
+    }
+
     @Test func actionsAndSessionsAreNeverFilledIntoTheDefaultPicks() {
         let reg = LauncherRegistry()
         reg.register(entry("go", action: true))
