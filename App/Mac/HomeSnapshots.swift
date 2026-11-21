@@ -45,6 +45,17 @@ enum HomeSnapshots {
         SetupAIDebug.subscriptionFirst = false
         app.debugPairedSetup(false)
         await shot("home", wait: 2.5)
+        // Home with no widgets (a fresh account): the greeting must stay where it is with widgets.
+        shell.surface = .home
+        for w in shell.widgets.items { shell.removeWidget(w.id) }
+        shell.toast = nil
+        await shot("home-empty", wait: 2.5)
+        shell.resetWidgets()
+        shell.toast = nil
+        // The launcher over Home: it follows Appearance like the panes now.
+        shell.toggleLauncher()
+        await shot("launcher", wait: 1.5)
+        shell.toggleLauncher()
         shell.debugForceQuickHover = true
         await shot("quick-hover")
         shell.debugForceQuickHover = false
