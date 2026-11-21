@@ -23,6 +23,16 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - run: brew install xcodegen
+      - name: Fetch the design engine (a build input, not in git) and check it against scripts/engine.pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          commit=$(sed -n 's/^CORE_COMMIT=//p' scripts/engine.pin)
+          dir="$RUNNER_TEMP/engine"; mkdir -p "$dir"
+          gh release download "engine-${commit:0:8}" -R "$GITHUB_REPOSITORY" -p DesignEngine.xcframework.zip -D "$dir"
+          ditto -x -k "$dir/DesignEngine.xcframework.zip" "$dir"
+          scripts/sync-engine.sh "$dir"   # refuses anything that does not hash to the pin
       - name: Import the Developer ID into a temporary keychain
         env:
           MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
