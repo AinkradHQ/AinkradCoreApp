@@ -82,7 +82,10 @@ struct SortStep: View {
     private var headline: String {
         let items = model.counts.stored.formatted()
         switch model.auto.sort {
-        case .waiting: return "Sorting \(items) items into places"
+        case .waiting:
+            // The count is lost when the app restarts mid-import: the model's total, or no number (never "0 items").
+            let n = model.counts.stored > 0 ? model.counts.stored : model.auto.reading?.total ?? 0
+            return n > 0 ? "Sorting \(n.formatted()) items into places" : "Sorting your work into places"
         case .sorted(let n):
             return "Sorted \(items) items into \(BrainWords.plural(n, "place", "places")), all accepted"
         case .undone(let n): return "Undone. \(n.formatted()) items are back in one pile for now."
