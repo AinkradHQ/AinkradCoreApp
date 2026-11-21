@@ -141,13 +141,16 @@ struct SetupWizardView: View {
                     symbol: "plus", title: "Set up a new Core",
                     detail: "Install Core on a Linux machine. One command, about two minutes."
                 ) { model.chooseNew() }
+                .coreTileKey("⌘1", key: "1")
                 ChoiceCard(
                     symbol: "link", title: "Use an existing Core",
                     detail: "Paste a link from a Core that is already running."
                 ) { model.chooseExisting() }
+                .coreTileKey("⌘2", key: "2")
             }
             HStack {
                 LinkButton(title: "Pair with a typed code instead", action: useCode)
+                    .keyboardShortcut("t", modifiers: .command).help("⌘T")
                 Spacer()
             }
         }
@@ -174,6 +177,7 @@ struct SetupWizardView: View {
                     copied = true
                 }
                 .coreGlassButton().accessibilityHint("Copies the install command")
+                .keyboardShortcut("c", modifiers: [.command, .shift]).environment(\.coreKeycap, "⇧⌘C")
             }
             .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
             .background(GlassInk.well, in: coreShape(Radius.control))
@@ -183,7 +187,7 @@ struct SetupWizardView: View {
             HStack {
                 Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
-                Button("I have the link") { model.haveLink() }.coreGlassButton()
+                Button("I have the link") { model.haveLink() }.coreGlassButton().modifier(LinkKey())
                 Button("I pasted it") { model.startWaiting() }.coreGlassButton(prominent: true).coreShortcut(.primary)
             }
         }
@@ -211,6 +215,7 @@ struct SetupWizardView: View {
                 Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
                 Button("Paste the link instead") { model.haveLink() }.coreGlassButton(prominent: model.waitEnded != nil)
+                    .modifier(LinkKey())
             }
         }
     }
@@ -239,7 +244,7 @@ struct SetupWizardView: View {
             HStack {
                 Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
-                Button("Paste a link instead") { model.haveLink() }.coreGlassButton()
+                Button("Paste a link instead") { model.haveLink() }.coreGlassButton().modifier(LinkKey())
                 // No Return shortcut: this link came from the network, so it is connected only by a deliberate press.
                 Button("Connect") { model.connect() }.buttonStyle(CoreButtonStyle(.prominent, size: .large))
                     .disabled(!model.canConnect)
@@ -279,6 +284,7 @@ struct SetupWizardView: View {
                 Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel)
                 Spacer()
                 Button("Paste a link instead") { model.haveLink() }.coreGlassButton(prominent: model.nearby.isEmpty)
+                    .modifier(LinkKey())
             }
         }
     }
@@ -440,5 +446,12 @@ private struct WelcomeHero: View {
         .frame(height: 190)
         .onAppear { if !reduce { up = true } }
         .accessibilityHidden(true)
+    }
+}
+
+/// ⌘L: "paste the link instead" on every setup page that offers it.
+private struct LinkKey: ViewModifier {
+    func body(content: Content) -> some View {
+        content.keyboardShortcut("l", modifiers: .command).environment(\.coreKeycap, "⌘L")
     }
 }

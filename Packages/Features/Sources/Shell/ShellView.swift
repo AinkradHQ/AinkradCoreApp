@@ -16,9 +16,14 @@ public struct ShellView: View {
     public var body: some View {
         ZStack {
             base
-            // Under the covers, so the Touch ID sheet (a dialog) rides above the card.
-            if shell.lock != .open { UnlockCard(shell: shell) }
-            covers
+            if shell.lock == .open {
+                covers
+            } else {
+                // Locked: the Unlock card is above everything (an open dialog's own dim buried it, a near-black screen
+                // after sleep or a Space switch). The dialogs come back once unlocked; only Touch ID rides above the card.
+                UnlockCard(shell: shell)
+                if let d = shell.topDialog, d.id == "step-up" { dialogLayer(d, id: "top") }
+            }
         }
         .coreAnimation(Motion.out(Motion.move), value: shell.lock)
         .animation(Motion.calm(Motion.out(Motion.move), reduce), value: shell.surface)

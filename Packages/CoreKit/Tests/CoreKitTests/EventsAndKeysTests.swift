@@ -321,3 +321,8 @@ private func event(_ seq: Int64, kind: String = "audit") -> [String: Any] {
         #expect(Wire.verify(spki: key.spki, message: Data("m".utf8), signature: sig))
     }
 }
+
+@Test func keychainSlotGenerationKeepsTheOriginalNameAndMovesLaterOnes() {
+    #expect(KeychainBlobs.account("default", "routine", generation: 0) == "default.routine")
+    #expect(KeychainBlobs.account("default", "routine", generation: 2) == "default.g2.routine")
+}
