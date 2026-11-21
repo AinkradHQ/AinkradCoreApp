@@ -61,8 +61,10 @@ extension AccountsModel {
 
     // MARK: rows
 
-    var orderRows: [OrderRow] {
-        let accs = orderIDs.compactMap { account($0) }
+    var orderRows: [OrderRow] { orderRows(orderIDs) }
+
+    func orderRows(_ ids: [Int64]) -> [OrderRow] {
+        let accs = ids.compactMap { account($0) }
         let verdicts = accs.map {
             (
                 AccountVerdict.of($0, limits: limits(of: $0), budgets: budgets, inPool: true), $0.state,

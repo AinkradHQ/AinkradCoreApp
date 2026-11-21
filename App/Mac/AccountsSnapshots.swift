@@ -3,7 +3,7 @@ import AppKit
 import Accounts
 import Pairing
 
-/// Debug only. `CORE_ACC_SNAPSHOT=<dir> [CORE_THEME=light|dark] [CORE_ACC_SCENES=a,b]` walks every Accounts state on the
+/// Debug only. `CORE_ACC_SNAPSHOT=<dir> [CORE_THEME=light|dark] [CORE_REDUCE_MOTION=1] [CORE_ACC_SCENES=a,b]` walks every Accounts state on the
 /// stand-in data (`AccountsDemo`) by changing the app's own state, captures its window and quits. No key events, no Core.
 @MainActor
 enum AccountsSnapshots {
@@ -15,8 +15,13 @@ enum AccountsSnapshots {
             return log("no main window")
         }
         let demo = app.debugAccountsDemo()
+        // CORE_REDUCE_MOTION=1: the account page draws its Reduce Motion fallback, the files end `-reduce`.
+        let reduce = env["CORE_REDUCE_MOTION"] == "1"
+        demo.setReduceMotion(reduce)
         let only = env["CORE_ACC_SCENES"].flatMap { $0.isEmpty ? nil : $0 }?.split(separator: ",").map(String.init)
-        for (i, scene) in (AccountsDemo.scenes + AccountsDemo.connScenes + AppModel.gapScenes).enumerated()
+        for (i, scene)
+            in (AccountsDemo.scenes + AccountsDemo.detailScenes + AccountsDemo.connScenes + AppModel.gapScenes)
+            .enumerated()
         where only?.contains(scene) ?? true {
             if AppModel.gapScenes.contains(scene) {
                 await demo.show("overview")  // back to a clean Accounts state first
@@ -25,7 +30,7 @@ enum AccountsSnapshots {
                 await demo.show(scene)
             }
             try? await Task.sleep(for: .seconds(1.6))
-            let file = "\(dir)/\(String(format: "%02d", i + 1))-\(scene)-\(theme)-app.png"
+            let file = "\(dir)/\(String(format: "%02d", i + 1))-\(scene)-\(theme)\(reduce ? "-reduce" : "")-app.png"
             log("shot \(scene) \(capture(window, to: file) ? "ok" : "FAILED")")
         }
         NSApp.terminate(nil)

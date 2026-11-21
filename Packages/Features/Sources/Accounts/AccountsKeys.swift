@@ -75,24 +75,6 @@ enum AccountsKeys {
 
     static func letter(_ m: AccountsModel, _ key: String) -> KeyPress.Result {
         let ro = m.readOnly
-        if m.page == .accounts, let id = m.detail, let a = m.account(id), !ro {
-            switch key {
-            case "t": Task { await m.setEnabled(a, a.phase == .disabled) }
-            case "k": AccountDialogs.openConnect(m, provider: a.provider, replacing: a)
-            case "l": AccountDialogs.openCap(m, a)
-            case "s": AccountDialogs.openLimits(m, a)
-            case "v": Task { await m.test(a) }
-            case "⌫": AccountDialogs.openDelete(m, a)
-            case "p" where m.pools(of: a).isEmpty:
-                if let p = m.defaultPool(a.provider) ?? m.pools(for: a.provider).first {
-                    AccountDialogs.openAddMember(m, pool: p)
-                } else {
-                    AccountDialogs.openNewPool(m)
-                }
-            default: return .ignored
-            }
-            return .handled
-        }
         if m.page == .budgets, !ro, let c = m.cursor, c.hasPrefix("g-"),
             let b = m.budgets.first(where: { "g-\($0.id)" == c })
         {
@@ -131,7 +113,9 @@ enum AccountsKeys {
     static func hint(_ m: AccountsModel) -> String {
         switch m.page {
         case .accounts where m.detail != nil:
-            "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
+            m.account(m.detail!).map {
+                "esc back · \(m.primaryAction($0).key.2) \(m.primaryAction($0).title) · ⌥⌘↑↓ move in the AI order · ⌘. more"
+            } ?? "esc back"
         case .accounts where m.aiOrderOn: "⌥↑ ⌥↓ move the row in focus · ⌘N add an account"
         case .accounts: "↑↓ move · ⏎ open · ⌘N add an account"
         case .pools: "\(coreArrowKeys()) pool · ↑↓ account · D default · A add · ⌫ remove"
