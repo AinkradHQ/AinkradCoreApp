@@ -53,6 +53,12 @@ public final class AutoFlow {
                     sort = n > 0 ? .sorted(rooms: n) : .nothing
                     return
                 }
+                // The Core may have filed the places already without its audit record (Core 0.10.0 lost it, 2026-11-21:
+                // 20 places made, the app said "Nothing was sorted"). Places of this run mean it is sorted.
+                if let n = (try? await routes.learning(run: run))?.places.count, n > 0 {
+                    sort = .sorted(rooms: n)
+                    return
+                }
                 // The slow part is the local model reading every item (GET /imports/{run}/semantic); the Core files the
                 // rooms once it is done. Wait as long as it reads: the old 2-minute give-up said "Nothing was sorted" on
                 // a big import while the model was still reading (Ahmed, 2026-11-21, 12,391 sessions).
