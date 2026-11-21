@@ -47,7 +47,7 @@ struct SignInFlow: Equatable {
 
 extension AccountsModel {
     /// Starts a sign-in behind Touch ID, then follows it until it ends.
-    func startSignIn(provider: String, label: String, runner: String? = nil) async {
+    func startSignIn(provider: String, label: String, displayName: String? = nil, runner: String? = nil) async {
         guard let service, mayWrite() else { return }
         signIn = SignInFlow(stage: .starting, label: label)
         pollBackoff = PollBackoff()
@@ -55,7 +55,9 @@ extension AccountsModel {
         do {
             let l = try await host.elevated(
                 "Sign in to \(providerName(provider)) as \(label).", done: "started", keepsEdit: true
-            ) { try await service.startLogin(provider: provider, label: label, runner: runner) }
+            ) {
+                try await service.startLogin(provider: provider, label: label, displayName: displayName, runner: runner)
+            }
             apply(l)
             await follow(l.id)
         } catch is AdminDeclined {

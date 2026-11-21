@@ -70,15 +70,13 @@ extension AccountsModel {
             )
         }
         let chips = OrderChips.chips(verdicts)
-        let dup = Dictionary(grouping: accs, by: \.provider).filter { $0.value.count > 1 }.keys
         return accs.enumerated().map { i, a in
             let facts = usageFacts(a, chip: chips[i])
-            let name = ProviderCatalog.name(a.provider, fallback: providerName(a.provider))
             let kind =
                 provider(a.provider).map(ProviderCatalog.kind)
                 ?? (a.provider.hasSuffix("-sub") ? .subscription : .apiKey)
             return OrderRow(
-                account: a, number: i + 1, title: dup.contains(a.provider) ? "\(name) · \(a.label)" : name, kind: kind,
+                account: a, number: i + 1, title: title(a), kind: kind,
                 chip: chips[i], sentence: UsageSentence.of(facts),
                 meter: chips[i] == .signingIn ? nil : UsageSentence.meter(facts),
                 model: aiOrder?.items.first { $0.account == a.id }?.model)
@@ -129,7 +127,7 @@ extension AccountsModel {
         let ok = await write(
             "model-\(a.id)-\(model)",
             reason: allowed
-                ? "Allow \(model) on \(a.label)." : "Switch \(model) off for \(a.label). Nothing will run it there.",
+                ? "Allow \(model) on \(title(a))." : "Switch \(model) off for \(title(a)). Nothing will run it there.",
             done: allowed ? "\(model) allowed" : "\(model) switched off", keepsEdit: true
         ) { try await $0.setModelAllowed(account: a.id, model: model, allowed: allowed) }
         if !ok { modelRows[a.id] = before }
@@ -224,7 +222,7 @@ extension AccountsModel {
     /// The words of one choice in the Per-agent select.
     func agentChoiceTitle(_ c: AgentChoice) -> String {
         func name(_ id: Int64) -> String {
-            account(id).map { ProviderCatalog.name($0.provider, fallback: $0.label) } ?? "Account \(id)"
+            account(id).map(title) ?? "Account \(id)"
         }
         switch c {
         case .follow: return "Follow the AI order"

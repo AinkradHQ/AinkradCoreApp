@@ -99,6 +99,12 @@ protocol AccountsService: Sendable {
     func removeAccount(_ id: Int64) async throws -> Date?
     /// `POST /accounts/{id}/restore` (step-up): inside the window only.
     func restoreAccount(_ id: Int64) async throws
+    // Account names (API minor 96). Wire in `AIOrder/AccountNameWire.swift`; the defaults say "not supported".
+    func namesSupported() async -> Bool
+    /// `PUT /accounts/{id}/name`: nil clears it.
+    func setAccountName(account: Int64, name: String?) async throws -> AccountItem
+    /// `startLogin` naming the account it makes.
+    func startLogin(provider: String, label: String, displayName: String?, runner: String?) async throws -> LoginItem
 }
 
 /// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).
@@ -107,6 +113,8 @@ struct ResolvedPlacement: Equatable, Sendable {
     var chain: Int64?
     var position: Int?
     var monthlyLimitMicros: Int64?
+    /// The account's free-text name (API minor 96); nil leaves it unnamed.
+    var displayName: String? = nil
 }
 
 extension AccountsService {
@@ -265,7 +273,8 @@ struct LiveAccountsService: AccountsService {
                 try await client.createAccount(
                     body: .json(
                         .init(
-                            chain: p.chain, label: label, monthlyLimitUsdMicros: p.monthlyLimitMicros, pool: p.pool,
+                            chain: p.chain, displayName: p.displayName, label: label,
+                            monthlyLimitUsdMicros: p.monthlyLimitMicros, pool: p.pool,
                             position: p.position.map(Int32.init), provider: provider, runners: runners, value: key))
                 ).ok.body.json.account)
         }
@@ -483,7 +492,8 @@ struct LiveAccountsService: AccountsService {
 
     static func account(_ a: Components.Schemas.ProviderAccount) -> AccountItem {
         AccountItem(
-            id: a.id, provider: a.provider, label: a.label, maskedTail: a.maskedTail, baseURL: a.baseUrl,
+            id: a.id, provider: a.provider, label: a.label, displayName: a.displayName, maskedTail: a.maskedTail,
+            baseURL: a.baseUrl,
             state: a.state, stateReason: a.stateReason, stateUntil: a.stateUntil, cap: a.cap,
             lastUsedAt: a.lastUsedAt, createdAt: a.createdAt, lastTest: a.lastTest.map { ($0.at, $0.result) },
             maxTokens: a.sessionLimits?.maxTokens, maxUSDMicros: a.sessionLimits?.maxUsdMicros, live: a.live,

@@ -123,7 +123,7 @@ extension AccountsModel {
     /// The budget's subject in words: an account's or pool's name, else the owner's id.
     func budgetName(_ b: BudgetItem) -> String {
         switch b.kind {
-        case "account": Int64(b.subject).flatMap(account)?.label ?? "Account \(b.subject)"
+        case "account": Int64(b.subject).flatMap(account).map { $0.displayName ?? $0.label } ?? "Account \(b.subject)"
         case "pool":
             Int64(b.subject).flatMap(pool).map { "\($0.name) · \(providerName($0.provider))" } ?? "Pool \(b.subject)"
         case "provider": ProviderCatalog.name(b.subject, fallback: providerName(b.subject))

@@ -66,7 +66,7 @@ enum AIOrderDemo {
                 ? a(1, "claude", "claude-sub", state: "limited", until: friday, week: 1)
                 : a(1, "claude", "claude-sub", week: 0.38),
             a(2, "codex", "codex-sub", week: 0.62),
-            a(3, "anthropic", "anthropic", spend: (12_000_000, 50_000_000)),
+            a(3, "anthropic", "anthropic", spend: (12_000_000, 50_000_000)).named("Work API"),
             a(4, "openrouter", "openrouter", spend: (4_000_000, 50_000_000)),
             a(5, "antigravity", "agy-sub", state: "signing_in"),
         ]
@@ -135,5 +135,33 @@ extension AccountsDemo.Service {
         if allowed { deniedModels[account]?.remove(model) } else { deniedModels[account, default: []].insert(model) }
     }
     func loginCode(_ id: String) async -> String? { loginProvider == "codex-sub" ? "K7QM-4XZP" : nil }
+
+    func namesSupported() async -> Bool { order010 }
+    func setAccountName(account: Int64, name: String?) async throws -> AccountItem {
+        guard let i = accountList.firstIndex(where: { $0.id == account }) else {
+            throw CoreError.http(status: 404, code: "not_found", message: "no such account")
+        }
+        accountList[i].displayName = name.flatMap(AccountNames.clean)
+        return accountList[i]
+    }
+    func createAccount(
+        provider: String, label: String, key: String, runners: [String], placement p: ResolvedPlacement
+    ) async throws -> AccountItem {
+        let a = try await createAccount(provider: provider, label: label, key: key, runners: runners)
+        guard let n = p.displayName else { return a }
+        return try await setAccountName(account: a.id, name: n)
+    }
+    func startLogin(provider: String, label: String, displayName: String?, runner: String?) async throws -> LoginItem {
+        loginName = displayName
+        return try await startLogin(provider: provider, label: label, runner: runner)
+    }
+}
+
+extension AccountItem {
+    fileprivate func named(_ n: String) -> AccountItem {
+        var a = self
+        a.displayName = n
+        return a
+    }
 }
 #endif

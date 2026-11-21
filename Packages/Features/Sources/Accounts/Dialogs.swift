@@ -41,6 +41,9 @@ enum AccountDialogs {
     static func openCap(_ m: AccountsModel, _ a: AccountItem) {
         present(m, "account-cap") { close in CapDialog(model: m, account: a, close: close) }
     }
+    static func openRename(_ m: AccountsModel, _ a: AccountItem) {
+        present(m, "account-rename") { close in RenameDialog(model: m, account: a, close: close) }
+    }
     static func openLimits(_ m: AccountsModel, _ a: AccountItem) {
         present(m, "account-limits") { close in LimitsDialog(model: m, account: a, close: close) }
     }
@@ -81,7 +84,7 @@ private struct DeleteAccountDialog: View {
     @State private var busy = false
     var body: some View {
         let pools = model.pools(of: account)
-        CoreDialogPanel("Delete \(account.label)?", width: Space.s8 * 14) {
+        CoreDialogPanel("Delete \(model.title(account))?", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
                     "Its key is deleted from Core and cannot be recovered. Its leases are dropped.\(pools.isEmpty ? "" : " It leaves \(pools.map(\.name).joined(separator: ", ")).")"
@@ -128,7 +131,7 @@ private struct CapDialog: View {
         return nil
     }
     var body: some View {
-        CoreDialogPanel("Sessions at once: \(account.label)", width: Space.s8 * 13) {
+        CoreDialogPanel("Sessions at once: \(model.title(account))", width: Space.s8 * 13) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField(
                     "Limit", placeholder: "No limit", text: $text, error: text.isEmpty ? nil : issue, autofocus: true
@@ -146,6 +149,50 @@ private struct CapDialog: View {
         busy = true
         Task {
             let ok = await model.setCap(account, n)
+            busy = false
+            if ok { close() }
+        }
+    }
+}
+
+/// Rename an account: one field, prefilled with what it is called now. ⏎ saves, esc cancels; blank goes back to the
+/// provider's name.
+private struct RenameDialog: View {
+    let model: AccountsModel
+    let account: AccountItem
+    let close: () -> Void
+    @State private var text: String
+    @State private var busy = false
+    init(model: AccountsModel, account: AccountItem, close: @escaping () -> Void) {
+        self.model = model
+        self.account = account
+        self.close = close
+        _text = State(initialValue: model.title(account))
+    }
+    private var issue: String? { AccountNames.problem(text) }
+    var body: some View {
+        CoreDialogPanel("Rename \(model.title(account))", width: Space.s8 * 13) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                CoreTextField(
+                    "Name",
+                    placeholder: ProviderCatalog.name(account.provider, fallback: model.providerName(account.provider)),
+                    text: $text, error: issue, autofocus: true
+                ) { go() }
+                .accessibilityIdentifier("account-rename-field")
+                Text("Leave it empty to use the provider's name.").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary)
+                if let e = model.writeError["name-\(account.id)"] { AccIssue(text: e) }
+                AccNotice(notice: model.host.elevationNotice)
+                AccDialogButtons(confirm: "Save", busy: busy, enabled: issue == nil, cancel: close) { go() }
+            }
+        }
+        .accessibilityIdentifier("account-rename")
+    }
+    private func go() {
+        guard issue == nil, !busy else { return }
+        busy = true
+        Task {
+            let ok = await model.rename(account, to: text)
             busy = false
             if ok { close() }
         }

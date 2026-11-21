@@ -142,7 +142,7 @@ extension AccountsModel {
 
     func label(ofAccount id: Int64?) -> String {
         guard let id else { return "Not a Core account" }
-        return account(id)?.label ?? "Account \(id)"
+        return account(id).map { $0.displayName ?? $0.label } ?? "Account \(id)"
     }
 }
 

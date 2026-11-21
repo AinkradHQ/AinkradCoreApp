@@ -42,13 +42,15 @@ struct OrderRowView: View {
     let first: Bool
     let last: Bool
     let dragging: Bool
+    /// The Core keeps names (API minor 96): Rename… shows.
+    var canRename = false
     let onDrag: (CGFloat) -> Void
     let onDrop: (CGFloat) -> Void
     let onKey: (Int) -> Void
     let onAction: (RowAction) -> Void
     @State private var more = false
 
-    enum RowAction { case open, up, down, check, limits, remove }
+    enum RowAction { case open, up, down, check, rename, limits, remove }
 
     var body: some View {
         let b = row.chip.badge
@@ -56,7 +58,7 @@ struct OrderRowView: View {
             grip
             Text("\(row.number)").coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
                 .foregroundStyle(GlassInk.secondary).frame(width: Space.s5, alignment: .center)
-            ProviderTile(name: row.title)
+            ProviderTile(name: ProviderCatalog.name(row.account.provider, fallback: row.title))
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                 Text(row.sentence).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
@@ -112,8 +114,9 @@ struct OrderRowView: View {
     }
 
     private var menu: some View {
-        CoreDropdown(
-            items: [
+        let rename = canRename ? [CoreDropdownItem("Rename…", symbol: "pencil") { onAction(.rename) }] : []
+        return CoreDropdown(
+            items: rename + [
                 CoreDropdownItem("Move up", symbol: "chevron.up", enabled: !first) { onAction(.up) },
                 CoreDropdownItem("Move down", symbol: "chevron.down", enabled: !last) { onAction(.down) },
                 CoreDropdownItem(

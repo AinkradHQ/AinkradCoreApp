@@ -18,6 +18,8 @@ final class KeyEntryFlow {
 
     var key = ""
     var label = "work"
+    /// The new account's free-text name (API minor 96); nil leaves it unnamed.
+    var displayName: String?
     var runner: String?
     var stage = Stage.form
     var gate: GateState?
@@ -111,13 +113,20 @@ final class KeyEntryFlow {
                 let rs = runner.map { [$0] } ?? []
                 let reason = "Add \(who) to \(name). Its key is stored in your Core."
                 let (pools, chains, pname, place) = (m.pools, m.chains, m.providerName(provider), placement)
+                let dn = displayName
                 let made = try await m.host.elevated(reason, done: "changed", keepsEdit: true) {
                     guard let place else {
-                        return try await svc.createAccount(provider: provider, label: who, key: value, runners: rs)
+                        guard let dn else {
+                            return try await svc.createAccount(provider: provider, label: who, key: value, runners: rs)
+                        }
+                        return try await svc.createAccount(
+                            provider: provider, label: who, key: value, runners: rs,
+                            placement: ResolvedPlacement(displayName: dn))
                     }
                     // A new pool or order is made first, in this one Touch ID, then the account goes into it.
-                    let resolved = try await Self.resolve(
+                    var resolved = try await Self.resolve(
                         svc, place, provider: provider, providerName: pname, pools: pools, chains: chains)
+                    resolved.displayName = dn
                     return try await svc.createAccount(
                         provider: provider, label: who, key: value, runners: rs, placement: resolved)
                 }

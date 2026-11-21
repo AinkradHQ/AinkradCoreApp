@@ -41,6 +41,8 @@ public final class AccountsModel {
     /// The AI order (E7-1), read when the Core serves API minor 95; `aiOrderOn` is false below that and the old pages show.
     var aiOrder: AIOrderDoc?
     var aiOrderOn = false
+    /// The Core keeps free-text account names (API minor 96): the Name field and Rename show.
+    var namesOn = false
     /// The accounts in the order shown. It moves first on a drag and goes back when the Core refuses.
     var orderIDs: [Int64] = []
     /// The Advanced disclosure of the AI order surface.
@@ -124,6 +126,7 @@ public final class AccountsModel {
         signIn = nil
         aiOrder = nil
         aiOrderOn = false
+        namesOn = false
         orderIDs = []
         modelRows = [:]
         usage = []
@@ -145,7 +148,7 @@ public final class AccountsModel {
 
     /// "Claude account Work": how an event names an account. Nil until the account is known.
     public func accountName(_ id: Int64) -> String? {
-        account(id).map { "\(providerName($0.provider)) account \($0.label)" }
+        account(id).map { $0.displayName ?? "\(providerName($0.provider)) account \($0.label)" }
     }
     public func poolName(_ id: Int64) -> String? { pool(id)?.name }
     func provider(_ id: String) -> ProviderItem? { providers.first { $0.id == id } }
@@ -200,6 +203,7 @@ public final class AccountsModel {
             load = .ready
             await reloadChains(service)
             await reloadAIOrder(service)
+            namesOn = await service.namesSupported()
             if aiOrderOn { await reloadBindings(service) }
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
@@ -323,24 +327,24 @@ public final class AccountsModel {
         await write(
             key,
             reason: on
-                ? "Turn on \(a.label). AI sessions can use it again."
-                : "Turn off \(a.label). New sessions skip it.",
-            done: on ? "\(a.label) is on" : "\(a.label) is off. Running sessions keep going until they end.",
+                ? "Turn on \(title(a)). AI sessions can use it again."
+                : "Turn off \(title(a)). New sessions skip it.",
+            done: on ? "\(title(a)) is on" : "\(title(a)) is off. Running sessions keep going until they end.",
             undo: { [weak self] in await self?.setEnabled(a, !on) }
         ) { _ = try await $0.setState(account: a.id, state: on ? "active" : "disabled") }
     }
 
     func setCap(_ a: AccountItem, _ cap: Int64) async -> Bool {
         await write(
-            "cap-\(a.id)", reason: "Change the session limit of \(a.label) to \(cap == 0 ? "none" : String(cap)).",
-            done: "\(a.label): \(AccountsWords.capWords(cap).lowercased())", keepsEdit: true
+            "cap-\(a.id)", reason: "Change the session limit of \(title(a)) to \(cap == 0 ? "none" : String(cap)).",
+            done: "\(title(a)): \(AccountsWords.capWords(cap).lowercased())", keepsEdit: true
         ) { _ = try await $0.setCap(account: a.id, cap: cap) }
     }
 
     func delete(_ a: AccountItem) async -> Bool {
         let ok = await write(
-            "delete-\(a.id)", reason: "Delete \(a.label) and its key. This cannot be undone.",
-            done: "\(a.label) deleted"
+            "delete-\(a.id)", reason: "Delete \(title(a)) and its key. This cannot be undone.",
+            done: "\(title(a)) deleted"
         ) { try await $0.deleteAccount(a.id) }
         if ok { detail = nil }
         return ok

@@ -17,13 +17,13 @@ extension AccountsModel {
         let index = orderIDs.firstIndex(of: a.id) ?? orderIDs.count
         let until = Box<Date>()
         let ok = await write(
-            "delete-\(a.id)", reason: "Remove \(a.label). You can undo it for a few seconds.", done: "", toast: false
+            "delete-\(a.id)", reason: "Remove \(title(a)). You can undo it for a few seconds.", done: "", toast: false
         ) { until.value = try await $0.removeAccount(a.id) }
         guard ok else { return false }
         if detail == a.id { detail = nil }
         let deadline = until.value ?? now().addingTimeInterval(Self.undoWindow)
         removed = RemovedAccount(account: a, index: index, until: deadline)
-        let name = ProviderCatalog.name(a.provider, fallback: providerName(a.provider))
+        let name = title(a)
         host.shell.showToast(
             AccountNotes.removedWords(name, note: a.wipeNote), lifetime: max(1, deadline.timeIntervalSince(now()))
         ) { [weak self] in Task { @MainActor in await self?.undoRemoval(a.id) } }

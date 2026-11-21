@@ -354,7 +354,7 @@ struct BudgetDialog: View {
             LazyVGrid(columns: grid, spacing: Space.s2) {
                 ForEach(model.accounts) { a in
                     AccPick(
-                        title: a.label, sub: model.providerName(a.provider), symbol: "creditcard",
+                        title: model.title(a), sub: model.providerName(a.provider), symbol: "creditcard",
                         hue: ProviderLook.hue(a.provider), on: subject == String(a.id)
                     ) { subject = String(a.id) }
                 }

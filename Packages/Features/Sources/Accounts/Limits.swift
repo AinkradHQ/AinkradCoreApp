@@ -78,8 +78,8 @@ extension AccountsModel {
         let ok = await write(
             "limit-\(a.id)",
             reason:
-                "Limit \(a.label) to \(UsageLimitWords.amount(d.cap, unit: d.unit)), \(UsageLimitWords.window(d.windowSecs).lowercased()).",
-            done: "\(a.label): usage limit saved", keepsEdit: true
+                "Limit \(title(a)) to \(UsageLimitWords.amount(d.cap, unit: d.unit)), \(UsageLimitWords.window(d.windowSecs).lowercased()).",
+            done: "\(title(a)): usage limit saved", keepsEdit: true
         ) { try await $0.setLimit(account: a.id, d) }
         if ok { await reloadLimits() }
         return ok
@@ -88,8 +88,8 @@ extension AccountsModel {
     func clearLimit(_ a: AccountItem, _ l: LimitItem) async -> Bool {
         let ok = await write(
             "limit-\(a.id)",
-            reason: "Remove the \(UsageLimitWords.amount(l.cap, unit: l.unit)) limit of \(a.label).",
-            done: "\(a.label): usage limit removed"
+            reason: "Remove the \(UsageLimitWords.amount(l.cap, unit: l.unit)) limit of \(title(a)).",
+            done: "\(title(a)): usage limit removed"
         ) { try await $0.clearLimit(account: a.id, unit: l.unit, windowSecs: l.windowSecs) }
         if ok { await reloadLimits() }
         return ok
@@ -202,7 +202,8 @@ struct LimitDialog: View {
 
     var body: some View {
         CoreDialogPanel(
-            editing == nil ? "Add a usage limit: \(account.label)" : "Change a usage limit: \(account.label)",
+            editing == nil
+                ? "Add a usage limit: \(model.title(account))" : "Change a usage limit: \(model.title(account))",
             width: Space.s8 * 15
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -258,7 +259,7 @@ struct ClearLimitDialog: View {
         CoreDialogPanel("Remove this usage limit?", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
-                    "\(account.label) will no longer stop at \(UsageLimitWords.amount(limit.cap, unit: limit.unit)) \(UsageLimitWords.window(limit.windowSecs).lowercased())."
+                    "\(model.title(account)) will no longer stop at \(UsageLimitWords.amount(limit.cap, unit: limit.unit)) \(UsageLimitWords.window(limit.windowSecs).lowercased())."
                 )
                 .fixedSize(horizontal: false, vertical: true)
                 if let e = model.writeError["limit-\(account.id)"] { AccIssue(text: e) }
