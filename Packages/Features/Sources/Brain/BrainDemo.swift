@@ -32,6 +32,8 @@ public final class BrainDemo {
         "room-overview-stage-queued", "room-overview-stage-waiting-runner", "room-overview-stage-picking",
         "room-overview-stage-writing", "room-overview-stage-reading", "room-overview-stage-retrying",
         "room-overview-stage-none",
+        // The calm Brain Home (mockup 15): fresh, a few things like a first real Brain, full, and an import under way.
+        "calm-fresh", "calm-few", "calm-home", "calm-import", "calm-import-drop",
     ]
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
@@ -75,7 +77,10 @@ public final class BrainDemo {
         shell.dialog = nil
         shell.overlay = nil
         shell.launcherOpen = false
+        shell.topMenu = nil
         shell.coreLink = .live
+        model.demoCalm = scene.hasPrefix("calm")
+        model.demoImport = nil
         model.detach()
         model.inboxState.list = .waiting
         var s = SampleBrainService.Scenario()
@@ -146,6 +151,10 @@ public final class BrainDemo {
         if scene != "unavailable", scene != "loading" {
             model.use(SampleBrainService(s, pace: scene == "checks-running" ? .milliseconds(1200) : .milliseconds(250)))
             await model.reload()
+        }
+        if scene.hasPrefix("calm") {
+            showCalm(scene)
+            return
         }
         if scene.hasPrefix("m3-") {
             await showM3(scene)
@@ -251,6 +260,74 @@ public final class BrainDemo {
             model.host.shell.open(.settings)
         default: model.show(.overview)
         }
+    }
+}
+extension BrainDemo {
+    /// The calm Brain Home on invented numbers: `calm-fresh` nothing yet, `calm-few` a first Brain (a couple of things about
+    /// you, the rest empty), `calm-home` a full one at work, `calm-import` an import collecting, `-drop` with the dropdown.
+    private func showCalm(_ scene: String) {
+        let few = scene != "calm-home"
+        func ago(_ s: Double) -> String { ISO8601DateFormatter().string(from: Date().addingTimeInterval(-s)) }
+        func area(_ a: String, _ n: Int, _ today: Int, _ latest: String?) -> BrainAreasWire.Summary {
+            .init(area: a, count: n, today: today, latest: latest)
+        }
+        func learned(_ i: Int, _ area: String, _ type: String, _ body: String, _ s: Double) -> LearnedWire {
+            .init(id: "l\(i)", room: "me", roomName: "Me", type: type, area: area, body: body, createdAt: ago(s))
+        }
+        let areas: BrainAreasWire =
+            switch scene {
+            case "calm-fresh":
+                .init(
+                    areas: ["me", "rules", "knowledge", "timeline"].map { area($0, 0, 0, nil) }, places: 0, evidence: 0,
+                    lockedRooms: 0)
+            case "calm-home":
+                .init(
+                    areas: [
+                        area("me", 23, 2, "Sam, full-stack developer, works best in the mornings"),
+                        area("rules", 18, 3, "Short answers. Ask before deleting. Plan before big changes"),
+                        area("knowledge", 412, 14, "Atlas syncs through a local database, not the cloud"),
+                        area("timeline", 96, 5, "Finished the sync rewrite and started the onboarding screens"),
+                    ], places: 7, evidence: 1200, lockedRooms: 0)
+            default:
+                .init(
+                    areas: [
+                        area("me", 2, 2, "Mostly works on: new products, client projects, maintenance and open source"),
+                        area("rules", 0, 0, nil), area("knowledge", 0, 0, nil), area("timeline", 0, 0, nil),
+                    ], places: 1, evidence: 12, lockedRooms: 0)
+            }
+        let rows: [LearnedWire] =
+            scene == "calm-fresh"
+            ? []
+            : few
+                ? [
+                    learned(
+                        1, "me", "preference", "Focuses on: shipping features, quality and keeping things simple",
+                        32_000),
+                    learned(2, "me", "preference", "Wants help with: planning the day, reviews and writing", 32_100),
+                    learned(3, "rules", "rule", "Ask before deleting files", 32_200),
+                    learned(4, "me", "preference", "Programs in: Swift, TypeScript, Python and Go", 32_300),
+                    learned(5, "me", "preference", "Likes short, direct answers: the answer first, then why", 32_400),
+                    learned(6, "me", "fact", "Uses these tools: Git, Docker, Xcode and a terminal all day", 32_500),
+                ]
+                : [
+                    learned(1, "rules", "rule", "Ask before deleting files", 480),
+                    learned(2, "knowledge", "fact", "Atlas syncs through a local database", 3_600),
+                    learned(3, "me", "preference", "You prefer short answers", 14_000),
+                ]
+        model.calm.demo(
+            areas: areas, learned: rows,
+            autoImports: scene == "calm-home" ? [AutoImportWire(run: "r1", at: ago(7_200), rooms: 3)] : [])
+        let working = scene == "calm-home"
+        model.status.demo(
+            BrainActivityWire(
+                state: working ? "working" : "idle", health: "ok", rooms: areas.places, distilling: working ? 3 : 0,
+                queued: 0, overviews: 0, failed: 0, needs: [], lastDoneAt: nil))
+        if scene.hasPrefix("calm-import") {
+            model.demoImport = .init(
+                step: "Collect", line: "Reading your sessions", detail: "9,928 of 12,391", progress: 9_928.0 / 12_391)
+        }
+        model.show(.overview)
+        if scene == "calm-import-drop" { model.host.shell.toggleMenu(.brain) }
     }
 }
 #endif

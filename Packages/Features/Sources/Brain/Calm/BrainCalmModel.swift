@@ -171,4 +171,15 @@ public final class BrainCalmModel {
             await reload()
         } catch { notice = BrainWords.failure(error) }
     }
+
+    #if DEBUG
+    /// Debug demo only: the calm Brain's numbers without a Core.
+    func demo(areas: BrainAreasWire, learned: [LearnedWire], autoImports: [AutoImportWire] = []) {
+        page = .home
+        self.areas = areas
+        self.learned = learned.map(Learned.init)
+        self.autoImports = autoImports
+        notice = nil
+    }
+    #endif
 }

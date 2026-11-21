@@ -10,7 +10,9 @@ struct StatusCluster: View {
         // Sessions, as the AI Sessions list counts them: running, and needing you (an approval or your next message).
         let counts = shell.sessionCounts?() ?? (running: shell.home.runningAgents, needYou: shell.waitingOnYou)
         let needsYou = counts.needYou + shell.alertsOnYou + shell.joinRequests > 0
-        let brainBusy = shell.brainStatus?()?.state == "working"
+        // Brain supplies its state: learning, or an import under way (with how far it is).
+        let brain = shell.brainStatus?()
+        let brainBusy = brain?.state == "working"
         let reconnecting: Bool = if case .reconnecting? = shell.chipState { true } else { false }
         // One even gap between every icon (Ahmed, 2026-11-21: the extra gaps before the bell and the emblem looked off).
         HStack(spacing: Space.s1) {
@@ -30,7 +32,10 @@ struct StatusCluster: View {
                 .runners, label: counts.running == 0 ? "Runners" : "Runners, \(counts.running) running",
                 symbol: "server.rack", on: shell.topMenu == .runners, badge: counts.running, busy: counts.running > 0
             ) { shell.toggleMenu(.runners) }
-            TopBarIcon(.brain, label: "Brain", symbol: "brain", on: shell.topMenu == .brain, busy: brainBusy) {
+            TopBarIcon(
+                .brain, label: brainBusy ? "Brain, \(brain?.line ?? "working")" : "Brain", symbol: "brain",
+                on: shell.topMenu == .brain, busy: brainBusy, progress: brainBusy ? brain?.progress : nil
+            ) {
                 shell.toggleMenu(.brain)
             }
             TopBarIcon(
@@ -86,14 +91,17 @@ private struct TopBarIcon: View {
     /// Its work is happening now (a running job, a reconnect, the Brain learning, something waiting on you): only then
     /// does the glyph move (Ahmed, 2026-11-21: animated only when there is a related job running).
     var busy = false
+    /// How far its work is (0...1): a hairline under the glyph, only while it is counted.
+    var progress: Double?
     let action: () -> Void
     @Environment(\.corePalette) private var palette
 
     init(
         _ kind: TopBarKind, label: String, symbol: String?, on: Bool = false, tone: Tone? = nil, badge: Int = 0,
-        mark: Bool = false, busy: Bool = false, action: @escaping () -> Void
+        mark: Bool = false, busy: Bool = false, progress: Double? = nil, action: @escaping () -> Void
     ) {
         self.busy = busy
+        self.progress = progress
         self.kind = kind
         self.label = label
         self.symbol = symbol
@@ -110,6 +118,7 @@ private struct TopBarIcon: View {
                 .modifier(TopBarLoop(kind: kind, active: busy))
                 .frame(width: 36, height: MacSize.controlMd - Space.s1 / 2)
                 .overlay(alignment: .topTrailing) { badgeView }
+                .overlay(alignment: .bottom) { progressView }
         }
         .buttonStyle(StatusBarStyle(on: on))
         .help(label)
@@ -123,6 +132,18 @@ private struct TopBarIcon: View {
                 .contentTransition(.symbolEffect(.replace))
         } else {
             Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: 19, height: 17)
+        }
+    }
+
+    @ViewBuilder private var progressView: some View {
+        if let progress {
+            ZStack(alignment: .leading) {
+                coreShape(1).fill(palette.text.opacity(0.18))
+                coreShape(1).fill(palette.tone(.run).ink).frame(width: 16 * min(max(progress, 0), 1))
+            }
+            .frame(width: 16, height: 2).offset(y: -2)
+            .animation(Motion.out(Motion.ui), value: progress)
+            .accessibilityHidden(true)
         }
     }
 

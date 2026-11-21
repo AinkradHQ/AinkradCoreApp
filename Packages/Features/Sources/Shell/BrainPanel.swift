@@ -14,6 +14,7 @@ struct BrainPanel: View {
                 DropHead(
                     symbol: "brain", title: "Brain", meta: g.status,
                     badge: DropBadge(g.healthy ? "Healthy" : "Needs a look", tone: g.healthy ? .done : .warn))
+                if let i = g.importing { importing(i) }
                 if g.doing != nil || g.flowStep != nil { doing(g) }
                 if !g.stats.isEmpty {
                     HStack(spacing: Space.s2) { ForEach(g.stats) { stat($0) } }
@@ -23,8 +24,17 @@ struct BrainPanel: View {
                 DropHead(
                     symbol: "brain", title: "Brain", meta: "Not ready yet", badge: DropBadge("Waiting", tone: .queue))
             }
-            HStack {
+            HStack(spacing: Space.s2) {
                 Spacer(minLength: 0)
+                if glance != nil, glance?.importing == nil, shell.brainOpenImport != nil {
+                    Button {
+                        openImport()
+                    } label: {
+                        Label("Import…", systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary))
+                    .accessibilityIdentifier("brain-drop-import")
+                }
                 Button("Open Brain") { open(nil) }.buttonStyle(CoreButtonStyle(.prominent))
             }
         }
@@ -45,6 +55,36 @@ struct BrainPanel: View {
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .background(GlassInk.well, in: coreShape(Radius.cardMac))
+    }
+
+    /// An import under way: its step, how far, and the way back into its panel.
+    private func importing(_ i: BrainGlance.Importing) -> some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Importing… \(i.step)").coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(palette.text2)
+                Spacer(minLength: Space.s2)
+                if let d = i.detail {
+                    Text(d).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).monospacedDigit()
+                }
+            }
+            Text(i.line).coreFont(size: MacTextSize.headline, weight: .semibold)
+            if let p = i.progress { CoreMeter(p, label: "Import progress") } else { CoreBusyBar() }
+            HStack {
+                Spacer(minLength: 0)
+                Button("Open import") { openImport() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .accessibilityIdentifier("brain-drop-open-import")
+            }
+        }
+        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("brain-drop-importing")
+    }
+
+    private func openImport() {
+        shell.topMenu = nil
+        shell.brainOpenImport?()
     }
 
     private static let steps: [(String, String)] = [

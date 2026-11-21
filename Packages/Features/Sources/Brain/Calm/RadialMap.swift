@@ -25,13 +25,14 @@ struct RadialMap: View {
     @State private var onScreen = false
     @State private var shown = false
 
-    /// Positions in the mockup's 876 x 740 map, as fractions.
-    private static let spots: [BrainCalmModel.Page: CGPoint] = [
-        .me: CGPoint(x: 190 / 876, y: 120 / 740), .rules: CGPoint(x: 686 / 876, y: 120 / 740),
-        .knowledge: CGPoint(x: 130 / 876, y: 400 / 740), .timeline: CGPoint(x: 746 / 876, y: 400 / 740),
-        .places: CGPoint(x: 438 / 876, y: 620 / 740),
+    /// Positions in the mockup's 876 x 740 map, as fractions. `Double` on purpose: as bare literals `190 / 876` picked
+    /// `CGPoint(x: Int, y: Int)` and divided as integers to 0, which put every card in the map's top-left corner.
+    static let spots: [BrainCalmModel.Page: CGPoint] = [
+        .me: CGPoint(x: 190.0 / 876, y: 120.0 / 740), .rules: CGPoint(x: 686.0 / 876, y: 120.0 / 740),
+        .knowledge: CGPoint(x: 130.0 / 876, y: 400.0 / 740), .timeline: CGPoint(x: 746.0 / 876, y: 400.0 / 740),
+        .places: CGPoint(x: 438.0 / 876, y: 620.0 / 740),
     ]
-    private static let centre = CGPoint(x: 0.5, y: 360 / 740)
+    private static let centre = CGPoint(x: 0.5, y: 360.0 / 740)
 
     private var animating: Bool { working && !reduce && onScreen && phase == .active }
 
@@ -46,7 +47,7 @@ struct RadialMap: View {
                     ForEach(Array(nodes.enumerated()), id: \.element.id) { i, node in
                         let p = point(node.page, size)
                         card(node)
-                            .frame(width: cardWidth(size), height: Space.s8 * 4)
+                            .frame(width: cardWidth(size), height: Self.cardHeight)
                             .position(x: p.x, y: p.y + float(t, i))
                             .coreRise(shown, i)
                     }
@@ -63,19 +64,32 @@ struct RadialMap: View {
         .accessibilityIdentifier("brain-map")
     }
 
+    private static let cardHeight = Space.s8 * 4
     private func cardWidth(_ s: CGSize) -> CGFloat { min(250, max(170, s.width * 0.28)) }
+    /// A card's centre, kept inside the map so a narrow or short pane never pushes a card over the title or the edge.
     private func point(_ p: BrainCalmModel.Page, _ s: CGSize) -> CGPoint {
-        let f = Self.spots[p] ?? .zero
-        return CGPoint(x: f.x * s.width, y: f.y * s.height)
+        let f = Self.spots[p] ?? Self.centre
+        let w = cardWidth(s) / 2
+        let h = Self.cardHeight / 2
+        return CGPoint(
+            x: min(max(f.x * s.width, w), max(s.width - w, w)), y: min(max(f.y * s.height, h), max(s.height - h, h)))
     }
     private func middle(_ s: CGSize) -> CGPoint { CGPoint(x: Self.centre.x * s.width, y: Self.centre.y * s.height) }
+    /// Where the line from the centre meets the card's edge: the line stops there instead of running under the glass card.
+    private func edge(_ p: CGPoint, to c: CGPoint, half: CGSize) -> CGPoint {
+        let dx = c.x - p.x
+        let dy = c.y - p.y
+        let k = min(dx == 0 ? .infinity : half.width / abs(dx), dy == 0 ? .infinity : half.height / abs(dy))
+        guard k < 1 else { return p }
+        return CGPoint(x: p.x + dx * k, y: p.y + dy * k)
+    }
     /// Each card floats up and down a few points on its own seven-second loop.
     private func float(_ t: Double, _ i: Int) -> CGFloat { CGFloat(sin(t * 2 * .pi / 7 + Double(i) * 1.3) * 3) }
 
     private func draw(_ gc: inout GraphicsContext, _ sz: CGSize, _ t: Double) {
         let c = middle(sz)
         for (i, n) in nodes.enumerated() {
-            let p = point(n.page, sz)
+            let p = edge(point(n.page, sz), to: c, half: CGSize(width: cardWidth(sz) / 2, height: Self.cardHeight / 2))
             var path = Path()
             path.move(to: p)
             path.addLine(to: c)
@@ -150,6 +164,8 @@ struct RadialMap: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).coreWell()
+            // An empty area stays on the map, quiet (mockup 15, fresh Brain).
+            .opacity(node.count == 0 ? 0.5 : 1)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("brain-node-\(node.page.rawValue)")
