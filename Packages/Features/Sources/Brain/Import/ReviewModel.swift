@@ -41,6 +41,16 @@ public final class ReviewModel {
     /// How long to wait between two reads while the model works.
     var pollEvery: Duration = .seconds(5)
     var watching: Task<Void, Never>?
+    /// The time left at the local model's measured pace while it reads; nil until two readings apart show a pace.
+    public internal(set) var readingLeft: Duration?
+    @ObservationIgnored var pace: (at: ContinuousClock.Instant, done: Int)?
+    /// Sort (review before filing): the place being renamed inline, the one whose merge target is being picked, and the
+    /// place the keys act on.
+    public var renaming: String?
+    public var mergingFor: String?
+    public var focus: String?
+    /// Sort on the calm Core: read the tidy summary even with the local model off (it tidies by names then).
+    public var readsPrepared = false
 
     public init(host: any AdminHost, routes: BrainRoutes) {
         self.host = host

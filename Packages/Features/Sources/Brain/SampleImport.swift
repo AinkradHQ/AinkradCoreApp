@@ -8,14 +8,49 @@ actor SampleImportTransport: BrainTransport {
     static let run = "sample-run"
     /// The local AI's step for this run: `pending`, `ready`, `declined` (ready, but it changed nothing) or `off`.
     private let semantic: String
-    private var state: String { semantic == "declined" ? "ready" : semantic }
+    private var state: String {
+        switch semantic {
+        case "declined", "places": "ready"
+        case "places-pending": "pending"
+        default: semantic
+        }
+    }
+    /// The review-before-filing walk (`places…`): places like a real first import, prepared by the Core.
+    private var placesWalk: Bool { semantic.hasPrefix("places") }
     /// Made-up "same project" names the Core remembers.
     private var aliases = [RoomAlias(from: "shopapi", to: "Acme Shop")]
     private var settings: [String: Int] = [
         "semantic.enabled": 1, "semantic.strength": 1, "semantic.threads": 1, "semantic.max_tokens": 128,
     ]
 
-    init(semantic: String = "off") { self.semantic = semantic }
+    init(semantic: String = "off") {
+        self.semantic = semantic
+        if semantic.hasPrefix("places") { cards = Self.placeCards }
+    }
+
+    /// What the Core prepared: Northwind and NorthwindBackend merged, lumen-app and lumen-cp merged into Lumen, three small ones in Unsorted.
+    static let placeCards = [
+        ProposalCard(
+            id: "harbor", name: "Harbor Studio", kind: "product", signals: ["path"], itemCount: 4210,
+            sampleTitles: ["Canvas zoom levels", "Plugin loading order"]),
+        ProposalCard(
+            id: "kestrel", name: "Kestrel API", kind: "product", signals: ["path"], itemCount: 932,
+            sampleTitles: ["Webhook retries", "Voice agent prompts"]),
+        ProposalCard(
+            id: "atlas", name: "Atlas app", kind: "product", signals: ["path"], itemCount: 388,
+            sampleTitles: ["Sync conflict notes", "Settings screen"]),
+        ProposalCard(
+            id: "northwind", name: "Northwind", kind: "product", signals: ["path"], itemCount: 1846,
+            sampleTitles: ["Shipping module phase 2", "NorthwindBackend API docs"]),
+        ProposalCard(
+            id: "lumen", name: "Lumen", kind: "project", signals: ["path"], itemCount: 274,
+            sampleTitles: ["lumen-app layout", "lumen-cp flags"]),
+        ProposalCard(
+            id: ProposalCard.unsortedID, name: "Unsorted", kind: "unsorted", itemCount: 57,
+            sampleTitles: ["Wifi-Hotspot", "Photo backup", "Recipe cards"]),
+    ]
+    static let placesTidy = TidySummary(
+        duplicatesMerged: 64, roomsMerged: 9, roomsFolded: 12, itemsMoved: 0, roomsBefore: 17, roomsAfter: 5)
 
     /// Made-up work of the local AI: what it tidied by itself, applied until Undo.
     private var undone = false
@@ -93,6 +128,8 @@ actor SampleImportTransport: BrainTransport {
             }
             return try e.encode(tagged)
         case ("GET", 3, "semantic"): return try e.encode(semanticView())
+        case ("GET", 1, "auto-imports"): return Data("[]".utf8)
+        case ("GET", 3, "learning"): return try e.encode(Self.learning)
         case ("GET", 4, "changes"):
             return try e.encode(TidyChanges(changes: undone || semantic != "ready" ? [] : Self.sampleChanges))
         case ("POST", 4, "undo"):
@@ -174,10 +211,35 @@ actor SampleImportTransport: BrainTransport {
         }
     }
 
+    /// Learn on the places: done, reading, one that could not reach the AI and retries, one queued.
+    static var learning: LearningWire {
+        let retry = ISO8601DateFormatter().string(from: Date().addingTimeInterval(8 * 60))
+        func place(_ id: String, _ name: String, _ n: Int, _ read: Int, _ learned: Int, _ state: String)
+            -> LearningWire.Place
+        {
+            LearningWire.Place(
+                room: id, name: name, sources: n, read: read, learned: learned, state: state,
+                provider: read > 0 ? "claude" : nil, costUsdMicros: 0)
+        }
+        var failed = place("northwind", "Northwind", 1846, 0, 0, "failed")
+        failed.retryAt = retry
+        failed.failure = "The AI account did not answer."
+        return LearningWire(
+            run: run,
+            places: [
+                place("harbor", "Harbor Studio", 4210, 4210, 212, "done"),
+                place("kestrel", "Kestrel API", 932, 410, 31, "learning"),
+                place("atlas", "Atlas app", 388, 0, 0, "pending"), failed,
+                place("lumen", "Lumen", 274, 0, 0, "pending"),
+            ], totalCostUsdMicros: 0, unpriced: 0, done: false)
+    }
+
     private func semanticView() -> SemanticView {
         var v = SemanticView(state: state)
         if state == "pending" { v.progress = SemanticProgress(done: 1240, total: 2980) }
         if semantic == "declined" { v.aiTidy = AiTidy(state: "declined", summary: Self.sampleTidy) }
+        if semantic == "places" { v.aiTidy = AiTidy(state: "applied", summary: Self.placesTidy) }
+        if semantic == "places-pending" { v.progress = SemanticProgress(done: 3210, total: 12391) }
         if semantic == "ready" { v.aiTidy = AiTidy(state: undone ? "undone" : "applied", summary: Self.sampleTidy) }
         return v
     }

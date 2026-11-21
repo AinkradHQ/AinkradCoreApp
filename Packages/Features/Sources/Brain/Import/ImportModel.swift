@@ -63,7 +63,11 @@ public final class ImportModel {
     public private(set) var result: CommitResult?
     public let review: ReviewModel
     /// The Core accepts the rooms and distils by itself (API minor 95): Sort and Learn replace Review and Import.
-    public var autoSort = false
+    public var autoSort = false {
+        didSet { review.readsPrepared = autoSort }
+    }
+    /// Approve is sending the commit.
+    public internal(set) var approving = false
     public let auto: AutoFlow
 
     @ObservationIgnored private var job: Task<Void, Never>?
@@ -541,26 +545,50 @@ public final class ImportModel {
     public func heldCards() -> [ProposalCard] { review.cards.filter(\.isHeld) }
 }
 
-// MARK: Sort and Learn (the Core accepts and distils by itself)
+// MARK: Sort and Learn (the Core prepares the places; the person approves; the Core distils)
 
 extension ImportModel {
-    /// Starts watching the Core sort the run. Called by the Sort step when it appears.
-    func beginSort() {
+    /// Sort appears: one look whether this is an old run the Core already filed by itself.
+    func beginSort() async {
         guard autoSort, let run else { return }
-        auto.watchSort(run: run)
+        await auto.check(run: run)
     }
 
-    /// Undo on the Sort step: back to one pile. The review is reloaded so "Sort it myself" shows the run's items in Unsorted.
+    /// Undo of an old run's sort: back to one pile, which is then reviewed here like any other.
     func undoSort() async {
         guard let run else { return }
         await auto.undo(run: run)
-        if case .undone = auto.sort { try? await review.load(run: run) }
+        if auto.sort == .review { try? await review.load(run: run) }
     }
 
-    /// The person sorts the undone run by hand: the ordinary Review step, and the Core does not take it over again.
-    func sortMyself() { autoSort = false }
+    /// Approve (⏎): files every listed place in one commit (Touch ID), Unsorted's items wait in No room yet, then Learn.
+    /// With nothing filed it goes straight to Done.
+    public func approve() async {
+        guard autoSort, step == .review, let run, !review.busy, review.approveBlock == nil else { return }
+        let keep = review.places.map(\.id)
+        approving = true
+        defer { approving = false }
+        do {
+            result = try await host.elevated(
+                "File the reviewed places into the Brain.", done: "filed", keepsEdit: false
+            ) { try await self.routes.commit(run: run, keep: keep, keepUnsorted: true) }
+        } catch is AdminDeclined {
+            return
+        } catch {
+            // An older Core may have filed the run by itself meanwhile: then there is nothing left to approve.
+            await auto.check(run: run)
+            if case .sorted = auto.sort { return beginLearning() }
+            await review.failed(error)
+            return
+        }
+        if result?.rooms.isEmpty ?? true {
+            await finishAuto()
+        } else {
+            beginLearning()
+        }
+    }
 
-    /// Continue from Sort: the Core is distilling every place (mandatory, no cap); this step shows how far.
+    /// The Core is distilling every filed place (mandatory, no cap); this step shows how far.
     func beginLearning() {
         guard autoSort, step == .review, let run else { return }
         step = .importing
