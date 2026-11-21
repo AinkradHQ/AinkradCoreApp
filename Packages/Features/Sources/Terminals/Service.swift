@@ -25,6 +25,13 @@ struct TerminalItem: Identifiable, Equatable, Sendable {
     var isReal: Bool { sandbox == "real" }
     var isEnded: Bool { status == "exited" || status == "reaped" }
     var hostLost: Bool { exitSignal == "host_lost" }
+
+    /// The Core no longer has this terminal: 404 `not_found` (reaped after `exit`, closed elsewhere, or never this
+    /// device's). Every caller treats it the same: drop it from the list and stop asking about it.
+    static func isGone(_ error: any Error) -> Bool {
+        guard case .http(let status, let code, _)? = CoreError.unwrapping(error) else { return false }
+        return status == 404 || code == "not_found"
+    }
 }
 
 struct DriverItem: Equatable, Sendable {
@@ -277,7 +284,8 @@ struct LiveTerminalService: TerminalService {
         return try await run {
             switch try await client.tailTerminal(path: .init(id: id), query: .init(lines: Int32(lines))) {
             case .ok(let o): return try o.body.json.lines
-            case .notFound: return []
+            // Gone (reaped after `exit`, or closed elsewhere): say so, so the list drops it and stops asking.
+            case .notFound(let r): throw Self.fail(404, try? r.body.json)
             case .undocumented(let status, let p): throw await Self.fail(status, p)
             default: throw Self.unknown
             }

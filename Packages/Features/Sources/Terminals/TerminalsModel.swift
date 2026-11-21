@@ -309,9 +309,14 @@ public final class TerminalsModel {
         // the advanced sheet picks the runner and the shell.
         l.register(
             LauncherEntry(
-                id: "new-terminal", title: "New terminal", sub: "Opens at once on the best runner · needs Touch ID",
+                id: "new-terminal", title: "New terminal", sub: "Opens at once in the Core sandbox · ⌘T",
                 symbol: "terminal", keywords: ["shell", "rune"], isAction: true
             ) { [weak self] in self?.quickNew() })
+        l.register(
+            LauncherEntry(
+                id: "new-terminal-mac", title: "New terminal on This Mac", sub: "A real shell on this Mac · ⌃⌘T",
+                symbol: "laptopcomputer", keywords: ["shell", "rune", "mac", "local", "real"], isAction: true
+            ) { [weak self] in self?.newOnThisMac() })
         l.register(
             LauncherEntry(
                 id: "new-terminal-advanced", title: "New terminal (advanced)…",
@@ -431,6 +436,7 @@ public final class TerminalsModel {
             session = TerminalSession(item: item, runner: runner(item.runner), service: service, host: host)
             session.onBell = { [weak self] in self?.bell(id) }
             session.onChange = { [weak self] in self?.paneChanged(id) }
+            session.onGone = { [weak self] in self?.forget(id) }
             sessions[id] = session
         }
         let pane = "terminal-\(id)"
@@ -531,6 +537,33 @@ public final class TerminalsModel {
         Task { await reload() }
     }
 
+    /// The Core says this terminal is gone (404): it leaves the list, so its row stops asking for its screen. An open pane
+    /// keeps its session and shows it ended; with no pane the session goes too.
+    func forget(_ id: String) {
+        items.removeAll { $0.id == id }
+        if selected == id { selected = nil }
+        rang.remove(id)
+        if !shell.allPanes.contains(where: { $0.id == "terminal-\(id)" }) {
+            sessions[id]?.shutDown()
+            sessions[id] = nil
+        }
+        syncLauncherTerminals()
+        changed?()
+    }
+
+    /// Close on a terminal that has already ended: it leaves the list at once; the Core forgets it too (an exited
+    /// terminal has no host to hang up, so no Touch ID unless the Core asks for one).
+    func dismiss(_ id: String) {
+        forget(id)
+        Task {
+            do { _ = try await service.close(id) } catch  where CoreError.unwrapping(error)?.needsProof == true {
+                _ = try? await host.elevated("Remove the ended terminal from the list.", done: "removed") {
+                    try await self.service.close(id)
+                }
+            } catch {}
+        }
+    }
+
     func closePane(_ id: String) {
         shell.closePane("terminal-\(id)")
         shell.showToast("Pane closed. The terminal stays in the list while it exists")
@@ -559,11 +592,21 @@ public final class TerminalsModel {
     func quickNew() {
         Task {
             if runners.isEmpty { await reload() }
-            let m = NewTerminalModel(model: self, runner: quickRunner)
+            // ⌘T is the Core sandbox (Ahmed, 2026-11-21); ⌃⌘T is This Mac. No built-in runner: the last machine used.
+            let m = NewTerminalModel(model: self, runner: runners.first(where: \.builtIn)?.id ?? quickRunner)
             guard m.canOpen else { return openNew(form: m) }
             await m.submit()
             if m.error != nil { openNew(form: m) }
         }
+    }
+
+    /// ⌃⌘T: a real shell on this Mac at once. With no runner on this Mac, a notice says so.
+    public func newOnThisMac() {
+        guard let mac = host.thisMacRunnerID else {
+            return shell.showToast(
+                "This Mac has no runner, so it cannot open a real shell here. Turn it on in Devices.", kind: .warn)
+        }
+        open(on: mac)
     }
 
     /// Opens a terminal on `runner` at once, in AI session `session`'s folder when given; the New terminal sheet shows only
@@ -599,6 +642,7 @@ public final class TerminalsModel {
             let s = TerminalSession(item: t, runner: self.runner(t.runner), service: service, host: host)
             s.onBell = { [weak self] in self?.bell(t.id) }
             s.onChange = { [weak self] in self?.paneChanged(t.id) }
+            s.onGone = { [weak self] in self?.forget(t.id) }
             sessions[t.id] = s
             await s.attach()
             return s

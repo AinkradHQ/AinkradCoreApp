@@ -1,9 +1,10 @@
 import CoreUI
 import SwiftUI
 
-/// The Terminals app (E6-3, `screens/08-terminals.html`): the terminals grouped by machine, each a card with a live look at
-/// its screen. This Mac's real shells come first, then the sandboxes. ⌘T opens a terminal at once on the last machine used;
-/// "New terminal…" (⌥⌘N) opens the sheet. Keyboard: arrows move, ⏎ opens, ⌫ closes, D detach, S running command, R rename.
+/// The Terminals app (E6-3, `screens/08-terminals.html`): the terminals grouped by machine, one row each (Ahmed, 2026-11-21:
+/// a list, not cards). This Mac's real shells come first, then the sandboxes. ⌘T opens a terminal at once in the Core sandbox,
+/// ⌃⌘T a real shell on this Mac; "New terminal…" (⌥⌘N) opens the sheet. Keyboard: ↑ ↓ move, ⏎ opens, ⌫ or ⌘⌫ closes,
+/// D detach, S running command, R rename.
 struct TerminalsListView: View {
     @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel
@@ -39,6 +40,14 @@ struct TerminalsListView: View {
                 model.openNew()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
+            if model.host.thisMacRunnerID != nil {
+                // ⌃⌘T is bound by the app's File menu (New Terminal on This Mac); the tile shows the key.
+                AppActionTile(
+                    title: "On This Mac", symbol: "laptopcomputer", key: "⌃⌘T", hue: GlassInk.accent(paneAccent)
+                ) {
+                    model.newOnThisMac()
+                }
+            }
             AppActionTile(
                 title: "New terminal", symbol: "plus", key: "⌘T", hue: GlassInk.accent(paneAccent), prominent: true
             ) {
@@ -67,7 +76,7 @@ struct TerminalsListView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: Space.s6) {
+                        VStack(alignment: .leading, spacing: Space.s5) {
                             ForEach(model.groups) { g in section(g) }
                         }
                         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
@@ -78,7 +87,6 @@ struct TerminalsListView: View {
                     .focusEffectDisabled()
                     .onKeyPress(.downArrow) { move(1, proxy) }
                     .onKeyPress(.upArrow) { move(-1, proxy) }
-                    .coreSideKeys { move($0, proxy) }
                     .onKeyPress(.return) { act(.open) }
                     .onKeyPress(.delete) { act(.end) }
                     .onKeyPress(characters: .letters) { press in
@@ -96,7 +104,7 @@ struct TerminalsListView: View {
         }
     }
 
-    /// One machine: its picture, what it is, how many, then its cards.
+    /// One machine: its picture, what it is, how many, then its rows.
     private func section(_ g: TerminalGroup) -> some View {
         let runner = model.runner(g.id)
         let mac = g.isThisMac
@@ -119,12 +127,9 @@ struct TerminalsListView: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 10), spacing: Space.s3, alignment: .top)],
-                spacing: Space.s3
-            ) {
+            VStack(spacing: Space.s1) {
                 ForEach(Array(g.items.enumerated()), id: \.element.id) { i, t in
-                    TerminalCard(model: model, item: t, thisMac: mac || t.isReal, index: i).id(t.id)
+                    TerminalRow(model: model, item: t, thisMac: mac || t.isReal, index: i).id(t.id)
                 }
             }
         }
@@ -154,7 +159,8 @@ struct TerminalsListView: View {
                 }
                 .buttonStyle(CoreButtonStyle(.prominent))
             }
-            Text("Tip: press ⌘T any time.").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text("Tip: press ⌘T any time, or ⌃⌘T for this Mac.").coreFont(size: MacTextSize.meta).foregroundStyle(
+                GlassInk.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
@@ -178,9 +184,10 @@ struct TerminalsListView: View {
 
     private var footer: some View {
         HStack(spacing: Space.s4) {
-            hint("← → ↑ ↓", "Move")
+            hint("↑ ↓", "Move")
             hint("⏎", "Open")
             hint("⌘T", "New terminal")
+            if model.host.thisMacRunnerID != nil { hint("⌃⌘T", "On This Mac") }
             hint("⌫", "Close")
             Spacer(minLength: 0)
         }
@@ -204,7 +211,13 @@ enum TileAction {
         switch a {
         case .open: model.openTerminal(id)
         case .detach: model.sessions[id]?.detach()
-        case .end: if let s = model.session(for: id) { model.confirmEnd(s) }
+        case .end:
+            // An ended terminal has nothing to stop: Close just takes it off the list.
+            if model.items.first(where: { $0.id == id })?.isEnded ?? true {
+                model.dismiss(id)
+            } else if let s = model.session(for: id) {
+                model.confirmEnd(s)
+            }
         case .signal:
             model.openTerminal(id)
             model.shell.toggleActions()

@@ -10,7 +10,7 @@ enum ShortcutCatalog {
             [
                 ("Launcher…", "⌘K"), ("Actions…", "⇧⌘A"), ("Overview", "⇧⌘O"), ("Next / Previous Tab", "⌃Tab / ⌃⇧Tab"),
                 ("Rename Tab…", "⇧⌘R"), ("New AI Session", "⌘N"), ("Quick Capture", "⇧⌘N"), ("New Terminal", "⌘T"),
-                ("Close Pane", "⌘W"),
+                ("New Terminal on This Mac", "⌃⌘T"), ("Close Pane", "⌘W"),
                 ("Reopen Closed Pane", "⇧⌘T"), ("Close All Panes", "⌥⌘W"),
             ]
         ),
@@ -162,6 +162,8 @@ public struct ShellCommands: Commands {
             Button("Quick Capture") { shell.launcher.entry("lore-capture")?.run() }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Terminal") { shell.launcher.entry("new-terminal")?.run() }.keyboardShortcut("t")
+            Button("New Terminal on This Mac") { shell.launcher.entry("new-terminal-mac")?.run() }
+                .keyboardShortcut("t", modifiers: [.command, .control])
             Button("New Terminal (Advanced)…") { shell.launcher.entry("new-terminal-advanced")?.run() }
                 .keyboardShortcut("t", modifiers: [.command, .option])
         }
