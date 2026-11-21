@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -6,6 +7,9 @@ import SwiftUI
 struct UnlockCard: View {
     @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
+    /// The Touch ID sheet is up: only the frosted backdrop shows under it, never a second card (Ahmed, 2026-11-21: the
+    /// sheet looks better, and two surfaces read as "still locked after I scanned").
+    var sheetUp = false
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
     @State private var breathe = false
@@ -18,53 +22,60 @@ struct UnlockCard: View {
                 .overlay(Color.black.opacity(0.18))
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
-            VStack(spacing: Space.s2) {
-                ZStack {
-                    coreShape(Radius.pane).fill(
-                        GlassInk.accent(paneAccent).opacity(checking ? 0.3 : breathe ? 0.34 : 0.18)
-                    )
-                    .frame(width: 96, height: 96)
-                    Image(systemName: "touchid").font(.system(size: 48, weight: .light))
-                        .foregroundStyle(GlassInk.accent(paneAccent))
-                        .symbolEffect(.pulse, options: .repeating, isActive: checking && !reduce)
-                }
-                .padding(.top, Space.s1).padding(.bottom, Space.s3)
-                .accessibilityHidden(true)
-                Text("Unlock Ainkrad").coreFont(size: MacTextSize.large + 4, weight: .bold)
-                    .accessibilityAddTraits(.isHeader)
-                Text(checking ? "Checking…" : "Touch the sensor to open your Core")
-                    .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
-                    .contentTransition(.opacity)
-                Button {
-                    shell.unlock?()
-                } label: {
-                    Label("Use Touch ID", systemImage: "touchid")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent))
-                .coreShortcut(.primary)
-                .disabled(checking)
-                .padding(.top, Space.s3)
-                Button("Use password instead") { shell.unlock?() }
-                    .buttonStyle(CoreButtonStyle(.plain))
-                    .disabled(checking)
-                HStack(spacing: Space.s1) {
-                    Image(systemName: "lock").accessibilityHidden(true)
-                    Text("Stays open until your Mac locks or sleeps")
-                }
-                .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                .padding(.top, Space.s3)
-            }
-            .padding(.horizontal, Space.s6).padding(.vertical, Space.s6)
-            .frame(width: Space.s8 * 8)
-            .corePanel(radius: Radius.pane + Space.s1, padding: 0)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Unlock Ainkrad")
-            .accessibilityIdentifier("unlock")
+            if !sheetUp { card }
         }
         .onAppear {
+            // Locked means Touch ID now: the sheet comes up by itself, no button first. Cancelling it leaves this card
+            // (its buttons ask again); it is asked once per lock, never in a loop.
+            if shell.lock == .locked, NSApplication.shared.isActive { shell.unlock?() }
             guard !reduce else { return }
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { breathe = true }
         }
         .transition(.opacity)
+    }
+
+    private var card: some View {
+        VStack(spacing: Space.s2) {
+            ZStack {
+                coreShape(Radius.pane).fill(
+                    GlassInk.accent(paneAccent).opacity(checking ? 0.3 : breathe ? 0.34 : 0.18)
+                )
+                .frame(width: 96, height: 96)
+                Image(systemName: "touchid").font(.system(size: 48, weight: .light))
+                    .foregroundStyle(GlassInk.accent(paneAccent))
+                    .symbolEffect(.pulse, options: .repeating, isActive: checking && !reduce)
+            }
+            .padding(.top, Space.s1).padding(.bottom, Space.s3)
+            .accessibilityHidden(true)
+            Text("Unlock Ainkrad").coreFont(size: MacTextSize.large + 4, weight: .bold)
+                .accessibilityAddTraits(.isHeader)
+            Text(checking ? "Checking…" : "Touch the sensor to open your Core")
+                .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                .contentTransition(.opacity)
+            Button {
+                shell.unlock?()
+            } label: {
+                Label("Use Touch ID", systemImage: "touchid")
+            }
+            .buttonStyle(CoreButtonStyle(.prominent))
+            .coreShortcut(.primary)
+            .disabled(checking)
+            .padding(.top, Space.s3)
+            Button("Use password instead") { shell.unlock?() }
+                .buttonStyle(CoreButtonStyle(.plain))
+                .disabled(checking)
+            HStack(spacing: Space.s1) {
+                Image(systemName: "lock").accessibilityHidden(true)
+                Text("Stays open until your Mac locks or sleeps")
+            }
+            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+            .padding(.top, Space.s3)
+        }
+        .padding(.horizontal, Space.s6).padding(.vertical, Space.s6)
+        .frame(width: Space.s8 * 8)
+        .corePanel(radius: Radius.pane + Space.s1, padding: 0)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Unlock Ainkrad")
+        .accessibilityIdentifier("unlock")
     }
 }

@@ -21,8 +21,9 @@ public struct ShellView: View {
             } else {
                 // Locked: the Unlock card is above everything (an open dialog's own dim buried it, a near-black screen
                 // after sleep or a Space switch). The dialogs come back once unlocked; only Touch ID rides above the card.
-                UnlockCard(shell: shell)
-                if let d = shell.topDialog, d.id == "step-up" { dialogLayer(d, id: "top") }
+                let sheet = shell.topDialog.flatMap { $0.id == "step-up" ? $0 : nil }
+                UnlockCard(shell: shell, sheetUp: sheet != nil)
+                if let d = sheet { dialogLayer(d, id: "top") }
             }
         }
         .coreAnimation(Motion.out(Motion.move), value: shell.lock)
