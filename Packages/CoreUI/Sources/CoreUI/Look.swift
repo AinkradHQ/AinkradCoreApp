@@ -142,9 +142,9 @@ struct FrameModifier: ViewModifier {
     @Environment(\.coreLook) private var inForce
     func body(content: Content) -> some View {
         let prefs = LookPrefs.shared
-        var look = part.flatMap { prefs.custom[$0] } ?? inForce
-        // Floating surfaces sit over other content, so they stay more solid than the panes (Ahmed, 2026-11-15).
-        if let part, Self.floating.contains(part), prefs.custom[part] == nil { look.opacity = max(look.opacity, 0.88) }
+        let look = part.flatMap { prefs.custom[$0] } ?? inForce
+        // Every surface follows Appearance (Ahmed, 2026-11-21: the launcher, dialogs, the bell and menus did not; the
+        // 2026-11-15 rule kept floating surfaces at least 88% solid). A part's own Look in Advanced still wins.
         // No glass (Ahmed, 2026-11-15): the content background with plain rounded corners; depth from a soft shadow.
         return
             content
@@ -154,8 +154,6 @@ struct FrameModifier: ViewModifier {
             .shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
     }
 
-    /// The launcher and dialogs follow Appearance like the panes (Ahmed, 2026-11-21).
-    private static let floating: Set<LookPart> = [.popups, .dropdowns]
 }
 
 /// What a pane's content asks of the pane's background: Appearance's Look, its app's own, or nothing because it draws its

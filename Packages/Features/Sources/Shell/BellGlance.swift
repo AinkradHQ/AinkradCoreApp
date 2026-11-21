@@ -66,7 +66,7 @@ public final class BellRegistry {
     public var waiting: Int { items.filter(\.needsPerson).count }
 }
 
-private enum BellTab: String, CaseIterable, Hashable { case all, approvals, alerts, runners }
+private enum BellTab: String, CaseIterable, Hashable { case all, approvals, alerts }
 
 /// The groups of `shell-glance.js`: read by who acts, agents first because their approvals expire soonest.
 private enum BellGroup: String, CaseIterable {
@@ -107,7 +107,6 @@ struct BellGlance: View {
         case .all: true
         case .approvals: i.kind == .approval
         case .alerts: i.kind != .approval
-        case .runners: false
         }
     }
 
@@ -125,7 +124,8 @@ struct BellGlance: View {
                 segments: [
                     // One word each, no counts: every group below carries its own count, and a count squeezed "Approvals" to "Approv…".
                     CoreSegment(BellTab.all, "All"), CoreSegment(.approvals, "Approvals"),
-                    CoreSegment(.alerts, "Alerts"), CoreSegment(.runners, "Runners"),
+                    // No Runners tab: Runners has its own icon and dropdown (Ahmed, 2026-11-21).
+                    CoreSegment(.alerts, "Alerts"),
                 ], selection: $tab, fill: true)
             // As tall as what it holds; past the cap the list scrolls.
             ViewThatFits(in: .vertical) {
@@ -148,7 +148,7 @@ struct BellGlance: View {
 
     private var list: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            if tab == .runners { runners } else { groups }
+            groups
         }
         .padding(.horizontal, 2)
     }
@@ -213,18 +213,8 @@ struct BellGlance: View {
                 ? "When an AI session asks to do something, it waits here for you."
                 : "Approvals and alerts from your Core show up here."
         )
+        .frame(maxWidth: .infinity)
         .transition(.opacity)
-    }
-
-    @ViewBuilder private var runners: some View {
-        ForEach(shell.home.machines) { m in
-            CoreRow(
-                m.id, subtitle: !m.online ? "Offline" : m.used == 0 ? "Idle" : "\(m.used) of \(m.slots) running",
-                symbol: "server.rack"
-            ) {
-                StateBadge(m.online ? "Online" : "Offline", tone: m.online ? .run : .queue, symbol: "circle")
-            }
-        }
     }
 }
 
