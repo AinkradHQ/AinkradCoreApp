@@ -34,6 +34,7 @@ public final class BrainModel {
             updateStatusPolling()
             importer?.review.canSameProject = remembersSameProject
             importer?.review.keepsInCommit = keepsInCommit
+            Task { await restoreImport() }
         }
     }
     /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows them in the sidebar.
@@ -283,6 +284,7 @@ public final class BrainModel {
             // A room that sealed or lost its lease under us must not stay on screen.
             if let id = inspectingID, room(id)?.lock != nil { clearRoomView() }
             if viewingLock != nil { clearRoomView() }
+            await restoreImport()
         } catch is CancellationError {
         } catch {
             load = .failed(BrainWords.loadFailure(error))

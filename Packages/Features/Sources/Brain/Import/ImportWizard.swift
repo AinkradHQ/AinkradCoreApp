@@ -24,6 +24,21 @@ extension BrainModel {
         openImport()
     }
 
+    /// After a restart or a reconnect (API minor 96): shows the import the Core is still learning from, or the one waiting
+    /// in review, as if this session had watched it. A Core before 96 keeps today's behaviour.
+    func restoreImport() async {
+        guard calmAvailable, !isSample, (apiMinor ?? 0) >= 96, importer?.isActive != true,
+            let routes = service?.importRoutes
+        else { return }
+        let m = ImportModel(
+            host: host, routes: routes, sources: importSources(), resume: .standard(), places: importPlaces)
+        m.service = service
+        m.review.canSameProject = remembersSameProject
+        m.review.keepsInCommit = keepsInCommit
+        m.autoSort = true
+        if await m.restoreUnderWay(), importer?.isActive != true { importer = m }
+    }
+
     /// `brain.inbox`: one notice, then the lists refresh.
     public func inboxNotice(unsorted: Int, newRooms: Int) {
         var parts: [String] = []

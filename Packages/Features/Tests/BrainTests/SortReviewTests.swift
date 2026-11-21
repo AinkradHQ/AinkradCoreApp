@@ -176,3 +176,69 @@ final class SentBody: @unchecked Sendable {
         lock.withLock { data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
     }
 }
+
+/// After a restart (Ahmed, 2026-11-21): the import the Core is still learning from is shown again, from `GET /imports`.
+@MainActor
+struct RestoreImportTests {
+    let base = "/modules/brain/v1/imports"
+
+    func model(_ t: FakeBrainTransport) -> ImportModel {
+        let (m, _) = BrainImportFlowTests().wizard(t)
+        m.autoSort = true
+        return m
+    }
+
+    func learning(done: Bool, states: [String]) -> [String: Any] {
+        let places: [[String: Any]] = states.enumerated().map { i, s in
+            [
+                "room": "p\(i)", "name": "P\(i)", "sources": 10, "read": s == "done" ? 10 : 4, "learned": 2, "state": s,
+                "cost_usd_micros": 0,
+            ]
+        }
+        return ["run": "r1", "places": places, "total_cost_usd_micros": 0, "unpriced": 0, "done": done]
+    }
+
+    @Test func aCommittedRunStillLearningOpensAtLearnWithItsProgress() async {
+        let t = FakeBrainTransport()
+        t.routes["GET \(base)"] = { _ in
+            [
+                ["run": "r2", "kind": "full", "state": "abandoned", "started_at": "x"],
+                ["run": "r1", "state": "committed"],
+            ]
+        }
+        nonisolated(unsafe) let l = learning(done: false, states: ["learning", "done"])
+        t.routes["GET \(base)/r1/learning"] = { _ in l }
+        let m = model(t)
+        #expect(await m.restoreUnderWay())
+        #expect(m.run == "r1" && m.step == .importing && m.isActive)
+        #expect(await until { m.auto.learning != nil })
+        #expect(m.glance?.line == "Learning from your work" && m.glance?.detail == "14 of 20")
+        m.auto.stop()
+    }
+
+    @Test func aRunThatLearnedEverythingShowsNothing() async {
+        let t = FakeBrainTransport()
+        t.routes["GET \(base)"] = { _ in [["run": "r1", "state": "committed"]] }
+        nonisolated(unsafe) let l = learning(done: true, states: ["done", "done"])
+        t.routes["GET \(base)/r1/learning"] = { _ in l }
+        let m = model(t)
+        #expect(await m.restoreUnderWay() == false)
+        #expect(m.run == nil && m.step == .sources && m.glance == nil)
+    }
+
+    @Test func aRunInReviewOpensAtSort() async {
+        let t = FakeBrainTransport()
+        t.routes["GET \(base)"] = { _ in [["run": "r1", "state": "review"], ["run": "r0", "state": "committed"]] }
+        let m = model(t)
+        #expect(await m.restoreUnderWay())
+        #expect(m.run == "r1" && m.step == .review && m.auto.sort == .review)
+        #expect(t.count("GET \(base)/r0/learning") == 0)
+    }
+
+    @Test func anOlderCoreWithoutTheListChangesNothing() async {
+        let t = FakeBrainTransport()  // GET /imports answers 404, as before API minor 96
+        let m = model(t)
+        #expect(await m.restoreUnderWay() == false)
+        #expect(m.run == nil && m.step == .sources && !m.isActive)
+    }
+}

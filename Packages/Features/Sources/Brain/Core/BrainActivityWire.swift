@@ -120,6 +120,13 @@ public struct LearningWire: Codable, Sendable, Equatable {
     }
 }
 
+/// One run of `GET /imports` (API minor 96, `brainImports`), newest first. Read leniently: only the id and state.
+public struct ImportRunWire: Decodable, Sendable, Equatable {
+    public var run: String
+    /// `collecting`, `discovering`, `review`, `committing`, `committed` or `abandoned`.
+    public var state: String
+}
+
 /// One record Brain accepted in the last day (`GET /learned`).
 public struct LearnedWire: Codable, Sendable, Equatable, Identifiable {
     public var id: String
@@ -191,6 +198,8 @@ extension BrainRoutes {
         let u = try await call("POST", "/auto-imports/\(Self.seg(run))/undo", as: UndoneWire.self)
         return (u.rooms, u.items ?? 0)
     }
+    /// API minor 96: the newest 50 import runs, newest first.
+    public func imports() async throws -> [ImportRunWire] { try await call("GET", "/imports") }
     public func learning(run: String) async throws -> LearningWire {
         try await call("GET", "/imports/\(Self.seg(run))/learning")
     }
