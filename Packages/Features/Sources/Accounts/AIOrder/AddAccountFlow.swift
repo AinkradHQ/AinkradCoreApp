@@ -13,6 +13,12 @@ final class AddAccountFlow {
     /// The line under the key field when the Core refused it or could not check it.
     var error: String?
     var addedAccount: Int64?
+    /// What the new account is called: the provider's name to start with, capitals and spaces welcome. The slug label
+    /// stays generated (`keyFlow.label`).
+    var accountName = ""
+    /// The name a sign-in was started with; a different one at its end is saved by a rename.
+    private var startedName: String?
+    var nameIssue: String? { AccountNames.problem(accountName) }
     var modelsFound: Int?
     /// The models were counted: the third line of the check is done.
     var modelsSettled = false
@@ -68,6 +74,8 @@ final class AddAccountFlow {
             for: ProviderCatalog.name(p.id, fallback: p.name), taken: Set(m.accounts.map(\.label)))
         stepper.choose(ProviderCatalog.kind(p))
         keyFlow.label = label
+        accountName = ProviderCatalog.name(p.id, fallback: p.name)
+        startedName = m.namesOn ? AccountNames.clean(accountName) : nil
         if ProviderCatalog.kind(p) == .subscription {
             runners = nil
             runnerName = nil
@@ -79,7 +87,7 @@ final class AddAccountFlow {
                 // One runner can do it: use it without asking. The sign-in says where it runs.
                 if c.only != nil, !needsConsent { await startOnRunner(m) }
             } else {
-                await m.startSignIn(provider: p.id, label: label)
+                await m.startSignIn(provider: p.id, label: label, displayName: startedName)
             }
         } else {
             await keyFlow.load(m)
@@ -91,7 +99,8 @@ final class AddAccountFlow {
         guard let id = providerID, let r = runners?.chosen, !needsConsent || consent else { return }
         runnerName = r.name
         runners = nil
-        await m.startSignIn(provider: id, label: keyFlow.label, runner: r.id)
+        startedName = m.namesOn && nameIssue == nil ? AccountNames.clean(accountName) : nil
+        await m.startSignIn(provider: id, label: keyFlow.label, displayName: startedName, runner: r.id)
     }
 
     /// No runner can sign in: install the provider's app on `target` (Touch ID), wait until a runner offers the sign-in,
@@ -161,8 +170,9 @@ final class AddAccountFlow {
     func live(_ m: AccountsModel) -> KeyShape.Live { KeyShape.live(key, prefix: provider(m)?.keyPrefix) }
 
     func submitKey(_ m: AccountsModel, settle: Bool) async {
-        guard let id = providerID, stepper.step == .key else { return }
+        guard let id = providerID, stepper.step == .key, nameIssue == nil else { return }
         error = nil
+        keyFlow.displayName = m.namesOn ? AccountNames.clean(accountName) : nil
         if keyFlow.needsGate { await keyFlow.enableKeys(m) }
         if keyFlow.needsGate {
             error = keyFlow.gateNote ?? "Keys are turned off on your Core. Turn them on in Settings, then try again."
@@ -195,9 +205,14 @@ final class AddAccountFlow {
 
     // MARK: sign-in
 
-    func signedIn(_ account: Int64?) {
+    /// The sign-in made the account; a name changed while it ran is saved now.
+    func signedIn(_ account: Int64?, _ m: AccountsModel) async {
         addedAccount = account
         stepper.signedIn()
+        let name = AccountNames.clean(accountName)
+        guard m.namesOn, let account, nameIssue == nil, name != startedName else { return }
+        _ = try? await m.service?.setAccountName(account: account, name: name)
+        await m.reload()
     }
 
     func retrySignIn(_ m: AccountsModel) async {

@@ -69,6 +69,17 @@ final class FakeService: AccountsService, @unchecked Sendable {
         if let failure { throw failure }
     }
     func aiOrderSupported() async -> Bool { orderOn }
+    /// Account names (API minor 96): off until a test turns them on.
+    var namesOn = false
+    func namesSupported() async -> Bool { namesOn }
+    func setAccountName(account id: Int64, name: String?) async throws -> AccountItem {
+        try note("setAccountName \(id) \(name ?? "-")")
+        guard let i = accountList.firstIndex(where: { $0.id == id }) else {
+            throw CoreError.invalidInput("no such account")
+        }
+        accountList[i].displayName = name
+        return accountList[i]
+    }
     func aiOrder() async throws -> AIOrderDoc { AIOrderDoc(items: orderEntries, overrides: overrideList) }
     func setAIOrder(agent: String?, items: [AIOrderPut.Item]) async throws -> AIOrderDoc {
         try note("setAIOrder \(agent ?? "-") \(items.map { String($0.account) }.joined(separator: ","))")

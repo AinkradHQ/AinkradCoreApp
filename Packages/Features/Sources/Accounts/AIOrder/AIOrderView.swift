@@ -56,7 +56,7 @@ struct AIOrderView: View {
                 let isDragged = dragging == row.id
                 let shift = from.flatMap { f in target.map { OrderMoves.shift(row: i, dragged: f, target: $0) } } ?? 0
                 OrderRowView(
-                    row: row, first: i == 0, last: i == rows.count - 1, dragging: isDragged,
+                    row: row, first: i == 0, last: i == rows.count - 1, dragging: isDragged, canRename: model.namesOn,
                     onDrag: {
                         dragging = row.id
                         dy = $0
@@ -91,6 +91,7 @@ struct AIOrderView: View {
             } else {
                 Task { await model.checkNow(row.account) }
             }
+        case .rename: AccountDialogs.openRename(model, row.account)
         case .limits:
             model.limitsAccount = row.id
             model.limitsTarget = .account(row.id)

@@ -57,7 +57,7 @@ private struct AccountsBanner: View {
                 Image(systemName: "bell.fill").foregroundStyle(GlassInk.amber).accessibilityHidden(true)
                 (Text(AccountsBannerWords.headline(need: need.count)).fontWeight(.semibold) + Text(" ")
                     + Text(
-                        "\(first.label): \(v.line(first, limits: model.limits(of: first), budgets: model.budgets, now: model.now()))"
+                        "\(model.title(first)): \(v.line(first, limits: model.limits(of: first), budgets: model.budgets, now: model.now()))"
                     ))
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: Space.s3)

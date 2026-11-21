@@ -205,6 +205,8 @@ public final class AccountsDemo {
         var loginStart: Date?
         var codeAt: Date?
         var loginLabel = "claude-plan"
+        /// The name the stand-in sign-in gives the account it makes.
+        var loginName: String?
         var loginFails = false
         /// The guided sign-in (OpenCode, Antigravity): when a line was last typed.
         var guidedSentAt: Date?
@@ -232,7 +234,9 @@ public final class AccountsDemo {
                 }
                 if state == "done" {
                     if !accountList.contains(where: { $0.label == loginLabel }) {
-                        accountList.append(a(31, loginLabel, loginProvider, "active", "dev1", 1, used: 0))
+                        var made = a(31, loginLabel, loginProvider, "active", "dev1", 1, used: 0)
+                        made.displayName = loginName
+                        accountList.append(made)
                         orderEntries.append(
                             AIOrderEntry(account: 31, provider: loginProvider, harness: nil, model: nil))
                     }
@@ -242,7 +246,9 @@ public final class AccountsDemo {
                 state = t.timeIntervalSince(c) > 1.5 ? "done" : "storing"
                 if state == "done" {
                     if !accountList.contains(where: { $0.label == loginLabel }) {
-                        accountList.append(a(7, loginLabel, "claude-sub", "active", "oat1", 1, used: 0))
+                        var made = a(7, loginLabel, "claude-sub", "active", "oat1", 1, used: 0)
+                        made.displayName = loginName
+                        accountList.append(made)
                     }
                     account = 7
                 }
@@ -499,7 +505,7 @@ public final class AccountsDemo {
         "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit", "usage-limit-clear",
         "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
         "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
-        "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices",
+        "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices", "ai-order-rename",
     ]
 
     let model: AccountsModel
@@ -537,7 +543,8 @@ public final class AccountsDemo {
         switch scene {
         case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
-            "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices":
+            "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices",
+            "ai-order-rename":
             svc.useAIOrderSample(limitHit: scene == "ai-order-limit-hit")
             svc.noLogin = scene.hasPrefix("ai-order-add-install")
         case "connect-installing": svc.noLogin = true
@@ -605,6 +612,7 @@ public final class AccountsDemo {
         case "ai-order-add-key": AccountDialogs.openConnect(model, provider: "anthropic")
         case "ai-order-add-signin": AccountDialogs.openConnect(model, provider: "codex-sub")
         case "ai-order-advanced": model.advancedOpen = true
+        case "ai-order-rename": AccountDialogs.openRename(model, model.account(3)!)
         case "ai-order-prices":
             model.advancedOpen = true
             model.advancedTab = .models

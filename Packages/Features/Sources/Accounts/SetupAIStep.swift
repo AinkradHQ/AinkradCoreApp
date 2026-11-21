@@ -47,7 +47,7 @@ public struct SetupAIStep: View {
                 HStack(spacing: Space.s3) {
                     ProviderTile(name: name)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(name).coreFont(size: MacTextSize.body, weight: .semibold)
+                        Text(model.title(a)).coreFont(size: MacTextSize.body, weight: .semibold)
                         Text(a.isPlan ? "Subscription" : "API key ending \(a.maskedTail)")
                             .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                     }

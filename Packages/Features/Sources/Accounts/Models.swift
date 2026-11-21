@@ -36,6 +36,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     let id: Int64
     let provider: String
     let label: String
+    /// The free-text name a person gave it (API minor 96); nil: it goes by its provider's name.
+    var displayName: String? = nil
     let maskedTail: String
     let baseURL: String
     var state: String
@@ -68,7 +70,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var isPlan: Bool { provider == "claude-sub" }
 
     static func == (l: Self, r: Self) -> Bool {
-        l.id == r.id && l.provider == r.provider && l.label == r.label && l.maskedTail == r.maskedTail
+        l.id == r.id && l.provider == r.provider && l.label == r.label && l.displayName == r.displayName
+            && l.maskedTail == r.maskedTail
             && l.baseURL == r.baseURL && l.state == r.state && l.stateReason == r.stateReason
             && l.stateUntil == r.stateUntil && l.cap == r.cap && l.lastUsedAt == r.lastUsedAt
             && l.createdAt == r.createdAt && l.lastTest?.at == r.lastTest?.at

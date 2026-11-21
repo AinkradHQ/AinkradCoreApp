@@ -71,10 +71,7 @@ extension AccountsModel {
         switch t {
         case .provider(let p): ProviderCatalog.name(p, fallback: providerName(p))
         case .account(let id):
-            account(id).map {
-                "\(ProviderCatalog.name($0.provider, fallback: providerName($0.provider))) · \($0.label)"
-            }
-                ?? "Account \(id)"
+            account(id).map(title) ?? "Account \(id)"
         }
     }
 

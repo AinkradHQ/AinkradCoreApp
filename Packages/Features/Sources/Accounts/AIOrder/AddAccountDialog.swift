@@ -37,7 +37,9 @@ struct AddAccountDialog: View {
             if let id = provider, let p = model.provider(id) { Task { await flow.choose(p, model) } }
         }
         .onChange(of: model.signIn?.stage) { _, s in
-            if case .done(let account)? = s, flow.stepper.step == .signIn { flow.signedIn(account) }
+            if case .done(let account)? = s, flow.stepper.step == .signIn {
+                Task { await flow.signedIn(account, model) }
+            }
         }
         .onDisappear {
             flow.key = ""
@@ -127,10 +129,22 @@ struct AddAccountDialog: View {
 
     private var keyBinding: Binding<String> { Binding(get: { flow.key }, set: { flow.key = $0 }) }
 
+    /// The new account's name (Core API minor 96): prefilled with the provider's, editable, capitals and spaces allowed.
+    @ViewBuilder private func nameField(submit: @escaping () -> Void) -> some View {
+        if model.namesOn {
+            CoreTextField(
+                "Name", placeholder: flow.name(model),
+                text: Binding(get: { flow.accountName }, set: { flow.accountName = $0 }), error: flow.nameIssue
+            ) { submit() }
+            .accessibilityIdentifier("account-name")
+        }
+    }
+
     private var keyStep: some View {
         let live = flow.live(model)
         return VStack(alignment: .leading, spacing: Space.s3) {
             hero("Add your \(flow.name(model)) key", "Paste it below. Core checks it right away.")
+            nameField { go() }
             HStack(alignment: .bottom, spacing: Space.s2) {
                 CoreSecureField("", placeholder: "Paste your key", text: keyBinding, autofocus: true) { go() }
                     .accessibilityIdentifier("account-key")
@@ -144,13 +158,13 @@ struct AddAccountDialog: View {
             Text("Your key goes straight to your Core and is never shown again.")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             AccDialogButtons(
-                confirm: "Check and add", cancelTitle: "Back", enabled: live == .looksValid,
+                confirm: "Check and add", cancelTitle: "Back", enabled: live == .looksValid && flow.nameIssue == nil,
                 cancel: { flow.back(model) }, run: go)
         }
     }
 
     private func go() {
-        guard flow.live(model) == .looksValid else { return }
+        guard flow.live(model) == .looksValid, flow.nameIssue == nil else { return }
         Task { await flow.submitKey(model, settle: !reduce) }
     }
 
@@ -237,6 +251,7 @@ struct AddAccountDialog: View {
                         : pastes
                             ? "Sign in on the page that opens in your browser, then paste the code it shows."
                             : "Sign in on the page that opens in your browser.")
+            nameField {}
             if let c = s?.deviceCode { codeBlock(c) }
             if case .guided? = s?.stage {
                 GuidedTerminal(

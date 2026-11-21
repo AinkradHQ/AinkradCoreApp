@@ -28,7 +28,7 @@ struct AccountDetailView: View {
                     AccTile(large: true, provider: a.provider)
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: Space.s2) {
-                            Text(a.label).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
+                            Text(model.title(a)).coreFont(size: MacTextSize.large, weight: .bold).lineLimit(1)
                                 .accessibilityAddTraits(.isHeader)
                             VerdictBadge(verdict: verdict)
                         }
