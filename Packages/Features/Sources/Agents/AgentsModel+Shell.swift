@@ -20,7 +20,8 @@ extension AgentsModel {
 
     public func openList() {
         var spec = PaneSpec(
-            id: Self.listPane, title: "AI Sessions", sub: "Home Core", symbol: "text.cursor", chip: listChip
+            id: Self.listPane, title: "AI Sessions", sub: "Home Core", symbol: "text.cursor", chip: listChip,
+            minHeight: ShellMetrics.listPaneMinHeight
         ) {
             AgentsListView(model: self)
         }

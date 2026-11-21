@@ -396,7 +396,8 @@ public final class TerminalsModel {
     func openList() {
         var spec = PaneSpec(
             id: "terminals", title: "Terminals", sub: "Home Core", symbol: "terminal",
-            chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560
+            chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"), minWidth: 560,
+            minHeight: ShellMetrics.listPaneMinHeight
         ) { TerminalsListView(model: self) }
         spec.tab = "Terminals"
         shell.openPane(spec)
@@ -439,7 +440,10 @@ public final class TerminalsModel {
         }
         let pane = "terminal-\(id)"
         shell.openPane(
-            PaneSpec(id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 560) {
+            PaneSpec(
+                id: pane, title: "Rune", sub: name(of: item.runner), symbol: "terminal", minWidth: 560,
+                minHeight: ShellMetrics.listPaneMinHeight
+            ) {
                 // The screen draws its own background in its theme's colour: the pane gives the rim only.
                 TerminalPaneView(model: self, session: session).paneLook(nil, own: true)
             })

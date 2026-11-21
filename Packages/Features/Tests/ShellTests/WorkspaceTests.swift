@@ -16,7 +16,7 @@ struct WorkspaceTests {
         #expect(shell.spaces.count == 1 && shell.panes.map(\.id) == ["a", "b", "c"])
     }
 
-    @Test func anAppThatDoesNotFitOpensANewWorkspaceNeverAStack() {
+    @Test func anAppThatDoesNotFitSideBySideOpensANewWorkspaceWhenTheHeightIsUnknown() {
         let shell = ShellModel()
         shell.workspaceWidth = 1000
         shell.openPane(spec("a"))
