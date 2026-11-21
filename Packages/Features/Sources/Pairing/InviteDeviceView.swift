@@ -43,7 +43,6 @@ struct InviteDeviceView: View {
             .coreFont(size: MacTextSize.body)
         }
         .task { await model.prepare() }
-        .background(WindowSharingGuard())
         .task(id: model.invite) {
             // A claimed invite is `approved` at once; the poll covers a dropped event stream.
             while !Task.isCancelled, model.invite != nil, !model.used, !model.ended {
