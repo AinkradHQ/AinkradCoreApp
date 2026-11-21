@@ -40,38 +40,23 @@ enum Registration {
             ) {
                 LockoutsSection(app: app)
             })
-        shell.settings.section(
-            SettingsSection(
-                id: "runners", group: .apps, title: "Runners", sub: "Its look and how runners are kept up to date",
-                symbol: "server.rack", order: 3,
-                tabs: [
-                    SettingsTab("look", "Look", order: 0) {
-                        AppLookSection(appName: "Runners", prefs: AppLookPrefs.shared("runners"))
-                            .foregroundStyle(GlassInk.primary)
-                    },
-                    SettingsTab("options", "Options", order: 1) { RunnersOptionsTab(app: app) },
-                ]))
+        // About (which Core, what this device may do) moved here from Devices & Runners.
+        shell.settings.tab("core", SettingsTab("about", "About", order: 1) { CoreAboutTab(app: app) })
+        // One door for computers and phones (Machines): plain at once, advanced with a name and scopes.
         shell.launcher.register(
             LauncherEntry(
-                id: "devices-runners", title: "Devices & Runners", sub: "Devices, runners, this Mac, about",
-                symbol: "iphone.and.arrow.forward", keywords: ["pair", "revoke", "rename", "scopes", "runner", "about"]
-            ) { [weak app] in app?.openHub(.devices) })
+                id: "add-machine", title: "Add machine", sub: "This Mac, a server or another Mac, a phone · ⌘N",
+                symbol: "plus.rectangle", keywords: ["add", "device", "runner", "pair", "qr", "phone", "server"],
+                isAction: true
+            ) { [weak app] in app?.openAddMachine() })
         shell.launcher.register(
             LauncherEntry(
-                id: "devices", title: "Devices", sub: "Devices & Runners", symbol: "iphone",
-                keywords: ["pair", "revoke", "rename", "scopes"]
-            ) { [weak app] in app?.openHub(.devices) })
-        shell.launcher.register(
-            LauncherEntry(
-                id: "add-device", title: "Add device", sub: "A device or a runner, step by step · needs Touch ID",
-                symbol: "plus.rectangle", keywords: ["pair", "qr", "code", "approve"], isAction: true
-            ) { app.openAddWizard() })
-        shell.launcher.register(
-            LauncherEntry(
-                id: "add-device-advanced", title: "Add device (advanced)…",
-                sub: "Name it and choose what it may do", symbol: "slider.horizontal.3",
-                keywords: ["pair", "qr", "code", "scopes", "runner"], isAction: true
-            ) { app.openAddDevice() })
+                id: "add-machine-advanced", title: "Add machine (advanced)…",
+                sub: "A phone or Mac that signs in: name it and choose what it may do", symbol: "slider.horizontal.3",
+                keywords: ["pair", "qr", "code", "scopes", "device"], isAction: true
+            ) { [weak app] in app?.openAddDevice() })
+        shell.launcher.aliases["add-device"] = "add-machine"
+        shell.launcher.aliases["add-device-advanced"] = "add-machine-advanced"
         shell.launcher.register(
             LauncherEntry(
                 id: "lockouts", title: "Lockouts", sub: "Settings, Core", symbol: "lock",

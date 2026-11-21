@@ -47,7 +47,12 @@ public final class TerminalsDemo {
         var terminalList: [TerminalItem] = []
         var runnerList: [RunnerItem] = []
         var refusal: CoreError?
-        func terminals() async throws -> [TerminalItem] { terminalList }
+        /// The Core does not answer at all: every list fails with this.
+        var down: CoreError?
+        func terminals() async throws -> [TerminalItem] {
+            if let down { throw down }
+            return terminalList
+        }
         func terminal(_ id: String) async throws -> TerminalItem {
             // As the Core does: a terminal that is not listed (reaped after `exit`) is 404.
             guard let t = terminalList.first(where: { $0.id == id }) else {
@@ -63,7 +68,10 @@ public final class TerminalsDemo {
             _ = try await terminal(id)
             return tails[id] ?? ["~/acme-shop $ git status"]
         }
-        func runners() async throws -> [RunnerItem] { runnerList }
+        func runners() async throws -> [RunnerItem] {
+            if let down { throw down }
+            return runnerList
+        }
         func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws
             -> TerminalItem
         {
@@ -258,21 +266,21 @@ public final class TerminalsDemo {
             await pane(
                 0, .failed(code: "too_many_attaches", message: "Too many clients are attached to this terminal."),
                 screen: false)
-        case "runners": model.openRunners()
-        case "runner-detail": model.openRunners(service.runnerList[0].id)
-        case "runner-login-shell": model.openRunners(service.runnerList[2].id)
+        case "runners": model.openMachines()
+        case "runner-detail": model.openMachines(service.runnerList[0].id)
+        case "runner-login-shell": model.openMachines(service.runnerList[2].id)
         case "runner-degraded":
             service.runnerList[2].degraded = true
             await model.reload()
-            model.openRunners(service.runnerList[2].id)
+            model.openMachines(service.runnerList[2].id)
         case "runner-offline-detail":
             service.runnerList[1].online = false
             await model.reload()
-            model.openRunners(service.runnerList[1].id)
+            model.openMachines(service.runnerList[1].id)
         case "runner-busy":
             service.runnerList[1].avg1 = 36.8
             await model.reload()
-            model.openRunners(service.runnerList[1].id)
+            model.openMachines(service.runnerList[1].id)
         case "new-terminal":
             model.openList()
             model.openNew()

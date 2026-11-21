@@ -50,7 +50,7 @@ struct AppModelTests {
         await m.start()
         #expect(m.shell.settings.hidden == AppModel.hiddenSettings)
         #expect(m.shell.launcher.entry("lockouts") == nil && m.shell.launcher.entry("admin-ops") == nil)
-        #expect(m.shell.launcher.entry("devices") != nil)
+        #expect(m.shell.launcher.entry("add-device")?.id == "add-machine", "the old id opens Add machine")
         m.showAdminPages(true)
         #expect(m.shell.settings.hidden.isEmpty)
         #expect(m.shell.launcher.entry("lockouts") != nil && m.shell.launcher.entry("admin-ops") != nil)
@@ -400,7 +400,7 @@ struct AppModelTests {
         let m = try app(FakeService())
         await m.start()
         #expect(m.shell.launcher.entry("add-device")?.isAction == true)
-        #expect(m.shell.launcher.entry("add-device-advanced")?.title == "Add device (advanced)…")
+        #expect(m.shell.launcher.entry("add-device-advanced")?.title == "Add machine (advanced)…")
     }
 
     @Test func aRunnerGetsExactlyRunner() {
@@ -485,17 +485,6 @@ struct AppModelTests {
     }
 }
 
-struct HubTabTests {
-    @Test func launcherEntriesLandOnTheRightTab() {
-        #expect(HubTab.forEntry("devices") == .devices)
-        #expect(HubTab.forEntry("add-device") == .devices)
-        #expect(HubTab.forEntry("devices-runners") == .devices)
-        #expect(HubTab.forEntry("runners") == .runners)
-        #expect(HubTab.forEntry("mac-runner") == .thisMac)
-        #expect(HubTab.forEntry("lockouts") == nil)
-    }
-}
-
 struct DeviceRoleTests {
     @Test func scopesReadAsAdminMemberOrViewer() {
         #expect(DeviceRole(scopes: ["read", "admin"]).title == "Admin")
@@ -507,13 +496,5 @@ struct DeviceRoleTests {
     @Test func makingAnAdminKeepsWhatItHadAndAddsAdminOnce() {
         #expect(DeviceRole.withAdmin(["read", "approve"]) == ["read", "approve", "admin"])
         #expect(DeviceRole.withAdmin(["read", "admin"]) == ["read", "admin"])
-    }
-}
-
-struct MacVitalsTests {
-    @Test func theShareIsBetweenNothingAndAll() {
-        let v = MacVitals.read()
-        #expect((0...1).contains(v.memory ?? 0.5) && (0...1).contains(v.disk ?? 0.5))
-        #expect(ThisMacView.percent(0.34) == "34%")
     }
 }

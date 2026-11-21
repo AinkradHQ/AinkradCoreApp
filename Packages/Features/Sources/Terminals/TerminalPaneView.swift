@@ -92,7 +92,7 @@ struct TerminalPaneView: View {
                 await model.reload()
                 await session.attach()
             }
-        case .runner: model.openRunners(session.item.runner)
+        case .runner: model.openMachines(session.item.runner)
         case .dismiss: session.dismissNote()
         case .closePane: model.closePane(session.id)
         case .newTerminal: model.openNew(runner: session.item.runner)

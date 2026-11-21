@@ -135,7 +135,7 @@ struct ConnectDialog: View {
                 Label("No runner is online to check the key.", systemImage: "server.rack")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: 0)
-                AccLink(title: "Open runners", symbol: "arrow.up.right") {
+                AccLink(title: "Open Machines", symbol: "arrow.up.right") {
                     close()
                     model.openRunners()
                 }

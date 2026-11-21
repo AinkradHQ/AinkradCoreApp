@@ -4,8 +4,8 @@ import Leyline
 import Shell
 import SwiftUI
 
-/// Add a runner (mockup 13): Where, Allow, Connect, Done. The pick screen is four big cards; connecting shows live lines and says
-/// in plain words why it failed.
+/// Add machine (mockup a-add): Where, Allow, Connect, Done. The pick screen is three rows with their keys (⌘1 This Mac, ⌘2 a
+/// server or another Mac, ⌘3 a phone or iPad); connecting shows live lines and says in plain words why it failed.
 struct AddRunnerView: View {
     @Environment(\.coreAccent) private var paneAccent
     let app: AppModel
@@ -25,10 +25,10 @@ struct AddRunnerView: View {
     }
 
     var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 22) {
+        CoreDialogPanel("", width: Space.s8 * 20) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 header
-                CoreStepper(Self.stepNames, at: stepNo)
+                if model.step != .pick && model.path != .onThatMac { CoreStepper(Self.stepNames, at: stepNo) }
                 Group {
                     switch model.step {
                     case .pick: pick
@@ -59,13 +59,16 @@ struct AddRunnerView: View {
     private var title: String {
         let name = model.connectedName ?? "The runner"
         switch model.step {
-        case .pick: return "Add a runner"
+        case .pick:
+            return model.serverPick
+                ? (model.prefill.map { "Let \($0) do work" } ?? "A server or another Mac") : "Add a machine"
         case .allow: return "What may it do?"
         case .failed: return "That did not work"
         case .done: return "\(name) is ready"
         case .connect:
             switch model.path {
             case .thisMac: return "Turning on this Mac"
+            case .onThatMac: return "On \(model.prefill ?? "that Mac")"
             case .anotherMac: return "Open this on the other Mac"
             case .command: return "Paste this on the server"
             default: return model.picking ? "Which server?" : "Setting up \(model.setup?.hostName ?? "the server")"
@@ -75,14 +78,15 @@ struct AddRunnerView: View {
 
     private var subtitle: String {
         switch model.step {
-        case .pick: "A runner is a computer that does work for you. Where is it?"
+        case .pick: model.serverPick ? "How do you reach it?" : "Where is it?"
         case .allow: "You can change this later. It only works inside its own home folder."
         case .failed: "Nothing else was changed."
-        case .done: "It can take work now. It will show up in Runners."
+        case .done: "It can take work now. It shows in Machines."
         case .connect:
             switch model.path {
             case .thisMac: "Just a moment."
-            case .anotherMac: "It joins as a device. Turn on “Work for Core” there and it becomes a runner."
+            case .onThatMac: "It already signs in, so it only needs its switch."
+            case .anotherMac: "It joins your Core. Turn on Do work on this Mac there and it does work too."
             case .command: "Open a terminal on the server, paste the line, press Return."
             default:
                 model.picking
@@ -107,15 +111,23 @@ struct AddRunnerView: View {
         HStack(spacing: Space.s2) {
             switch model.step {
             case .pick:
-                Button("Cancel", action: attemptClose).buttonStyle(.coreSecondary)
+                if model.serverPick && model.prefill == nil {
+                    Button("Back") { model.back() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
+                } else {
+                    Button("Cancel", action: attemptClose).buttonStyle(.coreSecondary).coreShortcut(.cancel)
+                }
                 Spacer()
-                Text("Nothing changes until you finish").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                Spacer()
+                Text("Nothing changes until you pick one").coreFont(size: MacTextSize.meta).foregroundStyle(
+                    palette.text2)
             case .allow:
                 Button("Back") { model.back() }.buttonStyle(.coreSecondary)
                 Spacer()
                 Button("Continue") { Task { await model.next() } }.buttonStyle(CoreButtonStyle(.prominent))
                     .keyboardShortcut(.defaultAction)
+            case .connect where model.path == .onThatMac:
+                Button("Back") { model.back() }.buttonStyle(.coreSecondary).coreShortcut(.cancel)
+                Spacer()
+                Button("Done", action: close).buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(.primary)
             case .connect:
                 Button("Back") { model.back() }.buttonStyle(.coreSecondary)
                 Spacer()
@@ -143,56 +155,105 @@ struct AddRunnerView: View {
 
     // MARK: 1 where
 
-    private var pick: some View {
-        Grid(horizontalSpacing: Space.s3, verticalSpacing: Space.s3) {
-            GridRow {
-                card(.thisMac, "laptopcomputer", "This Mac", "One switch. Use the Mac you are on right now.") {
-                    Text("Off").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                }
-                card(.anotherMac, "macbook", "Another Mac", "Open a link on it. Scan a code or copy the link.") {
-                    Text("A code and a link").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                }
-            }
-            GridRow {
-                card(
-                    .ssh, "server.rack", "A server I can reach by SSH",
-                    "Pick a host you already added. Ainkrad does the rest."
+    @ViewBuilder private var pick: some View {
+        VStack(spacing: Space.s2) {
+            if !model.serverPick {
+                let on = model.macRunner?.useThisMac == true && model.macRunner?.isAvailable == true
+                row(
+                    "1", "laptopcomputer", "This Mac",
+                    on
+                        ? "It already does work. Its switch is on its page in Machines."
+                        : "Do work on this Mac while you are signed in. One switch.",
+                    enabled: model.macRunner?.isAvailable == true && !on
                 ) {
-                    HStack(spacing: Space.s1 + 2) {
-                        ForEach(model.hosts.prefix(2)) { CoreChip($0.name, minWidth: 0).lineLimit(1) }
-                        CoreChip("+ Add", minWidth: 0)
-                    }
+                    model.choose(.thisMac)
+                    Task { await model.next() }
                 }
-                card(.command, "terminal", "A server by command", "Copy one line and paste it on the server.") {
-                    Text("$ sudo sh -c \"$(curl -fsSL …").coreFont(size: MacTextSize.meta, design: .monospaced)
-                        .foregroundStyle(palette.text2).lineLimit(1)
+                row("2", "cpu", "A server or another Mac", "Paste one line on it, or pick a host you reach by SSH.") {
+                    model.serverPick = true
+                }
+                row("3", "iphone", "A phone or iPad", "Scan a code with it to sign in to your Core.") {
+                    close()
+                    app.openInviteDevice()
+                }
+            } else {
+                let name = model.prefill
+                let n = name == nil ? 0 : 1
+                if let name {
+                    row(
+                        "1", "laptopcomputer", "Turn it on there",
+                        "\(name) already signs in. Its switch does the rest; nothing to install."
+                    ) { model.choose(.onThatMac) }
+                }
+                row(
+                    "\(n + 1)", "terminal", "By command", "Copy one line and paste it in a terminal on \(name ?? "it")."
+                ) {
+                    model.choose(.command)
+                }
+                row(
+                    "\(n + 2)", "server.rack", "A server I reach by SSH",
+                    model.hosts.isEmpty
+                        ? "Add a host in Leyline first, then Ainkrad does the rest."
+                        : "Pick one of \(model.hosts.prefix(2).map(\.name).joined(separator: ", ")). Ainkrad does the rest."
+                ) { model.choose(.ssh) }
+                if name == nil {
+                    row(
+                        "\(n + 3)", "macbook", "Another Mac, new to your Core",
+                        "Open a link on it, then turn on its switch."
+                    ) {
+                        model.choose(.anotherMac)
+                    }
                 }
             }
         }
     }
 
-    private func card<V: View>(
-        _ p: AddRunnerModel.Path, _ symbol: String, _ title: String, _ text: String, @ViewBuilder visual: () -> V
+    /// One choice of the pick screen: tile, what it is, one line, and its key (⌘1, ⌘2…).
+    private func row(
+        _ key: String, _ symbol: String, _ title: String, _ text: String, enabled: Bool = true,
+        run: @escaping () -> Void
     ) -> some View {
-        Button {
-            model.choose(p)
-        } label: {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                HStack(spacing: Space.s3) {
-                    IconTile(symbol, hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s2)
-                    Text(title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(2)
-                        .multilineTextAlignment(.leading)
+        Button(action: run) {
+            HStack(spacing: Space.s4) {
+                IconTile(symbol, hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
+                    Text(text).coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
                 }
-                Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                visual().padding(.top, Space.s1)
+                Spacer(minLength: Space.s2)
+                CoreKeycap("⌘\(key)")
             }
-            .padding(Space.s4)
-            .frame(maxWidth: .infinity, minHeight: Space.s8 * 4 + Space.s2, alignment: .topLeading)
+            .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(ChoiceCardStyle(selected: model.path == p))
-        .accessibilityIdentifier("add-runner-\(p)")
+        .buttonStyle(ChoiceCardStyle(selected: false))
+        .keyboardShortcut(KeyEquivalent(Character(key)), modifiers: .command)
+        .disabled(!enabled).opacity(enabled ? 1 : 0.55)
+        .help("\(title) (⌘\(key))")
+        .accessibilityIdentifier("add-machine-\(title)")
+    }
+
+    /// A Mac that already signs in: the switch is on that Mac.
+    private var onThatMac: some View {
+        let name = model.prefill ?? "that Mac"
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            ForEach(
+                Array(
+                    [
+                        ("laptopcomputer", "On \(name), open Ainkrad Core."),
+                        ("desktopcomputer", "Open Machines, then This Mac."),
+                        ("power", "Turn on Do work on this Mac. It shows here under Does work."),
+                    ].enumerated()), id: \.offset
+            ) { _, s in
+                HStack(spacing: Space.s3) {
+                    IconTile(s.0, hue: GlassInk.slate, size: Space.s8 - Space.s2)
+                    Text(s.1)
+                }
+            }
+            Text("Ainkrad installs Claude, Codex and OpenCode on it by itself.").coreFont(size: MacTextSize.meta)
+                .foregroundStyle(palette.text2)
+        }
+        .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading).coreWell()
     }
 
     // MARK: 2 allow
@@ -230,6 +291,7 @@ struct AddRunnerView: View {
         case .ssh: if model.picking { hostPicker } else { sshProgress }
         case .command: commandCard
         case .anotherMac: anotherMac
+        case .onThatMac: onThatMac
         case nil: EmptyView()
         }
     }
@@ -353,7 +415,7 @@ struct AddRunnerView: View {
                         .accessibilityLabel("QR code for the invite")
                     VStack(alignment: .leading, spacing: Space.s2) {
                         Text(
-                            "1. On the other Mac, scan the code or open the link in Ainkrad Core.\n2. Turn on “Work for Core” in This Mac."
+                            "1. On the other Mac, scan the code or open the link in Ainkrad Core.\n2. There, open Machines, then This Mac, and turn on Do work on this Mac."
                         )
                         .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                         Button {

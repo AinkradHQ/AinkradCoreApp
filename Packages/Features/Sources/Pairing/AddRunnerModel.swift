@@ -3,12 +3,12 @@ import Leyline
 import Observation
 import Terminals
 
-/// Add a runner (mockup 13): four places a runner can be, a short "what may it do", a live connect screen with plain failure
-/// reasons, and a done screen. It drives the models that already do the work: the Mac runner switch, Leyline's Make Runner, a
+/// Add machine (mockup a-add): This Mac, a server or another Mac (by command, over SSH, or a Mac new to the Core), or a
+/// phone; a short "what may it do", a live connect screen with plain failure reasons, and a done screen. It drives the models that already do the work: the Mac runner switch, Leyline's Make Runner, a
 /// runner invite for the one-line command, and a device invite for another Mac.
 @MainActor @Observable
 final class AddRunnerModel {
-    enum Path: CaseIterable, Equatable { case thisMac, anotherMac, ssh, command }
+    enum Path: CaseIterable, Equatable { case thisMac, anotherMac, ssh, command, onThatMac }
     enum Step: Int, Equatable { case pick, allow, connect, failed, done }
 
     /// One line of the connect screen.
@@ -25,6 +25,10 @@ final class AddRunnerModel {
 
     private(set) var path: Path?
     var step = Step.pick
+    /// The pick screen shows the server and other-Mac choices (after ⌘2, or from a Mac's own page).
+    var serverPick = false
+    /// The name of a Mac that only signs in, when Add machine was opened from its page ("Run work here").
+    private(set) var prefill: String?
     var terminals = true
     var agents = true
     /// SSH: the host chosen on the connect screen, and the setup running on it.
@@ -55,12 +59,21 @@ final class AddRunnerModel {
 
     func choose(_ p: Path) {
         path = p
-        step = .allow
+        // A Mac that already signs in only needs its own switch: nothing to allow here, the steps are on that Mac.
+        step = p == .onThatMac ? .connect : .allow
+    }
+
+    /// Opens on the server choices; `name` is a Mac that only signs in, whose name the invite and the steps use.
+    func startOnServer(name: String?) {
+        prefill = name
+        serverPick = true
     }
 
     func back() {
         switch step {
+        case .pick: if prefill == nil { serverPick = false }
         case .allow: step = .pick
+        case .connect where path == .onThatMac: step = .pick
         case .connect, .failed:
             setup = nil
             failure = nil
@@ -78,6 +91,7 @@ final class AddRunnerModel {
         case .ssh: break  // the host is picked on the connect screen
         case .command: await startInvite(kind: .linuxRunner)
         case .anotherMac: await startInvite(kind: .mac)
+        case .onThatMac: break
         }
     }
 
@@ -93,6 +107,7 @@ final class AddRunnerModel {
         _ = await requestClose()
         path = nil
         step = .pick
+        serverPick = prefill != nil
         connectedName = nil
         connectedID = nil
         progress = nil
@@ -122,7 +137,7 @@ final class AddRunnerModel {
     private func startInvite(kind: AddKind) async {
         guard let app else { return }
         let w = AddWizardModel(app: app, kind: kind)
-        w.name = kind == .mac ? "Mac" : "Runner"
+        w.name = prefill ?? (kind == .mac ? "Mac" : "Runner")
         w.terminals = terminals
         w.agents = agents
         wizard = w
@@ -139,7 +154,7 @@ final class AddRunnerModel {
         case .thisMac: pollThisMac()
         case .ssh: pollSSH()
         case .command, .anotherMac: await pollInvite()
-        case nil: break
+        case .onThatMac, nil: break
         }
         if connectedName != nil { await finishIfConnected() }
     }

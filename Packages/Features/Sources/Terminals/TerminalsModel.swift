@@ -57,14 +57,12 @@ public final class TerminalsModel {
     private(set) var load: Load = .idle
     var filter: TerminalFilter = .all
     var selected: String?
-    /// The runner whose page is open in the Runners pane (nil: the fleet).
-    var runnerDetail: String?
-    /// The summary tile that is on (mockup 12); nil shows every runner.
-    var runnerFilter: RunnerFacts.Live?
-    /// The summary tile picked on the Runners screen of the Devices & Runners app; nil shows every runner.
-    var runnerBucket: RunnerBucket?
-    /// Opens the Devices & Runners app on its Runners tab; set by the app that hosts that pane. Nil: the plain Runners pane.
-    @ObservationIgnored public var openRunnersApp: (@MainActor () -> Void)?
+    /// The machine whose page is open in Machines: a runner id, or a sign-in device id (nil: the list).
+    var machineDetail: String?
+    /// The row the arrow keys are on in the Machines list.
+    var machineSelected: String?
+    /// AI tool installs this app asked the Core for (`runner/tool`), so each is asked at most once per launch.
+    @ObservationIgnored var requestedInstalls: Set<String> = []
     private(set) var noop: [String: NoopOutcome] = [:]
     private(set) var sessions: [String: TerminalSession] = [:]
     /// Why the last embedded terminal did not open.
@@ -168,7 +166,7 @@ public final class TerminalsModel {
 
     /// Whether the Core says this runner has work on it now; nil when it is not in the list yet.
     public func isWorking(runner id: String) -> Bool? {
-        runners.first { $0.id == id }.map { RunnerBucket(of: $0) == .working }
+        runners.first { $0.id == id }.map { MachineStatus($0) == .working }
     }
 
     /// The runner's own version, as the Core lists it.
@@ -235,6 +233,7 @@ public final class TerminalsModel {
             for r in runners { sampleLoad(r) }
             applyReported()
             load = .ready
+            await autoInstall()
             await refreshHardware()
             for t in terminals { sessions[t.id]?.apply(item: t, runner: runner(t.runner)) }
             for s in sessions.values where !terminals.contains(where: { $0.id == s.id }) { await s.refresh() }
@@ -325,9 +324,12 @@ public final class TerminalsModel {
             ) { [weak self] in self?.openNew() })
         l.register(
             LauncherEntry(
-                id: "runners", title: "Hardware", sub: "Load, capacity and pause for each machine",
-                symbol: "server.rack", keywords: ["hardware", "runner", "machine", "load", "pause"]
-            ) { [weak self] in self?.openRunners() })
+                id: "machines", title: "Machines", sub: "Every computer and phone of your Core",
+                symbol: "desktopcomputer",
+                keywords: ["hardware", "runner", "device", "phone", "this mac", "load", "pause", "pair", "revoke"]
+            ) { [weak self] in self?.openMachines() })
+        // The old ids (Hardware, Devices & Runners, its tabs) open Machines: links and buttons that still name them keep working.
+        for old in ["runners", "devices", "devices-runners", "mac-runner"] { l.aliases[old] = "machines" }
     }
 
     /// One launcher entry per terminal that is still there (⌘K → Terminals), opening its pane.
@@ -352,9 +354,9 @@ public final class TerminalsModel {
             registeredRunners.insert(r.id)
             shell.launcher.register(
                 LauncherEntry(
-                    id: "runner-\(r.id)", title: "Runner \(r.name)", sub: Self.spec(r), symbol: "server.rack",
-                    keywords: ["runner", r.name]
-                ) { [weak self] in self?.openRunners(r.id) })
+                    id: "runner-\(r.id)", title: r.name, sub: "Machine · " + Self.spec(r), symbol: "server.rack",
+                    keywords: ["machine", "runner", r.name]
+                ) { [weak self] in self?.openMachines(r.id) })
         }
         for id in registeredRunners where !runners.contains(where: { $0.id == id }) {
             registeredRunners.remove(id)
@@ -368,13 +370,13 @@ public final class TerminalsModel {
                     BellItem(
                         id: id, kind: .runner, title: "\(r.name) disconnected",
                         sub: "Its terminals can't be reached until it's back.", time: "now",
-                        actions: [BellAction("View runner", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
+                        actions: [BellAction("Open machine", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
             case .degraded:
                 shell.bell.add(
                     BellItem(
                         id: id, kind: .runner, title: "\(r.name) is slow to answer",
                         sub: "It missed two check-ins in a row.", time: "now",
-                        actions: [BellAction("View runner", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
+                        actions: [BellAction("Open machine", primary: true) { [weak self] in self?.viewRunner(r.id) }]))
             default: shell.bell.remove(id)
             }
         }
@@ -382,7 +384,7 @@ public final class TerminalsModel {
 
     private func viewRunner(_ id: String) {
         shell.bellOpen = false
-        openRunners(id)
+        openMachines(id)
     }
 
     static func spec(_ r: RunnerItem) -> String {
@@ -401,21 +403,16 @@ public final class TerminalsModel {
         Task { await reload() }
     }
 
-    /// The Runners screen, to sit inside the Devices & Runners app.
-    public func runnersView() -> some View { HardwareView(model: self) }
-
-    public func openRunners(_ id: String? = nil) {
-        runnerDetail = id
-        if let openRunnersApp {
-            openRunnersApp()
-            Task { await reload() }
-            return
+    /// Opens Machines (the one place for every computer and device), on a machine's page when `id` is given.
+    public func openMachines(_ id: String? = nil) {
+        machineDetail = id
+        var spec = PaneSpec(
+            id: "machines", title: "Machines", sub: "Home Core", symbol: "desktopcomputer", minWidth: 880
+        ) {
+            MachinesView(model: self)
         }
-        // 1160: the runner rows clip below it, as in Devices & Runners.
-        shell.openPane(
-            PaneSpec(id: "runners", title: "Hardware", sub: "Home Core", symbol: "server.rack", minWidth: 1160) {
-                HardwareView(model: self)
-            })
+        spec.tab = "Machines"
+        shell.openPane(spec)
         Task { await reload() }
     }
 
@@ -710,7 +707,7 @@ public final class TerminalsModel {
         guard let h = host.runnerHost else { return "This build cannot revoke runners." }
         let why = await h.revokeRunner(id)
         if why == nil {
-            runnerDetail = nil
+            machineDetail = nil
             await reload()
         }
         return why

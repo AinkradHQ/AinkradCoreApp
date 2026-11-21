@@ -211,16 +211,3 @@ extension TerminalsModel {
             step: (o["step"] as? String) ?? "", reason: failed)
     }
 }
-
-extension TerminalsModel {
-    /// The install running on this runner now, when the Core reports installs (API minor 95).
-    func installing(_ runner: String) -> ToolInstall? {
-        showsUpdates ? installs[runner]?.values.first { $0.state == .running } : nil
-    }
-
-    /// The runners getting their tools now.
-    var updatingIDs: Set<String> { Set(runners.map(\.id).filter { installing($0) != nil }) }
-
-    /// Where a runner stands in the Runners pane: Updating while it installs tools.
-    func bucket(_ r: RunnerItem) -> RunnerBucket { .of(r, updating: installing(r.id) != nil) }
-}

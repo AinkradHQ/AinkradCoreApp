@@ -2,6 +2,7 @@ import Agents
 import CoreKit
 import Foundation
 import Shell
+import SwiftUI
 import Terminals
 
 /// What the terminal screens use of the app: the shell, and Touch ID through the one sheet.
@@ -38,17 +39,28 @@ final class TerminalHostAdapter: TerminalHost, RunnerHost {
         let now = Date()
         return app.agents.sessions.items.filter { $0.live && $0.runner == runner }.map { s in
             let minutes = max(0, Int(now.timeIntervalSince(s.createdAt) / 60))
+            let tool = AgentWords.harnessName(s.harness)
             return RunnerWork(
                 id: s.id, title: app.agents.title(s),
-                detail: "\(AgentWords.harnessName(s.harness)) · running \(minutes) min", minutes: minutes)
+                detail: "\(tool) · started " + s.createdAt.formatted(.relative(presentation: .named)), minutes: minutes,
+                tool: tool)
         }
     }
 
     func openAgent(_ id: String) { app.agents.openSession(id) }
     func startAgent(on runner: String) { app.agents.openNewSession(runner: runner) }
 
-    /// Add a runner: the guided flow, at the install screen for a Linux server (the runner invite is not in Core yet).
-    func addRunner() { app.openAddRunner() }
+    /// Add machine: one door for computers and phones.
+    func addMachine(_ start: AddMachineStart) { app.openAddMachine(start) }
+
+    func signInMachines() -> [SignInMachine]? { app.signInMachines }
+    func reloadSignInMachines() async { await app.devices?.reload() }
+
+    func signInPage(_ id: String, back: @escaping @MainActor () -> Void) -> AnyView {
+        AnyView(SignInPage(app: app, id: id, back: back))
+    }
+
+    func thisMacWork() -> AnyView? { app.macRunner.isAvailable ? AnyView(ThisMacWork(app: app)) : nil }
 
     func people() -> [RunnerPerson] {
         (app.devices?.active ?? []).filter { $0.kind != "runner" }.map {

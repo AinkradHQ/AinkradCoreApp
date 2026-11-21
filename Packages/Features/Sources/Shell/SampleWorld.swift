@@ -123,18 +123,18 @@ public enum SampleWorld {
         return [
             pane("core", "Accounts", "Accounts, pools, budgets and costs", "creditcard"),
             pane("terminals", "Terminals", "Your terminals", "terminal"),
-            pane("runners", "Runners", "machines and their slots", "server.rack"),
+            pane("runners", "Machines", "every computer and phone", "desktopcomputer"),
             action(
                 "new-terminal", "New terminal", "Open a shell on a runner · needs Touch ID", "terminal",
                 sample("New terminal")),
-            action("add-device", "Add device", "create a one-time pairing code", "plus", sample("Add device")),
+            action("add-device", "Add machine", "a computer or a phone", "plus", sample("Add machine")),
         ]
     }
 
     public static func samplePane(_ id: String, _ shell: ShellModel) -> PaneSpec {
         var spec = samplePaneBody(id, shell)
         // The tab carries the app's name, as the real panes do.
-        spec.tab = ["agents": "AI Sessions", "terminals": "Terminals", "runners": "Runners", "core": "Accounts"][id]
+        spec.tab = ["agents": "AI Sessions", "terminals": "Terminals", "runners": "Machines", "core": "Accounts"][id]
         return spec
     }
 
@@ -166,7 +166,7 @@ public enum SampleWorld {
                     ])
             }
         case "runners":
-            PaneSpec(id: id, title: "Runners", sub: "3 machines", symbol: "server.rack", minWidth: 1160) {
+            PaneSpec(id: id, title: "Machines", sub: "3 machines", symbol: "desktopcomputer", minWidth: 880) {
                 SampleList(
                     rows: [
                         ("mac-studio", "macOS 27 · 2 of 4 slots", SessionState.running),
