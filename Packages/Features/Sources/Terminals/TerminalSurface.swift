@@ -142,8 +142,14 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
 
     // MARK: output
 
-    /// Draws `data`; `repaint` clears the screen first (a snapshot).
-    func feed(_ data: Data, repaint: Bool = false) {
+    /// True while history is drawn: the emulator's answers to old questions in it (a device-attributes or keyboard-mode
+    /// query `claude` sent long ago) are dropped, or they land in the shell as typed text ("0u65;4;1;2;6;…c").
+    private var replaying = false
+
+    /// Draws `data`; `repaint` clears the screen first (a snapshot); `replay` is history, whose answers are not sent.
+    func feed(_ data: Data, repaint: Bool = false, replay: Bool = false) {
+        replaying = replay
+        defer { replaying = false }
         if repaint {
             term.feed(text: "\u{1b}c")
             instant.reset()
@@ -187,7 +193,7 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
     nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     nonisolated func send(source: TerminalView, data: ArraySlice<UInt8>) {
         let bytes = Data(data)
-        MainActor.assumeIsolated { typed(bytes) }
+        MainActor.assumeIsolated { if !replaying { typed(bytes) } }
     }
     nonisolated func scrolled(source: TerminalView, position: Double) {
         MainActor.assumeIsolated { container.showThumb() }
