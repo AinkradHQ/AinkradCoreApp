@@ -2,11 +2,14 @@ import CoreUI
 import SwiftUI
 
 /// Shell layout constants. Everything derives from CoreUI spacing tokens except the two pane minimums, which the plan fixes (D9, `tiles.js`).
-enum ShellMetrics {
+public enum ShellMetrics {
     /// No app gets narrower than this (Ahmed, 2026-11-05: squeezed apps broke their headers); past it the workspace
     /// scrolls sideways.
     static let paneMinWidth: CGFloat = 460
     static let paneMinHeight: CGFloat = 560
+    /// List apps (the AI Sessions list, Terminals, a terminal) scroll inside and work this short, so two stack on a
+    /// laptop (Ahmed, 2026-11-21). Nothing goes lower.
+    public static let listPaneMinHeight: CGFloat = 400
     /// Below this window width the pane tabs shrink to an icon rail.
     static let railBelow: CGFloat = 900
     /// What the top bar keeps free on its right for the status cluster; the tab strip gets the rest.

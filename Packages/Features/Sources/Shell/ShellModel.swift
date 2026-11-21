@@ -45,7 +45,7 @@ public struct PaneSpec: Identifiable {
         self.symbol = symbol
         self.chip = chip
         self.minWidth = max(minWidth ?? 0, ShellMetrics.paneMinWidth)
-        self.minHeight = max(minHeight ?? 0, ShellMetrics.paneMinHeight)
+        self.minHeight = max(minHeight ?? ShellMetrics.paneMinHeight, ShellMetrics.listPaneMinHeight)
         self.fullScreenOnly = fullScreenOnly
         self.content = AnyView(content())
     }

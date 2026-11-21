@@ -69,25 +69,30 @@ enum AgentsSnapshots {
         }
         log("key=\(window.isKeyWindow) fr=\(String(describing: window.firstResponder))")
 
+        // `CORE_AGENTS_ONLY=sessions` skips the list states and shoots the session panes alone.
+        let lists = env["CORE_AGENTS_ONLY"] != "sessions"
         // The list, in each state the prototype shows.
-        only { a.openList() }
-        await shot("list-normal")
-        a.filter = .needsYou
-        await shot("list-needs-you")
-        a.filter = .active
-        await shot("list-active")
-        a.filter = .ended
-        await shot("list-ended")
-        a.filter = .all
-        await list("loading", "list-loading")
-        await list("empty", "list-empty")
-        await list("failed", "list-error")
-        a.debugLink("reconnecting")
-        await shot("list-reconnecting")
-        a.debugLink("live")
-        a.debugPermission("notAsked")
-        await shot("list-notification-ask")
-        a.debugPermission("allowed")
+        func listShots() async {
+            only { a.openList() }
+            await shot("list-normal")
+            a.filter = .needsYou
+            await shot("list-needs-you")
+            a.filter = .active
+            await shot("list-active")
+            a.filter = .ended
+            await shot("list-ended")
+            a.filter = .all
+            await list("loading", "list-loading")
+            await list("empty", "list-empty")
+            await list("failed", "list-error")
+            a.debugLink("reconnecting")
+            await shot("list-reconnecting")
+            a.debugLink("live")
+            a.debugPermission("notAsked")
+            await shot("list-notification-ask")
+            a.debugPermission("allowed")
+        }
+        if lists { await listShots() }
 
         // Sessions: one pane for every state.
         for (n, name) in [

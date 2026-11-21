@@ -143,7 +143,8 @@ public enum SampleWorld {
         case "agents":
             PaneSpec(
                 id: id, title: "AI Sessions", sub: "Home Core", symbol: "sparkles",
-                chip: PaneChip("Waiting on you", tone: .warn, symbol: "hourglass")
+                chip: PaneChip("Waiting on you", tone: .warn, symbol: "hourglass"),
+                minHeight: ShellMetrics.listPaneMinHeight
             ) {
                 SampleList(
                     rows: [
@@ -156,7 +157,8 @@ public enum SampleWorld {
         case "terminals":
             PaneSpec(
                 id: id, title: "Terminals", sub: "Rune", symbol: "terminal",
-                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack")
+                chip: PaneChip("Home Core", tone: .queue, symbol: "server.rack"),
+                minHeight: ShellMetrics.listPaneMinHeight
             ) {
                 SampleList(
                     rows: [

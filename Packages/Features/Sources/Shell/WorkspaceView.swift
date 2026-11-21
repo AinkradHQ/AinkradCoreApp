@@ -19,15 +19,19 @@ struct WorkspaceView: View {
     #if DEBUG
     private static let probeWidth = ProcessInfo.processInfo.environment["CORE_PANE_WIDTH"].flatMap(Double.init)
         .map { CGFloat($0) }
+    /// `CORE_PANE_HEIGHT=<pt>`: the same for height (does a list app still look right 400 pt tall?).
+    private static let probeHeight = ProcessInfo.processInfo.environment["CORE_PANE_HEIGHT"].flatMap(Double.init)
+        .map { CGFloat($0) }
     #else
     private static let probeWidth: CGFloat? = nil
+    private static let probeHeight: CGFloat? = nil
     #endif
 
     var body: some View {
         GeometryReader { geo in
             let area = CGSize(
                 width: Self.probeWidth ?? geo.size.width - ShellMetrics.paneInset * 2,
-                height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset)
+                height: Self.probeHeight ?? geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset)
             let mins = Dictionary(uniqueKeysWithValues: shell.panes.map { ($0.id, $0.minWidth) })
             let tiled = shell.tree.layout(
                 minWidth: { mins[$0] ?? ShellMetrics.paneMinWidth }, container: area, gap: ShellMetrics.paneGap,

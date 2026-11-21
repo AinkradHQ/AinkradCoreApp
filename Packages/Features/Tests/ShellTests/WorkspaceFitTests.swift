@@ -31,6 +31,30 @@ struct WorkspaceFitTests {
         #expect(s.spaces.count == 2 && s.panes.map(\.id) == ["d"] && s.spaceIndex == 1 && s.activePane == "d")
     }
 
+    @Test func onTheAirAFourthListAppStacksAndASeventhGetsAWorkspace() {
+        let s = shell(air.width, air.height)
+        let list = ShellMetrics.listPaneMinHeight
+        for id in ["sessions", "terminals", "brain"] { s.openPane(spec(id, h: list)) }
+        s.openPane(spec("session-1", h: list))  // no room beside; stacked: (892 - 12) / 2 = 440 >= 400
+        #expect(s.spaces.count == 1 && s.panes.map(\.id) == ["sessions", "terminals", "brain", "session-1"])
+        for id in ["session-2", "session-3"] { s.openPane(spec(id, h: list)) }  // two per column, three columns
+        #expect(s.spaces.count == 1 && s.panes.count == 6)
+        s.openPane(spec("session-4", h: list))  // a third row: 3 x 400 + 24 = 1224 > 892
+        #expect(s.spaces.count == 2 && s.panes.map(\.id) == ["session-4"])
+    }
+
+    @Test func aListAppDoesNotStackUnderAnAppThatNeedsTheFullHeight() {
+        let s = shell(air.width, air.height)
+        s.openPane(spec("machines", w: 880))  // 560 tall: cannot share its column on the Air
+        s.openPane(spec("sessions", h: ShellMetrics.listPaneMinHeight))
+        s.openPane(spec("terminals", h: ShellMetrics.listPaneMinHeight))  // 880 + 460 + 460 + 24 > 1446: under sessions
+        #expect(s.spaces.count == 1 && s.panes.map(\.id) == ["machines", "sessions", "terminals"])
+    }
+
+    @Test func noAppIsShorterThanTheListMinimum() {
+        #expect(spec("x", h: 100).minHeight == ShellMetrics.listPaneMinHeight && spec("y").minHeight == 560)
+    }
+
     @Test func aTallScreenStacksTheAppThatDoesNotFitSideBySide() {
         let s = shell(big.width, big.height)
         s.openPane(spec("machines", w: 880))

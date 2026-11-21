@@ -17,6 +17,6 @@ struct PaneSpecTests {
         }
         #expect(big.minWidth == 720 && big.minHeight == 700 && big.fullScreenOnly)
         let small = PaneSpec(id: "b", title: "b", symbol: "square", minWidth: 100, minHeight: 100) { EmptyView() }
-        #expect(small.minWidth == ShellMetrics.paneMinWidth && small.minHeight == ShellMetrics.paneMinHeight)
+        #expect(small.minWidth == ShellMetrics.paneMinWidth && small.minHeight == ShellMetrics.listPaneMinHeight)
     }
 }

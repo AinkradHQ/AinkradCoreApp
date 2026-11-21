@@ -203,6 +203,15 @@ enum SnapshotRunner {
         pane("citadel")
         await shot("16c-fourth-app-new-workspace")
         shell.spaceNote = nil
+        // Back to the first workspace: a terminal (a list app) stacks under one of the three instead of a new workspace.
+        shell.goTo("agents")
+        shell.openPane(
+            PaneSpec(
+                id: "terminal-2", title: "Rune", sub: "linux-01", symbol: "terminal",
+                minHeight: ShellMetrics.listPaneMinHeight
+            ) { Color.clear })
+        await shot("16c2-fourth-list-app-stacks")
+        shell.closePane("terminal-2")
         pane("runners")
         await shot("16d-strip-three-workspaces")
         shell.goTo("terminals")
