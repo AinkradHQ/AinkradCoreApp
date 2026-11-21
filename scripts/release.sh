@@ -80,11 +80,11 @@ fi
 # The appcast (a SIGNED feed, SURequireSignedFeed) and the signed latest.json the ainkrad.io Worker and the download page trust.
 # The EdDSA key reaches the Sparkle tools as a 0600 temp file and is shredded; it is never an argument or printed.
 SPARKLE_BIN=${SPARKLE_BIN:-$(find "$DD/SourcePackages/artifacts" -path '*Sparkle/bin' -type d 2>/dev/null | head -1)}   # SPM fetched it during the build
-[ -n "$SPARKLE_BIN" ] && [ -x # The dmg is on the GitHub release (over the 100 MB a Worker upload takes); ainkrad.io keeps the small signed pointers.
-"$SPARKLE_BIN/generate_appcast" ] || { echo "no Sparkle tools: build once so SPM fetches Sparkle, or set SPARKLE_BIN" >&2; exit 1; }
+[ -n "$SPARKLE_BIN" ] && [ -x "$SPARKLE_BIN/generate_appcast" ] || { echo "no Sparkle tools: build once so SPM fetches Sparkle, or set SPARKLE_BIN" >&2; exit 1; }
 key=$(mktemp); trap 'rm -f "$key"' EXIT; printf '%s' "$SPARKLE_ED_PRIVATE_KEY" >"$key"
 rm -rf "$OUT"; mkdir -p "$OUT"; cp "$DMG" "$OUT/"
 [ -z "${RELEASE_NOTES:-}" ] || cp "$RELEASE_NOTES" "$OUT/Ainkrad-$VERSION.txt"
+# The dmg is on the GitHub release (over the 100 MB a Worker upload takes); ainkrad.io keeps the small signed pointers.
 "$SPARKLE_BIN/generate_appcast" --ed-key-file "$key" --download-url-prefix "https://github.com/AinkradHQ/AinkradCoreApp/releases/download/app-v$VERSION/" --embed-release-notes "$OUT"
 rm -f "$OUT/Ainkrad-$VERSION.txt"
 printf '{"generated":%s,"version":"%s","build":%s,"notarized":%s}\n' "$(date +%s)" "$VERSION" "$BUILD" "$notarized" >"$OUT/latest.json"
