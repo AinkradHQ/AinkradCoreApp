@@ -10,7 +10,10 @@ struct StatusCluster: View {
         // Sessions, as the AI Sessions list counts them: running, and needing you (an approval or your next message).
         let counts = shell.sessionCounts?() ?? (running: shell.home.runningAgents, needYou: shell.waitingOnYou)
         let needsYou = counts.needYou + shell.alertsOnYou + shell.joinRequests > 0
-        HStack(spacing: 2) {
+        let brainBusy = shell.brainStatus?()?.state == "working"
+        let reconnecting: Bool = if case .reconnecting? = shell.chipState { true } else { false }
+        // One even gap between every icon (Ahmed, 2026-11-21: the extra gaps before the bell and the emblem looked off).
+        HStack(spacing: Space.s1) {
             TopBarIcon(
                 .home, label: "Home", symbol: "house", on: shell.surface == .home && !shell.coverOpen
             ) { shell.show(.home) }
@@ -19,21 +22,20 @@ struct StatusCluster: View {
                 on: shell.surface == .workspace && !shell.coverOpen
             ) { shell.show(.workspace) }
             TopBarIcon(
-                .core, label: coreLabel, symbol: coreSymbol, on: shell.topMenu == .core, tone: coreTone
+                .core, label: coreLabel, symbol: coreSymbol, on: shell.topMenu == .core, tone: coreTone,
+                busy: reconnecting
             ) { shell.toggleMenu(.core) }
             TopBarIcon(
                 .runners, label: counts.running == 0 ? "Runners" : "Runners, \(counts.running) running",
-                symbol: "server.rack", on: shell.topMenu == .runners, badge: counts.running
+                symbol: "server.rack", on: shell.topMenu == .runners, badge: counts.running, busy: counts.running > 0
             ) { shell.toggleMenu(.runners) }
-            TopBarIcon(.brain, label: "Brain", symbol: "brain", on: shell.topMenu == .brain) {
+            TopBarIcon(.brain, label: "Brain", symbol: "brain", on: shell.topMenu == .brain, busy: brainBusy) {
                 shell.toggleMenu(.brain)
             }
-            Spacer().frame(width: Space.s2)
             TopBarIcon(
                 .bell, label: shell.bell.count == 0 ? "Notifications" : "Notifications, \(shell.bell.count)",
-                symbol: "bell", on: shell.bellOpen, mark: needsYou
+                symbol: "bell", on: shell.bellOpen, mark: needsYou, busy: needsYou
             ) { shell.toggleBell() }
-            Spacer().frame(width: Space.s2)
             TopBarIcon(.launcher, label: "Launcher (⌘K)", symbol: nil, on: shell.launcherOpen) {
                 shell.toggleLauncher()
             }
@@ -80,13 +82,17 @@ private struct TopBarIcon: View {
     var tone: Tone?
     var badge = 0
     var mark = false
+    /// Its work is happening now (a running job, a reconnect, the Brain learning, something waiting on you): only then
+    /// does the glyph move (Ahmed, 2026-11-21: animated only when there is a related job running).
+    var busy = false
     let action: () -> Void
     @Environment(\.corePalette) private var palette
 
     init(
         _ kind: TopBarKind, label: String, symbol: String?, on: Bool = false, tone: Tone? = nil, badge: Int = 0,
-        mark: Bool = false, action: @escaping () -> Void
+        mark: Bool = false, busy: Bool = false, action: @escaping () -> Void
     ) {
+        self.busy = busy
         self.kind = kind
         self.label = label
         self.symbol = symbol
@@ -100,7 +106,7 @@ private struct TopBarIcon: View {
     var body: some View {
         Button(action: action) {
             glyph
-                .modifier(TopBarLoop(kind: kind))
+                .modifier(TopBarLoop(kind: kind, active: busy))
                 .frame(width: 36, height: MacSize.controlMd - Space.s1 / 2)
                 .overlay(alignment: .topTrailing) { badgeView }
         }
@@ -134,11 +140,12 @@ private struct TopBarIcon: View {
 /// The calm loops of the mockup (`kit-shell.css` k-bi): slow, small, transform and opacity only. Reduce Motion: none.
 private struct TopBarLoop: ViewModifier {
     let kind: TopBarKind
+    let active: Bool
     @State private var on = false
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     func body(content: Content) -> some View {
-        if reduce {
+        if reduce || !active {
             content
         } else if kind == .bell {
             // A short ring every seven seconds, still the rest of the time.
