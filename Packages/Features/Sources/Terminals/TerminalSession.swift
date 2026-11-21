@@ -24,6 +24,9 @@ final class TerminalSession {
     @ObservationIgnored private var cursor: UInt64?
     @ObservationIgnored private var lastLetterbox = false
     @ObservationIgnored private var firstOutputAfterReattach = false
+    /// Bytes of history still to draw after an attach (up to where the terminal stood when it opened): drawn without
+    /// answering the questions in them.
+    @ObservationIgnored private var replayLeft: UInt64 = 0
     /// When output arrived, at most one stamp a second, newest last: the "output this Mac has seen" the tile's strip is drawn from.
     /// The Core stores no output, so this is the only history there is, and it starts when this Mac attaches.
     @ObservationIgnored private(set) var outputTimes: [Date] = []
@@ -116,6 +119,7 @@ final class TerminalSession {
             item.rows = opened.rows
         }
         firstOutputAfterReattach = after > 0 && opened.seq > after
+        replayLeft = opened.seq > after ? opened.seq - after : 0
         link = .attached(letterbox: letterbox)
         // The replay must land in an emulator that already has the pane's size, and the Core must know that size before
         // it redraws: so the pump (which feeds the buffered replay) starts only after the pane is laid out and the
@@ -158,12 +162,16 @@ final class TerminalSession {
                 note = .resumed(from: after, to: l.opened.seq)
             }
             noteOutput()
-            surface.feed(d)
+            let old = Int(min(replayLeft, UInt64(d.count)))
+            replayLeft -= UInt64(old)
+            if old > 0 { surface.feed(d.prefix(old), replay: true) }
+            if old < d.count { surface.feed(d.dropFirst(old)) }
             l.drawn(d.count)
         case .snapshot(let d):
             if after > 0 { note = .repainted }
             firstOutputAfterReattach = false
-            surface.feed(d, repaint: true)
+            replayLeft = 0
+            surface.feed(d, repaint: true, replay: true)
             l.drawn(d.count)
         case .exited(let code, let signal):
             item.status = "exited"

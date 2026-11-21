@@ -21,4 +21,16 @@ import Testing
         s.feed(Data("new screen".utf8), repaint: true)
         #expect(!s.visibleText().contains("old screen") && s.visibleText().contains("new screen"))
     }
+
+    /// Reopening a terminal replays its history; a device-attributes query `claude` sent earlier must not be answered
+    /// again, or the answer lands in the shell as typed text (Oracle, 2026-11-21). A live query is still answered.
+    @Test func historyIsDrawnWithoutAnsweringItsQuestions() {
+        let s = TerminalSurface()
+        var sent = Data()
+        s.onInput = { sent.append($0) }
+        s.feed(Data("\u{1b}[c".utf8), replay: true)
+        #expect(sent.isEmpty, "got \(sent.debugDescription)")
+        s.feed(Data("\u{1b}[c".utf8))
+        #expect(!sent.isEmpty)
+    }
 }
