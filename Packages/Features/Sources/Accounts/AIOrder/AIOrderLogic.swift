@@ -3,7 +3,7 @@ import Foundation
 
 /// The pure rules of the AI order surface: moves, the state chip, the usage sentence, the Add steps. No views, no Core.
 
-enum ProviderKind: Equatable, Sendable { case subscription, apiKey }
+enum ProviderKind: Hashable, Sendable { case subscription, apiKey }
 
 /// How a provider is shown: its name, its one letter and the line under it on the Add card. Names the Core knows come from
 /// this table; any other provider the Core lists shows under its own name, so a new preset needs no UI work.

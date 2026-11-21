@@ -80,6 +80,10 @@ final class SetupTourModel {
         if let saved { step = saved }
     }
 
+    #if DEBUG
+    func debugJump(to s: Step) { step = s }
+    #endif
+
     func begin() {
         if profile.name.isEmpty {
             profile.name =

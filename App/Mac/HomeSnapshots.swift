@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import Accounts
 import Pairing
 import Shell
 
@@ -32,6 +33,16 @@ enum HomeSnapshots {
         await shot("paired-setup-locked")
         shell.lock = .open
         await shot("paired-setup-unlocked")
+        await app.debugAccountsDemo().show("overview-empty")
+        shell.dialog = nil
+        app.debugPairedSetupAI()
+        await shot("paired-setup-ai", wait: 2.5)
+        app.debugPairedSetup(false)
+        try? await Task.sleep(for: .seconds(1))
+        SetupAIDebug.subscriptionFirst = true
+        app.debugPairedSetupAI()
+        await shot("paired-setup-ai-sub", wait: 2.5)
+        SetupAIDebug.subscriptionFirst = false
         app.debugPairedSetup(false)
         await shot("home", wait: 2.5)
         shell.debugForceQuickHover = true

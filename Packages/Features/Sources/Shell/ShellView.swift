@@ -48,7 +48,7 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var base: some View {
-        if shell.setupOpen() { sky } else { desktop }
+        if shell.setupOpen() { WallpaperView().ignoresSafeArea() } else { desktop }
     }
 
     private var desktop: some View {
