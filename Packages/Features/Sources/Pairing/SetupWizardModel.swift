@@ -26,21 +26,13 @@ final class SetupWizardModel {
         case failed(Failure)
     }
 
-    /// The one line the Core's installer is run with: the hosted bootstrap is a GitHub release asset.
-    static let installURL = "https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh"
-    /// The oldest Core this app works with: the installer refuses anything older.
-    static let minCoreVersion = "0.2.1"
-    /// The command with this install's code and key in it (`AINKRAD_RENDEZVOUS`), so the installer can hand the link back by
-    /// itself. The code is single use and is never printed again by the installer's re-run command.
-    static func installCommand(rendezvous spec: String) -> String {
-        installCommand.replacingOccurrences(
-            of: "AINKRAD_MIN_VERSION=\(minCoreVersion) ",
-            with: "AINKRAD_MIN_VERSION=\(minCoreVersion) AINKRAD_RENDEZVOUS=\(spec) ")
-    }
-
-    /// Never piped into `sudo`: that stops the installer at its first question (SIGTTIN) and Ctrl-C does nothing. `sh -c` with
-    /// the script as an argument keeps the terminal for its questions.
-    static let installCommand = "sudo AINKRAD_MIN_VERSION=\(minCoreVersion) sh -c \"$(curl -fsSL \(installURL))\""
+    /// The short installer on ainkrad.io (`site/i` in ainkrad-site): it runs the signed get.sh as root with the setup code and
+    /// the minimum Core version. Never piped into `sudo` (that stops the installer at its first question); `sh -c` with the
+    /// script as an argument keeps the terminal for its questions.
+    static let installCommand = #"sh -c "$(curl -fsSL ainkrad.io/i)""#
+    /// The command with this install's code and key (`<code>.<key>`), so the installer can hand the link back by itself. The
+    /// code is single use and stays in the command: ainkrad.io never sees it.
+    static func installCommand(rendezvous spec: String) -> String { "\(installCommand) - \(spec)" }
 
     private(set) var stage: Stage = .choose
     /// What was pasted: the whole installer output is fine, the link is found in it.

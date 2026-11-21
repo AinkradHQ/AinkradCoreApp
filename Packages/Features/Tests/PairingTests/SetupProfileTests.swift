@@ -142,4 +142,22 @@ struct SetupDetourTests {
         m.next()
         #expect(m.step == nil && m.detour == nil)
     }
+
+    @Test func unfinishedSetupResumesOnThePageItWasOnAfterAQuitAndEndsForGoodWhenFinished() {
+        let store = UserDefaults(suiteName: "setup-resume-\(UUID().uuidString)")!
+        let first = SetupTourModel(macRunner: nil, store: store, save: { _ in true })
+        first.arm()
+        first.startIfArmed()
+        first.next()
+        let page = first.step
+        #expect(page != nil && page != .role)
+        // The app quits mid-setup; the next launch opens the desktop without coming through the wizard.
+        let again = SetupTourModel(macRunner: nil, store: store, save: { _ in true })
+        again.startIfArmed()
+        #expect(again.step == page)
+        again.finish()
+        let after = SetupTourModel(macRunner: nil, store: store, save: { _ in true })
+        after.startIfArmed()
+        #expect(!after.isActive)
+    }
 }

@@ -149,7 +149,15 @@ enum SnapshotRunner {
         await shot("02f-unlock-card")
         shell.lock = .checking
         await shot("02g-unlock-checking")
+        // Locked with a dialog open (the Brain import after sleep): the card stays on top and the dialog waits.
         shell.lock = .open
+        shell.present(ShellDialog(id: "sample") { Text("A dialog under the lock").padding(80).corePanel() })
+        await shot("02h-dialog-open")
+        shell.lock = .locked
+        await shot("02i-unlock-over-dialog")
+        shell.lock = .open
+        await shot("02j-dialog-back")
+        shell.closeDialog()
         shell.toggleBell()
         await shot("03-bell")
         shell.bellOpen = false

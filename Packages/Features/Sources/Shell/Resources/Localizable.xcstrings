@@ -90,12 +90,12 @@
     "%lld" : {
 
     },
-    "%lld apps open · %@ ↑ ↓ choose · ↩ or 1–9 open · esc close" : {
+    "%lld apps open · %@ ↑ ↓ choose · ⏎ or 1–9 open · esc close" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld apps open · %2$@ ↑ ↓ choose · ↩ or 1–9 open · esc close"
+            "value" : "%1$lld apps open · %2$@ ↑ ↓ choose · ⏎ or 1–9 open · esc close"
           }
         }
       }

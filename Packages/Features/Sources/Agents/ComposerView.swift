@@ -234,7 +234,7 @@ struct ComposerView: View {
         }
         .buttonStyle(GraphiteButtonStyle(iconOnly: true))
         .disabled(act == .idle)
-        .keyHint(act == .stop ? "esc" : act == .idle ? "" : "↩")
+        .keyHint(act == .stop ? "esc" : act == .idle ? "" : "⏎")
         .help(act.help)
         .accessibilityLabel(act.name)
         .animation(Motion.out(Motion.ui), value: act)

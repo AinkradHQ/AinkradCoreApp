@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Connect a Claude plan (KAN-441): you confirm it is your own plan, Core starts Claude's own sign-in on a runner, your
 /// browser opens claude.ai, you paste the short code Claude shows, and the account appears. The app never sees a
-/// token: the runner hands it straight to Core. Every stage is keyboard driven (↩ goes on, esc stops).
+/// token: the runner hands it straight to Core. Every stage is keyboard driven (⏎ goes on, esc stops).
 struct SubscriptionSignIn: View {
     @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
@@ -202,10 +202,10 @@ struct SubscriptionSignIn: View {
                         model.openRunners()
                     }
                     .buttonStyle(CoreButtonStyle(.prominent)).keyboardShortcut(.defaultAction)
-                    .environment(\.coreKeycap, "↩")
+                    .environment(\.coreKeycap, "⏎")
                 } else {
                     Button("Try again") { model.signIn = nil }.buttonStyle(CoreButtonStyle(.prominent))
-                        .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
+                        .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "⏎")
                 }
             }
         }

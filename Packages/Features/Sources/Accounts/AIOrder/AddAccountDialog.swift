@@ -8,26 +8,29 @@ struct AddAccountDialog: View {
     let model: AccountsModel
     let provider: String?
     let close: () -> Void
+    /// Inside setup's AI page (no dialog frame, no step track): the pick is the approved 02 Setup one, a switch between API
+    /// key and subscription over one grid of provider cards; `inFlow` tells setup to step its own buttons aside meanwhile.
+    var embedded = false
+    var inFlow: Binding<Bool>? = nil
     @State private var flow = AddAccountFlow()
+    @State private var kind = AddAccountDialog.startKind
+    #if DEBUG
+    private static var startKind: ProviderKind { SetupAIDebug.subscriptionFirst ? .subscription : .apiKey }
+    #else
+    private static let startKind = ProviderKind.apiKey
+    #endif
     @State private var code = ""
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 18) {
-            VStack(alignment: .leading, spacing: Space.s4) {
-                StepTrack(["Pick", "Add", "Done"], at: flow.stepper.number - 1, hue: GlassInk.accent(paneAccent))
-                Group {
-                    switch flow.stepper.step {
-                    case .pick: pick
-                    case .key: keyStep
-                    case .checking: checking
-                    case .signIn: signIn
-                    case .done: done
-                    }
-                }
-                .transition(reduce ? .identity : .opacity)
+        Group {
+            if embedded {
+                content
+            } else {
+                CoreDialogPanel("", width: Space.s8 * 18) { content }
             }
         }
+        .onChange(of: flow.stepper.step, initial: true) { _, s in inFlow?.wrappedValue = s != .pick }
         .animation(reduce ? nil : Motion.out(Motion.ui), value: flow.stepper.step)
         .task {
             // Unstructured: a sign-in outlives this task, and the dialog's close stops it.
@@ -43,7 +46,53 @@ struct AddAccountDialog: View {
         .accessibilityIdentifier("account-add")
     }
 
+    private var content: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            if !embedded {
+                StepTrack(["Pick", "Add", "Done"], at: flow.stepper.number - 1, hue: GlassInk.accent(paneAccent))
+            }
+            Group {
+                switch flow.stepper.step {
+                case .pick: if embedded { setupPick } else { pick }
+                case .key: keyStep
+                case .checking: checking
+                case .signIn: signIn
+                case .done: done
+                }
+            }
+            .transition(reduce ? .identity : .opacity)
+        }
+    }
+
     // MARK: pick
+
+    /// Setup's pick (approved 02 Setup): API key or subscription, then that kind's providers, ⌘1… on each card.
+    private var setupPick: some View {
+        let cards = ProviderCatalog.cards(model.providers, kind)
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            CoreSegmented(
+                "How to connect",
+                segments: [
+                    CoreSegment(ProviderKind.apiKey, "API key"),
+                    CoreSegment(.subscription, "Sign in with subscription"),
+                ],
+                selection: $kind)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s3), count: 4), spacing: Space.s3)
+            {
+                ForEach(Array(cards.prefix(8).enumerated()), id: \.element.id) { i, p in
+                    SetupProviderCard(provider: p, key: i + 1) { Task { await flow.choose(p, model) } }
+                }
+            }
+            if kind == .subscription {
+                Label(
+                    "Uses your subscription at your own risk. The provider may limit or block this.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
 
     private var pick: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -144,6 +193,8 @@ struct AddAccountDialog: View {
                 NoRunnerView(
                     provider: name, choice: c,
                     openRunners: {
+                        // Setup hides the desktop: the Runners app would open behind it. Back to the pick there.
+                        if embedded { return flow.back(model) }
                         close()
                         model.openRunners()
                     },
@@ -284,7 +335,7 @@ struct AddAccountDialog: View {
                 }.buttonStyle(CoreButtonStyle(.secondary))
                 Spacer(minLength: Space.s2)
                 Button("Done", action: close).buttonStyle(CoreButtonStyle(.prominent))
-                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
+                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "⏎")
             }
             .padding(.top, Space.s3)
         }
@@ -338,3 +389,41 @@ private struct ProviderCard: View {
         .accessibilityIdentifier("add-\(provider.id)")
     }
 }
+
+/// A provider on setup's pick (approved 02 Setup): its letter, name and one line, centred; ⌘<n> picks it.
+private struct SetupProviderCard: View {
+    let provider: ProviderItem
+    let key: Int
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        let name = ProviderCatalog.name(provider.id, fallback: provider.name)
+        Button(action: action) {
+            VStack(spacing: Space.s2) {
+                ProviderTile(name: name)
+                VStack(spacing: 2) {
+                    Text(name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Text(ProviderCatalog.blurb(provider)).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, Space.s4).padding(.horizontal, Space.s2)
+            .coreWell(active: hover)
+            .contentShape(coreShape(Radius.cardMac))
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .coreTileKey("⌘\(key)", key: Character("\(key)"))
+        .accessibilityLabel(name)
+        .accessibilityIdentifier("setup-add-\(provider.id)")
+    }
+}
+
+#if DEBUG
+/// Snapshot walks: which side setup's AI pick opens on.
+public enum SetupAIDebug {
+    nonisolated(unsafe) public static var subscriptionFirst = false
+}
+#endif

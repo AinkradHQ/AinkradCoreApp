@@ -51,7 +51,7 @@ struct ConnectionsView: View {
             .onKeyPress(.downArrow) { arrow(1) }
             .coreSideKeys { arrow($0) }
             .onKeyPress(.upArrow) { arrow(-1) }
-            .onKeyPress(.return) { model.key("↩") ? .handled : .ignored }
+            .onKeyPress(.return) { model.key("⏎") ? .handled : .ignored }
             .onKeyPress(.delete) { model.key("⌫") ? .handled : .ignored }
             .onKeyPress(.escape) {
                 guard model.cursor != nil else { return .ignored }

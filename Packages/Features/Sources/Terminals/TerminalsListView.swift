@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Terminals app (E6-3, `screens/08-terminals.html`): the terminals grouped by machine, each a card with a live look at
 /// its screen. This Mac's real shells come first, then the sandboxes. ⌘T opens a terminal at once on the last machine used;
-/// "New terminal…" (⌥⌘N) opens the sheet. Keyboard: arrows move, ↩ opens, ⌫ closes, D detach, S running command, R rename.
+/// "New terminal…" (⌥⌘N) opens the sheet. Keyboard: arrows move, ⏎ opens, ⌫ closes, D detach, S running command, R rename.
 struct TerminalsListView: View {
     @Environment(\.coreAccent) private var paneAccent
     let model: TerminalsModel

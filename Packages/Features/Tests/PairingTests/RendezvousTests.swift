@@ -83,9 +83,7 @@ struct RendezvousTests {
     @Test func theCommandCarriesTheCodeAndTheKeyAndTheIdHidesTheCode() {
         let s = RendezvousSession()
         let cmd = SetupWizardModel.installCommand(rendezvous: s.spec)
-        #expect(
-            cmd.hasPrefix(
-                "sudo AINKRAD_MIN_VERSION=\(SetupWizardModel.minCoreVersion) AINKRAD_RENDEZVOUS=\(s.spec) sh -c"))
+        #expect(cmd == #"sh -c "$(curl -fsSL ainkrad.io/i)" - "# + s.spec)
         let parts = s.spec.split(separator: ".")
         #expect(Wire.unb64(String(parts[0]))?.count == 16 && Wire.unb64(String(parts[1]))?.count == 32)
         #expect(!s.id.contains(String(parts[0])) && s.id.count == 43)

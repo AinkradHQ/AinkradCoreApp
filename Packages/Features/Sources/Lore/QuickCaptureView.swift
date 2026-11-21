@@ -58,7 +58,7 @@ struct QuickCaptureView: View {
                     .foregroundStyle(GlassInk.secondary)
             }
             Spacer()
-            key("↩", "Save")
+            key("⏎", "Save")
             key("⎋", "Cancel")
         }
         .padding(.leading, MacSize.controlLg + Space.s3)

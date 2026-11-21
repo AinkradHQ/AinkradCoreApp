@@ -24,6 +24,12 @@ if [ -z "$src" ]; then
   . "$ROOT/scripts/runner.pin"
   [ -n "${VERSION:-}" ] && [ -n "${SHA256_ARM64:-}" ] || skip "no AINKRAD_RUNNER_DIR and no pinned release in scripts/runner.pin"
   [ "$(uname -m)" = arm64 ] || skip "the pinned runner is arm64 only"
+  # The app starts the runner with flags of its own release (--bundled came in 0.10): a runner pinned from an older Core
+  # release exits at once on every Mac. A Release build of app X.Y must bundle runner X.Y (2026-11-21: 0.10 shipped 0.9.0).
+  if [ "${CONFIGURATION:-Debug}" = Release ] && [ "${MARKETING_VERSION%.*}" != "${VERSION%.*}" ]; then
+    echo "error: bundle-runner: the app is ${MARKETING_VERSION:-?} but scripts/runner.pin bundles runner $VERSION; pin the ${MARKETING_VERSION%.*} Core release" >&2
+    exit 1
+  fi
   name=ainkrad-runner-$VERSION-macos-arm64
   cache=$ROOT/build/runner-cache/$VERSION
   mkdir -p "$cache"
@@ -44,6 +50,11 @@ fi
 for b in ainkrad-runner ainkrad-ptyhost; do
   [ -x "$src/$b" ] || skip "no $b in $src"
 done
+# The binary inside must be the one pinned (and must run): a zip with another build in it fails here, not on a user's Mac.
+if [ -n "${VERSION:-}" ] && [ -z "${AINKRAD_RUNNER_DIR:-}" ]; then
+  have=$("$src/ainkrad-runner" --version 2>/dev/null | awk '{print $2}')
+  [ "$have" = "$VERSION" ] || { echo "error: bundle-runner: the pinned zip holds runner '${have:-none}', expected $VERSION" >&2; exit 1; }
+fi
 
 mkdir -p "$HELPERS" "$AGENTS"
 for b in ainkrad-runner ainkrad-ptyhost; do

@@ -123,7 +123,7 @@ struct ApprovalCardView: View {
             }
         }
         .buttonStyle(CoreButtonStyle(approve ? .prominent : .secondary, size: .small))
-        .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
+        .environment(\.coreKeycap, approve ? "⌘⏎" : "⌘⌫")
         .disabled(busy)
         .help(
             approve

@@ -11,31 +11,39 @@ struct SetupTourView: View {
     @Bindable var shell: ShellModel
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
+    /// The AI page is adding an account (its own buttons show instead of setup's).
+    @State private var addingAccount = false
+    /// The page's own height, so the card hugs it.
+    @State private var pageHeight: CGFloat = Space.s8 * 14
 
     var body: some View {
         if let step = model.step {
             ZStack {
-                // Dims the desktop and keeps it from taking clicks while setup is open.
-                Color.black.opacity(0.18).ignoresSafeArea().contentShape(Rectangle())
+                // Keeps the wallpaper behind from taking clicks while setup is open (the desktop is hidden until it ends).
+                Color.clear.ignoresSafeArea().contentShape(Rectangle())
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    HStack(spacing: Space.s3) {
-                        Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
-                            .accessibilityHidden(true)
-                        SetupBars(at: step.bar)
-                    }
+                    // The approved setup header (02 Setup): the progress bars alone, centred, as on the welcome page.
+                    SetupBars(at: step.bar).frame(maxWidth: .infinity)
                     ScrollView {
                         page(step).id(step).transition(.opacity.combined(with: .offset(x: coreMove(reduce, 12))))
                             .padding(.vertical, Space.s1)
+                            .background {
+                                GeometryReader { g in Color.clear.preference(key: PageHeight.self, value: g.size.height)
+                                }
+                            }
                     }
-                    .scrollIndicators(.hidden).frame(maxHeight: Space.s8 * 14)
+                    // Hugs a short page (no gap) and scrolls a tall one.
+                    .scrollIndicators(.hidden)
+                    .frame(height: min(max(pageHeight, 1), Space.s8 * 14))
+                    .onPreferenceChange(PageHeight.self) { pageHeight = $0 }
                     footer(step)
                 }
                 .foregroundStyle(palette.text)
                 .coreFont(size: MacTextSize.body)
-                .padding(Space.s6)
+                .padding(EdgeInsets(top: 28, leading: 36, bottom: 24, trailing: 36))  // the approved 02 Setup card
                 // The Look page shows the pane's own look, so the sliders can be seen working on the card itself.
-                .coreFrame(radius: Radius.pane, part: step == .look ? .panes : .dialogs)
-                .frame(width: Space.s8 * 22)
+                .coreFrame(radius: Radius.pane, part: .panes)
+                .frame(width: 780)
                 .accessibilityElement(children: .contain)
             }
             .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: step)
@@ -50,10 +58,7 @@ struct SetupTourView: View {
                 meta: "Step 3 of 6", title: model.accountCount() > 0 ? "Your AI accounts" : "Connect an AI account",
                 sub: "Your Core can use as many as you like. It picks the right one for each job."
             ) {
-                SetupAIStep(
-                    model: accounts,
-                    turnOnThisMac: model.macRunner?.isAvailable == true
-                        ? { [macRunner = model.macRunner] in await macRunner?.setUseThisMac(true) } : nil)
+                SetupAIStep(model: accounts, inFlow: $addingAccount)
             }
         case .look: SetupLookPage(shell: shell)
         case .runner:
@@ -63,12 +68,18 @@ struct SetupTourView: View {
         }
     }
 
-    private func footer(_ step: SetupTourModel.Step) -> some View {
+    @ViewBuilder private func footer(_ step: SetupTourModel.Step) -> some View {
+        // Adding an AI account has its own Back and Connect: one row of buttons at a time.
+        if !(step == .ai && addingAccount) { buttons(step) }
+    }
+
+    private func buttons(_ step: SetupTourModel.Step) -> some View {
         HStack {
-            if !model.isFirst { Button("Back") { model.back() }.coreGlassButton() }
+            if !model.isFirst { Button("Back") { model.back() }.coreGlassButton().coreShortcut(.cancel) }
             Spacer()
             if step.isYou || (step == .ai && model.accountCount() == 0) {
                 Button("Skip") { model.next() }.coreGlassButton()
+                    .keyboardShortcut("s", modifiers: .command).environment(\.coreKeycap, "⌘S")
             }
             Button(label(step)) { step == .ready ? model.finish() : model.next() }
                 .buttonStyle(CoreButtonStyle(.prominent, size: .large)).coreShortcut(.primary)
@@ -217,4 +228,9 @@ struct SetupRunnerPage: View {
             // crash-report service. It is left out until then, not hidden: there is nothing for it to turn on yet.
         }
     }
+}
+
+private struct PageHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

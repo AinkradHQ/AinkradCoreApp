@@ -335,6 +335,8 @@ public final class ShellModel {
     public var elevatedUntil: Date?
     /// The app unlock (E1-1, mockup 01): `.open` shows the app; the others cover it with the Unlock card.
     public var lock: AppLock = .open
+    /// First-run setup is still open: the desktop stays hidden (only the wallpaper) until setup is finished or skipped.
+    public var setupOpen: () -> Bool = { false }
     /// The Unlock card's buttons: Touch ID, and the password fallback (the system sheet offers it after Touch ID).
     public var unlock: (@MainActor () -> Void)?
     /// The one "waiting on you" number: approvals nobody answered, supplied by Agents (`AgentsModel.waitingOnYou`). Alerts and Brain

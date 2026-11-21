@@ -230,7 +230,7 @@ struct ReadOnlyBanner: View {
 }
 
 /// The footer of an Accounts dialog: the shared `CoreDialogFooter`, with the way back on the left (`Cancel esc`, or `Close esc`
-/// when there is nothing to confirm) and the one action on the right (↩, or ⌘↩ when it removes something, so Return alone
+/// when there is nothing to confirm) and the one action on the right (⏎, or ⌘⏎ when it removes something, so Return alone
 /// never destroys). Only Cancel and Close carry the esc keycap.
 struct AccDialogButtons: View {
     var confirm: String?

@@ -45,8 +45,7 @@ struct SetupWizardTests {
         let c = SetupWizardModel.installCommand
         #expect(!c.contains("| sudo") && !c.contains("|sudo"))
         #expect(c.contains(#"sh -c "$(curl"#))
-        #expect(c.hasPrefix("sudo AINKRAD_MIN_VERSION=\(SetupWizardModel.minCoreVersion) sh -c"))
-        #expect(c.contains("https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh"))
+        #expect(c == #"sh -c "$(curl -fsSL ainkrad.io/i)""#)
     }
 
     @Test func aPastedLinkIsShownBeforeAnythingIsSent() {

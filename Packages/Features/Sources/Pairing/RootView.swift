@@ -6,6 +6,8 @@ import SwiftUI
 public struct RootView: View {
     @Bindable var app: AppModel
     @Environment(\.colorScheme) private var scheme
+    /// Appearance's Look, for the setup surfaces that sit outside the desktop (the desktop sets its own the same way).
+    @Bindable private var look = LookPrefs.shared
 
     public init(app: AppModel) { self.app = app }
 
@@ -17,18 +19,21 @@ public struct RootView: View {
                 if app.useTypedCode {
                     FirstRunView(model: app.firstRun) { app.useTypedCode = false }
                 } else {
-                    SetupWizardView(
-                        model: app.wizard, useCode: { app.useTypedCode = true },
-                        startTour: { app.tour.beginDetour($0) }
-                    )
-                    .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
+                    SetupWizardView(model: app.wizard, useCode: { app.useTypedCode = true })
+                        .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
                 }
             case .desktop:
+                // Setup waits for the unlock: locked, the Unlock card (and Touch ID) must be what shows, never hidden under it.
                 ShellView(shell: app.shell)
-                    .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
+                    .overlay {
+                        if app.shell.lock == .open {
+                            SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell)
+                        }
+                    }
             case .blocked(let f): blocked(f)
             }
         }
+        .environment(\.coreLook, look.look)
         .task { await app.start() }
         .coreTheme()
         .coreConfirm(

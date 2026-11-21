@@ -63,7 +63,7 @@ extension BrainSheets {
     static func split(_ m: BrainModel, _ id: String) { show(m, "inbox-split") { SplitSheet(model: m, id: id) } }
 }
 
-/// Cancel left, one named action right (⌘↩, so Return alone never approves).
+/// Cancel left, one named action right (⌘⏎, so Return alone never approves).
 private struct SheetButtons: View {
     let model: BrainModel
     let action: String

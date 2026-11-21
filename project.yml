@@ -15,7 +15,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "Apple Development"
     DEVELOPMENT_TEAM: RT9AA68C38
-    MARKETING_VERSION: "0.9.0"
+    MARKETING_VERSION: "0.10.0"
     CURRENT_PROJECT_VERSION: "2"
     # Swift string literals land in each String Catalog on build; catalogs are preferred over .strings.
     SWIFT_EMIT_LOC_STRINGS: YES
