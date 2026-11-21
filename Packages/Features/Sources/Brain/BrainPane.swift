@@ -1,84 +1,40 @@
 import CoreUI
 import SwiftUI
 
-/// The Brain, in the shape of every other Core app: tab tiles and action tiles in one header, the open-room bar under it,
-/// the tab below. Overview and Checks are global; the room picker sits inside Rooms, Inbox and Activity,
-/// the tabs that look at one room. The keyboard drives it: ⌘1 to ⌘5 tabs, ⌘N a new room, ⌥⌘N the advanced sheet, Esc back.
+/// The Brain: one app with a sidebar (Home, the four areas, Places, To check, Sources, Activity, the search) once it has
+/// rooms (`BrainCalmView`). Before that, the header and one card that says why it is empty and what to do.
+/// The keyboard drives it: ⌘1 to ⌘9 sections, ⌘E search, ⌘I Import, ⌘N a new room (sample), Esc back.
 struct BrainPane: View {
     @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     @FocusState private var paneFocus: Bool
 
-    /// The calm Brain fills the pane when the Core has it and the person is not in Explore.
-    private var showsCalm: Bool {
-        model.calmAvailable && !model.exploring && model.load == .ready && model.setup == .ready && !model.rooms.isEmpty
-    }
+    private var ready: Bool { model.load == .ready && model.setup == .ready && !model.rooms.isEmpty }
 
     var body: some View {
-        if showsCalm {
-            BrainCalmView(brain: model)
-                .coreFont(size: MacTextSize.body)
-                .foregroundStyle(GlassInk.primary)
-                .paneLook(AppLookPrefs.shared("brain").look)
-                .clipShape(coreShape(Radius.cardMac))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("brain-pane")
-        } else {
-            console
-        }
-    }
-
-    private var console: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            AppHeader {
-                // No service attached: nothing to look at, so no tabs over the unavailable card.
-                if model.tabsVisible {
-                    ForEach(Array(model.visibleTabs.enumerated()), id: \.offset) { i, t in
-                        AppFilterTile(
-                            title: t.title, count: model.tabCount(t), on: model.currentTab == t, key: "⌘\(i + 1)"
-                        ) {
-                            go(t)
-                        }
-                        .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
-                        .accessibilityIdentifier("brain-nav-\(t.rawValue)")
-                    }
-                }
-            } actions: {
-                actions
-            }
-            .background { importKey }
-            if model.load == .ready, model.setup == .ready, !model.rooms.isEmpty, let sync = model.sync,
-                model.currentTab == .rooms || model.currentTab == .sources
-            {
-                SyncBannerView(brain: model, sync: sync)
-                    .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
-            }
-            if fillsPane, model.load == .ready, model.setup == .ready, !model.rooms.isEmpty {
-                // Rooms and the Inbox fill the pane: their list and their detail each scroll on their own.
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    if let n = model.notice { notice(n) }
-                    BrainConditions(model: model)
-                    if model.currentTab == .rooms { RoomsTab(model: model) } else { CandidateInboxTab(model: model) }
-                }
-                .coreFont(size: MacTextSize.body)
-                .foregroundStyle(GlassInk.primary)
-                .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .transition(.opacity)
+        Group {
+            if ready {
+                BrainCalmView(brain: model)
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Space.s4) {
-                        if model.load == .ready, !model.rooms.isEmpty, showsRoomBar { RoomBar(model: model) }
-                        if let n = model.notice { notice(n) }
-                        content
+                VStack(alignment: .leading, spacing: 0) {
+                    AppHeader {
+                    } actions: {
+                        actions
                     }
-                    .coreFont(size: MacTextSize.body)
-                    .foregroundStyle(GlassInk.primary)
-                    .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background { importKey }
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Space.s4) {
+                            if let n = model.notice { notice(n) }
+                            content
+                        }
+                        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         }
+        .coreFont(size: MacTextSize.body)
+        .foregroundStyle(GlassInk.primary)
         .focusable().focused($paneFocus).focusEffectDisabled()
         .onAppear { paneFocus = true }
         .retakeFocus(after: model.host.shell, pane: "brain") { paneFocus = true }
@@ -89,43 +45,20 @@ struct BrainPane: View {
         .accessibilityIdentifier("brain-pane")
     }
 
-    private var servesInbox: Bool { model.service?.servesCandidates == true }
-    private var fillsPane: Bool { model.currentTab == .rooms || (model.currentTab == .inbox && servesInbox) }
-
-    /// Inbox, Rooms and Sources: when this Mac last synced and Sync now. Before the first rooms: Import.
+    /// Before the first rooms: Import, or a new room on the sample.
     @ViewBuilder private var actions: some View {
-        // In the header, never over the page: a footer chip sat on the last card of a long tab.
         if model.isSample {
             AppStatChip("testtube.2", "Sample data", GlassInk.slate).help(BrainWords.sampleLabel)
                 .accessibilityLabel(BrainWords.sampleLabel)
         }
-        let ready = model.setup == .ready && model.load == .ready
-        if model.calmAvailable {
-            AppActionTile(title: "Back to Brain", symbol: "brain", key: "⌘0", hue: GlassInk.accent(paneAccent)) {
-                model.explore(false)
-            }
-            .keyboardShortcut("0", modifiers: .command)
-        }
-        if ready, !model.rooms.isEmpty, let sync = model.sync,
-            model.currentTab == .rooms || model.currentTab == .sources || (model.currentTab == .inbox && servesInbox)
-        {
-            SyncNowTile(sync: sync)
-        } else if model.service?.importRoutes != nil, model.load == .ready, model.setup != .ready || model.rooms.isEmpty
-        {
+        if model.service?.importRoutes != nil, model.load == .ready {
             AppActionTile(
                 title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.accent(paneAccent)
             ) {
                 model.openImport()
             }
         }
-        if model.currentTab == .rooms, model.load == .ready, model.canMakeRooms {
-            AppActionTile(
-                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N",
-                hue: GlassInk.accent(paneAccent)
-            ) {
-                BrainSheets.openNewRoom(model)
-            }
-            .keyboardShortcut("n", modifiers: [.command, .option])
+        if model.load == .ready, model.canMakeRooms {
             AppActionTile(
                 title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
             ) {
@@ -135,29 +68,12 @@ struct BrainPane: View {
         }
     }
 
-    /// ⌘I opens Import from every tab, also where the header shows Sync now instead of the Import tile.
+    /// ⌘I opens Import before the first rooms too.
     private var importKey: some View {
         Button("Import into the Brain") { model.openImport() }
             .keyboardShortcut("i", modifiers: .command)
             .disabled(model.service?.importRoutes == nil)
             .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
-    }
-
-    /// Rooms, Inbox (but not the no-room list) and Activity look at one room. Overview and Checks are global.
-    private var showsRoomBar: Bool {
-        switch model.currentTab {
-        case .activity: true
-        case .inbox: model.inboxState.list != .noRoom
-        case .overview, .checks, .rooms, .sources, .records, .evidence: false
-        }
-    }
-
-    private func go(_ t: BrainTab) {
-        withAnimation(Motion.out(Motion.ui)) {
-            model.closeInspect()
-            model.tab = t
-        }
-        paneFocus = true
     }
 
     private func notice(_ text: String) -> some View {
@@ -189,25 +105,7 @@ struct BrainPane: View {
                 secondary: CoreAction("New room (advanced)…") { BrainSheets.openNewRoom(model) },
                 primary: CoreAction("New room") { Task { await model.quickRoom() } })
         case .ready:
-            BrainConditions(model: model)
-            Group {
-                switch model.currentTab {
-                case .overview: OverviewTab(model: model)
-                case .rooms: RoomsTab(model: model)
-                case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
-                case .records: ExploreRecordsTab(brain: model)
-                case .evidence: ExploreEvidenceTab(brain: model)
-                case .inbox: CandidateInboxTab(model: model)
-                case .activity:
-                    if model.isSample || model.service?.servesChanges == true {
-                        ActivityTab(model: model)
-                    } else {
-                        BrainComingLater(title: "Activity")
-                    }
-                case .checks: if model.isSample { ChecksTab(model: model) } else { BrainComingLater(title: "Checks") }
-                }
-            }
-            .transition(.opacity)
+            EmptyView()
         }
     }
 

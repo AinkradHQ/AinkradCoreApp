@@ -2,7 +2,8 @@ import CoreUI
 import SwiftUI
 
 /// Me, Rules & preferences, Knowledge and Timeline (mockup 15): the Core's current records of the area, best supported first,
-/// grouped the way the page reads. Only the important ones are shown; Explore has everything.
+/// grouped the way the page reads. Only the important ones are shown; the search has everything. A record opens its detail
+/// beside the list.
 struct CalmArea: View {
     let brain: BrainModel
     @State private var shown = false
@@ -39,25 +40,41 @@ struct CalmArea: View {
                     .foregroundStyle(GlassInk.secondary).padding(Space.s4)
                     .frame(maxWidth: .infinity, alignment: .leading).coreWell()
             } else {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(Array(calm.records.enumerated()), id: \.element.id) { i, r in
-                            CoreRow(r.body, subtitle: sub(r), symbol: Self.symbol(r.type)) {
-                                if r.support > 1 { StateBadge("Sure", tone: .done, symbol: "checkmark") }
+                HStack(alignment: .top, spacing: Space.s4) {
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        ScrollView {
+                            VStack(spacing: 2) {
+                                ForEach(Array(calm.records.enumerated()), id: \.element.id) { i, r in
+                                    CoreRow(
+                                        r.body, subtitle: sub(r), symbol: Self.symbol(r.type),
+                                        selected: calm.picked == r.id, action: { calm.picked = r.id }
+                                    ) {
+                                        if r.support > 1 { StateBadge("Sure", tone: .done, symbol: "checkmark") }
+                                    }
+                                    .coreRise(shown, min(i, 8))
+                                }
                             }
-                            .coreRise(shown, min(i, 8))
+                            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.records.map(\.id))
+                        }
+                        if calm.total > calm.records.count {
+                            HStack(spacing: Space.s2) {
+                                Text("Showing the \(calm.records.count) most important of \(calm.total).")
+                                Button("See everything") {
+                                    calm.searchArea = calm.page.area ?? ""
+                                    brain.go(.records)
+                                }
+                                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                            }
+                            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                         }
                     }
-                    .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.records.map(\.id))
-                }
-                if calm.total > calm.records.count {
-                    HStack(spacing: Space.s2) {
-                        Text("Showing the \(calm.records.count) most important of \(calm.total).")
-                        Button("See everything in Explore") { brain.explore(true) }
-                            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    if let r = calm.records.first(where: { $0.id == calm.picked }) {
+                        RecordDetail(brain: brain, record: r, area: calm.page.area ?? "")
+                            .frame(width: Space.s8 * 12)
+                            .transition(.opacity)
                     }
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
+                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.picked)
             }
             if calm.areas?.lockedRooms ?? 0 > 0 {
                 Text("\(BrainWords.plural(calm.areas?.lockedRooms ?? 0, "room", "rooms")) not shown until unlocked.")
@@ -89,35 +106,5 @@ struct CalmArea: View {
         case "project-state": "clock"
         default: "text.alignleft"
         }
-    }
-}
-
-/// Places: the rooms, each its own sealed memory, with the AI it learns with and its last sync.
-struct CalmPlaces: View {
-    let brain: BrainModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Places").coreFont(size: MacTextSize.title, weight: .semibold)
-                Text("Every place is its own room. What Brain learns in one never leaks into another.")
-                    .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
-            }
-            ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(brain.rooms) { r in
-                        CoreRow(
-                            r.name, subtitle: brain.lastSyncLabel(r).map { "Synced \($0)" }, symbol: "folder",
-                            action: {
-                                brain.view(r.id)
-                                brain.explore(true, tab: .rooms)
-                            }
-                        ) {
-                            if !r.mounted { StateBadge("Sealed", tone: .queue, symbol: "lock") }
-                        }
-                    }
-                }
-            }
-        }
-        .accessibilityIdentifier("brain-places-page")
     }
 }

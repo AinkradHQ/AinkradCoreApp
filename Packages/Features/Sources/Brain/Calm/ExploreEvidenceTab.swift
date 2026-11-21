@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Explore, Evidence (mockup 16): where Brain's knowledge comes from. The sources on the left by kind; the one you pick lists its
+/// Sources, What Brain read (mockup 16, evidence): where Brain's knowledge comes from. The sources on the left by kind; the one you pick lists its
 /// files and sessions on the right, and a file shows where it came from. Read from each open room's newest sources.
 struct ExploreEvidenceTab: View {
     let brain: BrainModel
@@ -82,8 +82,10 @@ struct ExploreEvidenceTab: View {
                 Self.title(f.item.sourceKind), subtitle: Self.when(f.item.startedAt),
                 symbol: Self.symbol(f.item.sourceKind))
             CoreRow(roomName(f.room), subtitle: "The place Brain filed it in", symbol: "folder")
-            Text("Brain read this and wrote down what mattered. What it learned is under Records.")
-                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            Text(
+                "Brain read this and wrote down what mattered. What it learned is under Me, Rules, Knowledge and Timeline."
+            )
+            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading).coreWell()
         .transition(.opacity)

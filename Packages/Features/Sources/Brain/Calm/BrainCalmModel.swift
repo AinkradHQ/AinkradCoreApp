@@ -27,6 +27,14 @@ public final class BrainCalmModel {
             case .places: "folder"
             }
         }
+        /// The sidebar section that shows this page.
+        var tab: BrainTab {
+            switch self {
+            case .home: .overview
+            case .places: .rooms
+            default: BrainTab(rawValue: rawValue) ?? .overview
+            }
+        }
         /// The Core's name for the area; nil for Home and Places.
         var area: String? {
             switch self {
@@ -37,6 +45,13 @@ public final class BrainCalmModel {
             default: nil
             }
         }
+    }
+
+    /// A record with the area it was read from.
+    struct AreaRecord: Identifiable, Equatable {
+        let area: String
+        let record: BrainAreaRecordWire
+        var id: String { record.id }
     }
 
     /// A line of "What I learned today": one record Brain accepted, in words, with its area and time.
@@ -95,6 +110,17 @@ public final class BrainCalmModel {
     public private(set) var notice: String?
     /// Knowledge shows facts or decisions.
     public var knowledgeType = "fact"
+    /// The search over everything (⌘E): its words and the area it is narrowed to ("" for all).
+    public var query = ""
+    public var searchArea = ""
+    /// Bumped to put the keyboard in the sidebar's search field.
+    public private(set) var searchAsked = 0
+    /// The record whose detail is open beside a list.
+    public var picked: String?
+    #if DEBUG
+    /// Debug demo only: each area's records without a Core.
+    var demoRecords: [String: [BrainAreaRecordWire]] = [:]
+    #endif
     @ObservationIgnored var routes: BrainRoutes?
     @ObservationIgnored var service: (any BrainService)?
     @ObservationIgnored var rooms: () -> [RoomSummary] = { [] }
@@ -125,6 +151,7 @@ public final class BrainCalmModel {
     }
 
     public func open(_ p: Page) async {
+        if page != p { picked = nil }
         page = p
         records = []
         total = 0
@@ -132,12 +159,59 @@ public final class BrainCalmModel {
     }
 
     func loadRecords() async {
-        guard let routes, let area = page.area else { return }
+        guard let area = page.area else { return }
+        #if DEBUG
+        if routes == nil, let demo = demoRecords[area] {
+            records = demo.filter { page != .knowledge || $0.type == knowledgeType }
+            total = records.count
+            return
+        }
+        #endif
+        guard let routes else { return }
         do {
             let p = try await routes.area(area, type: page == .knowledge ? knowledgeType : nil, limit: 60)
             records = p.records
             total = p.total
         } catch is CancellationError {
+        } catch { notice = BrainWords.failure(error) }
+    }
+
+    public func askSearch() { searchAsked += 1 }
+
+    /// Every current record of the four areas, with its area, best supported and newest first (the search).
+    func everything(limit: Int = 200) async -> [AreaRecord] {
+        var all: [AreaRecord] = []
+        for a in ["me", "rules", "knowledge", "timeline"] {
+            #if DEBUG
+            if routes == nil, let demo = demoRecords[a] {
+                all += demo.map { AreaRecord(area: a, record: $0) }
+                continue
+            }
+            #endif
+            guard let routes else { break }
+            do {
+                all += try await routes.area(a, limit: limit).records.map { AreaRecord(area: a, record: $0) }
+            } catch is CancellationError {
+            } catch { notice = BrainWords.failure(error) }
+        }
+        return all.sorted { ($0.record.support, $0.record.seenAt) > ($1.record.support, $1.record.seenAt) }
+    }
+
+    /// Takes a record out of memory (archived, never deleted), from its detail.
+    public func forget(_ r: BrainAreaRecordWire) async {
+        #if DEBUG
+        if routes == nil {
+            for k in demoRecords.keys { demoRecords[k]?.removeAll { $0.id == r.id } }
+            records.removeAll { $0.id == r.id }
+            picked = nil
+            return
+        }
+        #endif
+        guard let routes else { return }
+        do {
+            try await routes.archiveRecord(room: r.room, id: r.id)
+            records.removeAll { $0.id == r.id }
+            picked = nil
         } catch { notice = BrainWords.failure(error) }
     }
 
@@ -174,7 +248,11 @@ public final class BrainCalmModel {
 
     #if DEBUG
     /// Debug demo only: the calm Brain's numbers without a Core.
-    func demo(areas: BrainAreasWire, learned: [LearnedWire], autoImports: [AutoImportWire] = []) {
+    func demo(
+        areas: BrainAreasWire, learned: [LearnedWire], autoImports: [AutoImportWire] = [],
+        records: [String: [BrainAreaRecordWire]] = [:]
+    ) {
+        demoRecords = records
         page = .home
         self.areas = areas
         self.learned = learned.map(Learned.init)

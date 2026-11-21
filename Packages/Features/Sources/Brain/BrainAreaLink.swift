@@ -1,7 +1,10 @@
-/// Where the top bar's Brain counts land (`me`, `rules`, `knowledge`, `timeline`, `places`). The calm Brain opens its own
-/// page (`BrainModel.open(area:)` sets `calm.page = Page(rawValue: area)`); the console, which has no area pages, opens the overview.
+/// Where the top bar's Brain counts land (`me`, `rules`, `knowledge`, `timeline`, `places`, and `inbox`, `sources`,
+/// `activity`): the sidebar section of the same name. Anything else opens Home.
 enum BrainAreaLink {
-    static let areas: Set<String> = ["me", "rules", "knowledge", "timeline", "places"]
+    static let areas: Set<String> = ["me", "rules", "knowledge", "timeline", "places", "inbox", "sources", "activity"]
 
-    static func tab(for area: String) -> BrainTab { .overview }
+    static func tab(for area: String) -> BrainTab {
+        guard areas.contains(area) else { return .overview }
+        return area == "places" ? .rooms : BrainTab(rawValue: area) ?? .overview
+    }
 }

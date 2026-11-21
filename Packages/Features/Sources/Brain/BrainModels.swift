@@ -312,9 +312,38 @@ public struct NewRoomDraft: Sendable, Hashable {
     var provider: ProviderClass { .local }
 }
 
+/// A section of the Brain's sidebar, in its order. `records` is the search over everything (⌘E), reached from the field
+/// at the top of the sidebar rather than a row of its own.
 public enum BrainTab: String, Sendable, CaseIterable, Hashable {
-    case overview, rooms, sources, inbox, activity, checks, records, evidence
-    var title: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+    case overview, me, rules, knowledge, timeline, rooms, inbox, sources, activity, checks, records
+    var title: String {
+        switch self {
+        case .overview: "Home"
+        case .rules: "Rules & preferences"
+        case .rooms: "Places"
+        case .inbox: "To check"
+        case .records: "Search"
+        default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .inbox: "tray"
+        case .sources: "arrow.triangle.2.circlepath"
+        case .activity: "list.bullet.rectangle"
+        case .checks: "stethoscope"
+        case .records: "magnifyingglass"
+        default: calmPage?.symbol ?? "brain"
+        }
+    }
+    /// The calm Brain's page for Home, the four areas and Places.
+    var calmPage: BrainCalmModel.Page? {
+        switch self {
+        case .overview: .home
+        case .rooms: .places
+        default: BrainCalmModel.Page(rawValue: rawValue)
+        }
+    }
 }
 
 /// Why the Brain has nothing to show, in plain words.

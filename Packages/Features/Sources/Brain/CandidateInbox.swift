@@ -64,6 +64,7 @@ struct CandidateInboxTab: View {
     private func goToRules() {
         withAnimation(Motion.out(Motion.ui)) {
             c.paneMode = .settings
+            model.placeOpen = true
             model.tab = .rooms
         }
     }
@@ -155,6 +156,7 @@ private struct CandidateList: View {
         if let r = c.inbox.queued.first { model.view(r.room) }
         withAnimation(Motion.out(Motion.ui)) {
             c.paneMode = .settings
+            model.placeOpen = true
             model.tab = .rooms
         }
     }
