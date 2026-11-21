@@ -128,6 +128,14 @@ struct RunnerChoice: Equatable, Sendable {
     var needsPick: Bool { eligible.count > 1 }
     var chosen: AccountRunner? { eligible.first { $0.id == selected } }
 
+    /// Where the Core can install `harness` so a runner can sign in: the Core's own runner when it is online, else the
+    /// first online one. Nil when the Core cannot install that harness or no runner is online.
+    func installTarget(harness: String) -> AccountRunner? {
+        guard AccountsModel.installable.contains(harness) else { return nil }
+        let online = others.filter(\.online)
+        return online.first(where: \.builtIn) ?? online.first
+    }
+
     /// Why nothing can sign in, and what to do, in the order of what is most likely wrong.
     func why(provider: String) -> String {
         if others.isEmpty {

@@ -286,6 +286,7 @@ public final class AccountsDemo {
                 b(
                     Int64(budgetList.count + 10), d.kind, d.subject, d.period, cap: d.tokenCap, usd: d.usdCap, spent: 0,
                     usdSpent: 0, stop: d.hardStop))
+            budgetList[budgetList.count - 1].messageCap = d.messageCap
         }
         func deleteBudget(_ id: Int64) async throws { budgetList.removeAll { $0.id == id } }
         func raiseBudget(_ id: Int64, periodKey: String, tokens: Int64?, usdMicros: Int64?) async throws {
@@ -401,7 +402,7 @@ public final class AccountsDemo {
                             "gateway", "login", "subscription-env", "login-bound:codex", "login-bound:opencode",
                             "login-bound:agy",
                         ],
-                    drivers: ["agent"]),
+                    drivers: ["agent"], builtIn: true),
                 AccountRunner(id: "r_mac", name: "studio-mac", online: true),
                 AccountRunner(id: "r_old", name: "old-box", online: false),
             ]
@@ -498,7 +499,7 @@ public final class AccountsDemo {
         "usage-limits", "usage-limits-empty", "usage-limit-new", "usage-limit-edit", "usage-limit-clear",
         "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
         "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
-        "ai-order-advanced",
+        "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices",
     ]
 
     let model: AccountsModel
@@ -531,12 +532,14 @@ public final class AccountsDemo {
         model.opener = { _ in }
         model.signIn = nil
         model.advancedOpen = false
+        model.advancedTab = .limits
         model.installs = [:]
         switch scene {
         case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
-            "ai-order-advanced":
+            "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices":
             svc.useAIOrderSample(limitHit: scene == "ai-order-limit-hit")
+            svc.noLogin = scene.hasPrefix("ai-order-add-install")
         case "connect-installing": svc.noLogin = true
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
@@ -602,6 +605,14 @@ public final class AccountsDemo {
         case "ai-order-add-key": AccountDialogs.openConnect(model, provider: "anthropic")
         case "ai-order-add-signin": AccountDialogs.openConnect(model, provider: "codex-sub")
         case "ai-order-advanced": model.advancedOpen = true
+        case "ai-order-prices":
+            model.advancedOpen = true
+            model.advancedTab = .models
+            model.limitsAccount = 3
+        case "ai-order-add-install": AccountDialogs.openConnect(model, provider: "codex-sub")
+        case "ai-order-add-installing":
+            model.installs["r_linux01|codex"] = ToolProgress(state: .running, percent: 64, step: "Downloading…")
+            AccountDialogs.openConnect(model, provider: "codex-sub")
         case "connect": AccountDialogs.openConnect(model, provider: "anthropic")
         case "connect-key", "connect-name", "connect-place":
             ConnectWizardState.debugStep =

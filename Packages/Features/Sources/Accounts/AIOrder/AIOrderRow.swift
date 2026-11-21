@@ -7,11 +7,18 @@ struct ProviderTile: View {
     let name: String
     var size: CGFloat = 36
     var body: some View {
-        Text(ProviderCatalog.letter(name))
-            .coreFont(size: size * 0.44, weight: .semibold).foregroundStyle(GlassInk.ink(GlassInk.accent(paneAccent)))
-            .frame(width: size, height: size)
-            .background(GlassInk.well, in: coreShape(size > 40 ? Radius.cardMac : Radius.control))
-            .accessibilityHidden(true)
+        Group {
+            if let mark = ProviderCatalog.mark(name) {
+                Image(mark, bundle: .main).renderingMode(.template).resizable().scaledToFit()
+                    .frame(width: size * 0.5, height: size * 0.5)
+            } else {
+                Text(ProviderCatalog.letter(name)).coreFont(size: size * 0.44, weight: .semibold)
+            }
+        }
+        .foregroundStyle(GlassInk.ink(GlassInk.accent(paneAccent)))
+        .frame(width: size, height: size)
+        .background(GlassInk.well, in: coreShape(size > 40 ? Radius.cardMac : Radius.control))
+        .accessibilityHidden(true)
     }
 }
 

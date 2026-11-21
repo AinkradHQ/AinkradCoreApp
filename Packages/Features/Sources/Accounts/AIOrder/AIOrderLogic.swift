@@ -30,6 +30,17 @@ enum ProviderCatalog {
     static func blurb(_ p: ProviderItem) -> String {
         faces[p.id]?.blurb ?? (kind(p) == .subscription ? "Your \(p.name) plan" : "\(p.name) models")
     }
+    /// The brand mark in the app's asset catalog for a provider's shown name (simple-icons, CC0); nil keeps the letter.
+    /// Groq, xAI and AIMLAPI have no mark there.
+    static func mark(_ name: String) -> String? {
+        let marks: [String: String] = [
+            "claude": "claude", "anthropic": "anthropic", "chatgpt / codex": "openai", "openai": "openai",
+            "google gemini": "googlegemini", "gemini": "googlegemini", "antigravity": "google", "opencode": "opencode",
+            "openrouter": "openrouter", "deepseek": "deepseek", "mistral": "mistralai",
+        ]
+        let base = name.components(separatedBy: " · ")[0].lowercased()
+        return marks[base].map { "Mark-\($0)" }
+    }
     static func letter(_ name: String) -> String { name.first.map { String($0).uppercased() } ?? "?" }
 
     /// Providers of one kind in card order.

@@ -83,6 +83,15 @@ extension AccountsDemo.Service {
         chainBindingList = []
         orderEntries = accountList.map { AIOrderEntry(account: $0.id, provider: $0.provider, harness: nil, model: nil) }
         agentOrders = [AIOrderOverride(agent: "birch", items: [orderEntries[2]])]
+        // The mockup's two Claude limits: 900 messages a week, 60 every 5 hours.
+        for (id, period, cap, warn) in [(21, "week", 900, 80), (22, "hour5", 60, 90)] as [(Int64, String, Int64, Int64)]
+        {
+            budgetList.append(
+                BudgetItem(
+                    id: id, kind: "provider", subject: "claude-sub", company: nil, period: period, periodKey: period,
+                    tokenCap: 0, usdCap: nil, spent: 0, usdSpent: 0, held: 0, raised: 0, raisedUSD: 0, warnAt: warn,
+                    hardStop: true, exhausted: false, messageCap: cap))
+        }
     }
 
     func aiOrderSupported() async -> Bool { order010 }

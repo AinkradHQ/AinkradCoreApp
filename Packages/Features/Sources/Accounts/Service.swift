@@ -129,6 +129,8 @@ struct AccountRunner: Identifiable, Equatable, Sendable {
     /// Tools found on the host, name to version (`claude`, `git`, `node`…).
     var tools: [String: String] = [:]
     var policy: Policy?
+    /// The runner the installer made on the Core's own machine (`built_in`).
+    var builtIn = false
 
     struct Policy: Equatable, Sendable {
         var terminals: Bool
@@ -313,7 +315,7 @@ struct LiveAccountsService: AccountsService {
                     policy: $0.policy.map {
                         AccountRunner.Policy(
                             terminals: $0.terminals, agents: $0.agents, capacity: Int($0.agentCapacity))
-                    })
+                    }, builtIn: $0.builtIn ?? false)
             }
         }
     }
@@ -419,15 +421,6 @@ struct LiveAccountsService: AccountsService {
                     id: $0.id, at: $0.occurredAt, accountID: $0.accountId, provider: $0.provider, model: $0.model,
                     session: $0.session, input: $0.inputTokens, output: $0.outputTokens, cache: $0.cacheTokens,
                     costMicros: $0.costUsdMicros, basis: $0.basis, approximate: $0.approximate)
-            }
-        }
-    }
-    func prices() async throws -> [PriceItem] {
-        try await run {
-            try await client.listPrices().ok.body.json.map {
-                PriceItem(
-                    provider: $0.provider, model: $0.model, input: $0.inputPerMtokMicro, output: $0.outputPerMtokMicro,
-                    cache: $0.cachePerMtokMicro, version: $0.version, pricedAt: $0.pricedAt)
             }
         }
     }

@@ -138,8 +138,21 @@ struct BudgetLimitRow: View {
     private var capValue: Int64? { UsageLimitWords.parseCap(cap) }
     private var warnValue: Int64? { Int64(warn).flatMap { (1...100).contains($0) ? $0 : nil } }
 
+    /// One grid for the header and every row: window, stop at, warn at, then the row's actions.
+    enum Col {
+        static let window = Space.s8 * 5
+        static let stop = Space.s8 * 5
+        static let warn = Space.s8 * 3
+    }
+
+    /// A new limit, or a saved one whose numbers changed: Save shows on the row.
+    private var dirty: Bool {
+        guard let existing else { return true }
+        return capValue != existing.messageCap || warnValue != existing.warnAt
+    }
+
     var body: some View {
-        VStack(alignment: .trailing, spacing: Space.s2) {
+        VStack(alignment: .leading, spacing: Space.s2) {
             HStack(alignment: .center, spacing: Space.s3) {
                 CoreSelect(
                     nil,
@@ -151,30 +164,40 @@ struct BudgetLimitRow: View {
                         }),
                     options: AccountLimitRules.windows.map { CoreSelectOption($0.id, $0.title) }
                 )
-                .frame(width: Space.s8 * 5)
-                HStack(spacing: Space.s2) {
-                    CoreTextField("", placeholder: "900", text: $cap, error: nil) { Task { await commit() } }
-                    Text("messages").foregroundStyle(GlassInk.secondary)
+                .frame(width: Col.window)
+                LimitField(text: $cap, placeholder: "900", unit: "messages", label: "Stop at, messages") {
+                    Task { await commit() }
                 }
-                .frame(maxWidth: .infinity)
-                HStack(spacing: Space.s2) {
-                    CoreTextField("", placeholder: "80", text: $warn, error: nil) { Task { await commit() } }
-                    Text("%").foregroundStyle(GlassInk.secondary)
+                .frame(width: Col.stop, alignment: .leading)
+                LimitField(text: $warn, placeholder: "80", unit: "%", label: "Warn me at, percent") {
+                    Task { await commit() }
                 }
-                .frame(width: Space.s8 * 3)
+                .frame(width: Col.warn, alignment: .leading)
+                Spacer(minLength: 0)
+                if dirty {
+                    Button(existing == nil ? "Save limit" : "Save") { Task { await commit() } }
+                        .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                        .environment(\.coreKeycap, "⏎")
+                        .disabled(capValue == nil || warnValue == nil || model.readOnly)
+                        .help("Save this limit (Return in a field)")
+                }
                 Button {
                     if let existing { Task { _ = await model.deleteBudget(existing) } } else { done() }
                 } label: {
-                    Image(systemName: "xmark").frame(width: Space.s6, height: Space.s6)
+                    Image(systemName: existing == nil ? "xmark" : "trash").frame(width: Space.s6, height: Space.s6)
                 }
-                .buttonStyle(CoreButtonStyle(.plain, size: .small)).help("Remove limit")
-                .accessibilityLabel("Remove limit")
+                .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                .help(existing == nil ? "Discard this limit" : "Remove limit")
+                .accessibilityLabel(existing == nil ? "Discard this limit" : "Remove limit")
+                .disabled(model.readOnly)
             }
-            if existing == nil {
-                AccLink(title: "Save limit", symbol: "checkmark") { Task { await commit() } }
-                    .disabled(capValue == nil || warnValue == nil)
+            if capValue == nil || warnValue == nil {
+                Text("Stop at is a number of messages; warn me at is 1 to 100 %.")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
             }
         }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .background(GlassInk.well, in: coreShape(Radius.control))
     }
 
     /// A moved window is a new budget (the Core keys one by kind, subject and period): save the new, then drop the old.
@@ -185,5 +208,27 @@ struct BudgetLimitRow: View {
         guard ok else { return }
         if moved, let existing, existing.period != period { _ = await model.deleteBudget(existing) }
         if existing == nil { done() }
+    }
+}
+
+/// A number with its unit inside the field, one control high, so it lines up with the window picker beside it.
+private struct LimitField: View {
+    @Binding var text: String
+    let placeholder: String
+    let unit: String
+    let label: String
+    let submit: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: Space.s1) {
+            TextField(placeholder, text: $text).textFieldStyle(.plain).coreFont(size: MacTextSize.body)
+                .focused($focused).onSubmit(submit).accessibilityLabel(label)
+            Text(unit).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).fixedSize()
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, Space.s3)
+        .frame(height: MacSize.controlLg)
+        .coreFieldSurface(focused: focused)
     }
 }

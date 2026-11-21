@@ -58,7 +58,7 @@ extension AccountsModel {
     }
 
     /// Tools the Core can install for a provider's harness.
-    static let installable: Set<String> = ["claude", "codex"]
+    nonisolated static let installable: Set<String> = ["claude", "codex", "opencode", "agy"]
 
     /// The runner an install would go to: an online one without the tool yet, else any online one.
     func installTarget(_ p: ProviderItem, _ runners: [AccountRunner]) -> AccountRunner? {

@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// "Advanced" under the AI order: Limits, Models and prices, Per-agent order. Most people never open it.
+/// "Advanced" under the AI order: Limits, and Models and prices. Most people never open it.
 struct AdvancedPanel: View {
     @Bindable var model: AccountsModel
 
@@ -18,7 +18,6 @@ struct AdvancedPanel: View {
             switch model.advancedTab {
             case .limits: LimitsTab(model: model)
             case .models: ModelsTab(model: model)
-            case .agents: AgentsTab(model: model)
             }
         }
         .padding(Space.s4)
@@ -49,18 +48,22 @@ struct LimitsTab: View {
                             model.limitsTarget = $0
                             adding = false
                         }),
-                    options: model.limitOptions)
+                    options: model.limitOptions
+                )
+                .frame(width: Space.s8 * 9)
                 if case .account(let id) = t, let b = model.account(id)?.runnerBinding { RunnerBoundNote(binding: b) }
                 HStack(spacing: Space.s3) {
-                    header("Window").frame(width: Space.s8 * 5, alignment: .leading)
-                    header("Stop at").frame(maxWidth: .infinity, alignment: .leading)
-                    header("Warn me at").frame(width: Space.s8 * 3, alignment: .leading)
-                    Color.clear.frame(width: Space.s6, height: 1)
+                    header("Window").frame(width: BudgetLimitRow.Col.window, alignment: .leading)
+                    header("Stop at").frame(width: BudgetLimitRow.Col.stop, alignment: .leading)
+                    header("Warn me at").frame(width: BudgetLimitRow.Col.warn, alignment: .leading)
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, Space.s3)
                 BudgetLimitRows(model: model, target: t, adding: $adding)
                 HStack(spacing: Space.s2) {
                     AccLink(title: "Add a limit", symbol: "plus") { adding = true }
                         .disabled(model.readOnly || adding)
+                        .keyboardShortcut("l", modifiers: [.command, .option]).environment(\.coreKeycap, "⌥⌘L")
                     Spacer(minLength: Space.s2)
                     spendingLink
                 }
