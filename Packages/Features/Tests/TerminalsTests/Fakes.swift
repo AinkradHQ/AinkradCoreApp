@@ -10,6 +10,8 @@ final class FakeHost: TerminalHost {
     var isElevated = true
     var elevationNotice: ElevationNotice?
     var declines = false
+    var macID: String?
+    var thisMacRunnerID: String? { macID }
     private(set) var reasons: [String] = []
     func clearElevationNotice() { elevationNotice = nil }
     func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T {
@@ -25,7 +27,9 @@ final class FakeLink: TerminalLink, @unchecked Sendable {
     let updates: AsyncStream<TerminalUpdate>
     private let feed: AsyncStream<TerminalUpdate>.Continuation
     private let lock = NSLock()
-    private var state = (cursor: UInt64(0), detached: false, inputs: [Data](), sizes: [[Int]](), drawn: 0)
+    private var state = (
+        cursor: UInt64(0), detached: false, inputs: [Data](), sizes: [[Int]](), drawn: 0, events: [String]()
+    )
     init(cols: Int = 80, rows: Int = 24, seq: UInt64 = 0, state: String = "running") {
         opened = TerminalOpened(state: state, rows: rows, cols: cols, seq: seq)
         var c: AsyncStream<TerminalUpdate>.Continuation!
@@ -37,10 +41,22 @@ final class FakeLink: TerminalLink, @unchecked Sendable {
     var detached: Bool { lock.withLock { state.detached } }
     var inputs: [Data] { lock.withLock { state.inputs } }
     var sizes: [[Int]] { lock.withLock { state.sizes } }
+    /// "resize" and "drawn" in the order they happened.
+    var events: [String] { lock.withLock { state.events } }
     var drawnBytes: Int { lock.withLock { state.drawn } }
     func input(_ bytes: Data) { lock.withLock { state.inputs.append(bytes) } }
-    func resize(rows: Int, cols: Int) { lock.withLock { state.sizes.append([cols, rows]) } }
-    func drawn(_ bytes: Int) { lock.withLock { state.drawn += bytes } }
+    func resize(rows: Int, cols: Int) {
+        lock.withLock {
+            state.sizes.append([cols, rows])
+            state.events.append("resize")
+        }
+    }
+    func drawn(_ bytes: Int) {
+        lock.withLock {
+            state.drawn += bytes
+            state.events.append("drawn")
+        }
+    }
     func detach() {
         lock.withLock { state.detached = true }
         feed.yield(.closed(.detached))
@@ -68,6 +84,11 @@ final class FakeService: TerminalService, @unchecked Sendable {
     var policyResult: Result<(policy: RunnerPolicy, restarting: Bool), CoreError>?
     private(set) var policies: [RunnerPolicy] = []
     private(set) var installed: [String] = []
+    /// nil: the Core has no hardware API. Otherwise `/hardware`, `/hardware/pool` and `/jobs` answer these.
+    var hardwareList: [HardwareItem]?
+    var poolItem: HardwarePoolItem?
+    var jobList: [JobItem] = []
+    private(set) var pauses: [(id: String?, until: Date?)] = []
 
     func terminals() async throws -> [TerminalItem] { lock.withLock { terminalList } }
     func terminal(_ id: String) async throws -> TerminalItem {
@@ -92,6 +113,10 @@ final class FakeService: TerminalService, @unchecked Sendable {
     }
     func signal(_ id: String, _ name: String) async throws { lock.withLock { signals.append(name) } }
     func noop(_ runner: String) async throws -> Int { 31 }
+    func hardware() async -> [HardwareItem]? { lock.withLock { hardwareList } }
+    func hardwarePool() async -> HardwarePoolItem? { lock.withLock { poolItem } }
+    func jobs() async -> [JobItem] { lock.withLock { jobList } }
+    func pauseHardware(_ id: String?, until: Date?) async throws { lock.withLock { pauses.append((id, until)) } }
     func setPolicy(_ runner: String, _ policy: RunnerPolicy) async throws -> (policy: RunnerPolicy, restarting: Bool) {
         lock.withLock { policies.append(policy) }
         return try lock.withLock { policyResult }?.get() ?? (policy, true)
@@ -122,11 +147,12 @@ func item(
         exitCode: code, exitSignal: signal, createdAt: Date(timeIntervalSince1970: 1_800_000_000))
 }
 
-func runner(_ id: String = "r1", online: Bool = true, degraded: Bool = false, avg1: Double = 1, pty: Bool = true)
-    -> RunnerItem
-{
+func runner(
+    _ id: String = "r1", name: String = "mac-studio", online: Bool = true, degraded: Bool = false, avg1: Double = 1,
+    pty: Bool = true
+) -> RunnerItem {
     RunnerItem(
-        id: id, name: "mac-studio", online: online, degraded: degraded, load: 1, capacity: 4, avg1: avg1, cores: 4,
+        id: id, name: name, online: online, degraded: degraded, load: 1, capacity: 4, avg1: avg1, cores: 4,
         version: "0.24.0", arch: "aarch64", lastSeen: nil,
         drivers: pty ? [DriverItem(name: "pty", commands: ["noop"], capacity: 16)] : [], isolationTiers: nil)
 }

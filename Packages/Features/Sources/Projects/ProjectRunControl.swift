@@ -181,8 +181,33 @@ extension ProjectsModel {
             return
         }
         closeProject()
+        host.shell.closePane(Self.paneID(project.id))
         await reload()
-        host.shell.showToast("\(project.name) archived")
+        // A Core with the unarchive route (minor 95) gives a few seconds to undo, as the mockup's delete does.
+        guard let undo = insightsService else {
+            host.shell.showToast("\(project.name) archived")
+            return
+        }
+        host.shell.showToast(
+            "Deleted \(project.name). Your repos stay on GitHub.", kind: .ok,
+            undo: { [weak self] in Task { await self?.restore(project, undo) } })
+    }
+
+    /// The Undo of a delete: the project is active again and back in the list.
+    func restore(_ project: ProjectItem, _ service: any ProjectInsightsService) async {
+        guard mayWrite() else { return }
+        do {
+            try await host.elevated("Bring back \(project.name).", done: "restored", keepsEdit: false) {
+                try await service.unarchive(project: project.id)
+            }
+        } catch is AdminDeclined {
+            return
+        } catch {
+            host.shell.showToast(runWords(error), kind: .warn)
+            return
+        }
+        await reload()
+        host.shell.showToast("\(project.name) is back")
     }
 
 }

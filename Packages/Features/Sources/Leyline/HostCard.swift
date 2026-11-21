@@ -2,9 +2,10 @@ import CoreUI
 import Projects
 import SwiftUI
 
-/// A host in the gallery: its name and tick box, who it logs in as and how it is reached, the health area, and its AI rule.
+/// A host in the gallery (mockup 14): its tile, name and system, how it is reached and whether it is a runner.
 /// Same bones as a project card (well, hover lift, rise on arrival); a tap opens the host's space.
 struct HostCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: LeylineModel
     let host: HostItem
     let index: Int
@@ -23,23 +24,26 @@ struct HostCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            HStack(spacing: Space.s2) {
-                Text(host.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+            HStack(spacing: Space.s3) {
+                IconTile("server.rack", hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s2)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(host.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                    Text(host.os ?? host.login).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
                 Spacer(minLength: Space.s2)
+                if let p = host.presence { StateBadge(p.label, tone: p.tone, symbol: "circle") }
                 CoreCheckbox(
                     "", isOn: Binding(get: { picked }, set: { _ in model.toggle(host.id) }),
                     spoken: "Select \(host.name)"
                 )
                 .help("Select for a fleet run")
             }
-            Text(route).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            health
             HStack(spacing: Space.s2) {
-                StateBadge(host.aiRule.title, tone: tone, symbol: "sparkles")
-                if !host.tags.isEmpty {
-                    Text(host.tags.prefix(3).joined(separator: " · ")).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                }
+                Label(route, systemImage: "arrow.triangle.turn.up.right.diamond").foregroundStyle(GlassInk.secondary)
+                    .lineLimit(1)
                 Spacer(minLength: Space.s2)
+                if let seen = host.seenLine { Text(seen).foregroundStyle(GlassInk.secondary).lineLimit(1) }
+                Text(host.runnerDevice == nil ? "No runner" : "Runner").foregroundStyle(GlassInk.secondary)
                 if lit {
                     Button {
                         model.openHost(host.id)
@@ -55,8 +59,8 @@ struct HostCard: View {
         .coreWell(radius: Radius.pane, active: lit || picked)
         .contentShape(coreShape(Radius.pane))
         .onTapGesture { model.openHost(host.id) }
-        .coreScaleEffect(lit ? 1.01 : 1)
-        .coreRise(settled, index)
+        .coreScaleEffect(lit && LeylineOptions.calmOn ? 1.01 : 1)
+        .coreRise(settled || !LeylineOptions.calmOn, index)
         .animation(Motion.out(Motion.hover), value: lit)
         .onHover { hovering = $0 }
         .contextMenu {
@@ -70,25 +74,6 @@ struct HostCard: View {
     }
 
     private var route: String { "\(host.login) · via \(model.route(host).last ?? model.coreName)" }
-    private var tone: Tone {
-        switch host.aiRule {
-        case .readOnly: .done
-        case .ask: .queue
-        case .allowed: .warn
-        }
-    }
-
-    /// Where CPU, memory and disk go once the Core checks the host. TODO(Y5-01): health; until then it says so.
-    private var health: some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text("Not checked yet").coreFont(size: MacTextSize.body, weight: .medium)
-            Text("CPU, memory and disk appear after the first check.").coreFont(size: MacTextSize.meta)
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 2, alignment: .topLeading)
-        .coreCard(GlassInk.well, radius: Radius.cardMac)
-        .accessibilityElement(children: .combine)
-    }
 }
 
 /// A card on its way: soft wells in the card's shape.

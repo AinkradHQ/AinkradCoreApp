@@ -94,6 +94,8 @@ public enum LoreLinkPolicy {
     public var onOpenInternal: ((URL) -> Void)?
     /// One short line for the person (a toast): a link that was copied instead of opened, an upload that failed.
     public var onNotice: ((String) -> Void)?
+    /// The caret moved into (true) or out of (false) a table.
+    public var onTable: ((Bool) -> Void)?
 
     public init(titles: LoreNoteTitles = LoreStubTitles(), uploader: LoreAttachmentUploader = LoreNoUploads()) {
         self.titles = titles
@@ -123,6 +125,13 @@ public enum LoreLinkPolicy {
         textView.typingAttributes = Style.typing(textView.ts.length > 0 ? Block.at(textView.ts, 0) : .p)
         textView.undoManager?.removeAllActions()
         textView.scroll(.zero)
+    }
+
+    /// Lore's own text size factor; the page is drawn again at the new size (the text and the cursor stay, undo restarts).
+    public func setTextScale(_ scale: CGFloat) {
+        guard Typeface.userScale != scale else { return }
+        Typeface.userScale = scale
+        load(markdown: markdown())
     }
 
     /// The note as Markdown: the loaded bytes where nothing changed, fresh Markdown for edited blocks only.

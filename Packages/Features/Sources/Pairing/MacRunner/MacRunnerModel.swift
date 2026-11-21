@@ -7,6 +7,9 @@ struct MacRunnerDeps: Sendable {
     var coreURL: @MainActor @Sendable () -> URL?
     /// A one-time runner invite (admin, Touch ID). Throws `StepUpDeclined` when the person did not unlock.
     var makeInvite: @MainActor @Sendable (_ name: String) async throws -> RunnerInvite
+    /// Tells the Core this runner is the one bundled with this app (E6), once per enrolment. Optional: a failure only means
+    /// the runner opens sandboxes, not a real shell.
+    var attest: @MainActor @Sendable (_ runnerID: String) async throws -> Void = { _ in }
     /// Revokes the runner device; nil when it worked, else the reason in words.
     var revoke: @MainActor @Sendable (_ deviceID: String) async -> String?
 }
@@ -28,6 +31,7 @@ final class MacRunnerModel {
 
     static let useKey = "core.macRunner.on"
     static let terminalsKey = "core.macRunner.terminals"
+    static let awakeKey = "core.macRunner.awake"
     /// D2, shown beside the terminals switch.
     static let terminalsWarning = "Devices allowed to open terminals can reach this Mac's files."
     /// D3: what the runner itself reports (`accountsAnswer` is "Yes" or "No (reason)"); nil until the Core says.
@@ -42,11 +46,14 @@ final class MacRunnerModel {
 
     private(set) var state: State
     private(set) var deviceID: String?
+    /// Why the runner is not fully working, in plain words (`MacRunnerProblem`); read by `refreshProblem`.
+    private(set) var problem: String?
     private let control: any MacRunnerControl
     private let defaults: UserDefaults
     private let deps: MacRunnerDeps
     private let macName: String
     private var busy = false
+    @ObservationIgnored private var awake: NSObjectProtocol?
 
     init(control: any MacRunnerControl, deps: MacRunnerDeps, defaults: UserDefaults = .standard, macName: String? = nil)
     {
@@ -123,6 +130,11 @@ final class MacRunnerModel {
                 try await control.pair(core: core, token: invite.token)
             }
             deviceID = control.enrolment()?.deviceID
+            if let id = deviceID, UserDefaults.standard.string(forKey: "macRunner.attested") != id,
+                (try? await deps.attest(id)) != nil
+            {
+                UserDefaults.standard.set(id, forKey: "macRunner.attested")
+            }
             state = .working("Starting the runner")
             try control.register(terminals: terminals)
             state = control.registration(terminals: terminals) == .needsApproval ? .needsApproval : .running
@@ -156,4 +168,50 @@ final class MacRunnerModel {
     }
 
     func openLoginItems() { control.openLoginItems() }
+
+    /// Show what it did: the runner's own folder in Finder.
+    func showLog() { control.revealLog() }
+
+    /// Starts the runner again (the system keeps it running; this registers and starts it once more).
+    func restart() async {
+        guard useThisMac, control.isBundled else { return }
+        await start()
+    }
+
+    /// Keep this Mac awake while working (on unless turned off): stays awake only while the Core has work on this runner.
+    var keepAwake: Bool { defaults.object(forKey: Self.awakeKey) as? Bool ?? true }
+    func setKeepAwake(_ on: Bool) {
+        defaults.set(on, forKey: Self.awakeKey)
+        if !on { holdAwake(false) }
+    }
+
+    /// Called as the Core's report of this runner's work changes; holds or releases the "no idle sleep" assertion.
+    func holdAwake(_ working: Bool) {
+        if working, keepAwake, useThisMac {
+            if awake == nil {
+                awake = ProcessInfo.processInfo.beginActivity(
+                    options: [.idleSystemSleepDisabled, .userInitiated], reason: "Ainkrad is working for your Core")
+            }
+        } else if let a = awake {
+            ProcessInfo.processInfo.endActivity(a)
+            awake = nil
+        }
+    }
+
+    /// Looks at launchd and the runner's own note again (off the main thread: it runs `launchctl`).
+    func refreshProblem(connected: Bool?) async {
+        guard control.isBundled, useThisMac else {
+            problem = nil
+            return
+        }
+        let control = control
+        problem = await Task.detached { control.lastProblem(connected: connected == true) }.value
+    }
+
+    /// The headline under the switch: connected to the Core (what the Core reports), not merely registered with macOS.
+    nonisolated static func headline(connected: Bool?) -> (title: String, text: String, done: Bool) {
+        connected == true
+            ? ("This Mac is connected to your Core", "Its terminals and AI sessions pause while the Mac sleeps.", true)
+            : ("Started, not connected yet", "macOS started the runner. The Core has not heard from it yet.", false)
+    }
 }

@@ -11,6 +11,13 @@ struct SessionsPage: View {
     let project: ProjectItem
     @State private var filter = Filter.all
     @State private var settled = false
+    @State private var insights: ProjectInsightsModel
+
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.model = model
+        self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
+    }
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "All"
@@ -31,7 +38,26 @@ struct SessionsPage: View {
     private var all: [ProjectLive.Session] { project.live?.sessions ?? [] }
     private var shown: [ProjectLive.Session] { all.filter { filter.keeps($0.state) } }
 
+    private var usage: UsageInfo? { insights.usage }
+
     var body: some View {
+        VStack(spacing: Space.s2) {
+            if let u = usage {
+                HStack(spacing: Space.s2) {
+                    InsightTile(
+                        title: "Running now", value: "\(u.running)", line: "Working on your code", spark: u.byDay)
+                    InsightTile(
+                        title: "Sessions this week", value: "\(u.sessionsWeek)", line: "Started in the last 7 days")
+                    InsightTile(title: "Cost this week", value: CostWords.money(u.weekCost), line: u.trend)
+                }
+                .fixedSize(horizontal: false, vertical: true).coreRise(settled, 0)
+            }
+            sessionsIsland
+        }
+        .task(id: project.id) { await insights.loadUsage() }
+    }
+
+    private var sessionsIsland: some View {
         Island(
             title: "AI Sessions", sub: all.isEmpty ? nil : "\(all.count) in this project",
             accessory: {
@@ -46,7 +72,19 @@ struct SessionsPage: View {
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                if all.isEmpty {
+                if all.isEmpty, let rows = usage?.sessions, !rows.isEmpty {
+                    VStack(spacing: Space.s1) {
+                        ForEach(rows) { r in
+                            CoreRow(
+                                r.title, subtitle: r.running ? "Working now" : r.state.capitalized, symbol: "sparkles"
+                            ) {
+                                CoreSpark(r.spark, tone: r.running ? .run : .queue).frame(
+                                    width: Space.s8 * 2, height: Space.s4)
+                                StateBadge(CostWords.money(r.cost), tone: .queue, symbol: "circle")
+                            }
+                        }
+                    }
+                } else if all.isEmpty {
                     Text("No AI sessions yet. Start one from the top bar.").foregroundStyle(GlassInk.secondary)
                 } else if shown.isEmpty {
                     Text("No \(filter.rawValue.lowercased()) sessions.").foregroundStyle(GlassInk.secondary)

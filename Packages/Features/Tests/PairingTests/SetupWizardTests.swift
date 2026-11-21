@@ -34,6 +34,8 @@ struct SetupWizardTests {
         #expect(m.stage == .install, "back returns to where the person came from")
         m.back()
         m.chooseExisting()
+        #expect(m.stage == .nearby, "a Core near you first, paste as the way on")
+        m.haveLink()
         #expect(m.stage == .connect)
         m.back()
         #expect(m.stage == .choose)
@@ -43,8 +45,7 @@ struct SetupWizardTests {
         let c = SetupWizardModel.installCommand
         #expect(!c.contains("| sudo") && !c.contains("|sudo"))
         #expect(c.contains(#"sh -c "$(curl"#))
-        #expect(c.hasPrefix("sudo AINKRAD_MIN_VERSION=\(SetupWizardModel.minCoreVersion) sh -c"))
-        #expect(c.contains("https://github.com/AinkradHQ/AinkradCore/releases/latest/download/get.sh"))
+        #expect(c == #"sh -c "$(curl -fsSL ainkrad.io/i)""#)
     }
 
     @Test func aPastedLinkIsShownBeforeAnythingIsSent() {

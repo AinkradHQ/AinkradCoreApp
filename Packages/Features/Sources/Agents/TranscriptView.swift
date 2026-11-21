@@ -1,9 +1,11 @@
 import CoreUI
+import Shell
 import SwiftUI
 
 /// The streamed transcript: a lazy column, one row per entry with the seq as its identity, so an appended entry adds a row and
 /// leaves the rest alone. It follows the end while you are at the end; scrolling up loads earlier entries.
 struct TranscriptView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let store: TranscriptStore?
     let session: AgentSessionInfo
@@ -150,7 +152,7 @@ struct TranscriptView: View {
     private func marked(_ e: TranscriptEntry, @ViewBuilder _ c: () -> some View) -> some View {
         c().background {
             if e.seq == focus {
-                coreShape(Radius.control).fill(GlassInk.blue.opacity(0.16)).padding(-Space.s1)
+                coreShape(Radius.control).fill(GlassInk.accent(paneAccent).opacity(0.16)).padding(-Space.s1)
             }
         }
     }
@@ -178,8 +180,10 @@ struct TranscriptView: View {
             }
         } else {
             EntryRow(
-                entry: e, harness: session.harness, runner: model.runnerName(session.runner), turn: turn,
-                latest: latest,
+                entry: e, harness: session.harness, runner: model.runnerName(session.runner),
+                ranOn: ranOn(e), turn: turn, latest: latest,
+                streaming: e.seq == store.entries.last(where: { $0.kind != .hidden })?.seq && latest && session.live
+                    && !session.idle,
                 openConnections: { model.shell.launcher.entry("connections")?.run() },
                 actions: EntryActions.make(model, session, ui: ui)
             )
@@ -187,6 +191,18 @@ struct TranscriptView: View {
             // A new entry rises 6 pt as it fades in; with Reduce Motion it only fades.
             .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: Space.s2)))
         }
+    }
+
+    /// A tool step's "ran on X": the session's job that started inside the step's run window (`at` to `at` + its duration).
+    private func ranOn(_ e: TranscriptEntry) -> JobPlace? {
+        let end: Date?
+        switch e.kind {
+        case .toolUse: end = nil
+        case .toolDone(_, _, _, _, _, _, let ms), .toolResult(_, _, _, _, _, let ms):
+            end = e.at.addingTimeInterval(Double(ms ?? 0) / 1000)
+        default: return nil
+        }
+        return model.shell.hardwareDeck.place(session: session.id, from: e.at, until: end)
     }
 
     /// Scrolls to the newest entry: eased, or at once under Reduce Motion.
@@ -254,9 +270,13 @@ struct EntryRow: View, Equatable {
     let entry: TranscriptEntry
     var harness = "claude"
     var runner = ""
+    /// Where a heavy job of this step ran, when it was not the Core (E15): matched by time in `TranscriptView.row`.
+    var ranOn: JobPlace?
     var turn: ConversationWords.Turn?
     /// Your latest message or the latest answer: it carries the action row.
     var latest = false
+    /// The answer is still being written: its text ends in a soft caret.
+    var streaming = false
     /// Opens Connections from a refused connection call (CN5).
     var openConnections: (() -> Void)?
     /// Copy, Edit, Resend, Retry, Quote. Only `canSend` is compared.
@@ -267,7 +287,9 @@ struct EntryRow: View, Equatable {
     nonisolated(unsafe) static var openAtStart = false
 
     nonisolated static func == (a: EntryRow, b: EntryRow) -> Bool {
-        a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.turn == b.turn && a.latest == b.latest
+        a.entry == b.entry && a.harness == b.harness && a.runner == b.runner && a.ranOn == b.ranOn && a.turn == b.turn
+            && a.latest == b.latest
+            && a.streaming == b.streaming
             && a.actions?.canSend == b.actions?.canSend
     }
     @Environment(\.corePalette) private var palette
@@ -302,8 +324,9 @@ struct EntryRow: View, Equatable {
             .accessibilityLabel("You: \(text)")
         case .assistant(let text):
             // Printed on the glass, no bubble.
-            MarkdownText(text).frame(maxWidth: .infinity, alignment: .leading)
+            MarkdownText(text, streaming: streaming).frame(maxWidth: .infinity, alignment: .leading)
                 .messageActions(text: text, user: false, latest: latest, actions)
+        case .thinking(let text): ThinkingBlock(text: text)
         case .toolUse(_, let name, let summary) where CodeModeTool.of(name) != nil:
             CodeModeCard(
                 tool: CodeModeTool.of(name)!, summary: summary, status: .running, output: "", durationMs: nil,
@@ -323,15 +346,15 @@ struct EntryRow: View, Equatable {
                 tool: name, summary: "", ok: ok, why: output.split(separator: "\n").first.map(String.init) ?? "",
                 openConnections: openConnections)
         case .toolUse(_, let name, let summary):
-            ToolCard(name: name, summary: summary, status: .running, output: "", expanded: $expanded)
+            ToolCard(name: name, summary: summary, status: .running, output: "", ranOn: ranOn, expanded: $expanded)
         case .toolDone(_, let name, let summary, let ok, let code, let output, let ms):
             ToolCard(
                 name: name, summary: summary, status: ok ? .ok(facts(nil, ms)) : .failed(facts(code, ms)),
-                output: output, expanded: $expanded)
+                output: output, ranOn: ranOn, expanded: $expanded)
         case .toolResult(_, let name, let ok, let code, let output, let ms):
             ToolCard(
                 name: name ?? "Result", summary: "", status: ok ? .ok(facts(nil, ms)) : .failed(facts(code, ms)),
-                output: output, expanded: $expanded)
+                output: output, ranOn: ranOn, expanded: $expanded)
         case .toolEdit(_, let name, let path, let old, let new, let ok, let ms):
             EditCard(name: name, path: path, old: old, new: new, ok: ok, ms: ms, expanded: $expanded)
         case .toolTodos(_, let items): TodoCard(items: items)
@@ -385,6 +408,7 @@ struct ToolCard: View {
     let summary: String
     let status: Status
     let output: String
+    var ranOn: JobPlace?
     @Binding var expanded: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
@@ -424,9 +448,13 @@ struct ToolCard: View {
                     Image(systemName: symbol).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
                         .frame(width: Space.s4)
                     Text(Self.verb(name)).coreFont(size: MacTextSize.body).foregroundStyle(SessionInk.text2)
+                    // The file, pattern or command sits in a small chip (the mockup's), so the verb reads apart from it.
                     Text(PathWords.short(summary.isEmpty ? name : summary))
-                        .coreFont(size: 12, design: .monospaced).foregroundStyle(SessionInk.text)
+                        .coreFont(size: 12, weight: .medium, design: .monospaced).foregroundStyle(SessionInk.text)
                         .lineLimit(1).truncationMode(.middle)
+                        .padding(.horizontal, Space.s2).padding(.vertical, 2)
+                        .background(GlassInk.wellHover, in: coreShape(Radius.chip))
+                    RanOnChip(ranOn)
                     // The working bar gives way to ✓ or ✗ with a short crossfade when the step finishes.
                     trailing.animation(Motion.out(0.2), value: statusKey)
                     Spacer(minLength: 0)

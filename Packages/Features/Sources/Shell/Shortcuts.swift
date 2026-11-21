@@ -17,7 +17,9 @@ enum ShortcutCatalog {
         (
             "View",
             [
-                ("Home", "⌘0"), ("Workspace", "⇧⌘0"), ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘B"),
+                ("Home or last workspace", "⌘0"), ("Workspace", "⇧⌘0"),
+                ("Next / Previous Workspace", "⌃→ / ⌃←"), ("Jump to Workspace", "⌃1–9"), ("All Workspaces", "⌃↑"),
+                ("Focus Mode", "⇧⌘F"), ("Notifications", "⇧⌘B"),
                 ("Reconnect to Core", "⌘R"),
                 ("Switch Day and Night", "⌃⌘D"), ("Next Pane", "⌘`"), ("Previous Pane", "⇧⌘`"),
                 ("Move Pane Left", "⌃⌥←"), ("Move Pane Right", "⌃⌥→"),
@@ -34,7 +36,8 @@ enum ShortcutCatalog {
             "Launcher",
             [
                 ("Move", "↑ ↓  ⌃N ⌃P"), ("Page", "⇞ ⇟"), ("First or last", "⌘↑ ⌘↓"), ("Open", "↵"),
-                ("Pick a result", "⌘1–9"), ("Close", "esc"),
+                ("Pick a result", "⌘1–9"), ("Next group", "⇥"), ("Open beside", "⌘↵"), ("Copy name", "⌥↵"),
+                ("Actions", "→"), ("Close", "esc"),
             ]
         ),
     ]
@@ -110,21 +113,21 @@ public struct ShellCommands: Commands {
     let paneCount: Int
     let focusMode: Bool
     let closedCount: Int
-    let chipOn: Bool
     let coreOffline: Bool
     let paneTitles: [(id: String, title: String)]
+    let spaceCount: Int
     public init(
-        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0, chipOn: Bool = true,
+        shell: ShellModel, paneCount: Int, focusMode: Bool, closedCount: Int = 0,
         coreOffline: Bool = false,
-        paneTitles: [(id: String, title: String)] = []
+        paneTitles: [(id: String, title: String)] = [], spaceCount: Int = 1
     ) {
         self.shell = shell
         self.paneCount = paneCount
         self.focusMode = focusMode
         self.closedCount = closedCount
-        self.chipOn = chipOn
         self.coreOffline = coreOffline
         self.paneTitles = paneTitles
+        self.spaceCount = spaceCount
     }
 
     public var body: some Commands {
@@ -171,8 +174,18 @@ public struct ShellCommands: Commands {
                 .keyboardShortcut("w", modifiers: [.command, .option]).disabled(paneCount == 0)
         }
         CommandGroup(replacing: .sidebar) {
-            Button("Home") { shell.show(.home) }.keyboardShortcut("0")
+            Button("Home or Last Workspace") { shell.toggleSurface() }.keyboardShortcut("0")
             Button("Workspace") { shell.show(.workspace) }.keyboardShortcut("0", modifiers: [.command, .shift])
+            Button("Next Workspace") { shell.moveSpace(1) }.keyboardShortcut(.rightArrow, modifiers: .control)
+                .disabled(spaceCount < 2)
+            Button("Previous Workspace") { shell.moveSpace(-1) }.keyboardShortcut(.leftArrow, modifiers: .control)
+                .disabled(spaceCount < 2)
+            Button("All Workspaces") { shell.toggleSpaces() }.keyboardShortcut(.upArrow, modifiers: .control)
+            ForEach(1..<10, id: \.self) { n in
+                Button("Workspace \(n)") { shell.switchSpace(to: n - 1) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .control)
+                    .disabled(n > spaceCount)
+            }
             Button(!focusMode ? "Focus Mode" : "Tile Panes") { shell.toggleFocusMode() }
                 .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(paneCount == 0)
             Button("Notifications") { shell.toggleBell() }.keyboardShortcut("b", modifiers: [.command, .shift])
@@ -180,7 +193,6 @@ public struct ShellCommands: Commands {
             Button("Switch Day and Night") { shell.switchDayAndNight() }
                 .keyboardShortcut("d", modifiers: [.control, .command])
             Button("Reconnect to Core") { shell.retryConnection?() }.keyboardShortcut("r").disabled(!coreOffline)
-            Toggle("Show Activity in Status Bar", isOn: Binding(get: { chipOn }, set: { shell.showActivityChip = $0 }))
             Divider()
             Button("Next Pane") { shell.cyclePane(1) }.keyboardShortcut("`").disabled(paneCount < 2)
             Button("Previous Pane") { shell.cyclePane(-1) }.keyboardShortcut("`", modifiers: [.command, .shift])
@@ -196,7 +208,7 @@ public struct ShellCommands: Commands {
         CommandGroup(before: .windowList) {
             ForEach(paneTitles, id: \.id) { p in
                 Button(p.title) {
-                    if let spec = shell.panes.first(where: { $0.id == p.id }) { shell.openPane(spec) }
+                    if let spec = shell.allPanes.first(where: { $0.id == p.id }) { shell.openPane(spec) }
                 }
             }
         }

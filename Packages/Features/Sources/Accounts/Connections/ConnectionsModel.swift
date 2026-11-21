@@ -21,13 +21,9 @@ public final class ConnectionsModel {
     var load: AccountsLoad = .loading
     var filter: ConnFilter = .all
     /// The sign-in running in the Connect sheet.
-    var flow: ConnFlow?
+    var flow: ConnFlow? { didSet { if flow?.step != oldValue?.step { advance() } } }
     /// The connection being signed in to again (its "Sign in again" button), instead of a new one.
     var again: Int64?
-    /// GitHub: the repositories the person picked, read once the connection exists.
-    var picked: [String] = []
-    /// GitHub's repository page is open; waiting for GitHub to say which were chosen.
-    var installing = false
     /// The card the keyboard is on.
     var cursor: Int64?
     /// What the last Test of each connection said.
@@ -45,14 +41,31 @@ public final class ConnectionsModel {
         case done
         case refused(String)
     }
-    @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// The guided Add dialog, when it is open.
+    var add: ConnAddState?
+    /// The list of step 4.
+    var picks = ConnPickLoad.idle
+    /// A refusal of the last step, in words, shown in the dialog.
+    var addError: String?
+    /// Disconnected a moment ago and still undoable: gone from the list, not yet deleted on the Core.
+    var pendingDelete: Set<Int64> = []
+    @ObservationIgnored var undoTasks: [Int64: Task<Void, Never>] = [:]
+    /// How long "Disconnect" can be undone before the Core really deletes the connection.
+    @ObservationIgnored var undoWindow: Duration = .seconds(6)
+    /// Opens a sign-in page, through the host (a test host only records it).
+    @ObservationIgnored var opener: (URL) -> Void = { _ in }
     /// A macOS notification (id, title, body); the app routes it through the Agents notifier.
     @ObservationIgnored public var notify: ((String, String, String) -> Void)?
     @ObservationIgnored var pollEvery: Duration = .seconds(1)
     @ObservationIgnored private var poller: Task<Void, Never>?
+    /// The background check (Settings, Connections): tests each sign-in on the chosen interval.
+    @ObservationIgnored private var checker: Task<Void, Never>?
     @ObservationIgnored private var catcher: LoopbackCatcher?
 
-    public init(host: any AdminHost) { self.host = host }
+    public init(host: any AdminHost) {
+        self.host = host
+        opener = { [weak host] in host?.open($0) }
+    }
 
     // MARK: connection
 
@@ -64,9 +77,30 @@ public final class ConnectionsModel {
         service = s
         self.sample = sample
         Task { await reload() }
+        startChecks()
+    }
+
+    /// Every interval (Settings, Connections, Options) each connected sign-in is tested, and a broken one again when
+    /// "Reconnect automatically" is on; the list is read again after. Not on stand-in data.
+    private func startChecks() {
+        checker?.cancel()
+        guard !sample else { return }
+        checker = Task { [weak self] in
+            while !Task.isCancelled {
+                let o = ConnectionsOptions.options
+                try? await Task.sleep(
+                    for: .seconds(ConnectionsOptions.seconds(o.string(ConnectionsOptions.every, "5m"))))
+                guard let self, !Task.isCancelled, let service = self.service, self.load == .ready else { continue }
+                let due = ConnectionsOptions.due(self.items, reconnect: o.bool(ConnectionsOptions.reconnect, true))
+                for c in due { _ = try? await service.test(c.id) }
+                if !due.isEmpty { await self.reload() }
+            }
+        }
     }
 
     public func detach() {
+        checker?.cancel()
+        checker = nil
         stopFlow()
         service = nil
         items = []
@@ -96,7 +130,7 @@ public final class ConnectionsModel {
     func items(of kind: String) -> [ConnItem] { items.filter { $0.kind == kind && filter.matches($0) } }
     func item(_ id: Int64) -> ConnItem? { items.first { $0.id == id } }
     /// The cards in the order they are drawn, for the arrows.
-    var ordered: [ConnItem] { liveKinds.flatMap { items(of: $0.id) } }
+    var ordered: [ConnItem] { kinds.flatMap { items(of: $0.id) } }
 
     func move(_ step: Int) {
         let ids = ordered.map(\.id)
@@ -105,20 +139,20 @@ public final class ConnectionsModel {
         cursor = ids[min(max(i + step, 0), ids.count - 1)]
     }
 
-    /// A key on the card under the cursor: ↩ who can use it (or sign in again), T test, R rename, D default, ⌫ disconnect.
+    /// A key on the row under the cursor: ⏎ what AI may do (or sign in again), T test, R rename, D default, ⌫ disconnect.
     func key(_ k: String) -> Bool {
         guard let c = cursor.flatMap(item) else { return false }
         switch k {
-        case "↩":
-            if c.status == .needsLook {
-                ConnDialogs.openConnect(self, kind: c.kind, again: c.id)
+        case "⏎":
+            if c.status == .needsLook && c.authMethod == "oauth" {
+                beginAgain(c)
             } else {
-                ConnDialogs.openAccess(self, c)
+                beginEdit(c, at: .allow)
             }
         case "t": Task { await test(c) }
         case "r": ConnDialogs.openRename(self, c)
         case "d": Task { await makeDefault(c) }
-        case "⌫": ConnDialogs.openDisconnect(self, c)
+        case "⌫": disconnectWithUndo(c)
         default: return false
         }
         return true
@@ -167,7 +201,6 @@ public final class ConnectionsModel {
     func startFlow(_ kind: String) async {
         guard let service else { return }
         stopFlow()
-        picked = []
         turnOn = nil
         if let why = host.pausedReason {
             host.shell.showToast(why)
@@ -180,7 +213,9 @@ public final class ConnectionsModel {
                 try await service.start(kind: kind, again: again)
             }
             flow = f
-            if f.callbackState != nil || self.kind(kind)?.signIn == .browser { startCatcher(for: f) }
+            if f.callbackState != nil || (self.kind(kind)?.signIn == .browser && f.userCode == nil) {
+                startCatcher(for: f)
+            }
         } catch is AdminDeclined {
             failFlow(kind, "Nothing was started.", "Press Try again and confirm with Touch ID.")
         } catch {
@@ -237,7 +272,6 @@ public final class ConnectionsModel {
                 guard let self, let f = self.flow, let service = self.service else { return }
                 switch f.step {
                 case .waiting: break
-                case .chooseResources where self.installing: break
                 default: return
                 }
                 try? await Task.sleep(for: self.pollEvery)
@@ -248,50 +282,7 @@ public final class ConnectionsModel {
         }
     }
 
-    /// GitHub's page for the Ainkrad app, where the person picks repositories; the sheet then waits for GitHub.
-    func openInstall() {
-        guard case .chooseResources(_, let install)? = flow?.step else { return }
-        // GitHub sends the person back to this Mac with the installation's number; the connection is made from it.
-        do {
-            let c = try LoopbackCatcher(state: nil) { [weak self] number in
-                Task { @MainActor in await self?.installed(number) }
-            }
-            c.start()
-            catcher = c
-        } catch {
-            flow?.step = .failed(
-                title: "This Mac couldn't wait for GitHub's answer.",
-                fix: "Another app may be using the same address. Quit it or try again in a minute.")
-            return
-        }
-        opener(install)
-        installing = true
-        poll()
-    }
-
-    func installed(_ number: String) async {
-        guard let f = flow, let service, let n = Int64(number) else { return }
-        do {
-            let why = "Let Core reach the repositories you chose."
-            let c = try await host.elevated(why, done: "changed", keepsEdit: false) {
-                try await service.install(kind: f.kind, installation: n)
-            }
-            await reload()
-            picked = (try? await service.resources(c.id)) ?? []
-            if flow?.id == f.id { flow?.step = .connected(c.id) }
-            catcher?.stop()
-            catcher = nil
-            installing = false
-        } catch is AdminDeclined {
-            installing = false
-        } catch {
-            flow?.step = ConnSay.installFailure(error, hasGitHub: items.contains { $0.kind == f.kind })
-            flow?.gated = ConnSay.isGate(error)
-            installing = false
-        }
-    }
-
-    /// GitHub: done choosing repositories on GitHub, or skipped. Jira: the site picked.
+    /// Jira: the site picked. (GitHub has nothing to choose: the sign-in already made the connection.)
     func choose(site: String?) async {
         guard let f = flow, let service else { return }
         do {
@@ -307,7 +298,6 @@ public final class ConnectionsModel {
         poller = nil
         catcher?.stop()
         catcher = nil
-        installing = false
         again = nil
         if let f = flow, !f.id.isEmpty, let service, !f.isConnected { Task { try? await service.cancel(f.id) } }
         flow = nil
@@ -412,6 +402,8 @@ public final class ConnectionsModel {
             "delete-\(c.id)", reason: "Disconnect \(c.name). AI sessions lose access to it.",
             done: "\(c.name) is disconnected"
         ) {
+            // The Core refuses to delete a kind's default; there is one thing to say, so do both.
+            if c.isDefault { try await $0.clearDefault(kind: c.kind) }
             try await $0.delete(c.id)
         }
     }
@@ -448,11 +440,10 @@ public final class ConnectionsModel {
 
     // MARK: pane and launcher
 
-    /// "History" on a card: Settings, Audit, showing only this connection's rows.
+    /// "History" on a card: Activity, Audit, showing only this connection's rows.
     func openHistory(_ item: ConnItem) {
-        host.shell.settings.open(
-            "audit", handoff: ["audit.kind": "connection.", "audit.target": "connection:\(item.id)"])
-        host.shell.open(.settings)
+        host.shell.settings.handoff = ["audit.kind": "connection.", "audit.target": "connection:\(item.id)"]
+        host.shell.launcher.entry("admin-audit")?.run()
     }
 
     func show() {
@@ -463,7 +454,7 @@ public final class ConnectionsModel {
         spec.tab = "Connections"
         spec.onNew = { [weak self] in
             guard let self, service != nil else { return }
-            ConnDialogs.openConnect(self, kind: nil)
+            beginAdd()
         }
         host.shell.openPane(spec)
         Task { await reload() }
@@ -471,19 +462,31 @@ public final class ConnectionsModel {
 
     public func install() {
         let shell = host.shell
+        shell.settings.section(
+            SettingsSection(
+                id: "connections", group: .apps, title: "Connections", sub: "Its look and how it checks sign-ins",
+                symbol: "link", order: 10,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Connections", prefs: AppLookPrefs.shared("connections"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { ConnectionsOptionsTab() },
+                ]))
         shell.launcher.register(
             LauncherEntry(
-                id: "connections", title: "Connections", sub: "GitHub, Jira and other services", symbol: "link",
-                keywords: ["github", "jira", "sign in", "service"]
+                id: "connections", title: "Connections", sub: "GitHub, Jira, Linear, Slack and Teams", symbol: "link",
+                keywords: ["github", "jira", "linear", "slack", "teams", "sign in", "service"]
             ) { [weak self] in self?.show() })
         shell.launcher.register(
             LauncherEntry(
-                id: "connections-connect", title: "Connect a service", sub: "Sign in to GitHub or Jira", symbol: "plus",
-                keywords: ["github", "jira", "connect"], isAction: true
+                id: "connections-connect", title: "Connect a service",
+                sub: "Sign in to GitHub, Jira, Linear, Slack or Teams", symbol: "plus",
+                keywords: ["github", "jira", "linear", "slack", "teams", "connect"], isAction: true
             ) { [weak self] in
                 guard let self else { return }
                 show()
-                ConnDialogs.openConnect(self, kind: nil)
+                beginAdd()
             })
     }
 }

@@ -65,6 +65,7 @@ struct OverviewTab: View {
 
 /// One thing that waits: its count, what it is, and (for a mounted room) the room's name. Opens the tab that settles it.
 private struct NeedTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     let need: NeedItem
     @State private var hovering = false
@@ -84,7 +85,7 @@ private struct NeedTile: View {
                 Spacer(minLength: 0)
             }
             .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 2, alignment: .leading)
-            .background(GlassInk.blue.opacity(hovering ? 0.2 : 0.12), in: coreShape(Radius.cardMac))
+            .background(GlassInk.accent(paneAccent).opacity(hovering ? 0.2 : 0.12), in: coreShape(Radius.cardMac))
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain).focusEffectDisabled()
@@ -96,6 +97,7 @@ private struct NeedTile: View {
 }
 
 private struct HealthTileView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let tile: HealthTile
     var body: some View {
         let (label, hue) = style
@@ -130,7 +132,7 @@ private struct HealthTileView: View {
     private var style: (String, Color) {
         switch tile.status {
         case .ok: ("Good", GlassInk.green)
-        case .warn: ("Needs a look", GlassInk.blue)
+        case .warn: ("Needs a look", GlassInk.accent(paneAccent))
         case .bad: ("Failed", GlassInk.red)
         case .off: ("Off", GlassInk.slate)
         }
@@ -170,6 +172,7 @@ private struct RecordsPerRoom: View {
 }
 
 private struct TypeBar: View {
+    @Environment(\.coreAccent) private var paneAccent
     let shares: [TypeShare]
     let total: Double
     static func opacity(_ i: Int) -> Double { max(0.35, 1 - Double(i) * 0.09) }
@@ -179,7 +182,7 @@ private struct TypeBar: View {
             let width = g.size.width * (sum / max(total, 1))
             HStack(spacing: 1) {
                 ForEach(Array(shares.enumerated()), id: \.offset) { i, s in
-                    Rectangle().fill(GlassInk.blue.opacity(Self.opacity(i)))
+                    Rectangle().fill(GlassInk.accent(paneAccent).opacity(Self.opacity(i)))
                         .frame(width: max(width * Double(s.count) / sum - 1, 0))
                 }
             }
@@ -193,6 +196,7 @@ private struct TypeBar: View {
 /// Local search p95 over the last days as bars against the target line. The latest is lit and printed in words. The
 /// target is named above its line on a well, and the left edge carries the values.
 private struct SpeedChart: View {
+    @Environment(\.coreAccent) private var paneAccent
     let speed: [Double]
     let target: Double
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -215,7 +219,7 @@ private struct SpeedChart: View {
                 ZStack(alignment: .topLeading) {
                     HStack(alignment: .bottom, spacing: Space.s1) {
                         ForEach(Array(speed.enumerated()), id: \.offset) { i, v in
-                            coreShape(3).fill(GlassInk.blue.opacity(i == speed.count - 1 ? 1 : 0.55))
+                            coreShape(3).fill(GlassInk.accent(paneAccent).opacity(i == speed.count - 1 ? 1 : 0.55))
                                 .frame(height: g.size.height * (v / top) * (shown || reduce ? 1 : 0.02))
                         }
                     }

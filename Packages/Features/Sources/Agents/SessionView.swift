@@ -25,7 +25,8 @@ struct SessionView: View {
     /// What the screen shows, kept in its own state so a toggle always animates (a settings write can skip the
     /// animation); the choice is still saved to `showSidebar` / `showPanel`.
     @State private var sidebarOn = UserDefaults.standard.object(forKey: SessionView.sidebarKey) as? Bool ?? true
-    @State private var panelOn = UserDefaults.standard.object(forKey: "agents.sessionPanel") as? Bool ?? true
+    // The panel opens on demand (the mockup's): closed until you open it, then it remembers.
+    @State private var panelOn = UserDefaults.standard.object(forKey: "agents.sessionPanel") as? Bool ?? false
     /// The toggles slide the sidebar and the panel from their edge while the conversation glides over (Ahmed,
     /// 2026-11-16: "add transition motion to the toggle"), with Reduce Motion too: he asked for this movement.
     static let toggleMotion = Motion.out(0.28)
@@ -37,7 +38,7 @@ struct SessionView: View {
         var compact: Bool
     }
     /// The session panel at the right, shown or hidden with its toggle at the end of the title line (⌥⌘I).
-    @AppStorage("agents.sessionPanel") private var showPanel = true
+    @AppStorage("agents.sessionPanel") private var showPanel = false
     /// The pane has room for the panel beside the conversation; under it, ⌥⌘I shows the details strip instead.
     @State private var panelRoom = false
     static let sidebarKey = "agents.sessionSidebar"
@@ -167,7 +168,7 @@ struct SessionView: View {
             .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in typing ? .ignored : write(s) }
             .onKeyPress(.downArrow) { typing ? .ignored : latest() }
             .onKeyPress(.end) { typing ? .ignored : latest() }
-            // The session's shortcuts (⌘F, ⌘↩, ⇧⌘R…), wherever the keyboard is in the pane; the message field hands over the
+            // The session's shortcuts (⌘F, ⌘⏎, ⇧⌘R…), wherever the keyboard is in the pane; the message field hands over the
             // same ones itself (ComposerKeys.command). ⌥↑ ⌥↓ jump between your messages.
             .onKeyPress(phases: .down) { press in
                 guard let key = SessionShortcut.match(press.key.character, press.modifiers) else { return .ignored }
@@ -208,6 +209,7 @@ struct SessionView: View {
             // of bare wallpaper beside the conversation (Ahmed, 2026-11-16).
             .background(SessionInk.backing)
             .paneLook(AgentPrefs.shared.look)
+            .appLookTheme(AgentPrefs.shared.appLook)
             .clipShape(coreShape(Radius.cardMac))
             .accessibilityElement(children: .contain)
         } else {
@@ -271,6 +273,14 @@ struct SessionView: View {
         // A plan card's Go ahead approves the tool's pending plan request, or tells the agent to build; Change it starts a
         // message.
         .environment(\.planActions, model.canReply(s) ? planActions(s) : nil)
+        .environment(
+            \.applyCode,
+            model.canWrite(s)
+                ? ApplyCode(
+                    files: model.filesTouched(s.id).map(\.path),
+                    write: { path, code in Task { await model.writeFile(s.id, path: path, content: code) } }) : nil
+        )
+        .task { await model.refreshSessionTools() }
         // The conversation's own text size and typeface (Settings, AI Sessions, Text).
         .environment(\.coreTextScale, AgentPrefs.shared.textScale)
         .environment(\.coreFontDesign, AgentPrefs.shared.fontDesign)
@@ -295,7 +305,7 @@ struct SessionView: View {
         case .findNext, .findPrevious:
             guard finding else { return false }
             findStep(key == .findNext ? 1 : -1)
-        // A waiting approval's own buttons hold ⌘↩ and ⌘⌫; with none, ⌘↩ and ⇧⌘↩ answer the newest plan.
+        // A waiting approval's own buttons hold ⌘⏎ and ⌘⌫; with none, ⌘⏎ and ⇧⌘⏎ answer the newest plan.
         case .goAhead, .changePlan:
             guard !pending, model.canReply(s), latestPlan != nil else { return false }
             let a = planActions(s)

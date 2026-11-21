@@ -1,4 +1,5 @@
 import Brain
+import BrainImport
 import CoreKit
 import Foundation
 
@@ -15,6 +16,17 @@ struct LiveBrainTransport: BrainTransport {
             throw BrainHTTPError(status: status, code: code, message: message)
         } catch CoreError.badRequest(let message) {
             throw BrainHTTPError(status: 400, code: "bad_request", message: message)
+        }
+    }
+}
+
+/// The Core did not answer, or answered 5xx: an import waits and tries again. Anything else (auth, 4xx) stops it.
+extension CoreError: TransientFailure {
+    public var isTransient: Bool {
+        switch self {
+        case .offline, .coreUnproven: true
+        case .http(let status, _, _): status >= 500
+        default: false
         }
     }
 }

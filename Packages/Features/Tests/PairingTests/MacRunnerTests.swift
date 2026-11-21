@@ -223,20 +223,24 @@ struct MacRunnerSetupTests {
             control: c, deps: deps, defaults: UserDefaults(suiteName: "macrunner-\(UUID().uuidString)")!)
     }
 
-    @Test func theEndScreenComesBeforeTheDesktopWhenTheRunnerIsInside() async {
+    @Test func theDesktopOpensAtOnceAndTheTourIsArmedFirst() async {
         var opened = 0
-        let m = SetupWizardModel(driver: paired(), macRunner: runner(bundled: true)) { opened += 1 }
+        var armed = 0
+        let m = SetupWizardModel(driver: paired()) { opened += 1 }
+        m.armTour = { armed += 1 }
         await finish(m)
-        #expect(m.stage == .ready && opened == 0)
-        m.finishSetup()
-        #expect(opened == 1)
+        #expect(opened == 1 && armed == 1)
     }
 
-    @Test func thereIsNoEndScreenWithoutARunnerInside() async {
-        var opened = 0
-        let m = SetupWizardModel(driver: paired(), macRunner: runner(bundled: false)) { opened += 1 }
-        await finish(m)
-        #expect(opened == 1)
+    @Test func theTourSkipsTheRunnerPageWithoutARunnerInside() {
+        let inside = SetupTourModel(macRunner: runner(bundled: true), save: { _ in true })
+        let outside = SetupTourModel(macRunner: runner(bundled: false), save: { _ in true })
+        for m in [inside, outside] {
+            m.begin()
+            while m.step != .look { m.next() }
+            m.next()
+        }
+        #expect(inside.step == .runner && outside.step == .ready)
     }
 
     @Test func theEndScreenSwitchOnlyRemembersTheChoice() {
@@ -263,6 +267,7 @@ struct MacRunnerPlistTests {
         let a = try #require(plain["ProgramArguments"] as? [String])
         let b = try #require(terms["ProgramArguments"] as? [String])
         #expect(a.contains("--enable-agents") && !a.contains("--enable-pty"))
+        #expect(a.contains("--bundled") && b.contains("--bundled"))
         #expect(b.contains("--enable-agents") && b.contains("--enable-pty"))
         let ea = try #require(plain["EnvironmentVariables"] as? [String: String])
         let eb = try #require(terms["EnvironmentVariables"] as? [String: String])
@@ -297,5 +302,24 @@ struct MacRunnerPairProcessTests {
         #expect(!args.contains("SECRET"))
         #expect(args.split(separator: "\n").suffix(2) == ["--invite", "-"])
         #expect(stdin == "core.example/FP.SECRET\n")
+    }
+
+    @Test func launchdFailureAndMissingToolAreSaidInPlainWords() {
+        let launchd = "job state = spawn failed\n\tlast exit code = 78: EX_CONFIG\n"
+        #expect(MacRunnerProblem.exitCode(launchd) == 78)
+        #expect(
+            MacRunnerProblem.words(launchd: launchd, lastErrorFile: nil)?.hasPrefix(
+                "macOS could not start the runner (error 78)") == true)
+        #expect(MacRunnerProblem.words(launchd: "last exit code = (never exited)", lastErrorFile: nil) == nil)
+        #expect(
+            MacRunnerProblem.words(launchd: nil, lastErrorFile: "no AI tool installed: x")?.contains(
+                "no AI tool is installed") == true)
+        #expect(MacRunnerProblem.words(launchd: nil, lastErrorFile: "\n") == nil)
+    }
+
+    @Test func runningIsConnectedOnlyWhenTheCoreSaysSo() {
+        #expect(MacRunnerModel.headline(connected: true).done)
+        #expect(!MacRunnerModel.headline(connected: false).done)
+        #expect(!MacRunnerModel.headline(connected: nil).done)
     }
 }

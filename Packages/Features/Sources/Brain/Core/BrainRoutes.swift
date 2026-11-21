@@ -10,7 +10,9 @@ public protocol BrainTransport: Sendable {
 }
 
 /// The Core answered with an error status.
-public struct BrainHTTPError: Error, Sendable, Equatable {
+public struct BrainHTTPError: Error, Sendable, Equatable, TransientFailure {
+    /// 5xx (503 while the Core is busy) passes; 4xx never does.
+    public var isTransient: Bool { status >= 500 }
     public let status: Int
     public let code: String
     public let message: String
@@ -140,7 +142,7 @@ public struct BrainRoutes: Sendable {
     }
     /// The remembered "same project" names (API minor 72).
     public func aliases() async throws -> [RoomAlias] { try await call("GET", "/aliases") }
-    /// Forgets one; answers the ones left. The next Re-sort keeps the two rooms apart again.
+    /// Forgets one; answers the ones left. The Core keeps the two rooms apart again.
     public func removeAlias(_ from: String) async throws -> [RoomAlias] {
         try await call("DELETE", "/aliases/\(Self.seg(from))")
     }

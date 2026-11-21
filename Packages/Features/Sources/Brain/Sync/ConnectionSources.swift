@@ -133,6 +133,7 @@ struct RunnerSources: View {
 /// "Collect history on vps-1?": what is read, what is never sent, and Turn On (Touch ID, every time). One Touch ID
 /// covers both steps at the Core: the runner's history sharing, then the source's switch.
 struct RunnerHistorySheet: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     @State private var busy = false
     private var c: BrainCandidates { model.candidates }
@@ -163,7 +164,7 @@ struct RunnerHistorySheet: View {
                         ForEach(r.tools) { t in
                             HStack(spacing: Space.s3) {
                                 Image(systemName: t.installed ? "checkmark.square.fill" : "square")
-                                    .foregroundStyle(t.installed ? GlassInk.blue : GlassInk.secondary)
+                                    .foregroundStyle(t.installed ? GlassInk.accent(paneAccent) : GlassInk.secondary)
                                     .accessibilityHidden(true)
                                 HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                                     Text(t.name).coreFont(size: MacTextSize.body, weight: .medium)

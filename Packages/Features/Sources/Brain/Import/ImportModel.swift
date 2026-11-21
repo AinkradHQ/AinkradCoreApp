@@ -58,8 +58,13 @@ public final class ImportModel {
     public private(set) var itemsFound = 0
     public private(set) var secondsLeft: Int?
     public internal(set) var failure: String?
+    /// The Core does not answer (or says 5xx) and the import tries again by itself: a calm state, not a failure.
+    public private(set) var waitingForCore = false
     public private(set) var result: CommitResult?
     public let review: ReviewModel
+    /// The Core accepts the rooms and distils by itself (API minor 95): Sort and Learn replace Review and Import.
+    public var autoSort = false
+    public let auto: AutoFlow
 
     @ObservationIgnored private var job: Task<Void, Never>?
     @ObservationIgnored private var poller: Task<Void, Never>?
@@ -75,7 +80,7 @@ public final class ImportModel {
     public init(
         host: any AdminHost, routes: BrainRoutes, sources: [any ImportSource], poll: Duration = .seconds(1),
         resume: ResumeStore? = nil, places: ImportPlaces? = nil,
-        pause: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(for: .seconds(Double(1 << $0))) }
+        pause: @escaping @Sendable (Int) async -> Void = ImportRetry.pause
     ) {
         self.host = host
         self.routes = routes
@@ -93,6 +98,7 @@ public final class ImportModel {
                 absent: ($0 as? NotReadableSource)?.absent ?? false)
         }
         review = ReviewModel(host: host, routes: routes)
+        auto = AutoFlow(routes: routes)
     }
 
     // MARK: step 1
@@ -281,7 +287,9 @@ public final class ImportModel {
             itemsFound = 0
             phase = .uploading
             startPoller(run: id)
-            let uploader = Uploader(transport: RoutesImportTransport(routes: routes), pause: pause)
+            let uploader = Uploader(
+                transport: RoutesImportTransport(routes: routes), pause: pause,
+                onWaiting: { [weak self] on in await self?.setWaiting(on) })
             for c in chosen {
                 let sid = c.id
                 guard let source = sources[sid], !collectedSources.contains(sid) else { continue }
@@ -293,7 +301,8 @@ public final class ImportModel {
                     onProgress: { [weak self] p in await self?.apply(p) })
                 for (k, n) in report.skipped { localSkipped[k, default: 0] += n }
                 itemsFound += report.items
-                do { _ = try await routes.collected(run: id, source: sid) } catch let e as BrainHTTPError
+                do { _ = try await retrying { try await routes.collected(run: id, source: sid) } } catch let e
+                    as BrainHTTPError
                     where e.status == 409
                 {}  // already reported by an earlier attempt
                 collectedSources.insert(sid)
@@ -319,14 +328,15 @@ public final class ImportModel {
         if let run { return (run, "collecting") }
         let ids = chosen.map(\.id)
         if let saved = resume?.load(), let r = saved.run, Set(saved.sources.keys).isSubset(of: ids),
-            let view = try? await routes.run(r), ["collecting", "discovering", "review"].contains(view.state)
+            let view = try? await retrying { try await routes.run(r) },
+            ["collecting", "discovering", "review"].contains(view.state)
         {
             resumeState = saved
             run = r
             return (r, view.state)
         }
         resume?.clear()
-        let id = try await routes.startRun(kind: "full", sources: ids)
+        let id = try await retrying { try await routes.startRun(kind: "full", sources: ids) }
         run = id
         resumeState = ResumeState()
         resumeState.run = id
@@ -366,12 +376,25 @@ public final class ImportModel {
         poller = nil
     }
 
+    func setWaiting(_ on: Bool) { waitingForCore = on }
+
+    /// `op` until it works: forever on a Core that does not answer or says 5xx (1 s up to 30 s apart), never on a 4xx.
+    func retrying<T>(_ op: () async throws -> T) async throws -> T {
+        try await ImportRetry.run(pause: pause, waiting: { setWaiting($0) }, op)
+    }
+
     /// One `GET /imports/{run}`; the progress bar and the status line read what it said.
     @discardableResult
     func refresh(run: String) async -> RunView? {
-        guard let v = try? await routes.run(run) else { return nil }
-        counts = v.counts
-        return v
+        do {
+            let v = try await routes.run(run)
+            waitingForCore = false
+            counts = v.counts
+            return v
+        } catch {
+            if ImportRetry.isTransient(error) { waitingForCore = true }
+            return nil
+        }
     }
 
     private func waitForReview(run: String) async throws {
@@ -380,6 +403,10 @@ public final class ImportModel {
             if let v = await refresh(run: run) {
                 if v.state == "abandoned" { throw BrainFailure("This import was abandoned.", code: "abandoned") }
                 if ["review", "committing", "committed"].contains(v.state) { return }
+                // Discovery failed on the Core and the run is open again: say "collected" again to start it.
+                if v.state == "collecting", !collectedSources.isEmpty {
+                    for sid in collectedSources { _ = try? await routes.collected(run: run, source: sid) }
+                }
             }
             try await Task.sleep(for: poll)
         }
@@ -512,4 +539,39 @@ public final class ImportModel {
 
     /// For the done page: which rooms were made and which wait for the backup.
     public func heldCards() -> [ProposalCard] { review.cards.filter(\.isHeld) }
+}
+
+// MARK: Sort and Learn (the Core accepts and distils by itself)
+
+extension ImportModel {
+    /// Starts watching the Core sort the run. Called by the Sort step when it appears.
+    func beginSort() {
+        guard autoSort, let run else { return }
+        auto.watchSort(run: run)
+    }
+
+    /// Undo on the Sort step: back to one pile. The review is reloaded so "Sort it myself" shows the run's items in Unsorted.
+    func undoSort() async {
+        guard let run else { return }
+        await auto.undo(run: run)
+        if case .undone = auto.sort { try? await review.load(run: run) }
+    }
+
+    /// The person sorts the undone run by hand: the ordinary Review step, and the Core does not take it over again.
+    func sortMyself() { autoSort = false }
+
+    /// Continue from Sort: the Core is distilling every place (mandatory, no cap); this step shows how far.
+    func beginLearning() {
+        guard autoSort, step == .review, let run else { return }
+        step = .importing
+        auto.watchLearning(run: run) { [weak self] in await self?.finishAuto() }
+    }
+
+    private func finishAuto() async {
+        resume?.clear()
+        if let since = started, let service {
+            await SyncModel.register(chosen.map(\.id), from: Array(sources.values), since: since, service: service)
+        }
+        step = .done
+    }
 }

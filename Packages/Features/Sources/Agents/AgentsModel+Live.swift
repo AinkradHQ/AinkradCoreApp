@@ -14,6 +14,7 @@ extension AgentsModel {
         return SessionIndex(
             SessionIndex.Inputs(
                 items: sessions.items, needsYou: needs, pinned: pinned, archived: archived, now: now,
+                archiveDays: AgentPrefs.shared.keepDays,
                 title: { [self] in title($0) }, runnerName: { [self] in runnerName($0) }, project: { $0.project }))
     }
 
@@ -31,7 +32,7 @@ extension AgentsModel {
     // MARK: new session
 
     /// ⌘N: a live session at once with the defaults and an empty composer. The best ready runner, the default tool and order.
-    public func startLiveSession(runner: String? = nil) async -> InlineNotice? {
+    public func startLiveSession(runner: String? = nil, prompt: String = "") async -> InlineNotice? {
         await loadRunners()
         let prefs = AgentPrefs.shared
         let pick =
@@ -46,7 +47,7 @@ extension AgentsModel {
         return await create(
             NewAgentSession(
                 runner: pick, harness: prefs.harness, model: chain == nil && !prefs.model.isEmpty ? prefs.model : nil,
-                prompt: "", mode: prefs.mode, chain: chain?.id))
+                prompt: prompt, mode: prefs.mode, chain: chain?.id))
     }
 
     // MARK: the live conversation
@@ -91,21 +92,10 @@ extension AgentsModel {
         }
     }
 
-    /// Ends the session for good, after asking: the live process exits and the composer closes.
-    public func confirmEnd(_ id: String) {
-        guard let s = sessions.session(id), s.live else { return }
-        shell.presentSheet(
-            title: "End this AI session?",
-            message:
-                "\(AgentWords.toolName(s.harness)) exits and the composer closes. The transcript stays, and you can start a new AI session from it.",
-            actions: [
-                ShellSheetAction("Keep it open"),
-                ShellSheetAction("End Session", primary: true, destructive: true) { [weak self] in self?.end(id) },
-            ])
-    }
-
+    /// Ends the session for good, at once: the live process exits and the composer closes. It cannot be taken back, so the
+    /// toast says what happened and offers no Undo.
     public func end(_ id: String) {
-        guard let api else { return }
+        guard let api, let info = sessions.session(id), info.live else { return }
         note(id, nil)
         stopping[id] = .cancelling
         Task { [weak self] in
@@ -118,6 +108,9 @@ extension AgentsModel {
                 self.sessions.upsert(s)
                 if s.over { self.stopping[id] = nil }
                 self.syncDerived()
+                self.shell.showToast(
+                    "Ended the \(AgentWords.toolName(info.harness)) session. The transcript stays; start a new one from it.",
+                    kind: .info)
             } catch {
                 self.stopping[id] = nil
                 self.note(id, Self.notice(error, doing: "Ending the session"))

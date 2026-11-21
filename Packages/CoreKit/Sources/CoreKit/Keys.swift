@@ -254,7 +254,7 @@ struct KeychainBlobs: BlobStore {
         var q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: "\(namespace).\(name)",
+            kSecAttrAccount as String: Self.account(namespace, name, generation: generation),
             kSecAttrSynchronizable as String: false,
         ]
         if dataProtection { q[kSecUseDataProtectionKeychain as String] = true }
@@ -276,6 +276,11 @@ struct KeychainBlobs: BlobStore {
     func write(_ name: String, _ data: Data) throws {
         let updated = SecItemUpdate(query(name) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         if updated == errSecSuccess { return }
+        if updated == errSecInvalidOwnerEdit {
+            // Another build's item sits in this slot and only it may change it: start a fresh slot and add there.
+            moveOn()
+            return try write(name, data)
+        }
         guard updated == errSecItemNotFound else { throw Self.fail("write", updated) }
         var q = query(name)
         q[kSecValueData as String] = data
@@ -286,7 +291,19 @@ struct KeychainBlobs: BlobStore {
 
     func remove(_ name: String) throws {
         let status = SecItemDelete(query(name) as CFDictionary)
+        // An earlier, differently signed build saved it and macOS lets only that build delete it (OSStatus -25244, seen on
+        // Forget after updating from a Developer ID build to a locally signed one). Leave it behind unused and move on.
+        if status == errSecInvalidOwnerEdit { return moveOn() }
         guard status == errSecSuccess || status == errSecItemNotFound else { throw Self.fail("delete", status) }
+    }
+
+    /// The slot generation: 0 is the original `<namespace>.<name>`; each item another build owns moves every key to the next.
+    private var generationKey: String { "corekit.\(service).\(namespace).generation" }
+    private var generation: Int { UserDefaults.standard.integer(forKey: generationKey) }
+    private func moveOn() { UserDefaults.standard.set(generation + 1, forKey: generationKey) }
+
+    static func account(_ namespace: String, _ name: String, generation: Int) -> String {
+        generation == 0 ? "\(namespace).\(name)" : "\(namespace).g\(generation).\(name)"
     }
 
     private static func fail(_ what: String, _ status: OSStatus) -> CoreError {

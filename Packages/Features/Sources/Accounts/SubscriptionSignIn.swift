@@ -3,8 +3,9 @@ import SwiftUI
 
 /// Connect a Claude plan (KAN-441): you confirm it is your own plan, Core starts Claude's own sign-in on a runner, your
 /// browser opens claude.ai, you paste the short code Claude shows, and the account appears. The app never sees a
-/// token: the runner hands it straight to Core. Every stage is keyboard driven (↩ goes on, esc stops).
+/// token: the runner hands it straight to Core. Every stage is keyboard driven (⏎ goes on, esc stops).
 struct SubscriptionSignIn: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let provider: ProviderItem
     let close: () -> Void
@@ -17,7 +18,7 @@ struct SubscriptionSignIn: View {
     @FocusState private var codeFocus: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    private var hue: Color { GlassInk.blue }
+    private var hue: Color { GlassInk.accent(paneAccent) }
     private var labelOK: Bool { label.range(of: "^[a-z][a-z0-9._-]{0,63}$", options: .regularExpression) != nil }
 
     var body: some View {
@@ -28,6 +29,7 @@ struct SubscriptionSignIn: View {
                 case nil: intro
                 case .starting?: waiting("Getting Claude ready", "Starting Claude's sign-in on a runner…")
                 case .open(let url)?: signIn(url)
+                case .guided?: waiting("Waiting for you", "Finish signing in on the runner.")
                 case .working?: waiting("Almost there", "Connecting your Claude plan to your Core…")
                 case .done(let account)?: done(account)
                 case .failed(let why)?: failed(why)
@@ -55,6 +57,11 @@ struct SubscriptionSignIn: View {
                 "Sign in with your Claude Pro or Max plan. You sign in on claude.ai; Ainkrad never sees your password."
             )
             .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            // D-33 (E12-7): shown to every user, one line, before they confirm.
+            CoreNotice(
+                symbol: "exclamationmark.triangle", title: "Uses your subscription at your own risk.", tone: .warn
+            )
+            .accessibilityIdentifier("subscription-risk")
             GlassToggleTile(
                 "This is my own Claude plan, for my own use.",
                 sub: "Anthropic's terms don't allow sharing a plan or using someone else's.", symbol: "person",
@@ -111,7 +118,7 @@ struct SubscriptionSignIn: View {
             numbered(2, "Paste the code Claude shows you", "It's a short code, not a password.") {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "doc.on.clipboard").foregroundStyle(
-                        codeFocus ? GlassInk.blueInk : GlassInk.secondary)
+                        codeFocus ? GlassInk.accentInk(paneAccent) : GlassInk.secondary)
                     TextField("Paste the code here", text: $code).textFieldStyle(.plain)
                         .coreFont(size: MacTextSize.title, design: .monospaced).focused($codeFocus)
                         .autocorrectionDisabled().onSubmit(send)
@@ -195,10 +202,10 @@ struct SubscriptionSignIn: View {
                         model.openRunners()
                     }
                     .buttonStyle(CoreButtonStyle(.prominent)).keyboardShortcut(.defaultAction)
-                    .environment(\.coreKeycap, "↩")
+                    .environment(\.coreKeycap, "⏎")
                 } else {
                     Button("Try again") { model.signIn = nil }.buttonStyle(CoreButtonStyle(.prominent))
-                        .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
+                        .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "⏎")
                 }
             }
         }

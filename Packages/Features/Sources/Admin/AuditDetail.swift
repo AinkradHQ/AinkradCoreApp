@@ -77,6 +77,7 @@ struct AuditDetail: View {
 
 /// When things happened across the rows loaded: flat bars, the busiest slice tallest.
 struct Activity: View {
+    @Environment(\.coreAccent) private var paneAccent
     let cells: [Double]
     let from: Date
     let to: Date
@@ -86,7 +87,7 @@ struct Activity: View {
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, v in
                     coreShape(2)
-                        .fill(v <= 0 ? GlassInk.track.opacity(0.5) : GlassInk.blue)
+                        .fill(v <= 0 ? GlassInk.track.opacity(0.5) : GlassInk.accent(paneAccent))
                         .frame(maxWidth: .infinity).frame(height: 4 + CGFloat(v) * 28)
                 }
             }

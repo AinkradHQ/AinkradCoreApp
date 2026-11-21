@@ -1,23 +1,6 @@
 import CoreUI
 import SwiftUI
 
-/// Settings, Mac: "Use this Mac as a runner", its state, and the terminals switch with its warning (N16, D1, D2, D3).
-struct MacRunnerSection: View {
-    let model: MacRunnerModel
-    /// "Yes" or "No (reason)" from the runner's own report; nil when the Core has not said.
-    var accounts: String?
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Run terminals and AI sessions for your Core on this Mac.").foregroundStyle(palette.text2)
-            MacRunnerSwitches(model: model)
-            if model.isAvailable { MacRunnerStatus(model: model, accounts: accounts) }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
 /// The two switches. Used in Settings and on the setup end screen (where the second one waits until the first is on).
 struct MacRunnerSwitches: View {
     let model: MacRunnerModel
@@ -50,15 +33,16 @@ struct MacRunnerSwitches: View {
 struct MacRunnerStatus: View {
     let model: MacRunnerModel
     var accounts: String?
+    var connected: Bool?
     @Environment(\.corePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             switch model.state {
             case .running:
+                let h = MacRunnerModel.headline(connected: connected)
                 CoreNotice(
-                    symbol: "checkmark", title: "This Mac is a runner",
-                    text: "Its terminals and AI sessions pause while the Mac sleeps.", tone: .done)
+                    symbol: h.done ? "checkmark" : "clock", title: h.title, text: h.text, tone: h.done ? .done : .warn)
             case .working(let what):
                 HStack(spacing: Space.s2) {
                     CoreBusyBar()
@@ -78,6 +62,11 @@ struct MacRunnerStatus: View {
             case .off, .unavailable:
                 EmptyView()
             }
+            if let problem = model.problem {
+                Text(problem).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("mac-runner-problem")
+            }
             if model.useThisMac {
                 Text(MacRunnerModel.accountsLine(accounts)).coreFont(size: MacTextSize.meta).foregroundStyle(
                     palette.text2
@@ -85,5 +74,8 @@ struct MacRunnerStatus: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+        // The Core's list refreshes on its own; launchd and the runner's note are looked at when this opens and when the
+        // connection changes.
+        .task(id: connected) { await model.refreshProblem(connected: connected) }
     }
 }

@@ -137,7 +137,7 @@ enum SnapshotRunner {
         shell.toggleLauncher()
         shell.showToast("Added Today", kind: .ok)
         await shot("02c-toast-ok")
-        shell.showToast("Admin actions locked again. The next one asks for Touch ID.", kind: .warn)
+        shell.showToast("The Core is slow to answer. Trying again.", kind: .warn)
         await shot("02d-toast-warn")
         shell.toast = nil
         shell.presentSheet(
@@ -145,15 +145,19 @@ enum SnapshotRunner {
             actions: [ShellSheetAction("Cancel"), ShellSheetAction("End Session", destructive: true)])
         await shot("02e-sheet")
         shell.sheet = nil
-        shell.elevatedUntil = nil
-        shell.elevationPanelOpen = true
-        await shot("02f-elevation-locked")
-        shell.elevatedUntil = Date().addingTimeInterval(262)
-        await shot("02g-elevation-open")
-        shell.elevatedUntil = Date().addingTimeInterval(44)
-        await shot("02h-elevation-soon")
-        shell.elevationPanelOpen = false
-        shell.elevatedUntil = nil
+        shell.lock = .locked
+        await shot("02f-unlock-card")
+        shell.lock = .checking
+        await shot("02g-unlock-checking")
+        // Locked with a dialog open (the Brain import after sleep): the card stays on top and the dialog waits.
+        shell.lock = .open
+        shell.present(ShellDialog(id: "sample") { Text("A dialog under the lock").padding(80).corePanel() })
+        await shot("02h-dialog-open")
+        shell.lock = .locked
+        await shot("02i-unlock-over-dialog")
+        shell.lock = .open
+        await shot("02j-dialog-back")
+        shell.closeDialog()
         shell.toggleBell()
         await shot("03-bell")
         shell.bellOpen = false

@@ -69,9 +69,13 @@ struct RepoPicker: View {
                         CoreSkeleton(coreShape(Radius.control)).frame(height: MacSize.controlLg + Space.s2)
                     }
                 case .unavailable where pasted.isEmpty && typedLink == nil:
-                    Text("GitHub’s repo list is not available from this Core yet. Paste a repo link above to add one.")
-                        .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                        .padding(Space.s2)
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        Text("Connect GitHub to see your repos. Or paste a repo link above to add one.")
+                            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                        Button("Connect GitHub") { model.connectGithub() }
+                            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    }
+                    .padding(Space.s2)
                 case .ready where groups.isEmpty && typedLink == nil:
                     Text("No repo matches “\(query)”.").foregroundStyle(GlassInk.secondary).padding(Space.s2)
                 default: EmptyView()

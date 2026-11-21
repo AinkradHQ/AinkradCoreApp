@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Inbox: what the distillations proposed, across the open rooms. The list is on the left, the chosen candidate on the
 /// right with its sources and Accept, Edit and Reject; Edit swaps the right side for a form. The keyboard drives it:
-/// ↑ ↓ move, Return accepts, E edits, ⌫ rejects, ⌘↩ saves an edit, Esc cancels it.
+/// ↑ ↓ move, Return accepts, E edits, ⌫ rejects, ⌘⏎ saves an edit, Esc cancels it.
 struct CandidateInboxTab: View {
     let model: BrainModel
     private var c: BrainCandidates { model.candidates }
@@ -231,6 +231,7 @@ private struct CandidateRow: View {
 // MARK: detail
 
 private struct SourceRows: View {
+    @Environment(\.coreAccent) private var paneAccent
     let c: InboxCandidate
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -244,10 +245,11 @@ private struct SourceRows: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(c.sources) { s in
                     HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-                        Image(systemName: "link").foregroundStyle(GlassInk.blueInk).accessibilityHidden(true)
+                        Image(systemName: "link").foregroundStyle(GlassInk.accentInk(paneAccent)).accessibilityHidden(
+                            true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(s.title).coreFont(size: MacTextSize.body, weight: .medium).foregroundStyle(
-                                GlassInk.blueInk)
+                                GlassInk.accentInk(paneAccent))
                             if !s.quote.isEmpty {
                                 Text(s.quote).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -266,12 +268,13 @@ private struct SourceRows: View {
 }
 
 private struct DetailHead: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let title: String
     let sub: String
     var body: some View {
         HStack(spacing: Space.s3) {
-            IconTile(symbol, hue: GlassInk.blue)
+            IconTile(symbol, hue: GlassInk.accent(paneAccent))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
                 Text(sub).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary).lineLimit(1)
@@ -312,7 +315,7 @@ private struct CandidateDetail: View {
                     Button {
                         Task { await state.accept(c.id) }
                     } label: {
-                        ActionLabel(title: "Accept", key: "↩")
+                        ActionLabel(title: "Accept", key: "⏎")
                     }
                     .buttonStyle(CoreButtonStyle(.prominent))
                     Button {
@@ -397,7 +400,7 @@ private struct CandidateEditForm: View {
                     Button {
                         Task { await state.saveEdit() }
                     } label: {
-                        ActionLabel(title: "Save and accept", key: "⌘↩")
+                        ActionLabel(title: "Save and accept", key: "⌘⏎")
                     }
                     .buttonStyle(CoreButtonStyle(.prominent))
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.busy)

@@ -119,6 +119,9 @@ struct InviteDeviceTests {
         let board: FakeBoard
     }
 
+    /// This suite's own quit notifications, never the process-wide center the other tests' app models watch.
+    private let quits = NotificationCenter()
+
     private func rig(after: Duration = .seconds(60)) async throws -> Rig {
         let fake = FakeInvites()
         let store = makeMemoryKeyStore()
@@ -133,8 +136,9 @@ struct InviteDeviceTests {
         m.shell.elevatedUntil = Date().addingTimeInterval(300)
         let board = FakeBoard()
         return Rig(
-            add: InviteDeviceModel(host: m, pasteboard: board, clearAfter: after), app: m, service: service, fake: fake,
-            board: board)
+            add: InviteDeviceModel(host: m, pasteboard: board, clearAfter: after, quits: quits), app: m,
+            service: service,
+            fake: fake, board: board)
     }
 
     private func expire(_ r: Rig) { r.app.shell.elevatedUntil = Date().addingTimeInterval(-1) }
@@ -460,12 +464,12 @@ struct InviteDeviceTests {
         let r = try await rig()
         await r.add.create()
         r.add.copyLink()
-        NotificationCenter.default.post(name: NSApplication.willTerminateNotification, object: nil)
+        quits.post(name: NSApplication.willTerminateNotification, object: nil)
         #expect(r.board.text == nil)
         r.board.userCopies("mine")
         r.add.copyLink()
         r.board.userCopies("changed since")
-        NotificationCenter.default.post(name: NSApplication.willTerminateNotification, object: nil)
+        quits.post(name: NSApplication.willTerminateNotification, object: nil)
         #expect(r.board.text == "changed since")
     }
 

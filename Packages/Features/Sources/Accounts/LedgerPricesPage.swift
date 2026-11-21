@@ -4,6 +4,7 @@ import SwiftUI
 /// The ledger: every model call Core recorded, newest first and grouped by day, each as one line: when, which model and
 /// account, tokens, and its cost (or "No price"). A row of account tiles filters it.
 struct LedgerPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AccountsModel
     @State private var only: Int64?
 
@@ -36,7 +37,7 @@ struct LedgerPage: View {
                 HStack(spacing: Space.s2) {
                     AccPick(
                         title: "All accounts", sub: "\(model.costs.count) calls", symbol: "tray.full",
-                        hue: GlassInk.blue, on: only == nil
+                        hue: GlassInk.accent(paneAccent), on: only == nil
                     ) { only = nil }
                     .frame(width: 170)
                     ForEach(ids, id: \.self) { id in
@@ -168,6 +169,7 @@ struct PricesPage: View {
 }
 
 private struct PriceRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let price: PriceItem
     @State private var hovering = false
@@ -185,7 +187,7 @@ private struct PriceRow: View {
                 Text(CostWords.usd(v)).coreFont(size: MacTextSize.headline, weight: .semibold).monospacedDigit()
                     .frame(width: 90, alignment: .trailing)
             }
-            AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "", hue: GlassInk.blue) {
+            AppActionTile(title: "Change", symbol: "slider.horizontal.3", key: "", hue: GlassInk.accent(paneAccent)) {
                 AccountDialogs.openPrice(model, editing: p)
             }
             .opacity(hovering && !model.readOnly ? 1 : 0).allowsHitTesting(hovering && !model.readOnly)

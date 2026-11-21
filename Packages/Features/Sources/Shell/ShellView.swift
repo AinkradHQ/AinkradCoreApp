@@ -16,8 +16,16 @@ public struct ShellView: View {
     public var body: some View {
         ZStack {
             base
-            covers
+            if shell.lock == .open {
+                covers
+            } else {
+                // Locked: the Unlock card is above everything (an open dialog's own dim buried it, a near-black screen
+                // after sleep or a Space switch). The dialogs come back once unlocked; only Touch ID rides above the card.
+                UnlockCard(shell: shell)
+                if let d = shell.topDialog, d.id == "step-up" { dialogLayer(d, id: "top") }
+            }
         }
+        .coreAnimation(Motion.out(Motion.move), value: shell.lock)
         .animation(Motion.calm(Motion.out(Motion.move), reduce), value: shell.surface)
         .coreAnimation(Motion.out(Motion.ui), value: shell.coverOpen)
         .coreTheme()
@@ -39,7 +47,11 @@ public struct ShellView: View {
             || shell.topDialog != nil || shell.sheet != nil
     }
 
-    private var base: some View {
+    @ViewBuilder private var base: some View {
+        if shell.setupOpen() { WallpaperView().ignoresSafeArea() } else { desktop }
+    }
+
+    private var desktop: some View {
         ZStack {
             sky
             HomeView(shell: shell)
@@ -145,21 +157,20 @@ public struct ShellView: View {
     }
 
     @ViewBuilder private var covers: some View {
-        if shell.connectionPanelOpen {
-            Color.clear.contentShape(Rectangle()).onTapGesture { shell.connectionPanelOpen = false }
+        if let menu = shell.topMenu {
+            Color.clear.contentShape(Rectangle()).onTapGesture { shell.topMenu = nil }
                 .accessibilityHidden(true)
-            ConnectionPanel(shell: shell)
-                .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .transition(.opacity)
-        }
-        if shell.elevationPanelOpen {
-            Color.clear.contentShape(Rectangle()).onTapGesture { shell.elevationPanelOpen = false }
-                .accessibilityHidden(true)
-            ElevationPanel(shell: shell)
-                .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .transition(.opacity)
+            Group {
+                switch menu {
+                case .core: ConnectionPanel(shell: shell)
+                case .runners: RunnersPanel(shell: shell)
+                case .brain: BrainPanel(shell: shell)
+                }
+            }
+            .id(menu)
+            .padding(.top, ShellMetrics.topBar).padding(.trailing, Space.s4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .transition(.opacity)
         }
         if shell.launcherOpen || shell.actionsOpen || shell.overviewOpen || shell.overlay != nil {
             Self.scrim.onTapGesture { shell.closeTopmost() }

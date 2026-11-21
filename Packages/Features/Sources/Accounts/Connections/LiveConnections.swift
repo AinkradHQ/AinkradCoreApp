@@ -7,9 +7,19 @@ import OpenAPIRuntime
 /// read back or logged: no request body is kept anywhere here. Step-up (Touch ID) is the model's job, around each write.
 struct LiveConnectionsService: ConnectionsService {
     let client: Client
+    /// Whether the Core serves the picker's list (minor 95). Nil: assume it does (tests, a Core known to be new).
+    let supportsPicks: (@Sendable () async -> Bool)?
 
-    init(client: Client) { self.client = client }
-    init(connection: CoreConnection) { client = connection.client }
+    init(client: Client, supportsPicks: (@Sendable () async -> Bool)? = nil) {
+        self.client = client
+        self.supportsPicks = supportsPicks
+    }
+    init(connection: CoreConnection) {
+        client = connection.client
+        supportsPicks = { await connection.serverSupports(minor: coreMinorV010) }
+    }
+
+    /// The API minor that added `listConnectionResources` (the coordinator renumbers it at integration).
 
     // MARK: reading
 
@@ -62,6 +72,21 @@ struct LiveConnectionsService: ConnectionsService {
         }
     }
 
+    /// The Core's own list (names, a second line, when it changed); an older Core says only the ones already chosen.
+    func picks(_ id: Int64) async throws -> ConnPicks {
+        if let supportsPicks, await !supportsPicks() {
+            return ConnPicks(items: try await resources(id).map { ConnPick(id: $0, name: $0) })
+        }
+        return try await run {
+            let r = try await client.listConnectionResources(path: .init(id: String(id)), query: .init()).ok.body.json
+            return ConnPicks(
+                items: r.resources.map {
+                    ConnPick(id: $0.id, name: $0.name, detail: $0.detail, updatedAt: $0.updatedAt)
+                },
+                truncated: r.truncated)
+        }
+    }
+
     // MARK: signing in
 
     func start(kind: String, again: Int64?) async throws -> ConnFlow {
@@ -81,7 +106,7 @@ struct LiveConnectionsService: ConnectionsService {
             let f = try await client.getConnectionFlow(path: .init(id: id)).ok.body.json
             guard f.step == "choose_site", let site else {
                 guard let c = f.connection else { return try await flow(f) }
-                var done = Self.flow(f, install: nil)
+                var done = Self.flow(f)
                 done.step = .connected(c)
                 return done
             }
@@ -108,17 +133,8 @@ struct LiveConnectionsService: ConnectionsService {
         try await run { _ = try await client.cancelConnectionFlow(path: .init(id: id)).ok }
     }
 
-    /// A flow as the sheet shows it. Only a finished GitHub sign-in needs the kind (for its app install page).
-    private func flow(_ f: Components.Schemas.ConnectionFlow) async throws -> ConnFlow {
-        var install: URL?
-        if f.step == "connected", f.connection != nil {
-            let k = try? await client.listConnectionKinds().ok.body.json.first { $0.kind == f.kind }
-            if k?.authMethods.contains(where: { $0.id == "app_install" && $0.available }) == true {
-                install = k?.installUrl.flatMap(URL.init(string:))
-            }
-        }
-        return Self.flow(f, install: install)
-    }
+    /// A flow as the dialog shows it.
+    private func flow(_ f: Components.Schemas.ConnectionFlow) async throws -> ConnFlow { Self.flow(f) }
 
     func addToken(kind: String, name: String, fields: [String: String], token: String) async throws -> ConnItem {
         try await run {
@@ -259,12 +275,14 @@ struct LiveConnectionsService: ConnectionsService {
         let token = k.authMethods.first { $0.id == "token" && $0.available }
         let limit = k.limits.first
         return ConnKind(
-            id: k.kind, name: k.title, say: k.summary, signIn: k.kind == "github" ? .deviceCode : .browser,
+            id: k.kind, name: k.title, say: k.summary,
+            signIn: k.kind == "github" || k.kind == "teams" ? .deviceCode : .browser,
             resource: limit?.title.lowercased() ?? "places",
             capabilities: k.capabilities.map {
                 ConnCapability(
                     id: $0.name, title: $0.title,
-                    say: $0.write ? "Changes things on \(k.title)." : "Looks, never changes anything.", writes: $0.write
+                    say: $0.summary ?? ($0.write ? "Changes things on \(k.title)." : "Looks, never changes anything."),
+                    writes: $0.write
                 )
             },
             tokenTitle: token?.title ?? "", tokenHelp: token?.steps ?? [],
@@ -297,7 +315,8 @@ struct LiveConnectionsService: ConnectionsService {
             id: c.id, kind: c.kind, name: c.name, identity: c.identity ?? c.label, status: status,
             reason: status == .needsLook ? reason(c.stateReason, service: service) : nil, isDefault: c.isDefault,
             allowed: Set(grants == nil ? (c.myCapabilities ?? []) : (member?.capabilities ?? [])), only: chosen,
-            lastUsed: nil, lastChecked: c.lastTestedAt, users: Int(c.grantCount ?? 1))
+            lastUsed: nil, lastChecked: c.lastTestedAt, users: Int(c.grantCount ?? 1), signInNeeded: authLost,
+            authMethod: c.authMethod)
     }
 
     /// The Core's reasons are short codes; the screen says them in words.
@@ -312,21 +331,21 @@ struct LiveConnectionsService: ConnectionsService {
         }
     }
 
-    static func flow(_ f: Components.Schemas.ConnectionFlow, install: URL?) -> ConnFlow {
+    static func flow(_ f: Components.Schemas.ConnectionFlow) -> ConnFlow {
         let service = name(of: f.kind, nil)
         let url = (f.verificationUri ?? f.authorizeUrl).flatMap(URL.init(string:)) ?? URL(string: "about:blank")!
         let step: ConnFlow.Step =
             switch f.step {
             case "connected":
                 if let c = f.connection {
-                    install.map { .chooseResources(login: f.identity ?? "", install: $0) } ?? .connected(c)
+                    .connected(c)
                 } else {
                     failed(f, service)
                 }
             case "choose_site": .pickSite(f.sites.map(\.name))
             case "expired":
                 .failed(
-                    title: "The sign-in ran out of time.",
+                    title: ConnSay.expiredTitle,
                     fix: "Try again for a new one, then finish it within a few minutes.")
             case "denied":
                 .failed(title: "\(service) said no.", fix: "Nothing was connected. Try again if that was a mistake.")
@@ -378,7 +397,8 @@ struct LiveConnectionsService: ConnectionsService {
 /// Every failure in plain words with what to do, never a code.
 enum ConnSay {
     static let notConfigured =
-        "This service isn't set up on your Core. If it's self-hosted, use Your own app on this page."
+        "Sign-in isn't set up on your Core for this service yet. If you run the Core, set up your own app."
+    static let expiredTitle = "The sign-in ran out of time."
     static let serviceDown = "Ainkrad's sign-in service can't be reached. Try again in a minute."
     static let notYours = "This GitHub install isn't yours."
     static let signInFirst = "Sign in to GitHub first."
@@ -426,7 +446,7 @@ enum ConnSay {
         case .offline: return "This Mac can't reach your Core. Check the network, then try again."
         case .forbiddenScope:
             return "This Mac can only look. Changes need a Mac you allowed to manage the Core. Nothing was changed."
-        case .stepUpRequired: return "Touch ID is needed for that. Try again and confirm it."
+        case .stepUpRequired, .unlockRequired: return "Touch ID is needed for that. Try again and confirm it."
         case .authFailed, .sessionExpired, .revoked:
             return "This Mac needs to sign in to your Core again. Reopen Ainkrad and try again."
         case .rateLimited(let s):

@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 /// Settings, Apps, Brain: the Core's local AI tunables. The Core owns the values; this reads them and writes one at a
-/// time. A change applies from the next re-sort of a review.
+/// time. A change applies the next time Brain sorts.
 @MainActor @Observable
 final class AISettings {
     enum Load: Equatable { case loading, ready, missing }
@@ -48,12 +48,13 @@ final class AISettings {
 }
 
 struct BrainAISection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let settings: AISettings
 
     var body: some View {
         GlassSection(
             "AI suggestions", sub: "Runs on your Core. Nothing leaves your server.", symbol: "sparkles",
-            hue: GlassInk.blue, index: 2
+            hue: GlassInk.accent(paneAccent), index: 2
         ) {
             if settings.load == .ready {
                 CoreSwitch(
@@ -95,7 +96,7 @@ struct BrainAISection: View {
                             "Text read per item", "Short reads the start of each item and is about twice as fast.",
                             "semantic.max_tokens", settings.maxTokens,
                             [CoreSegment(128, "Short"), CoreSegment(256, "Long")])
-                        Text("A change applies the next time you re-sort a review.").coreFont(size: MacTextSize.meta)
+                        Text("A change applies the next time Brain sorts.").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(GlassInk.secondary)
                     }
                 }

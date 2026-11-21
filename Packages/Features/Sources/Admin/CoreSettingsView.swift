@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// Settings, Core, Core settings: every limit the Core reports, in plain words, grouped by what it is about. One row is the
-/// cursor (↑ ↓); ↩ changes it, H shows who changed it, ⌫ puts it back to its default, esc closes.
+/// cursor (↑ ↓); ⏎ changes it, H shows who changed it, ⌫ puts it back to its default, esc closes.
 struct CoreSettingsSection: View {
     let admin: AdminModel
     @FocusState private var listFocus: Bool
@@ -12,7 +12,7 @@ struct CoreSettingsSection: View {
         AdminScreen(
             admin: admin, what: "Settings",
             intro:
-                "The limits your Core keeps to. Pick one and press ↩ to change it. Each change asks for Touch ID and can be undone.",
+                "The limits your Core keeps to. Pick one and press ⏎ to change it. Each change asks for Touch ID and can be undone.",
             state: model.state, empty: ("No settings reported", "Your Core returned no settings.", "tray"),
             retry: { Task { await model.reload() } }
         ) {
@@ -194,7 +194,7 @@ private struct LimitRow: View {
                 ) { Task { await model.reset(setting) } }
             }
             AppActionTile(
-                title: "Change", symbol: "slider.horizontal.3", key: selected ? "↩" : "", hue: hue, prominent: true
+                title: "Change", symbol: "slider.horizontal.3", key: selected ? "⏎" : "", hue: hue, prominent: true
             ) {
                 pick()
                 model.beginEdit(setting)
@@ -203,7 +203,7 @@ private struct LimitRow: View {
     }
 }
 
-/// The new value, typed in the Core's unit, read back in plain words as you type. Cancel left (esc), Save right (↩).
+/// The new value, typed in the Core's unit, read back in plain words as you type. Cancel left (esc), Save right (⏎).
 private struct LimitEditor: View {
     @Bindable var model: RegistryModel
     let setting: SettingItem
@@ -227,7 +227,7 @@ private struct LimitEditor: View {
                 Label("Asks for Touch ID", systemImage: "touchid").coreFont(size: MacTextSize.meta)
                     .foregroundStyle(GlassInk.secondary)
                 AppActionTile(title: "Cancel", symbol: "xmark", key: "esc", hue: GlassInk.slate) { model.cancelEdit() }
-                AppActionTile(title: "Save", symbol: "checkmark", key: "↩", hue: hue, prominent: true) {
+                AppActionTile(title: "Save", symbol: "checkmark", key: "⏎", hue: hue, prominent: true) {
                     Task { await model.saveEdit(setting) }
                 }
                 .opacity(model.busy == setting.key ? 0.5 : 1)
@@ -265,7 +265,8 @@ private struct LimitEditor: View {
 /// ghost marker for the draft (red with the words when it would be refused).
 struct RangeBar: View {
     let setting: SettingItem
-    var hue: Color = GlassInk.blue
+    var hue: Color?
+    @Environment(\.coreAccent) private var paneAccent
     var ghost: Int64?
 
     var body: some View {
@@ -277,10 +278,10 @@ struct RangeBar: View {
                 let dx = w * setting.position(setting.defaultValue)
                 ZStack(alignment: .leading) {
                     coreShape(3).fill(GlassInk.track.opacity(0.6)).frame(height: 6)
-                    coreShape(3).fill(hue).frame(width: max(x, 6), height: 6)
+                    coreShape(3).fill(hue ?? GlassInk.accent(paneAccent)).frame(width: max(x, 6), height: 6)
                     coreShape(1).fill(GlassInk.secondary).frame(width: 2, height: 12)
                         .offset(x: dx - 1)  // grid: ok tick
-                    coreShape(4).fill(hue).frame(width: 8, height: 18)
+                    coreShape(4).fill(hue ?? GlassInk.accent(paneAccent)).frame(width: 8, height: 18)
                         .offset(x: min(max(x - 4, 0), w - 8))  // grid: ok marker
                     if let ghost {
                         coreShape(3).fill(refused ? GlassInk.red : GlassInk.primary.opacity(0.8))

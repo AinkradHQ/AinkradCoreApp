@@ -14,7 +14,7 @@ public final class AccountsModel {
     private(set) var service: (any AccountsService)?
 
     private(set) var providers: [ProviderItem] = []
-    private(set) var accounts: [AccountItem] = []
+    var accounts: [AccountItem] = []
     private(set) var pools: [PoolItem] = []
     private(set) var chains: [ChainItem] = []
     private(set) var chainBindings: [ChainBindingItem] = []
@@ -32,6 +32,27 @@ public final class AccountsModel {
     var poolSelection: Int64?
     /// A subscription sign-in in the Connect sheet, while it runs (`SignIn.swift`).
     var signIn: SignInFlow?
+    /// Seconds between looks at a sign-in (tests make it short).
+    var signInTick = 1.0
+    /// How fast a guided sign-in's screen is read: quick while it changes, slower while it is still.
+    var pollBackoff = PollBackoff()
+    /// Runner ids the app saw sign-ins finish on, for a Core that does not report where an account runs.
+    var boundSeen: [Int64: String] = [:]
+    /// The AI order (E7-1), read when the Core serves API minor 95; `aiOrderOn` is false below that and the old pages show.
+    var aiOrder: AIOrderDoc?
+    var aiOrderOn = false
+    /// The accounts in the order shown. It moves first on a drag and goes back when the Core refuses.
+    var orderIDs: [Int64] = []
+    /// The Advanced disclosure of the AI order surface.
+    var advancedOpen = false
+    var advancedTab: AdvancedTab = .limits
+    var limitsAccount: Int64?
+    /// What the Limits tab speaks of: a provider, or one account when Limits… was opened from its row (0.10).
+    var limitsTarget: LimitTarget?
+    /// The account removed last and still undoable; in memory only, so a relaunch never shows an old Undo.
+    var removed: RemovedAccount?
+    /// Each account's models with price and switch (0.10), read when the Models tab opens.
+    var modelRows: [Int64: [ModelRowItem]] = [:]
     /// The keyboard's cursor tile on the page: "a-<account>", "m-<account>" (a pool member) or "b-<binding>".
     var cursor: String?
     /// A refusal from the Core for the row or control being written, in words.
@@ -60,8 +81,8 @@ public final class AccountsModel {
     /// The usage limits on an account page, read when it opens.
     var limitsLoad: AccountsLoad = .loading
     var pricesLoad: AccountsLoad = .loading
-    /// Opens a provider's own page. Tests and the demo replace it: they must never open a browser.
-    @ObservationIgnored var opener: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// Opens a provider's own page, through the host (a test host only records it). The demo replaces it.
+    @ObservationIgnored var opener: (URL) -> Void = { _ in }
     @ObservationIgnored var now: () -> Date = { Date() }
 
     /// Connections (GitHub, Jira…): its own pane, driven alongside the accounts.
@@ -70,6 +91,7 @@ public final class AccountsModel {
     public init(host: any AdminHost) {
         self.host = host
         connections = ConnectionsModel(host: host)
+        opener = { [weak host] in host?.open($0) }
     }
 
     // MARK: connection
@@ -100,6 +122,10 @@ public final class AccountsModel {
         readOnly = false
         detail = nil
         signIn = nil
+        aiOrder = nil
+        aiOrderOn = false
+        orderIDs = []
+        modelRows = [:]
         usage = []
         limitsLoad = .loading
     }
@@ -162,8 +188,19 @@ public final class AccountsModel {
             async let a = service.accounts()
             async let o = service.pools()
             (providers, accounts, pools) = try await (p, a, o)
+            // The Core's own usage meter of each row (0.10); an older Core or a device without `admin` has none.
+            let meters = await service.accountMeters()
+            if !meters.isEmpty {
+                accounts = accounts.map {
+                    var a = $0
+                    a.meter = meters[a.id]
+                    return a
+                }
+            }
             load = .ready
             await reloadChains(service)
+            await reloadAIOrder(service)
+            if aiOrderOn { await reloadBindings(service) }
             if let d = detail, account(d) == nil { detail = nil }
         } catch { load = state(for: error) }
         // The verdict on every card needs the limits and budgets too; a device without `admin` just gets none.
@@ -212,6 +249,7 @@ public final class AccountsModel {
         switch e {
         case .forbiddenScope: "forbidden_scope"
         case .stepUpRequired: "step_up_required"
+        case .unlockRequired: "unlock_required"
         case .rateLimited: "rate_limited"
         case .offline: "offline"
         case .sessionExpired: "session_expired"
@@ -243,7 +281,7 @@ public final class AccountsModel {
     /// `writeError[key]`; a person who did not elevate changes nothing and gets no error (the host shows its notice).
     @discardableResult
     func write(
-        _ key: String, reason: String, done: String, keepsEdit: Bool = false,
+        _ key: String, reason: String, done: String, keepsEdit: Bool = false, toast: Bool = true,
         undo: (@MainActor () async -> Void)? = nil,
         _ op: @escaping @Sendable (any AccountsService) async throws -> Void
     ) async -> Bool {
@@ -255,9 +293,9 @@ public final class AccountsModel {
         do {
             try await host.elevated(reason, done: "changed", keepsEdit: keepsEdit) { try await op(service) }
             await reload()
-            if let undo {
+            if toast, let undo {
                 host.shell.showToast(done) { Task { @MainActor in await undo() } }
-            } else {
+            } else if toast {
                 host.shell.showToast(done)
             }
             return true
@@ -515,8 +553,7 @@ public final class AccountsModel {
     }
 
     func openAudit() {
-        host.shell.settings.selected = "audit"
-        host.shell.open(.settings)
+        host.shell.launcher.entry("admin-audit")?.run()
     }
 
     /// "Raise budget…" from an ended session: the Raise dialog for that account's spent budget when it is known, else the
@@ -538,12 +575,13 @@ public final class AccountsModel {
         case .prices: AccountDialogs.openPrice(self, editing: nil)
         case .costs, .ledger: break
         case .spending: AccountDialogs.openBudget(self, editing: nil)
-        case .connections: if connections.service != nil { ConnDialogs.openConnect(connections, kind: nil) }
         default: AccountDialogs.openConnect(self, provider: nil)
         }
     }
 
     func show(_ page: AccountsPage, account id: Int64? = nil, pool: Int64? = nil) {
+        // From Core 0.10 pools and chains are the Core's own words, kept under the AI order.
+        let page = aiOrderOn && [.pools, .chains].contains(page) ? AccountsPage.accounts : page
         self.page = page
         detail = page == .accounts ? id : nil
         if let pool { poolSelection = pool }
@@ -620,9 +658,10 @@ public final class AccountsModel {
         }
         shell.settings.section(
             SettingsSection(
-                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 4
-            ) {
-                AccountsLinkSection(model: self)
-            })
+                id: "accounts-link", group: .apps, title: "Accounts", symbol: "creditcard", order: 9,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { AccountsLinkSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { AccountsLinkSection(model: self, part: .options) },
+                ]))
     }
 }

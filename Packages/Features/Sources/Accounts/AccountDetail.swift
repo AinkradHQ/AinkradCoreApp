@@ -6,9 +6,12 @@ import SwiftUI
 /// an account needs (key saved, turned on, in a pool) with the missing one offering its fix; then three tiles: the key,
 /// how many sessions at once, and the pools it is in. What Core does not report yet is one quiet line, not a card.
 struct AccountDetailView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let account: AccountItem
     @State private var tech = false
+    /// The account whose key ending Touch ID unlocked (Settings, Accounts, Ask Touch ID to reveal keys).
+    @State private var revealed: Int64?
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.corePalette) private var palette
 
@@ -30,6 +33,11 @@ struct AccountDetailView: View {
                             VerdictBadge(verdict: verdict)
                         }
                         Text(model.providerName(a.provider)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                        if let b = a.runnerBinding { RunnerBoundNote(binding: b) }
+                        if let w = a.wipeNote {
+                            Text(w).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+                                .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("wipe-note")
+                        }
                     }
                     Spacer(minLength: Space.s3)
                     HStack(spacing: Space.s2) {
@@ -37,7 +45,8 @@ struct AccountDetailView: View {
                             AccountDialogs.openDelete(model, a)
                         }
                         .disabled(ro)
-                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.blue) {
+                        AppActionTile(title: "New key", symbol: "key.fill", key: "K", hue: GlassInk.accent(paneAccent))
+                        {
                             AccountDialogs.openConnect(model, provider: a.provider, replacing: a)
                         }
                         .disabled(ro)
@@ -60,14 +69,14 @@ struct AccountDetailView: View {
                         tile("Sign-in", "person.badge.key.fill") { SignInTile(model: model, account: a) }.id("keytest")
                     } else {
                         tile("Key test", "checkmark.shield.fill") {
-                            TestTile(model: model, account: a, hue: GlassInk.blue)
+                            TestTile(model: model, account: a, hue: GlassInk.accent(paneAccent))
                         }
                         .id("keytest")
                     }
                     poolsTile(a, pools).id("pools")
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                AccountLimitsSection(model: model, account: a, hue: GlassInk.blue).id("limits")
+                AccountLimitsSection(model: model, account: a, hue: GlassInk.accent(paneAccent)).id("limits")
                 AccountSlice(model: model, account: a)
                 HStack(spacing: Space.s2) {
                     Spacer(minLength: Space.s2)
@@ -125,7 +134,7 @@ struct AccountDetailView: View {
                 Text(line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Space.s3)
-            path(on: a.phase != .disabled, inPool: !pools.isEmpty, hue: GlassInk.blue)
+            path(on: a.phase != .disabled, inPool: !pools.isEmpty, hue: GlassInk.accent(paneAccent))
             if let cause = verdict.cause, cause != .state, cause != .pools {
                 AccLink(title: "Open \(AccountsWords.causeName(cause))", symbol: "arrow.down.right") {
                     open(cause, proxy: proxy)
@@ -189,14 +198,31 @@ struct AccountDetailView: View {
         .coreWell()
     }
 
+    /// The ending is held back while Touch ID is asked for it and has not been given for this account.
+    private func hidden(_ a: AccountItem) -> Bool {
+        AccountsOptions.asksTouchID && !a.maskedTail.isEmpty && revealed != a.id
+    }
+
+    private func reveal(_ a: AccountItem) async {
+        do {
+            try await model.host.elevated("Show how this key ends.", done: "shown", keepsEdit: false) {}
+            revealed = a.id
+        } catch {}
+    }
+
     private func keyTile(_ a: AccountItem) -> some View {
         tile("Key", "lock.shield.fill") {
             HStack(spacing: 6) {
                 ForEach(0..<4, id: \.self) { _ in
                     coreShape(2).fill(GlassInk.secondary).frame(width: 8, height: 8)
                 }
-                Text(a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(
+                Text(hidden(a) || a.maskedTail.isEmpty ? "saved" : a.maskedTail).coreFont(
                     size: MacTextSize.title, weight: .semibold, design: .monospaced)
+                if hidden(a) {
+                    Button("Show ending") { Task { await reveal(a) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Show how this key ends. Needs Touch ID")
+                }
             }
             Text("Kept sealed in Core. It can't be shown again.").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary)
@@ -220,7 +246,7 @@ struct AccountDetailView: View {
                 } label: {
                     HStack(spacing: Space.s2) {
                         Image(systemName: p.isDefault ? "star.fill" : "square.grid.2x2").foregroundStyle(
-                            GlassInk.blueInk)
+                            GlassInk.accentInk(paneAccent))
                         Text(p.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.forward").foregroundStyle(GlassInk.secondary)

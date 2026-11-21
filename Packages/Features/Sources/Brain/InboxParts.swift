@@ -3,6 +3,7 @@ import SwiftUI
 
 /// A note inside a card: the CoreUI notice, toned by what it says. Red refuses, amber needs you, blue and slate inform.
 struct InboxNote: View {
+    @Environment(\.coreAccent) private var paneAccent
     let symbol: String
     let hue: Color
     let title: String
@@ -19,7 +20,7 @@ struct InboxNote: View {
             tone: hue == GlassInk.red
                 ? .fail
                 : hue == GlassInk.amber
-                    ? .warn : hue == GlassInk.blue ? .done : hue == GlassInk.green ? .run : .queue)
+                    ? .warn : hue == GlassInk.accent(paneAccent) ? .done : hue == GlassInk.green ? .run : .queue)
     }
 }
 
@@ -50,7 +51,7 @@ struct SourceBadge: View {
     }
 }
 
-/// A button label with its key beside it, like the prototype's "Approve ⌘↩".
+/// A button label with its key beside it, like the prototype's "Approve ⌘⏎".
 struct KeyLabel: View {
     let title: String
     let key: String?

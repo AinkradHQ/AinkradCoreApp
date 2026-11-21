@@ -1,6 +1,7 @@
 import Accounts
 import Admin
 import Agents
+import AppKit
 import Brain
 import CoreKit
 import CoreUI
@@ -30,6 +31,8 @@ public final class AppModel {
     /// The setup wizard is the first screen; the typed-code first run is its fallback (and a pairing left half done).
     private(set) var wizard: SetupWizardModel!
     var useTypedCode = false
+    /// What follows pairing: About you, an AI account, Look and the Mac runner (E3-1), over the desktop.
+    private(set) var tour: SetupTourModel!
     /// Makes device invites (QR). Unavailable until the Core serves them.
     var invites: any InviteService = UnavailableInviteService()
     /// Invites that were still live when their dialog went away; withdrawn from the bell.
@@ -72,11 +75,18 @@ public final class AppModel {
     private let demo: Bool
     private var events: Task<Void, Never>?
     private var homeFeed: HomeFeed?
+    private var coreUpdateFeed: CoreUpdateFeed?
     private var retry: Task<Void, Never>?
     private var noticeIDs: [String] = []
     /// One per terminal Core has warned about: the toast it owns and the task that keeps its words fresh until `reap_at`.
     private var reaps: [String: (toast: UUID, watch: Task<Void, Never>)] = [:]
     private var expiry: Task<Void, Never>?
+    /// The app unlock (E1-1): whether this Core serves it, the heartbeat that holds it, and what watches the Mac lock and sleep.
+    private var unlockSupported = false
+    private var beat: Task<Void, Never>?
+    private var lockWatch: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    /// Seconds between heartbeats; the Core lapses an unlock after 90 s without one.
+    var beatEvery: Duration = .seconds(30)
     /// The clock and the wait the reap watch runs on; a test replaces both so no real time passes.
     var reapNow: @Sendable () -> Date = { Date() }
     var reapPause: @Sendable (TimeInterval) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
@@ -113,6 +123,14 @@ public final class AppModel {
                         try await self.invites.createRunnerInvite(name: name)
                     }
                 },
+                attest: { [weak self] id in
+                    guard let self else { throw CancellationError() }
+                    try await self.elevated(
+                        "Mark this Mac's runner as its own, so it can open real shells.", done: "recorded"
+                    ) {
+                        try await self.invites.attestBundledRunner(id)
+                    }
+                },
                 revoke: { [weak self] id in
                     guard let self else { return "Not connected to a Core." }
                     return await TerminalHostAdapter(app: self).revokeRunner(id)
@@ -121,35 +139,45 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        wizard = SetupWizardModel(driver: driver, profile: shell.profile, macRunner: macRunner) { [weak self] in
+        wizard = SetupWizardModel(driver: driver, discovery: BonjourDiscovery()) { [weak self] in
             guard let self else { return }
             Task { await self.openDesktop() }
         }
+        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile, store: .standard) { [weak self] items in
+            await self?.saveMeProfile(items) ?? false
+        }
+        wizard.armTour = { [weak self] in self?.tour.arm() }
         devices = DevicesModel(host: self)
         lockouts = LockoutsModel(host: self)
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
+        tour.accountCount = { [weak accounts] in accounts?.accountCount ?? 0 }
+        shell.setupOpen = { [weak tour] in tour?.step != nil && tour?.detour == nil }
         brain = BrainModel(host: AdminHostAdapter(app: self))
         projects = ProjectsModel(host: AdminHostAdapter(app: self))
         leyline = LeylineModel(host: AdminHostAdapter(app: self))
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
+        agents.loreNotes = { [weak lore] session in lore?.notes(ofSession: session) ?? []
+        }
+        agents.openNoteInLore = { [weak lore] id in lore?.open(note: id) }
+        lore.openSession = { [weak agents] id in agents?.openSession(id) }
+        shell.devicesGlance = { [weak devices] in
+            (devices?.active ?? []).prefix(4).map { d in
+                DeviceGlance(
+                    id: d.id, name: d.name,
+                    sub: devices?.isMe(d) == true
+                        ? "\(DeviceWords.platform(d.platform)) · this device"
+                        : "Last seen \(DeviceWords.seen(d.lastUsed).lowercased())",
+                    symbol: DeviceWords.symbol(d.kind, d.platform),
+                    online: !d.cutOff && (d.lastUsed.map { Date().timeIntervalSince($0) < 300 } ?? false))
+            }
+        }
         shell.waitingSource = { [weak agents] in agents?.waitingOnYou ?? 0 }
         shell.sessionCounts = { [weak agents] in agents?.sessionCounts ?? (0, 0) }
         agents.onRaiseBudget = { [weak accounts] s in accounts?.raiseBudget(forAccount: s.route?.account) }
-        shell.elevate = { [weak self] in
-            guard let self else { return }
-            Task {
-                // The chip has no panel to show a notice in, so its outcome is a toast.
-                if await !self.ensureElevated("Unlock admin actions on this Mac for 5 minutes.", done: "unlocked"),
-                    let n = self.stepUpNotice
-                {
-                    self.shell.showToast(n.title)
-                    self.stepUpNotice = nil
-                }
-            }
-        }
+        shell.unlock = { [weak self] in Task { await self?.unlockApp() } }
         shell.retryConnection = { [weak self] in
             guard let self else { return }
             Task { await self.connect() }
@@ -197,6 +225,13 @@ public final class AppModel {
         open(url: url)
     }
 
+    /// The background collector (E9-6): once the Core is live, one sync of the Mac collectors. Does nothing offline.
+    public func collectInBackground() async {
+        for _ in 0..<60 where shell.coreLink != .live { try? await Task.sleep(for: .seconds(1)) }
+        guard shell.coreLink == .live else { return }
+        await brain.collectNow()
+    }
+
     public func start() async {
         guard phase == .starting else { return }
         defer { applyPendingURL() }
@@ -232,9 +267,31 @@ public final class AppModel {
         shell.home.coreName = (try? keyStore.loadIdentity())??.endpoint.host() ?? "Home Core"
         if let live = service as? LiveCoreService {
             homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
+            shell.corePage.source = LiveCorePageSource(connection: live.connection)
+            shell.corePage.gate = { [weak self] reason, op in
+                guard let self else { throw CancellationError() }
+                do { try await self.elevated(reason, done: "changed") { try await op() } } catch is StepUpDeclined {
+                    throw CancellationError()
+                }
+            }
+            let updates = CoreUpdateFeed(shell: shell, connection: live.connection) { [weak self] op in
+                guard let self else { return }
+                try await self.elevated("Update the Core", done: "The update did not start.") { try await op() }
+            }
+            updates.start()
+            coreUpdateFeed = updates
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
+            model.openRunnersApp = { [weak self] in self?.openHub(.runners) }
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let working = self.macRunner.runnerID.flatMap { self.terminals?.isWorking(runner: $0) } ?? false
+                    self.macRunner.holdAwake(working)
+                    try? await Task.sleep(for: .seconds(15))
+                }
+            }
             admin.attach(connection: live.connection)
             accounts.attach(connection: live.connection)
             projects.attach(connection: live.connection)
@@ -245,6 +302,13 @@ public final class AppModel {
                 model?.recording[terminal] = paused.map { PaneRecording(paused: $0) }
             }
             model.pauseRecording = { [weak self] terminal in await self?.leyline.pauseRecording(terminal: terminal) }
+            // The host page's Runner card: how its runner is doing, and a way into the runner's page.
+            leyline.runnerGlance = { [weak self] id in
+                self?.terminals?.runnerProgress(id: id).map {
+                    RunnerGlance(online: $0.online, installing: $0.installing, percent: $0.percent)
+                }
+            }
+            leyline.openRunner = { [weak self] id in self?.terminals?.openRunners(id) }
             // Who claimed a runner invite, from the device list the Admin app keeps.
             leyline.deviceLookup = { [weak self] id in
                 self?.devices.items.first { $0.id == id }.map {
@@ -255,10 +319,50 @@ public final class AppModel {
             lore.attach(connection: live.connection)
             // A Core without the Brain module answers 404 and the pane says "Brain is coming".
             brain.use(CoreBrainService(transport: LiveBrainTransport(connection: live.connection)))
+            if let feed = homeFeed {
+                feed.terminalFacts = { [weak model] in model?.homeFacts() ?? [] }
+                feed.brainService = { [weak self] in self?.brain.service }
+                shell.answerBrainQuestion = { [weak feed] id, room, keep in
+                    Task { await feed?.answer(id, room: room, keep: keep) }
+                }
+                shell.toggleNoteTodo = { [weak feed] i in Task { await feed?.toggleTodo(i) } }
+                model.changed = { [weak feed] in feed?.event(kind: "terminal.changed") }
+            }
         }
         if let live = service as? LiveCoreService { invites = LiveInviteService(service: live) }
         phase = .desktop
+        tour.startIfArmed()
         await connect()
+    }
+
+    /// The setup's About you answers into the Brain's Me space (`PUT /brain/me/profile`, API minor 95). False when this Core
+    /// does not have the route yet or could not be reached: the Ready page says so.
+    private func saveMeProfile(_ items: [SetupProfile.Item]) async -> Bool {
+        guard (brain.apiMinor ?? 0) >= Int(coreMinorV010), let live = service as? LiveCoreService,
+            let body = try? JSONSerialization.data(
+                withJSONObject: ["items": items.map { ["key": $0.key, "body": $0.body] }])
+        else { return false }
+        do {
+            _ = try await LiveBrainTransport(connection: live.connection).send(
+                "PUT", BrainRoutes.base + "/me/profile", body: body)
+            return true
+        } catch { return false }
+    }
+
+    /// E12-5/10: a Core that needs a newer app says so (`min_app`); the person is told to update Ainkrad (it updates by itself, or
+    /// Check for Updates). Skipped on a Core that does not serve minor 95, and when the answer is not readable.
+    private func checkMinApp() async {
+        guard let live = service as? LiveCoreService, await live.connection.serverSupports(minor: coreMinorV010),
+            let data = try? await live.connection.signedRequest(method: "GET", target: "/api/v1/core/health"),
+            let min = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["min_app"] as? String,
+            let app = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            CoreSkew.appTooOld(app: app, minApp: min)
+        else { return }
+        shell.presentSheet(
+            title: "Update Ainkrad",
+            message:
+                "Your Core needs Ainkrad \(min) or newer, and this Mac has \(app). Ainkrad updates itself; to do it now, choose Ainkrad, then Check for Updates.",
+            actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
     }
 
     /// Proves the Core and opens the session. Unreachable is a banner and a retry; anything else stops with its reason.
@@ -268,6 +372,18 @@ public final class AppModel {
         shell.coreLink = .connecting
         do {
             try await service.connect()
+            // E12-5: a Core below the oldest this app works with is not talked to; the person is told to update it.
+            if let live = service as? LiveCoreService, let v = await live.connection.coreProof?.serverVersion,
+                CoreSkew.tooOld(v)
+            {
+                await service.close()
+                shell.coreLink = .offline
+                shell.presentSheet(
+                    title: "Update the Core", message: CoreSkew.message(core: v),
+                    actions: [ShellSheetAction("OK", primary: true)], symbol: "arrow.down.circle")
+                return
+            }
+            await checkMinApp()
             shell.coreLink = .live
             shell.retryAttempt = 0
             shell.nextRetryAt = nil
@@ -277,6 +393,9 @@ public final class AppModel {
             about.use { try await service.about() }
             let me = await about.reload()
             brain.apiMinor = me?.apiMinor
+            let v010 = (me?.apiMinor ?? 0) >= Int(coreMinorV010)  // the runner tool report of Core 0.10
+            shell.showsRunnerUpdates = v010
+            terminals?.showsUpdates = v010
             var admin = me?.isAdmin
             if admin == nil { admin = (try? await service.myScopes())?.contains("admin") }
             let isAdmin = admin ?? false
@@ -284,6 +403,7 @@ public final class AppModel {
             showAdminPages(isAdmin)
             await refreshAll()
             await homeFeed?.refresh()
+            await startUnlock()
             if isAdmin {
                 await syncPendingPairings()
                 await macRunner.reconcile()
@@ -313,10 +433,18 @@ public final class AppModel {
     }
 
     /// Settings sections and launcher entries that need `admin` are out of reach of a device that does not hold it.
-    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "lockouts", "mac-runner"]
+    static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts"]
+    /// The settings pages a device without `admin` does not see: Core stays (Forget lives there), its Limits tab does not.
+    static let hiddenSettings = Set(adminOnly.filter { $0 != "core" } + ["core.limits"])
+    /// Whether this device holds `admin`: the This Mac tab of Devices & Runners is hidden without it.
+    private(set) var isAdminDevice = true
+    /// The tab the Devices & Runners app shows.
+    var hubTab: HubTab = .devices
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
-        shell.settings.hidden = admin ? [] : Set(Self.adminOnly)
+        shell.settings.hidden = admin ? [] : Self.hiddenSettings
+        isAdminDevice = admin
+        if !admin, hubTab == .thisMac { hubTab = .devices }
         if admin {
             stashed.forEach(shell.launcher.register)
             stashed = []
@@ -391,6 +519,7 @@ public final class AppModel {
             }
         case .toolInstall(let fields):
             terminals?.toolInstall(fields)
+            shell.toolInstall(fields)
             accounts.toolInstall(fields)
         case .event(let kind, let pairing, _):
             terminals?.event(kind: kind)
@@ -593,6 +722,26 @@ public final class AppModel {
             })
     }
 
+    /// Add a runner (mockup 13): This Mac, another Mac, a server over SSH, or a server by command.
+    func openAddRunner() {
+        guard service != nil else {
+            shell.showToast("Connect to a Core first.")
+            return
+        }
+        stepUpNotice = nil
+        let model = AddRunnerModel(app: self)
+        shell.present(
+            ShellDialog(
+                id: "add-runner",
+                onClose: { [weak self, weak model] in
+                    self?.stepUpNotice = nil
+                    Task { _ = await model?.requestClose() }
+                }
+            ) {
+                AddRunnerView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
+            })
+    }
+
     func watch(typed m: AddDeviceModel) { wizardPairing = m }
     func unwatch(typed m: AddDeviceModel?) { if wizardPairing === m { wizardPairing = nil } }
 
@@ -664,13 +813,19 @@ public final class AppModel {
     /// The Core's address (`https://host:port`), for the command a runner runs to pair.
     var coreURL: String? { (try? keyStore.loadIdentity())??.endpoint.absoluteString }
 
-    var isElevated: Bool { shell.elevatedUntil.map { $0 > Date() } ?? false }
+    /// The app unlock stands for the elevation the terminal and AI-session routes want; a fresh step-up (a danger action) is the
+    /// per-action `elevatedUntil` window.
+    var isElevated: Bool { isUnlocked || (shell.elevatedUntil.map { $0 > Date() } ?? false) }
+    var isUnlocked: Bool { unlockSupported && shell.lock == .open }
 
     /// Touch ID, through the one sheet, shown only while the system prompt is up. True when the session is elevated (it may have
     /// been already). When it is not, `stepUpNotice` says why and the caller's panel shows it inline.
-    func ensureElevated(_ reason: String, done: String, keepsEdit: Bool = true, force: Bool = false) async -> Bool {
+    func ensureElevated(
+        _ reason: String, done: String, keepsEdit: Bool = true, force: Bool = false, session: Bool = false
+    ) async -> Bool {
         guard let service else { return false }
-        if isElevated && !force { return true }
+        if isElevated && !force && !session { return true }
+        stepUp.opensSession = session
         stepUpNotice = nil
         stepUp.set(.asking(reason))
         shell.presentOnTop(ShellDialog(id: "step-up", dismissible: false) { StepUpSheet(model: stepUp) })
@@ -682,7 +837,11 @@ public final class AppModel {
             return false
         }
         do {
-            setElevated(try await service.stepUp(reason: reason))
+            if session {
+                _ = try await service.unlock(reason: reason)
+            } else {
+                setElevated(try await service.stepUp(reason: reason))
+            }
             stepUp.set(.done)
             try? await Task.sleep(for: .milliseconds(450))  // the tick, before the sheet leaves
             return true
@@ -704,35 +863,160 @@ public final class AppModel {
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
             guard !Task.isCancelled, let self, self.shell.elevatedUntil == until else { return }
             self.shell.elevatedUntil = nil
-            self.shell.showToast("Admin actions locked again. The next one asks for Touch ID.", kind: .warn)
         }
     }
 
-    /// Runs an action that needs elevation: Touch ID first when the session is not elevated, and once more if the Core still
-    /// says `step_up_required` (the session may have been renewed). `done` names what did not happen if Touch ID does not elevate.
+    /// Runs an action that may need Touch ID. It runs first: the Core says what it wants. `step_up_required` on a danger action (D-4)
+    /// asks a fresh Touch ID; with the app locked (it lapsed, or the Core restarted) the unlock comes first. `done` names what did not
+    /// happen if the person says no. At most two prompts, then the Core's own answer stands.
     func elevated<T>(
-        _ reason: String, done: String, keepsEdit: Bool = true, _ op: () async throws -> T
+        _ reason: String, done: String, keepsEdit: Bool = true, force: Bool = false, _ op: () async throws -> T
     ) async throws -> T {
-        guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit) else { throw StepUpDeclined() }
-        do { return try await op() } catch {
-            guard case .stepUpRequired = CoreError.unwrapping(error) else { throw error }
-            shell.elevatedUntil = nil
-            shell.showToast("The Core wants Touch ID for this. Asking now, then trying again.", kind: .warn)
+        if force {
             guard await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true) else {
                 throw StepUpDeclined()
             }
-            return try await op()
         }
+        var asked = 0
+        while true {
+            do { return try await op() } catch {
+                guard let why = CoreError.unwrapping(error), why.needsProof, asked < 2 else { throw error }
+                asked += 1
+                // `unlock_required` means the Core forgot the unlock: sign in again. `step_up_required` is a danger action.
+                let ok =
+                    why == .unlockRequired || (unlockSupported && shell.lock != .open)
+                    ? await unlockApp()
+                    : await ensureElevated(reason, done: done, keepsEdit: keepsEdit, force: true)
+                guard ok else { throw StepUpDeclined() }
+            }
+        }
+    }
+
+    // MARK: app unlock (E1-1)
+
+    /// After the session opens: unlock once (Touch ID), then hold it. A Core without the unlock leaves the app open and every danger
+    /// or code-running action asks for its own Touch ID, as before.
+    func startUnlock() async {
+        guard let service else { return }
+        unlockSupported = await service.supportsUnlock
+        guard unlockSupported else {
+            shell.lock = .open
+            return
+        }
+        watchMacLock()
+        if shell.lock == .open { shell.lock = .locked }
+        await unlockApp()
+    }
+
+    /// One Touch ID opens the app until the Mac locks or sleeps or the app quits (D-5: no time cap). False when it was not given.
+    @discardableResult
+    func unlockApp() async -> Bool {
+        guard unlockSupported, shell.lock != .checking else { return shell.lock == .open }
+        shell.lock = .checking
+        if await ensureElevated("Unlock Ainkrad.", done: "unlocked", keepsEdit: false, force: true, session: true) {
+            shell.lock = .open
+            stepUpNotice = nil
+            holdUnlock()
+            Task { [brain] in
+                await brain?.reload()
+                await brain?.openSealedRooms()
+            }
+            return true
+        }
+        shell.lock = .locked
+        return false
+    }
+
+    /// The heartbeat: every 30 s while the app is open. A beat the Core refuses means it forgot the unlock (it restarted): the
+    /// card comes back and one Touch ID opens it again.
+    private func holdUnlock() {
+        beat?.cancel()
+        beat = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: self?.beatEvery ?? .seconds(30))
+                guard !Task.isCancelled, let self, let service = self.service else { return }
+                do { try await service.beatUnlock() } catch {
+                    guard CoreError.unwrapping(error)?.needsProof == true else { continue }
+                    self.lockApp(tellCore: false)
+                    await self.unlockApp()
+                    return
+                }
+            }
+        }
+    }
+
+    /// The Mac locked or slept, or the app is going: the Core ends the unlock and the card covers the app.
+    func lockApp(tellCore: Bool = true) {
+        beat?.cancel()
+        beat = nil
+        guard unlockSupported else { return }
+        shell.elevatedUntil = nil
+        shell.lock = .locked
+        admin.hideRevealed()  // a revealed value never outlives the unlock
+        if tellCore, let service { Self.endInBackground(service) }
+    }
+
+    private func watchMacLock() {
+        guard lockWatch.isEmpty, !demo else { return }
+        let ws = NSWorkspace.shared.notificationCenter
+        let dc = DistributedNotificationCenter.default()
+        func on(_ c: NotificationCenter, _ name: Notification.Name, _ f: @escaping @MainActor (AppModel) -> Void) {
+            let t = c.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if let self { f(self) } }
+            }
+            lockWatch.append((c, t))
+        }
+        on(ws, NSWorkspace.willSleepNotification) { $0.lockApp() }
+        // Waking: the screen may not lock at all, so no unlock notice would come. Ask once; if the screen is still locked the
+        // prompt is refused and the card waits for `screenIsUnlocked`.
+        on(ws, NSWorkspace.didWakeNotification) { m in
+            m.lockApp(tellCore: false)
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                await m.unlockApp()
+            }
+        }
+        on(dc, Notification.Name("com.apple.screenIsLocked")) { $0.lockApp() }
+        on(dc, Notification.Name("com.apple.screenIsUnlocked")) { m in Task { await m.unlockApp() } }
+        // Quitting ends it too, so the Core does not wait out the 90 s.
+        on(NotificationCenter.default, NSApplication.willTerminateNotification) { m in
+            guard m.unlockSupported, let service = m.service else { return }
+            Self.endInBackground(service)
+        }
+    }
+
+    /// Tells the Core the unlock ended without blocking the main thread. An activity keeps the process (and a Mac going idle to sleep)
+    /// alive for the one call; if the Mac sleeps or quits first, the Core lapses the unlock itself 90 s after the last beat.
+    private static func endInBackground(_ service: any CoreService) {
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated], reason: "Ending the app unlock")
+        Task.detached {
+            await service.endUnlock()
+            ProcessInfo.processInfo.endActivity(activity)
+        }
+    }
+
+    private func stopUnlock() {
+        beat?.cancel()
+        beat = nil
+        lockWatch.forEach { $0.center.removeObserver($0.token) }
+        lockWatch = []
+        unlockSupported = false
+        shell.lock = .open
     }
 
     // MARK: forgetting
 
     /// This Mac was revoked (by itself, from Devices) or the person chose to forget the Core: the keys go, first run returns.
     func forgetCore() async {
+        stopUnlock()
         events?.cancel()
         retry?.cancel()
         homeFeed?.stop()
         homeFeed = nil
+        shell.corePage.source = nil
+        coreUpdateFeed?.stop()
+        coreUpdateFeed = nil
         agents.detach()
         await service?.close()
         await macRunner.coreForgotten()
@@ -782,10 +1066,17 @@ extension AppModel: AgentsHost {
     public var thisMacRunnerID: String? { macRunner.runnerID }
 
     public func openTerminal(on runner: String, session: String?) { terminals?.open(on: runner, session: session) }
+    public func embeddedTerminal(on runner: String, session: String) -> AnyView? {
+        terminals.map { AnyView(EmbeddedTerminal(model: $0, runner: runner, session: session)) }
+    }
 
     /// Touch ID for the agent actions: nil when elevated, else the inline words for what happened.
     public func elevate(reason: String, force: Bool) async -> InlineNotice? {
         if isElevated && !force { return nil }
+        if force && unlockSupported && shell.lock != .open {
+            if await unlockApp() { return nil }
+            return InlineNotice(title: "Touch ID did not run.")
+        }
         if await ensureElevated(reason, done: "done", keepsEdit: true, force: force) { return nil }
         let n = stepUpNotice
         stepUpNotice = nil

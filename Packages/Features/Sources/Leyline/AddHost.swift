@@ -44,12 +44,34 @@ struct QuickAddHost: View {
     let model: LeylineModel
     @Environment(\.corePalette) private var palette
 
+    /// What the Core says when asked whether the typed address answers SSH (API minor 95; nothing on an older Core).
+    private enum Answer: Equatable {
+        case idle, checking
+        case ok(Int)
+        case failed(String)
+    }
+    @State private var answer = Answer.idle
+
     private var typed: Bool { !model.quickText.trimmingCharacters(in: .whitespaces).isEmpty }
     private var login: HostRules.Login? { HostRules.login(model.quickText) }
     /// The Core's refusal, else what is wrong with the text (only once something is typed).
     private var problem: String? {
         if let e = model.writeError { return e }
         return typed && login == nil ? "Type it as user@address, like deploy@10.0.0.4." : nil
+    }
+
+    @ViewBuilder private var answerLine: some View {
+        switch answer {
+        case .idle: EmptyView()
+        case .checking:
+            Label("Checking…", systemImage: "arrow.triangle.2.circlepath").foregroundStyle(palette.text2)
+        case .ok(let ms):
+            Label("\(login?.address ?? "It") answered in \(ms) ms.", systemImage: "checkmark")
+                .foregroundStyle(palette.tone(.run).ink)
+        case .failed(let why):
+            Label(why.prefix(1).uppercased() + why.dropFirst() + ".", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(palette.tone(.warn).ink).fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     var body: some View {
@@ -63,10 +85,22 @@ struct QuickAddHost: View {
                 )
                 .accessibilityIdentifier("host-quick-login")
                 Text(promise).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                answerLine
                 CoreDialogFooter(
                     cancel: CoreAction("Advanced…") { HostDialogs.openAdd(model, login: model.quickText) },
                     primary: CoreAction("Add", key: .primary, run: add), busy: model.busy, enabled: login != nil)
             }
+        }
+        .task(id: login.map { "\($0.address):\($0.port)" }) {
+            answer = .idle
+            guard let l = login else { return }
+            try? await Task.sleep(for: .milliseconds(700))
+            if Task.isCancelled { return }
+            answer = .checking
+            do {
+                let c = try await model.checkHost(l.address, l.port)
+                answer = c.ok ? .ok(c.ms ?? 0) : .failed(c.reason ?? "it did not answer")
+            } catch { answer = .idle }
         }
         .onChange(of: model.quickText) { _, _ in model.clearWriteError() }
         .onExitCommand { model.quickOpen = false }
@@ -221,7 +255,7 @@ struct HostSheet: View {
 
     private var keyOptions: [CoreSelectOption<String>] {
         [CoreSelectOption("", "None · password")]
-            + model.keys.map { CoreSelectOption($0.id, $0.name, note: $0.algo) }
+            + model.keys.map { CoreSelectOption($0.id, $0.name, note: $0.typeWord) }
     }
 
     private func hopOptions(_ i: Int) -> [CoreSelectOption<String>] {

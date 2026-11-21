@@ -14,6 +14,8 @@ protocol AdminService: Sendable {
     func createSecret(_ draft: SecretDraft) async throws -> SecretItem
     func rotateSecret(_ name: String, value: String, fileName: String?) async throws -> SecretItem
     func deleteSecret(_ name: String) async throws
+    /// The plain value, shown once on the person's screen (E1 Reveal). A danger route: the caller steps up first.
+    func revealSecret(_ name: String) async throws -> String
     func secretGroups() async throws -> [SecretGroupItem]
     func createSecretGroup(name: String, description: String, runners: [String]) async throws -> SecretGroupItem
     func updateSecretGroup(_ name: String, description: String, runners: [String]) async throws -> SecretGroupItem
@@ -25,6 +27,24 @@ protocol AdminService: Sendable {
     func audit(before: Int64?, limit: Int, filter: AuditFilter) async throws -> AuditPageItem
     /// The Core's Prometheus text, as it is.
     func metrics() async throws -> String
+    /// Core 0.10 (API minor 95): show or export a value, the Core's own history, the audit counts. See `ActivityService.swift`.
+    func supportsV010() async -> Bool
+    func revealValue(_ name: String) async throws -> RevealedValue
+    func exportSecrets() async throws -> [ExportedValue]
+    func opsHistory() async throws -> [OpsPoint]
+    /// The whole machine and the runner fleet (nil before Core 0.10), the backup schedule and history, and "back up now".
+    func hostFacts() async -> CoreHostFacts?
+    func backups() async throws -> CoreBackups?
+    func startBackup() async throws
+    /// The restarts people asked for, newest first (Core 0.10), for the Ops card "Recent restarts".
+    func recentRestarts() async -> [CoreRestart]
+    func auditStats(days: Int, tzOffsetMins: Int) async throws -> [AuditDayStat]
+}
+
+extension AdminService {
+    func revealSecret(_ name: String) async throws -> String {
+        throw CoreError.badRequest(message: "Not available here.")
+    }
 }
 
 struct LiveAdminService: AdminService {
@@ -142,6 +162,10 @@ struct LiveAdminService: AdminService {
 
     func secretGroups() async throws -> [SecretGroupItem] {
         try await run { try await client.listSecretGroups().ok.body.json.map(Self.group) }
+    }
+
+    func revealSecret(_ name: String) async throws -> String {
+        try await run { try await connection.revealSecret(name: name) }
     }
 
     func createSecretGroup(name: String, description: String, runners: [String]) async throws -> SecretGroupItem {

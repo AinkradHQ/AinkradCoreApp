@@ -83,6 +83,8 @@ final class StepUpModel {
     private(set) var phase: StepUpPhase?
     /// The context the embedded Touch ID view and the Secure Enclave signature share (one per ask).
     private(set) var context = LAContext()
+    /// True while the ask opens the app unlock rather than one action: the sheet's tick says how long it stays open.
+    var opensSession = false
     func set(_ p: StepUpPhase?) {
         if case .asking = p {
             context = LAContext()
@@ -124,7 +126,7 @@ final class StepUpModel {
 
     private var cancelled = false
 
-    /// The sheet's buttons and keys: Try again (↩) after a miss, Cancel (esc) at any time.
+    /// The sheet's buttons and keys: Try again (⏎) after a miss, Cancel (esc) at any time.
     func retry() { choice?.resume(returning: true) }
     func cancel() {
         cancelled = true
@@ -151,6 +153,7 @@ struct StepUpBanner: View {
 /// The one Touch ID sheet. It shows only while the system prompt is up: a fingerprint that scans, a tick when it goes through, a
 /// small shake when it does not match.
 struct StepUpSheet: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: StepUpModel
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var ripple = false
@@ -158,7 +161,7 @@ struct StepUpSheet: View {
     /// Esc and Return are caught here first: the window's own Esc handler leaves this sheet alone (it is not dismissible).
     @State private var keys: Any?
 
-    private var hue: Color { done ? GlassInk.green : missed ? GlassInk.red : GlassInk.blue }
+    private var hue: Color { done ? GlassInk.green : missed ? GlassInk.red : GlassInk.accent(paneAccent) }
 
     var body: some View {
         VStack(spacing: Space.s4) {
@@ -208,7 +211,7 @@ struct StepUpSheet: View {
                     .accessibilityAddTraits(.isHeader)
                 Text(
                     done
-                        ? "Admin actions are open for a short while."
+                        ? (model.opensSession ? "Stays open until your Mac locks or sleeps." : "Confirmed.")
                         : missed ? "Touch it again. After a few misses macOS asks for your password." : reason
                 )
                 .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)

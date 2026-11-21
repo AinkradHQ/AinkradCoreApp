@@ -9,7 +9,7 @@ extension AgentsModel {
     func elevated<T>(_ reason: String, _ op: () async throws -> T) async throws -> T {
         if let host, let n = await host.elevate(reason: reason, force: false) { throw ElevationDeclined(notice: n) }
         do { return try await op() } catch {
-            guard case .stepUpRequired = CoreError.unwrapping(error), let host else { throw error }
+            guard CoreError.unwrapping(error)?.needsProof == true, let host else { throw error }
             if let n = await host.elevate(reason: reason, force: true) { throw ElevationDeclined(notice: n) }
             return try await op()
         }
@@ -112,17 +112,27 @@ extension AgentsModel {
 
     // MARK: cancel, kill, resume, wake
 
-    /// Cancel and Kill ask first: what the agent already did stays, but it stops.
-    public func confirmCancel(_ id: String) {
+    /// Cancel acts at once (no question, no Undo: it cannot be taken back) and says what happens: what the agent already did
+    /// stays in the transcript, and it stops after the tool call in flight. Kill still asks.
+    public func cancel(_ id: String) {
         guard let s = sessions.session(id) else { return }
+        run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
+        shell.showToast(
+            "Cancelling the \(AgentWords.toolName(s.harness)) session. What it did stays in the transcript.",
+            kind: .info)
+    }
+
+    /// ⇧⌘E asks first (a key is easy to hit by mistake); the End button and the row's End… end at once.
+    public func confirmEnd(_ id: String) {
+        guard let s = sessions.session(id), s.live else { return }
         shell.presentSheet(
-            title: "Cancel this session?",
+            title: "End this session?",
             message:
-                "\(s.harness) finishes the tool call in flight, then the session ends as cancelled. What it already did stays in the transcript.",
+                "The \(AgentWords.toolName(s.harness)) process exits and the composer closes. The transcript stays.",
             actions: [
                 ShellSheetAction("Keep running"),
-                ShellSheetAction("Cancel session", primary: true, destructive: true) { [weak self] in
-                    self?.run(id, "Cancelling", stop: .cancelling) { try await $0.cancel(id) }
+                ShellSheetAction("End session", primary: true, destructive: true) { [weak self] in
+                    self?.end(id)
                 },
             ])
     }
@@ -263,7 +273,7 @@ extension AgentsModel {
     public func create(_ new: NewAgentSession) async -> InlineNotice? {
         guard let api else { return InlineNotice(title: "Connect to a Core first.") }
         do {
-            let s = try await elevated("Start \(new.harness) on \(runnerName(new.runner)).") {
+            let s = try await elevated("Start \(new.harness) on \(new.runner.map(runnerName) ?? "the Core").") {
                 try await api.create(new)
             }
             sessions.upsert(s)

@@ -132,6 +132,21 @@ extension LiveLeylineService {
         ).item
     }
 
+    func checkHost(address: String, port: Int) async throws -> HostCheck {
+        guard await connection.serverSupports(minor: coreMinorV010) else { throw LeylineFailure.notYet }
+        struct Body: Encodable {
+            let address: String
+            let port: Int
+        }
+        struct Wire: Decodable {
+            let ok: Bool
+            let ms: Int?
+            let reason: String?
+        }
+        let w = try await call("POST", "/hosts/check", Body(address: address, port: port), as: Wire.self)
+        return HostCheck(ok: w.ok, ms: w.ms, reason: w.reason)
+    }
+
     // `POST /hosts/{h}/direct` answers the ready command; `/direct/revoke` drops the lease.
     func startDirect(host: String) async throws -> DirectLease {
         try await call("POST", "/hosts/\(Self.seg(host))/direct", as: DirectWire.self).item

@@ -7,10 +7,12 @@ import SwiftUI
 struct ProjectSpaceView: View {
     let model: ProjectsModel
     let project: ProjectItem
+    /// What the back button does; nil goes back to the gallery of the Projects pane.
+    var onBack: (() -> Void)?
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            TopBar(model: model, project: project)
+            TopBar(model: model, project: project, onBack: onBack)
             HStack(alignment: .top, spacing: Space.s2) {
                 Rail(model: model)
                 page
@@ -30,7 +32,7 @@ struct ProjectSpaceView: View {
         case .overview:
             Overview(model: model, project: project)
         case .run:
-            RunPage(model: model, project: project).id(project.id)
+            RunsPage(model: model, project: project).id(project.id)
         case .repos:
             ReposPage(model: model, project: project)
         case .sessions:
@@ -54,10 +56,13 @@ struct ProjectSpaceView: View {
 private struct TopBar: View {
     let model: ProjectsModel
     let project: ProjectItem
+    let onBack: (() -> Void)?
 
     var body: some View {
         AppHeader {
-            BackButton("Projects") { model.closeProject() }
+            BackButton("Projects") {
+                if let onBack { onBack() } else { model.closeProject() }
+            }
             ProjectMark(name: project.name, colour: model.colour(project), size: MacSize.controlMd)
             Text(project.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
             ProjectStateBadge(project: project)
@@ -85,18 +90,28 @@ private struct TopBar: View {
     /// Restart and Stop while it runs, Stop while it starts, Start otherwise. Each asks the Core's run routes behind Touch ID.
     @ViewBuilder private var runButtons: some View {
         let can = model.canControl(project)
-        switch project.tag {
-        case .running:
-            run("Restart", "arrow.clockwise", .restart, enabled: can)
-            run("Stop", "stop", .stop, enabled: can)
-        case .starting:
-            run("Stop", "stop", .stop, enabled: can)
-        case .stopped, .failed:
-            run("Start", "play", .start, enabled: can)
-        case .settingUp, .new:
-            run(
-                "Start", "play", .start, enabled: false,
-                why: "Start is ready once the repos are copied and the run is drafted")
+        if project.archived {
+            Button {
+                Task { await model.unarchive(project) }
+            } label: {
+                Label("Unarchive", systemImage: "arrow.uturn.backward")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary)).disabled(!can)
+            .help("Bring \(project.name) back to the Projects list")
+        } else {
+            switch project.tag {
+            case .running:
+                run("Restart", "arrow.clockwise", .restart, enabled: can)
+                run("Stop", "stop", .stop, enabled: can)
+            case .starting:
+                run("Stop", "stop", .stop, enabled: can)
+            case .stopped, .failed:
+                run("Start", "play", .start, enabled: can)
+            case .settingUp, .new:
+                run(
+                    "Start", "play", .start, enabled: false,
+                    why: "Start is ready once the repos are copied and the run is drafted")
+            }
         }
     }
 
@@ -135,5 +150,26 @@ private struct Rail: View {
         }
         .keyboardShortcut(KeyEquivalent(s.key), modifiers: .command)
         .accessibilityIdentifier("project-rail-\(s.title)")
+    }
+}
+
+/// A project's space in a pane of its own (Settings > Projects > Options > "Open projects in" = A new workspace). It reads the
+/// project again on every change, and going back closes the pane.
+struct ProjectPaneView: View {
+    let model: ProjectsModel
+    let id: Int64
+
+    var body: some View {
+        ZStack {
+            if let project = model.project(id) {
+                ProjectSpaceView(model: model, project: project) {
+                    model.host.shell.closePane(ProjectsModel.paneID(id))
+                }
+            } else {
+                Text("This project is not in the list any more.").foregroundStyle(GlassInk.secondary)
+            }
+        }
+        .appLook(AppLookPrefs.shared("projects"))
+        .clipShape(coreShape(Radius.cardMac))
     }
 }

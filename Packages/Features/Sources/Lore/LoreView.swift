@@ -7,6 +7,7 @@ import SwiftUI
 /// own (`own: true`), like the Projects and Leyline spaces. Opens on today's note with the cursor ready (L1).
 struct LoreView: View {
     let model: LoreModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Space.s2) {
@@ -16,13 +17,32 @@ struct LoreView: View {
                     .frame(maxWidth: Self.pageWidth)
                     .transition(.opacity)
             }
-            content.frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: Space.s2) {
+                if model.showLeft {
+                    LoreLeftSidebar(model: model).frame(width: Self.leftWidth).coreWell(radius: Radius.pane)
+                        .transition(.opacity)
+                }
+                content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                if model.showRight {
+                    LoreRightSidebar(model: model).frame(width: Self.rightWidth).coreWell(radius: Radius.pane)
+                        .transition(.opacity)
+                }
+            }
+            // Reduce Motion: the sidebars simply appear.
+            .animation(reduceMotion ? nil : Motion.out(Motion.ui), value: model.showLeft)
+            .animation(reduceMotion ? nil : Motion.out(Motion.ui), value: model.showRight)
         }
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
         .animation(Motion.out(Motion.ui), value: model.notice)
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("lore"))
+        .onAppear {
+            model.editor?.setTextScale(LoreOptions.scale(LoreOptions.options.string(LoreOptions.textSize, "medium")))
+        }
+        .onChange(of: LoreOptions.options.string(LoreOptions.textSize, "medium")) { _, id in
+            model.editor?.setTextScale(LoreOptions.scale(id))
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lore-space")
     }
@@ -42,17 +62,17 @@ struct LoreView: View {
         }
     }
 
-    /// A reading measure: about 80 characters of body text.
-    static let pageWidth = Space.s8 * 24
+    /// The page's widest text column. It was 768; the page now takes the room the sidebars leave (E10-1).
+    static let pageWidth = Space.s8 * 28
+    static let leftWidth = Space.s8 * 7.5
+    static let rightWidth = Space.s8 * 8
 
     @ViewBuilder private var content: some View {
         switch model.load {
         case .ready, .loading:
             VStack(spacing: Space.s2) {
                 LorePageIsland(model: model)
-                if !model.backlinks.isEmpty { LoreBacklinksIsland(model: model) }
             }
-            .animation(Motion.out(Motion.ui), value: model.backlinks.isEmpty)
         case .notConnected:
             CoreStateCard(
                 symbol: "wifi.slash", title: "Not connected",
@@ -74,16 +94,21 @@ private struct LorePageIsland: View {
     let model: LoreModel
 
     var body: some View {
-        Group {
-            if let editor = model.editor {
-                LoreEditor(editor)
-                    .opacity(model.load == .ready ? 1 : 0)
-                    .onAppear { model.ready() }
-                    .onChange(of: model.load) { if model.load == .ready { model.ready() } }
+        VStack(spacing: Space.s2) {
+            if let doc = model.openDoc { LoreAIBanner(model: model, doc: doc) }
+            if model.hasTable { LoreTableBar(model: model) }
+            Group {
+                if let editor = model.editor {
+                    LoreEditor(editor)
+                        .opacity(model.load == .ready ? 1 : 0)
+                        .onAppear { model.ready() }
+                        .onChange(of: model.load) { if model.load == .ready { model.ready() } }
+                }
             }
+            .frame(maxWidth: LoreView.pageWidth)
         }
         .padding(.horizontal, Space.s6).padding(.vertical, Space.s5)
-        .frame(maxWidth: LoreView.pageWidth, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .coreFrame(radius: Radius.pane)
         .accessibilityLabel(model.title)
         .accessibilityIdentifier("lore-page")
@@ -96,10 +121,10 @@ private struct LoreTopBar: View {
 
     var body: some View {
         AppHeader {
-            CoreIconButton(symbol: "chevron.left", label: "Show the day before  ⌘[") { model.step(-1) }
-                .keyboardShortcut("[", modifiers: .command)
-            CoreIconButton(symbol: "chevron.right", label: "Show the next day  ⌘]") { model.step(1) }
-                .keyboardShortcut("]", modifiers: .command)
+            CoreIconButton(symbol: "chevron.left", label: "Show the day before  ⌥⌘[") { model.step(-1) }
+                .keyboardShortcut("[", modifiers: [.command, .option])
+            CoreIconButton(symbol: "chevron.right", label: "Show the next day  ⌥⌘]") { model.step(1) }
+                .keyboardShortcut("]", modifiers: [.command, .option])
             Text(model.title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 .help(model.title)
                 .accessibilityAddTraits(.isHeader)
@@ -110,6 +135,12 @@ private struct LoreTopBar: View {
             LoreProjectChip(model: model)
         } actions: {
             Text(model.syncWords).foregroundStyle(GlassInk.secondary).accessibilityIdentifier("lore-sync")
+            CoreIconButton(symbol: "sidebar.left", label: "Hide the left sidebar  ⌘[") { model.showLeft.toggle() }
+                .keyboardShortcut("[", modifiers: .command)
+            CoreIconButton(symbol: "sidebar.right", label: "Hide the right sidebar  ⌘]") { model.showRight.toggle() }
+                .keyboardShortcut("]", modifiers: .command)
+            Button("Focus") { model.toggleFocus() }.keyboardShortcut(".", modifiers: .command).hidden()
+                .frame(width: 0, height: 0).accessibilityHidden(true)
             CoreIconButton(symbol: "clock.arrow.circlepath", label: "Show earlier versions of this note") {
                 model.showVersions()
             }

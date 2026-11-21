@@ -130,7 +130,7 @@ struct SessionRow: View {
                 if hover {
                     HStack(spacing: Space.s1) {
                         mini(pinned ? "Unpin" : "Pin", "P", onPin)
-                        if session.live { mini("End…", "E", onEnd) }
+                        if session.live { mini("End…", nil, onEnd) }
                     }
                     .padding(.leading, Space.s2)
                     .background(selected ? SessionInk.selected : SessionInk.hover, in: coreShape(Radius.control))
@@ -167,9 +167,9 @@ struct SessionRow: View {
         .accessibilityLabel("\(title), \(AgentWords.toolName(session.harness)) on \(runner), \(st.label)")
     }
 
-    private func mini(_ t: String, _ key: String, _ run: @escaping () -> Void) -> some View {
+    private func mini(_ t: String, _ key: String?, _ run: @escaping () -> Void) -> some View {
         Button(t, action: run).buttonStyle(CoreButtonStyle(.secondary, size: .small)).environment(\.coreKeycap, key)
-            .help("\(t) (\(key))")
+            .help(key.map { "\(t) (\($0))" } ?? t)
     }
 }
 

@@ -5,10 +5,30 @@ import SwiftUI
 /// the tab below. Overview and Checks are global; the room picker sits inside Rooms, Inbox and Activity,
 /// the tabs that look at one room. The keyboard drives it: ⌘1 to ⌘5 tabs, ⌘N a new room, ⌥⌘N the advanced sheet, Esc back.
 struct BrainPane: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     @FocusState private var paneFocus: Bool
 
+    /// The calm Brain fills the pane when the Core has it and the person is not in Explore.
+    private var showsCalm: Bool {
+        model.calmAvailable && !model.exploring && model.load == .ready && model.setup == .ready && !model.rooms.isEmpty
+    }
+
     var body: some View {
+        if showsCalm {
+            BrainCalmView(brain: model)
+                .coreFont(size: MacTextSize.body)
+                .foregroundStyle(GlassInk.primary)
+                .paneLook(AppLookPrefs.shared("brain").look)
+                .clipShape(coreShape(Radius.cardMac))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("brain-pane")
+        } else {
+            console
+        }
+    }
+
+    private var console: some View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
                 // No service attached: nothing to look at, so no tabs over the unavailable card.
@@ -62,7 +82,8 @@ struct BrainPane: View {
         .focusable().focused($paneFocus).focusEffectDisabled()
         .onAppear { paneFocus = true }
         .retakeFocus(after: model.host.shell, pane: "brain") { paneFocus = true }
-        .paneLook(BrainPrefs.shared.look)
+        .paneLook(AppLookPrefs.shared("brain").look)
+        .appLookTheme(AppLookPrefs.shared("brain"))
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("brain-pane")
@@ -79,24 +100,35 @@ struct BrainPane: View {
                 .accessibilityLabel(BrainWords.sampleLabel)
         }
         let ready = model.setup == .ready && model.load == .ready
+        if model.calmAvailable {
+            AppActionTile(title: "Back to Brain", symbol: "brain", key: "⌘0", hue: GlassInk.accent(paneAccent)) {
+                model.explore(false)
+            }
+            .keyboardShortcut("0", modifiers: .command)
+        }
         if ready, !model.rooms.isEmpty, let sync = model.sync,
             model.currentTab == .rooms || model.currentTab == .sources || (model.currentTab == .inbox && servesInbox)
         {
             SyncNowTile(sync: sync)
         } else if model.service?.importRoutes != nil, model.load == .ready, model.setup != .ready || model.rooms.isEmpty
         {
-            AppActionTile(title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.blue) {
+            AppActionTile(
+                title: "Import…", symbol: "square.and.arrow.down", key: "⌘I", hue: GlassInk.accent(paneAccent)
+            ) {
                 model.openImport()
             }
         }
         if model.currentTab == .rooms, model.load == .ready, model.canMakeRooms {
             AppActionTile(
-                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N", hue: GlassInk.blue
+                title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N",
+                hue: GlassInk.accent(paneAccent)
             ) {
                 BrainSheets.openNewRoom(model)
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
-            AppActionTile(title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
+            AppActionTile(
+                title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+            ) {
                 Task { await model.quickRoom() }
             }
             .keyboardShortcut("n", modifiers: .command)
@@ -116,7 +148,7 @@ struct BrainPane: View {
         switch model.currentTab {
         case .activity: true
         case .inbox: model.inboxState.list != .noRoom
-        case .overview, .checks, .rooms, .sources: false
+        case .overview, .checks, .rooms, .sources, .records, .evidence: false
         }
     }
 
@@ -163,6 +195,8 @@ struct BrainPane: View {
                 case .overview: OverviewTab(model: model)
                 case .rooms: RoomsTab(model: model)
                 case .sources: if let sync = model.sync { SourcesTab(brain: model, sync: sync) }
+                case .records: ExploreRecordsTab(brain: model)
+                case .evidence: ExploreEvidenceTab(brain: model)
                 case .inbox: CandidateInboxTab(model: model)
                 case .activity:
                     if model.isSample || model.service?.servesChanges == true {

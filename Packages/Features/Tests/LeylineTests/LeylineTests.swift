@@ -8,6 +8,7 @@ import Testing
 
 @MainActor
 final class FakeHost: AdminHost {
+    func open(_ url: URL) {}  // never a real browser in a test
     let shell = ShellModel()
     var pausedReason: String?
     var elevationNotice: AdminNotice?
@@ -125,6 +126,32 @@ struct LeylineTests {
         #expect(groups[2].sub == "not in a group · 1 host")
     }
 
+    @Test func aHostSaysOnlineOrNotAnsweringOnlyOnceTheCoreHasChecked() {
+        var h = HostItem(
+            id: "h", name: "n", address: "a", port: 22, username: "u", keyID: nil, jumpChain: [], viaRunner: nil,
+            group: nil, tags: [], aiRule: .ask, os: nil, createdAt: nil)
+        #expect(h.presence == nil && h.seenLine == nil)
+        h.reach = HostReach(up: true, latencyMS: 40, checkedAt: Date(), seenAt: Date())
+        #expect(h.presence?.label == "Online" && h.seenLine != nil)
+        h.reach = HostReach(up: false, latencyMS: nil, checkedAt: Date(), seenAt: nil)
+        #expect(h.presence?.label == "Not answering" && h.seenLine == nil)
+    }
+
+    @MainActor @Test func theRunnerChoicesMarkTheHostsThatAreAlreadyRunners() {
+        let (m, _, _) = model()
+        func h(_ n: String, runner: String?) -> HostItem {
+            var x = HostItem(
+                id: n, name: n, address: "10.0.0.4", port: 22, username: "ops", keyID: nil, jumpChain: [],
+                viaRunner: nil, group: nil, tags: [], aiRule: .ask, os: "Ubuntu 24.04", createdAt: nil)
+            x.runnerDevice = runner
+            return x
+        }
+        m.hosts = [h("birch", runner: nil), h("cedar", runner: "d_1")]
+        let choices = m.runnerChoices
+        #expect(choices.map(\.isRunner) == [false, true])
+        #expect(choices[0].detail == "Ubuntu 24.04 · ops@10.0.0.4")
+    }
+
     @Test func aPatchSendsNullToClearAndOmitsWhatItDoesNotOwn() throws {
         let p = HostPatch.edit(HostDraft(name: "w", address: "a", username: "u"))
         let json = try #require(
@@ -191,9 +218,21 @@ struct LeylineTests {
                 passphrase: ""))
         #expect(host.reasons.count == 2)
         #expect(s.calls == ["generate deploy", "import ops passphrase=false", "generate ops"])
-        // Not an OpenSSH key: refused here, nothing sent, no Touch ID.
-        #expect(!(await m.importKey(name: "rsa", privateKey: "-----BEGIN RSA PRIVATE KEY-----", passphrase: "")))
-        #expect(host.reasons.count == 2)
+        // A PEM key is sent like any other (the Core decides what it accepts): Touch ID, then the call.
+        #expect(await m.importKey(name: "rsa", privateKey: "-----BEGIN RSA PRIVATE KEY-----", passphrase: ""))
+        #expect(host.reasons.count == 3)
+    }
+
+    @Test func aKeyListShowsItsTypeAndBits() {
+        let k = { (algo: String, bits: Int?) in
+            KeyItem(
+                id: "k_1", name: "n", algo: algo, publicKey: "", fingerprint: "", imported: true, createdAt: nil,
+                bits: bits)
+        }
+        #expect(k("rsa", 4096).line == "RSA 4096 · imported")
+        #expect(k("rsa", nil).typeWord == "RSA")
+        #expect(k("ecdsa-p384", 384).typeWord == "ecdsa")
+        #expect(k("ed25519", 256).typeWord == "ed25519")
     }
 
     @MainActor @Test func aKeyShowsTheHostsThatUseIt() async {

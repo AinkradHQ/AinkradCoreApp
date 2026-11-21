@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ServiceManagement
 
@@ -35,6 +36,46 @@ protocol MacRunnerControl: Sendable {
     /// Deletes the runner's key and enrolment (the Core has revoked it or been forgotten).
     func forgetEnrolment()
     func openLoginItems()
+    /// Why the runner is not doing its job, in plain words; nil when nothing is wrong (see `MacRunnerProblem`).
+    func lastProblem(connected: Bool) -> String?
+    /// Shows the runner's own folder (its log and last error) in Finder.
+    func revealLog()
+}
+
+extension MacRunnerControl {
+    func lastProblem(connected: Bool) -> String? { nil }
+    func revealLog() {}
+}
+
+/// The runner's problems in plain words, from the two places they show: launchd (`launchctl print`, when it could not start
+/// the runner at all) and the runner's own `last-error` file (when it runs without AI tools).
+enum MacRunnerProblem {
+    /// A launchd note is old news once the runner is connected (`last exit code` stays), so `launchd` is passed nil then.
+    static func words(launchd: String?, lastErrorFile: String?) -> String? {
+        if let launchd {
+            let code = exitCode(launchd)
+            if code == 78 || launchd.contains("spawn failed") {
+                return
+                    "macOS could not start the runner\(code.map { " (error \($0))" } ?? ""). Restart the app, or turn the switch off and on."
+            }
+            if let code, code != 0 { return "The runner stopped (error \(code)). macOS starts it again by itself." }
+        }
+        guard let why = lastErrorFile?.trimmingCharacters(in: .whitespacesAndNewlines), !why.isEmpty else { return nil }
+        if why.hasPrefix("no AI tool installed") {
+            return
+                "The runner is on, but no AI tool is installed on this Mac. Terminals work; AI sessions wait for one."
+        }
+        return "The runner is on without AI sessions: \(why)"
+    }
+
+    /// `last exit code = 78: EX_CONFIG` or `last exit code = (never exited)`.
+    static func exitCode(_ launchd: String) -> Int? {
+        guard let line = launchd.split(separator: "\n").first(where: { $0.contains("last exit code =") }) else {
+            return nil
+        }
+        let value = line.split(separator: "=", maxSplits: 1).last?.trimmingCharacters(in: .whitespaces) ?? ""
+        return Int(value.prefix { $0.isNumber })
+    }
 }
 
 /// The real thing: the runner and pty host in `Contents/Helpers`, two agent plists in `Contents/Library/LaunchAgents`
@@ -145,6 +186,38 @@ struct LiveMacRunnerControl: MacRunnerControl {
     }
 
     func openLoginItems() { SMAppService.openSystemSettingsLoginItems() }
+
+    func revealLog() {
+        let log = state.appending(path: "runner.log")
+        if FileManager.default.fileExists(atPath: log.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([log])
+        } else {
+            NSWorkspace.shared.open(state)
+        }
+    }
+
+    func lastProblem(connected: Bool) -> String? {
+        let launchd = connected ? nil : Self.launchctlPrint()
+        let file = try? String(contentsOf: state.appending(path: "last-error"), encoding: .utf8)
+        return MacRunnerProblem.words(launchd: launchd, lastErrorFile: file)
+    }
+
+    /// `launchctl print gui/<uid>/<label>`, of whichever of the two agents exists; nil when neither is loaded.
+    private static func launchctlPrint() -> String? {
+        for l in ["com.ainkrad.core.runner.terminals", "com.ainkrad.core.runner"] {
+            let p = Process()
+            p.executableURL = URL(filePath: "/bin/launchctl")
+            p.arguments = ["print", "gui/\(getuid())/\(l)"]
+            let out = Pipe()
+            p.standardOutput = out
+            p.standardError = FileHandle.nullDevice
+            guard (try? p.run()) != nil else { continue }
+            let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+            p.waitUntilExit()
+            if p.terminationStatus == 0 { return text }
+        }
+        return nil
+    }
 }
 
 /// Demo mode and previews: no runner inside, nothing to register.

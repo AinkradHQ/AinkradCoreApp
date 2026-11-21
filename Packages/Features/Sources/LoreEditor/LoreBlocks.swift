@@ -24,6 +24,8 @@ extension NSAttributedString.Key {
     /// Source text the reader did not parse (plain runs, a paragraph over the limit): written back exactly, unescaped.
     /// Typed text never carries it, so what the person types is escaped as usual.
     static let loreRaw = NSAttributedString.Key("loreRaw")
+    /// A raw block that is a GFM table: drawn as a grid unless the caret is inside it.
+    static let loreTable = NSAttributedString.Key("loreTable")
     /// The index of the source block this paragraph was read from (see `LoreSourceMap`).
     static let loreSeq = NSAttributedString.Key("loreSeq")
 }
@@ -102,19 +104,20 @@ enum LoreInk {
     @MainActor static let selection = NSColor(GlassInk.lift(0.18))
 
     struct Resolved: Sendable {
-        var text2, faint, code, chip, box, boxOn, check: CGColor
+        var text2, faint, code, chip, box, boxOn, check, head: CGColor
     }
 
     /// Written on the main thread when the text view's appearance changes; read while TextKit draws (main thread).
     nonisolated(unsafe) static var cg = Resolved(
-        text2: .black, faint: .black, code: .black, chip: .black, box: .black, boxOn: .black, check: .white)
+        text2: .black, faint: .black, code: .black, chip: .black, box: .black, boxOn: .black, check: .white,
+        head: .black)
 
     @MainActor static func resolve(for appearance: NSAppearance) {
         appearance.performAsCurrentDrawingAppearance {
             cg = Resolved(
                 text2: text2.cgColor, faint: faint.cgColor, code: NSColor(GlassInk.sunk(0.18)).cgColor,
                 chip: NSColor(GlassInk.well).cgColor, box: faint.cgColor, boxOn: NSColor(GlassInk.blue).cgColor,
-                check: NSColor(Palette.night.btnInk).cgColor)
+                check: NSColor(Palette.night.btnInk).cgColor, head: NSColor(GlassInk.lift(0.12)).cgColor)
         }
     }
 }
@@ -122,10 +125,12 @@ enum LoreInk {
 /// SF Pro at the writing sizes, scaled by Settings, Appearance, Text size.
 @MainActor enum Typeface {
     /// Body is the Mac title size (15 pt): a page for reading, not a form.
-    static var body: CGFloat { MacTextSize.scaled(MacTextSize.title) }
+    static var body: CGFloat { MacTextSize.scaled(MacTextSize.title) * userScale }
+    /// Lore's own Text size (Settings, Lore, Options): 0.9 small, 1 medium, 1.15 large, on top of Appearance's.
+    static var userScale: CGFloat = 1
     /// h1, h2, h3; h4–h6 draw as body-sized semibold.
     static func heading(_ n: Int) -> CGFloat {
-        MacTextSize.scaled([26, MacTextSize.large, 17][min(max(n, 1), 3) - 1])
+        MacTextSize.scaled([26, MacTextSize.large, 17][min(max(n, 1), 3) - 1]) * userScale
     }
     private static var cache: [String: NSFont] = [:]
 
@@ -217,6 +222,13 @@ enum LoreInk {
         ts.removeAttribute(.loreFence, range: r)
         ts.addAttributes(blockAttrs(b), range: r)
         if b == .code { ts.addAttribute(.loreFence, value: "all", range: r) }
+        // A table row never wraps (the grid draws one row per line); the grid truncates what does not fit.
+        if ts.attribute(.loreTable, at: r.location, effectiveRange: nil) != nil {
+            let p = (para(.code).mutableCopy() as! NSMutableParagraphStyle)  // swiftlint:disable:this force_cast
+            p.lineBreakMode = .byClipping
+            p.lineSpacing = 10
+            ts.addAttribute(.paragraphStyle, value: p, range: r)
+        }
         var runs: [(NSRange, [NSAttributedString.Key: Any])] = []
         ts.enumerateAttributes(in: r) { a, rr, _ in runs.append((rr, runAttrs(b, a))) }
         for (rr, a) in runs { ts.addAttributes(a, range: rr) }

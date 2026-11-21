@@ -78,7 +78,7 @@ extension AddWizardView {
         switch model.kind {
         case .phone:
             VStack(spacing: Space.s2) {
-                IconTile("iphone", hue: GlassInk.blue, size: 48)
+                IconTile("iphone", hue: GlassInk.accent(paneAccent), size: 48)
                 Text("Coming soon").coreFont(size: MacTextSize.title, weight: .semibold)
                 Text(
                     "When it is ready, a QR here opens its App Store or TestFlight page. You can add a Mac or a runner now."

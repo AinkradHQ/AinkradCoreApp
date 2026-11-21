@@ -29,7 +29,13 @@ final class KeyEntryFlow {
     /// Where a new account goes and its monthly limit; nil leaves both to the Core's defaults.
     var placement: AccountPlacement?
 
-    init(target: AccountItem? = nil) { self.target = target }
+    /// Setup adds the first key before any runner is on: the key is saved, and checked once a runner can do it.
+    let allowNoRunner: Bool
+
+    init(target: AccountItem? = nil, allowNoRunner: Bool = false) {
+        self.target = target
+        self.allowNoRunner = allowNoRunner
+    }
 
     /// Keys are refused until `secrets.mode` and `secrets.provider_accounts` are both on.
     var needsGate: Bool { gate.map { $0.mode == 0 || $0.providerAccounts == 0 } ?? false }
@@ -47,7 +53,7 @@ final class KeyEntryFlow {
     }
     func ready(rotating: Bool) -> Bool {
         !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !needsGate
-            && (rotating || (labelOK && runner != nil))
+            && (rotating || (labelOK && (runner != nil || allowNoRunner)))
     }
 
     func wipe() { key = "" }

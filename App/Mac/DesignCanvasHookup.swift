@@ -1,3 +1,4 @@
+import CoreKit
 import Design
 import DesignCanvas
 import Foundation
@@ -31,12 +32,11 @@ final class CanvasEditing: DesignEditBackend {
     }
 }
 
-/// Gives Design its canvas (V3-02). The app links the engine; `Features` does not. A design gets a canvas once its doc can
-/// sync with the Core. TODO(V1-03): the Core serves no `docs/{d}/sync` route yet, so there is no live `DesignSyncChannel`
-/// and real designs keep their preview. Then: `DesignCanvas(doc:system:channel:assets:)` with the live channel and a
-/// `CanvasAssetSource` over `input.info` / `input.data` (its `CanvasAssetInfo(contentType:check:)` from `info`), and
-/// `onReady: { CanvasEditing.connect($0, to: input.editor) }` so the layers panel and inspector work. Debug: `CORE_DESIGN_SCENE=<dir>` (doc.bin, system.bin, <sha>.png from AinkradCore's
-/// synth scene) opens every design on that scene through a local channel, for screenshots and the T5 measurement.
+/// Gives Design its canvas (V3-02). The app links the engine; `Features` does not. A design gets its canvas over the
+/// Core's sync socket (`CoreDesignSyncChannel`, resuming from the last seq it applied); a design system rides the same
+/// channel. Assets come from the Design service. Debug: `CORE_DESIGN_SCENE=<dir>` (doc.bin, system.bin, <sha>.png from
+/// AinkradCore's synth scene) opens every design on that scene through a local channel, for screenshots and the T5
+/// measurement.
 @MainActor
 enum DesignCanvasHookup {
     static func install(_ app: AppModel) {
@@ -56,8 +56,43 @@ enum DesignCanvasHookup {
             return
         }
         #endif
-        app.design.canvas = { _ in nil }
+        app.design.canvas = { input in
+            guard let openSocket = input.openSocket else { return nil }
+            let channel = CoreDesignSyncChannel { doc, seq in CoreSocketAdapter(try await openSocket(doc, seq)) }
+            let assets = CanvasAssetSource(
+                info: { sha in
+                    guard let i = await input.info(sha) else { return nil }
+                    return CanvasAssetInfo(
+                        contentType: i.contentType,
+                        check: i.check == "ok" ? .ok : i.check == "refused" ? .refused : .pending)
+                },
+                data: input.data)
+            return AnyView(
+                DesignCanvas(
+                    doc: input.doc, system: input.system, channel: channel, assets: assets,
+                    onReady: { CanvasEditing.connect($0, to: input.editor) }))
+        }
     }
+}
+
+/// CoreKit's signed socket as the channel's socket.
+struct CoreSocketAdapter: DesignSocket {
+    let socket: CoreSocket
+    init(_ socket: CoreSocket) { self.socket = socket }
+    func receive() async throws -> DesignSocketFrame {
+        switch try await socket.receive() {
+        case .text(let t): .text(t)
+        case .binary(let d): .binary(d)
+        }
+    }
+    func send(_ frame: DesignSocketFrame) async throws {
+        switch frame {
+        case .text(let t): try await socket.send(.text(t))
+        case .binary(let d): try await socket.send(.binary(d))
+        }
+    }
+    func cancel() { socket.cancel() }
+    var closeCode: Int { socket.closeCode }
 }
 
 #if DEBUG

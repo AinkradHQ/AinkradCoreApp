@@ -15,13 +15,14 @@ extension EnvironmentValues {
 /// A plan the agent proposes (ExitPlanMode): titled, its Markdown in full (headings, steps, tables, code), and in a live
 /// session Go ahead / Change it.
 struct PlanCard: View {
+    @Environment(\.coreAccent) private var paneAccent
     let text: String
     @Environment(\.planActions) private var actions
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(spacing: Space.s3) {
-                IconTile("list.bullet.clipboard", hue: GlassInk.blue, size: MacSize.controlLg)
+                IconTile("list.bullet.clipboard", hue: GlassInk.accent(paneAccent), size: MacSize.controlLg)
                 Text("Plan").coreFont(size: MacTextSize.title, weight: .semibold)
                 Spacer(minLength: 0)
             }
@@ -31,19 +32,19 @@ struct PlanCard: View {
                     Button(action: actions.goAhead) {
                         HStack(spacing: Space.s2) {
                             Text("Go Ahead")
-                            Text("⌘↩").coreFont(size: MacTextSize.meta).opacity(0.7)
+                            Text("⌘⏎").coreFont(size: MacTextSize.meta).opacity(0.7)
                         }
                     }
                     .buttonStyle(GraphiteButtonStyle())
-                    .help("Approve the plan: the agent starts building it (⌘↩)").keyHint(.goAhead)
+                    .help("Approve the plan: the agent starts building it (⌘⏎)").keyHint(.goAhead)
                     Button(action: actions.change) {
                         HStack(spacing: Space.s2) {
                             Text("Change Plan…")
-                            Text("⇧⌘↩").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
+                            Text("⇧⌘⏎").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                         }
                     }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
-                    .help("Write what to change in the plan (⇧⌘↩)").keyHint(.changePlan)
+                    .help("Write what to change in the plan (⇧⌘⏎)").keyHint(.changePlan)
                 }
             }
         }

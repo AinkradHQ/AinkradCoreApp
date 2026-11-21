@@ -109,6 +109,7 @@ private struct BulkBar: View {
 }
 
 private struct CaptureRow: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
     let u: Capture
     @State private var more = false
@@ -130,7 +131,7 @@ private struct CaptureRow: View {
                     Text("Waiting \(BrainWords.glue(u.age))").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                     if u.stale { BrainChip("Stale", GlassInk.amber, help: "Older than 14 days") }
-                    if u.inBell { BrainChip("In the bell", GlassInk.blue, help: "Older than 30 days") }
+                    if u.inBell { BrainChip("In the bell", GlassInk.accent(paneAccent), help: "Older than 30 days") }
                     BrainChip(
                         u.guess.map { "Guess: \($0)" } ?? "No guess", GlassInk.slate,
                         help: "A local model may suggest a room only if you turn that on. It is advice, not action.")

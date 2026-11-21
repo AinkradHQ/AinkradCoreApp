@@ -57,26 +57,68 @@ struct HostItem: Identifiable, Equatable, Sendable {
     /// The runner device this host was made into (Make Runner): display only, never a route and never proof that the
     /// runner is this host (the Core says the same).
     var runnerDevice: String?
+    /// How the Core's last reachability check went (API minor 95): nil for a host it cannot reach directly or before the first.
+    var reach: HostReach?
+    /// How Make Runner stands on this host: installing, failed (with the reason) or paired.
+    var runnerInstall: HostRunnerInstall?
 
     /// `user@address`, with the port only when it is not 22.
     var login: String { "\(username)@\(address)" + (port == 22 ? "" : ":\(port)") }
+}
+
+/// A host's reachability: it answered like an SSH server (a TCP connect and the banner, no login).
+struct HostReach: Equatable, Sendable {
+    var up: Bool
+    var latencyMS: Int?
+    var checkedAt: Date?
+    var seenAt: Date?
+}
+
+extension HostItem {
+    /// "Online" or "Not answering", from the Core's last reachability check; nil when it has none.
+    var presence: (label: String, tone: Tone)? {
+        reach.map { $0.up ? ("Online", .run) : ("Not answering", .fail) }
+    }
+
+    /// "Seen just now", "Seen 3 hours ago": the last time it answered; nil when it never has.
+    var seenLine: String? {
+        guard let d = reach?.up == true ? reach?.checkedAt : reach?.seenAt else { return nil }
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return "Seen " + f.localizedString(for: d, relativeTo: Date())
+    }
+}
+
+/// Make Runner on a host: `installing`, `failed` or `paired`; `mode` is `system` or `user`.
+struct HostRunnerInstall: Equatable, Sendable {
+    var state: String
+    var mode: String?
+    var reason: String?
 }
 
 /// A key the Core keeps sealed. The private half never reaches this app after it is made.
 struct KeyItem: Identifiable, Equatable, Sendable {
     let id: String
     var name: String
-    /// `ed25519`, `ecdsa-p256` or `ecdsa-p384`.
+    /// `ed25519`, `ecdsa-p256`, `ecdsa-p384` or `rsa`.
     var algo: String
     var publicKey: String
     /// `SHA256:…`, as `ssh-keygen -l` prints it.
     var fingerprint: String
     var imported: Bool
     var createdAt: Date?
+    /// The size the Core reports (RSA modulus, or the curve); nil from a Core that does not say.
+    var bits: Int? = nil
+
+    /// "ed25519", "ecdsa" or "RSA 4096".
+    var typeWord: String {
+        if algo == "rsa" { return bits.map { "RSA \($0)" } ?? "RSA" }
+        return algo.hasPrefix("ecdsa") ? "ecdsa" : algo
+    }
 
     /// "ed25519 · made in the Core · 3 Nov".
     var line: String {
-        let algoWord = algo.hasPrefix("ecdsa") ? "ecdsa" : algo
+        let algoWord = typeWord
         let how = imported ? "imported" : "made in the Core"
         guard let createdAt else { return "\(algoWord) · \(how)" }
         return "\(algoWord) · \(how) · \(createdAt.formatted(.dateTime.day().month(.abbreviated)))"

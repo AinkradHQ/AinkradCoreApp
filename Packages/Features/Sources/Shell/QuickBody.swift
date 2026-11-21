@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Quick actions in the four macOS sizes. Tiles use the glass well style and rise in one after another when the widget arrives.
 struct QuickBody: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var shell: ShellModel
     let size: WidgetSize
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -24,16 +25,19 @@ struct QuickBody: View {
         }
     }
 
-    private var tiles: [(id: String, title: String, symbol: String, key: String?)] {
+    private typealias Tile = (id: String, title: String, symbol: String, sub: String)
+    /// The five actions of the 05-home mockup. Small and Medium show the first four.
+    private var tiles: [Tile] {
         [
-            ("agents.new", "New AI session", "play", nil), ("new-terminal", "New terminal", "terminal", nil),
-            ("add-device", "Add device", "plus", nil), ("launcher", "Launcher", "magnifyingglass", "⌘K"),
+            ("agents.new", "New AI session", "sparkles", "Pick a task, it starts at once"),
+            ("new-terminal", "New terminal", "terminal", "On this Mac or in the sandbox"),
+            ("brain", "Search Brain", "magnifyingglass", "Ask what you already know"),
+            ("projects", "Open a project", "folder", "Jump back into your work"),
+            ("lore-capture", "Today note", "note.text", "Write something down"),
         ]
     }
 
-    private func go(_ t: (id: String, title: String, symbol: String, key: String?)) {
-        if t.id == "launcher" { shell.toggleLauncher() } else { run(t.id, t.title) }
-    }
+    private func go(_ t: Tile) { run(t.id, t.title) }
 
     /// Small: four icons in a square. Medium: one row with labels. Large: a list with keys. Extra large: big tiles.
     var body: some View {
@@ -41,22 +45,24 @@ struct QuickBody: View {
             if size != .s { WHead("bolt", "Quick actions") }
             switch size {
             case .s:
-                grid(columns: 2, labels: false)
+                grid(tiles.prefix(4), columns: 2, labels: false)
             case .m:
-                grid(columns: 4, labels: true)
-            case .l, .t:
+                grid(tiles.prefix(4), columns: 4, labels: true)
+            case .l:
                 VStack(spacing: Space.s2) {
                     ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
                         Button {
                             go(t)
                         } label: {
                             HStack(spacing: Space.s3) {
-                                Image(systemName: t.symbol).foregroundStyle(GlassInk.blue).frame(width: 20)
-                                Text(t.title).coreFont(size: MacTextSize.body, weight: .medium)
-                                Spacer(minLength: 0)
-                                if let k = t.key {
-                                    Text(k).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                                Image(systemName: t.symbol).foregroundStyle(GlassInk.accent(paneAccent)).frame(
+                                    width: 20)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(t.title).coreFont(size: MacTextSize.body, weight: .medium)
+                                    Text(t.sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                                        .lineLimit(1)
                                 }
+                                Spacer(minLength: 0)
                             }
                             .padding(.horizontal, Space.s3).frame(
                                 maxWidth: .infinity, minHeight: 40, alignment: .leading)
@@ -65,17 +71,17 @@ struct QuickBody: View {
                     }
                     Spacer(minLength: 0)
                 }
-            case .x:
-                grid(columns: 4, labels: true)
+            case .w:
+                grid(tiles[...], columns: 5, labels: true)
             }
         }
         .onAppear { arrived = true }
     }
 
-    private func grid(columns: Int, labels: Bool) -> some View {
+    private func grid(_ shown: ArraySlice<Tile>, columns: Int, labels: Bool) -> some View {
         let cols = Array(repeating: GridItem(.flexible(), spacing: Space.s2), count: columns)
         return LazyVGrid(columns: cols, spacing: Space.s2) {
-            ForEach(Array(tiles.enumerated()), id: \.offset) { i, t in
+            ForEach(Array(shown.enumerated()), id: \.offset) { i, t in
                 Button {
                     go(t)
                 } label: {
@@ -86,9 +92,9 @@ struct QuickBody: View {
                                 .multilineTextAlignment(.center)
                         }
                     }
-                    .frame(maxWidth: .infinity, minHeight: size == .s ? 52 : size == .x ? 120 : 76)
+                    .frame(maxWidth: .infinity, minHeight: size == .s ? 52 : size == .w ? 80 : 76)
                 }
-                .buttonStyle(QuickTileStyle(prominent: t.id == "launcher")).rise(arrived, i, reduce)
+                .buttonStyle(QuickTileStyle(prominent: false)).rise(arrived, i, reduce)
                 .environment(\.coreForcedInteraction, forcedHover(i))
                 .accessibilityLabel(t.title)
                 .help(t.title)
@@ -119,6 +125,7 @@ struct QuickTileStyle: ButtonStyle {
 }
 
 private struct QuickTile: View {
+    @Environment(\.coreAccent) private var paneAccent
     let configuration: ButtonStyleConfiguration
     let prominent: Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -138,6 +145,6 @@ private struct QuickTile: View {
     }
 
     private var fill: Color {
-        prominent ? GlassInk.blue.opacity(lit ? 1 : 0.85) : lit ? GlassInk.wellEdge : GlassInk.wellHover
+        prominent ? GlassInk.accent(paneAccent).opacity(lit ? 1 : 0.85) : lit ? GlassInk.wellEdge : GlassInk.wellHover
     }
 }

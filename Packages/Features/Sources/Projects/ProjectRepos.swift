@@ -8,6 +8,13 @@ struct ReposPage: View {
     let project: ProjectItem
     @State private var pick: Int64?
     @State private var settled = false
+    @State private var insights: ProjectInsightsModel
+
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.model = model
+        self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
+    }
 
     /// The picked repo; before a pick, the first one that failed to fetch (it needs the person), else the first.
     private var current: RepoItem? {
@@ -19,7 +26,8 @@ struct ReposPage: View {
             list.coreRise(settled, 0).frame(width: Space.s8 * 18)
             Group {
                 if let r = current {
-                    RepoDetail(model: model, project: project, repo: r)
+                    RepoDetail(
+                        model: model, project: project, repo: r, info: insights.code?.first { $0.repo == r.name })
                 } else {
                     Island("Repos") {
                         Text("Add a repo and the Core keeps a copy of it here.").foregroundStyle(GlassInk.secondary)
@@ -30,6 +38,10 @@ struct ReposPage: View {
             .coreRise(settled, 1)
         }
         .onAppear { settled = true }
+        .task(id: project.id) {
+            await insights.loadCode()
+            await insights.loadTuning()
+        }
         .accessibilityIdentifier("project-page-Repos")
     }
 
@@ -38,6 +50,10 @@ struct ReposPage: View {
             title: "Repos", sub: project.repos.isEmpty ? nil : "\(project.repos.count)",
             accessory: {
                 CoreIconButton(symbol: "arrow.clockwise", label: "Check the Core's copies again") { model.resync() }
+                Button("Fetch All") { for r in project.repos { model.fetchRepo(project, r) } }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .disabled(model.readOnly || project.repos.isEmpty)
+                    .help("Copy the latest changes of every repo into the Core now")
                 Button {
                     NewProjectDialogs.openAddRepos(model, project)
                 } label: {
@@ -53,15 +69,25 @@ struct ReposPage: View {
                             r.name, subtitle: line(r), symbol: "arrow.triangle.branch", selected: r.id == current?.id,
                             action: { pick = r.id }
                         ) {
-                            if r.fetchError != nil {
-                                StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
+                            switch r.copy {
+                            case .failed: StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
+                            case .fetching: StateBadge("Copying", tone: .warn, symbol: "gearshape")
+                            case .ready:
+                                if let i = insights.code?.first(where: { $0.repo == r.name }) {
+                                    HStack(spacing: Space.s1) {
+                                        if i.ahead > 0 { StateBadge("↑ \(i.ahead)", tone: .run, symbol: "arrow.up") }
+                                        if i.behind > 0 {
+                                            StateBadge("↓ \(i.behind)", tone: .warn, symbol: "arrow.down")
+                                        }
+                                    }
+                                }
                             }
                         }
                         .help(r.remoteURL)
                     }
                 }
                 Text(
-                    "GitHub holds the source. The Core keeps one copy of each repo; every AI session and run gets its own clone."
+                    "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes \(insights.supported ? FetchInterval.line(insights.tuning.fetchInterval) : "every 15 minutes") by itself; every AI session and run gets its own clone."
                 )
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -69,9 +95,11 @@ struct ReposPage: View {
     }
 
     private func line(_ r: RepoItem) -> String {
-        if r.fetchError != nil { return r.branch }
-        guard let at = r.fetchedAt else { return "\(r.branch) · copying…" }
-        return "\(r.branch) · fetched \(PickRepo.ago(at, model.now()))"
+        switch r.copy {
+        case .failed(let why, let text): return why.needsConnection ? "\(r.branch) · private" : "\(r.branch) · \(text)"
+        case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
+        case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
+        }
     }
 }
 
@@ -79,6 +107,7 @@ private struct RepoDetail: View {
     let model: ProjectsModel
     let project: ProjectItem
     let repo: RepoItem
+    var info: CodeInfo?
 
     private var extra: ProjectLive.RepoExtra? { project.live?.repoExtras[repo.name] }
     private var short: String { repo.head.map { String($0.prefix(7)) } ?? "–" }
@@ -87,27 +116,34 @@ private struct RepoDetail: View {
         Island(
             title: repo.name, sub: Self.path(repo.remoteURL),
             accessory: {
-                // TODO(core): `POST /projects/{id}/repos/{repo}/fetch` (AinkradCore PR #287) is not in the synced client yet.
-                Button("Fetch Now") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                    .help("Fetching on demand arrives with the next Core update")
+                Button("Fetch Now") { model.fetchRepo(project, repo) }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly || copying)
+                    .help(copying ? "The Core is copying this repo now" : "Copy the latest changes into the Core now")
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s4) {
-                if let e = repo.fetchError { failure(e) }
+                if case .failed(let why, let text) = repo.copy { failure(why, text) }
                 facts
                 if let commits = extra?.commits, !commits.isEmpty { commitList(commits) }
             }
         }
     }
 
-    private func failure(_ error: String) -> some View {
+    private var copying: Bool { if case .fetching = repo.copy { true } else { false } }
+
+    private func failure(_ why: RepoFailure, _ text: String) -> some View {
         let last = repo.head == nil ? "" : " Sessions and runs keep using the last copy (\(short))."
         return CoreNotice(
-            symbol: "exclamationmark.triangle", title: "The Core could not fetch this repo.",
-            text: error + last, tone: .fail
+            symbol: "exclamationmark.triangle", title: "The Core could not copy this repo.", text: text + last,
+            tone: .fail
         ) {
-            Button("Reconnect GitHub…") { model.host.shell.launcher.entry("connections")?.run() }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            if why.needsConnection {
+                Button("Connect GitHub") { model.connectGithub() }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            } else if why != .sshNotSupported {
+                Button("Try again") { model.fetchRepo(project, repo) }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
+            }
         }
     }
 
@@ -129,6 +165,24 @@ private struct RepoDetail: View {
                     Text(copyAge).foregroundStyle(GlassInk.secondary)
                 }
             }
+            if let info {
+                GridRow {
+                    label("Files")
+                    Text(info.files.formatted())
+                }
+                GridRow {
+                    label("Against \(repo.branch)")
+                    Text(
+                        info.ahead == 0 && info.behind == 0
+                            ? "Up to date" : "\(info.ahead) ahead · \(info.behind) behind")
+                }
+                if let c = info.last {
+                    GridRow {
+                        label("Last commit")
+                        Text("\(c.message) · \(c.author) · \(runsAgo(c.at))").lineLimit(2)
+                    }
+                }
+            }
             if let extra {
                 GridRow {
                     label("Used by")
@@ -143,8 +197,13 @@ private struct RepoDetail: View {
     }
 
     private var copyAge: String {
-        guard let at = repo.fetchedAt else { return repo.fetchError == nil ? "copying…" : "never copied" }
-        return "· fetched \(PickRepo.ago(at, model.now()))"
+        switch repo.copy {
+        case .fetching(let since): return RepoCopy.elapsed(since: since, now: model.now())
+        case .failed:
+            guard let at = repo.fetchedAt else { return "never copied" }
+            return "· last fetched \(PickRepo.ago(at, model.now()))"
+        case .ready: return "· fetched \(PickRepo.ago(repo.fetchedAt ?? model.now(), model.now()))"
+        }
     }
 
     private func label(_ s: String) -> some View {

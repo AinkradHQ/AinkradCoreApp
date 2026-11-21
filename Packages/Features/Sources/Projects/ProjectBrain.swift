@@ -11,25 +11,64 @@ struct BrainPage: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var settled = false
+    @State private var insights: ProjectInsightsModel
+
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.model = model
+        self.project = project
+        _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
+    }
 
     private var room: ProjectLive.Room? { project.live?.room }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s2) {
-            if let room {
-                summary(room).coreRise(settled, 0).frame(width: Space.s8 * 18)
-                rules(room).coreRise(settled, 1)
-            } else {
-                Island("\(project.name) room") {
-                    Text(
-                        "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
-                    )
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: Space.s2) {
+            HStack(alignment: .top, spacing: Space.s2) {
+                if let room {
+                    summary(room).coreRise(settled, 0).frame(width: Space.s8 * 18)
+                    rules(room).coreRise(settled, 1)
+                } else {
+                    Island("\(project.name) room") {
+                        VStack(alignment: .leading, spacing: Space.s3) {
+                            Text(
+                                "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
+                            )
+                            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                            if let r = insights.rules, !r.isEmpty {
+                                Text("Rules").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(
+                                    GlassInk.secondary)
+                                ForEach(r.prefix(8)) { KnownRow(r: $0) }
+                            }
+                        }
+                    }
                 }
             }
+            if insights.supported { remembered.coreRise(settled, 2) }
         }
         .onAppear { settled = true }
+        .task(id: project.id) { await insights.loadKnowledge() }
         .accessibilityIdentifier("project-page-Brain")
+    }
+
+    /// What Core remembers: the Brain records of this project's place, newest-supported first.
+    private var remembered: some View {
+        let items = insights.knowledge ?? []
+        return Island(
+            title: "What Core remembers", sub: insights.knowledge == nil ? nil : "\(items.count) shown",
+            accessory: {
+                Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }.buttonStyle(
+                    CoreButtonStyle(.secondary, size: .small))
+            }
+        ) {
+            if insights.knowledge == nil {
+                Text("Loading…").foregroundStyle(GlassInk.secondary)
+            } else if items.isEmpty {
+                Text("Nothing yet. Core learns as you work.").foregroundStyle(GlassInk.secondary)
+            } else {
+                ScrollView { VStack(spacing: Space.s1) { ForEach(items.prefix(30)) { KnownRow(r: $0) } } }
+            }
+        }
+        .frame(maxHeight: Space.s8 * 14)
     }
 
     private func summary(_ room: ProjectLive.Room) -> some View {

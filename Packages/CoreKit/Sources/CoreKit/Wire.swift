@@ -142,6 +142,13 @@ public enum Wire {
         Data(["AINKRAD-STEPUP-V1", coreFP, deviceID, sessionID, challenge].joined(separator: "\n").utf8)
     }
 
+    /// What the step-up key signs for a **session** proof (review M2): V2 and the purpose, so it is never valid as an action proof.
+    public static func stepUpMessageV2(
+        coreFP: String, deviceID: String, sessionID: String, challenge: String, purpose: String
+    ) -> Data {
+        Data(["AINKRAD-STEPUP-V2", coreFP, deviceID, sessionID, challenge, purpose].joined(separator: "\n").utf8)
+    }
+
     /// An RFC 3339 UTC timestamp with milliseconds (the contract's one timestamp shape), as unix seconds.
     public static func parseTimestamp(_ text: String) -> Int64? {
         let f = ISO8601DateFormatter()

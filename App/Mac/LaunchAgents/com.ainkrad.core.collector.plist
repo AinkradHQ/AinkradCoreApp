@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- E9-6 (D-26): the Mac collectors run after the app is quit. launchd starts the app's own executable in collector mode
+	     (no window, no Dock icon) at login and then every hour. The collector exits at once when the app itself is running
+	     (the app does the sync then) and otherwise syncs once and exits. Registered by BackgroundCollect with SMAppService. -->
+	<key>Label</key>
+	<string>com.ainkrad.core.collector</string>
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/Ainkrad</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>Ainkrad</string>
+		<string>--background-collect</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>3600</integer>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>ExitTimeOut</key>
+	<integer>20</integer>
+</dict>
+</plist>

@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import SwiftUI
 
@@ -20,6 +21,9 @@ public struct DesignCanvasInput: Sendable {
     /// The editor chrome (V3-04). When the canvas is up the app gives it the canvas: `editor.attach(backend)`, and calls
     /// `editor.changed()` when the document or selection may have changed.
     public let editor: DesignEditorHandle
+    /// Opens the signed sync socket of a design (or a design system), resuming after `lastSeq`: `GET
+    /// /modules/design/v1/docs/{d}/sync` with `Last-Update-Seq`. Nil without a connection.
+    public let openSocket: (@Sendable (_ doc: String, _ lastSeq: UInt64?) async throws -> CoreSocket)?
 }
 
 /// The app's way to reach the editor chrome of one design without seeing its internals.
@@ -34,6 +38,13 @@ extension DesignModel {
     /// The canvas for a design doc, or nil when the app has none (tests) or the doc cannot sync yet.
     func canvasView(_ d: DesignDoc) -> AnyView? {
         guard d.kind == .design, let canvas, let service else { return nil }
+        let socketOpener: (@Sendable (String, UInt64?) async throws -> CoreSocket)? = connection.map { connection in
+            { @Sendable (doc: String, lastSeq: UInt64?) async throws -> CoreSocket in
+                let headers: [String: String] = lastSeq.map { ["Last-Update-Seq": String($0)] } ?? [:]
+                let target = LiveDesignService.base + "/docs/" + LiveDesignService.seg(doc) + "/sync"
+                return try await connection.openSocket(target: target, headers: headers)
+            }
+        }
         let input = DesignCanvasInput(
             doc: d.id, system: d.system,
             info: { sha in
@@ -41,7 +52,8 @@ extension DesignModel {
                 return .init(contentType: a.contentType, check: a.check.rawValue)
             },
             data: { try await service.data($0) },
-            editor: DesignEditorHandle(editor: editor(for: d.id)))
+            editor: DesignEditorHandle(editor: editor(for: d.id)),
+            openSocket: socketOpener)
         return canvas(input)
     }
 

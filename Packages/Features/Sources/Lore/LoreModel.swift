@@ -57,6 +57,35 @@ public final class LoreModel {
     private(set) var backlinks: [LoreBacklink] = []
     var projectNames: [String: String] = [:]
 
+    // Sidebars (E10-1). Both open by default; ⌘. hides both (focus), ⌘[ the left, ⌘] the right.
+    var showLeft = LoreSidebarPrefs.read("left") { didSet { LoreSidebarPrefs.write("left", showLeft) } }
+    var showRight = LoreSidebarPrefs.read("right") { didSet { LoreSidebarPrefs.write("right", showRight) } }
+    /// Every live note without its text, newest change first (the tree, recents, project counts).
+    var sideNotes: [LoreNote] = []
+    var sideTags: [LoreTagCount] = []
+    var sessionDocs: [LoreSessionDoc] = []
+    /// The notes an AI session wrote in its folder, for the AI Sessions screen (a note id each).
+    public func notes(ofSession session: String) -> [String] {
+        sessionDocs.filter { $0.session == session }.map(\.note)
+    }
+    var sideVersions: [LoreVersion] = []
+    var outline: [LoreHeading] = []
+    var wordCount = 0
+    var hasTable = false
+    var noteTags: [String] = []
+    /// The caret is inside a table (the row and column tools are live).
+    var caretInTable = false
+    var tablesAsText = false
+    /// A project, tag or search the left sidebar is filtered to; `filterHits` are its notes.
+    var sideFilter: LoreSideFilter?
+    var filterHits: [LoreNote] = []
+    @ObservationIgnored var outlineTask: Task<Void, Never>?
+    @ObservationIgnored var filterTask: Task<Void, Never>?
+    /// The Core serves `/tags` and `/session-docs` (minor 95); true until a connection says otherwise.
+    @ObservationIgnored var serves95 = true
+    /// Opens an AI session in the Agents space (wired by the app; Lore does not depend on Agents).
+    @ObservationIgnored public var openSession: (@MainActor (String) -> Void)?
+
     @ObservationIgnored let page: any LorePageText
     /// Quick capture ⇧⌘N (R6-05).
     @ObservationIgnored public private(set) lazy var capture = QuickCapture(lore: self)
@@ -71,6 +100,7 @@ public final class LoreModel {
     @ObservationIgnored private var again = false
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private var opening = 0
+    @ObservationIgnored private var registeredNotes: Set<String> = []
     @ObservationIgnored private var backlinkOwner = ""
     /// The space was opened since the Core was attached.
     @ObservationIgnored private var opened = false
@@ -88,19 +118,28 @@ public final class LoreModel {
         self.editor = editor
         self.drafts = drafts
         editor?.onChange = { [weak self] in self?.changed() }
+        editor?.onTable = { [weak self] in self?.caretInTable = $0 }
         editor?.onOpenInternal = { [weak self] in self?.openInternal($0) }
         editor?.onNotice = { [weak self] in self?.host.shell.showToast($0, kind: .info) }
     }
 
     // MARK: connection
 
-    public func attach(connection: CoreConnection) { use(LiveLoreService(connection: connection)) }
+    public func attach(connection: CoreConnection) {
+        use(LiveLoreService(connection: connection))
+        Task { [weak self] in
+            let ok = await connection.serverSupports(minor: coreMinorV010)
+            self?.serves95 = ok
+            await self?.refreshSide()
+        }
+    }
 
     func use(_ service: any LoreService) {
         self.service = service
         load = .loading
         Task {
             projectNames = (try? await service.projectNames()) ?? [:]
+            await syncLauncherNotes()
             // Today's note is made on the first open of the space (T7), not on every connect.
             if opened { await reload() }
         }
@@ -112,6 +151,11 @@ public final class LoreModel {
         service = nil
         note = nil
         backlinks = []
+        sideNotes = []
+        sideTags = []
+        sessionDocs = []
+        sideVersions = []
+        outline = []
         day = nil
         base = 0
         synced = ""
@@ -133,6 +177,7 @@ public final class LoreModel {
 
     /// `lore.note.changed {id, rev, origin}` (ids only, T3): the open note changed on the Core.
     public func remote(_ fields: [String: String]) {
+        Task { await refreshSide() }
         guard let id = fields["id"], id == note?.id, let rev = Int(fields["rev"] ?? ""), rev > base else { return }
         Task { await pull() }
     }
@@ -153,9 +198,17 @@ public final class LoreModel {
             LoreView(model: self)
         }
         spec.tab = "Lore"
+        spec.fullScreenOnly = true
         spec.onNew = { [weak self] in Task { await self?.newNote() } }
         shell.openPane(spec)
-        if today, load != .ready { Task { await openDay(todayKey) } }
+        if today, load != .ready {
+            let o = LoreOptions.options
+            let last = LoreOptions.noteAtStart(
+                openLast: o.bool(LoreOptions.openLast, true), last: o.string(LoreOptions.lastNote, ""))
+            Task {
+                if let last { await openNote(last) } else { await openDay(todayKey) }
+            }
+        }
     }
 
     /// The page is on screen and takes typing (L1). Ends the open signpost.
@@ -178,6 +231,7 @@ public final class LoreModel {
 
     func openDay(_ key: String) async {
         opened = true
+        LoreOptions.options.set(LoreOptions.lastNote, "")
         await leave()
         day = key
         note = nil
@@ -187,6 +241,7 @@ public final class LoreModel {
     func openNote(_ id: String) async {
         guard LoreLink.isNoteID(id) else { return }
         opened = true
+        LoreOptions.options.set(LoreOptions.lastNote, id)
         await leave()
         day = nil
         note = LoreNote(id: id)
@@ -226,6 +281,7 @@ public final class LoreModel {
             }
             guard mine == opening else { return }
             apply(n)
+            Task { await syncLauncherNotes() }
         } catch {
             guard mine == opening else { return }
             switch Self.status(error) {
@@ -257,6 +313,8 @@ public final class LoreModel {
         }
         sync = waiting ? .kept : .saved
         load = .ready
+        refreshOutline(after: .zero)
+        Task { await refreshSide() }
     }
 
     /// Before the page changes: send what was typed.
@@ -272,6 +330,7 @@ public final class LoreModel {
     func changed() {
         guard load == .ready else { return }
         schedule(debounce)
+        refreshOutline(after: .milliseconds(400))
     }
 
     private func schedule(_ wait: Duration) {
@@ -386,6 +445,8 @@ public final class LoreModel {
         page.show(n.text, fold: true)
         sync = .saved
         refreshBacklinks()
+        refreshOutline(after: .zero)
+        Task { await refreshSide() }
     }
 
     /// The note moved projects: only the project changes, so typed text and the base stay.
@@ -480,10 +541,53 @@ public final class LoreModel {
             ) { [weak self] in self?.capture.toggle() })
         shell.settings.section(
             SettingsSection(
-                id: "lore", group: .apps, title: "Lore", sub: "The quick capture shortcut", symbol: "text.book.closed",
-                order: 40
-            ) { [capture] in LoreSettingsSection(capture: capture) })
+                id: "lore", group: .apps, title: "Lore", sub: "Look and the quick capture shortcut",
+                symbol: "text.book.closed", order: 6,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Lore", prefs: AppLookPrefs.shared("lore"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { [capture] in
+                        VStack(alignment: .leading, spacing: Space.s4) {
+                            LoreWritingSection()
+                            LoreSettingsSection(capture: capture)
+                        }
+                    },
+                ]))
+        shell.launcher.registerFallback(
+            LauncherFallback(id: "lore-search", symbol: "magnifyingglass", title: { "Search notes for “\($0)”" }) {
+                [weak self] q in if let self { LoreOpenSheet.open(self, query: q) }
+            })
+        shell.launcher.registerFallback(
+            LauncherFallback(id: "lore-new", symbol: "square.and.pencil", title: { _ in "New note" }) { [weak self] _ in
+                guard let self else { return }
+                self.show(today: false)
+                Task { await self.newNote() }
+            })
         capture.start()
+        Task { await syncLauncherNotes() }
+    }
+
+    /// The eight most recent notes as launcher entries (⌘K → Notes).
+    func syncLauncherNotes() async {
+        guard let service,
+            let list = try? await service.list(filter: LoreFilter(state: "active", kind: nil, project: nil, tag: nil))
+        else { return }
+        let shell = host.shell
+        let names = projectNames
+        let recent = list.prefix(8).map { LoreFinder.row($0, names, nil) }
+        let ids = Set(recent.map { "note-\($0.id)" })
+        for gone in registeredNotes.subtracting(ids) { shell.launcher.unregister(gone) }
+        for r in recent {
+            shell.launcher.register(
+                LauncherEntry(
+                    id: "note-\(r.id)", title: r.title, sub: r.sub, symbol: r.symbol, keywords: ["note", "lore"]
+                ) {
+                    [weak self] in self?.open(note: r.id)
+                })
+        }
+        registeredNotes = ids
     }
 }
 

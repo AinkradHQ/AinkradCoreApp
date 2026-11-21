@@ -15,8 +15,8 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "Apple Development"
     DEVELOPMENT_TEAM: RT9AA68C38
-    MARKETING_VERSION: "0.9.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.10.0"
+    CURRENT_PROJECT_VERSION: "2"
     # Swift string literals land in each String Catalog on build; catalogs are preferred over .strings.
     SWIFT_EMIT_LOC_STRINGS: YES
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
@@ -30,6 +30,10 @@ packages:
     path: Packages/CoreKit
   Features:
     path: Packages/Features
+  # E12-2: automatic updates (EdDSA appcast on ainkrad.io). The app is not sandboxed, so no XPC services are needed.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
   DesignCanvas:
     path: Packages/DesignCanvas
 
@@ -37,7 +41,9 @@ targets:
   AinkradCoreMac:
     type: application
     platform: macOS
-    sources: [App/Mac]
+    sources:
+      - App/Mac
+      - Icon/AppIcon.icon
     dependencies:
       - package: AinkradClient
       - package: CoreUI
@@ -56,6 +62,8 @@ targets:
         product: Agents
       - package: Features
         product: Brain
+      - package: Sparkle
+        product: Sparkle
       - package: Features
         product: Projects
       - package: Features
@@ -84,16 +92,36 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.ainkrad.core.connect
             CFBundleURLSchemes: [ainkrad]
+        # Setup's "Use an existing Core" lists Cores that advertise _ainkrad._tcp; macOS asks for Local Network access then.
+        NSBonjourServices: [_ainkrad._tcp]
+        NSLocalNetworkUsageDescription: Ainkrad looks for your Core on this network. Nothing is sent until you connect.
+        # Sparkle (E12-2, D-7): check by itself, download and install by itself; AppUpdater turns "install on quit" into the
+        # "restart when idle" toast. The public key is the login-keychain key's (runbook step 4).
+        SUFeedURL: https://ainkrad.io/releases/app/appcast.xml
+        SUPublicEDKey: ZfzFnEOyjj3JvJZl7UsuIy6Y29xRPxSYWdBwv3RiWL4=
+        SUEnableAutomaticChecks: true
+        SUAutomaticallyUpdate: true
+        # The feed and every archive must be signed with the EdDSA key; the archive is verified before it is unpacked.
+        SURequireSignedFeed: true
+        SUVerifyUpdateBeforeExtraction: true
+        SUScheduledCheckInterval: 14400
     settings:
       base:
         PRODUCT_NAME: Ainkrad
         PRODUCT_BUNDLE_IDENTIFIER: com.ainkrad.core
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Ainkrad
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_HARDENED_RUNTIME: YES
         # Import Apple Notes (R4-03): macOS asks the first time the person chooses it, with this sentence.
         INFOPLIST_KEY_NSAppleEventsUsageDescription: Ainkrad reads your notes in Notes only when you choose Import Apple Notes.
+        # Dictation in the AI session composer: macOS asks the first time the person presses the mic, with these sentences.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Ainkrad listens only while you dictate a message in an AI session.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Ainkrad turns your speech into text on this Mac when you dictate a message. Nothing is sent out.
+        # Weather and Calendar widgets: macOS asks only when the widget first shows on Home.
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: Ainkrad uses your rough location only for the Weather widget, and sends nothing more precise than about 10 km.
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: Ainkrad reads your events only to show them in the Calendar widget.
         CODE_SIGN_ENTITLEMENTS: App/Mac/Ainkrad.entitlements
 
   AinkradCoreMacUITests:

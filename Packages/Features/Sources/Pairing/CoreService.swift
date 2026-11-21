@@ -79,6 +79,11 @@ protocol CoreService: Sendable {
     func about() async throws -> CoreAbout
     func elevatedUntil() async -> Date?
     func stepUp(reason: String) async throws -> Date
+    /// The app unlock (E1-1): whether this Core serves it, one proof that opens it, the heartbeat that holds it, and the end call.
+    var supportsUnlock: Bool { get async }
+    func unlock(reason: String) async throws -> Date
+    func beatUnlock() async throws
+    func endUnlock() async
     func devices() async throws -> [DeviceInfo]
     func rename(_ id: String, to name: String) async throws -> DeviceInfo
     func setScopes(_ id: String, _ scopes: [String]) async throws -> DeviceInfo
@@ -97,6 +102,10 @@ protocol CoreService: Sendable {
 }
 
 extension CoreService {
+    var supportsUnlock: Bool { get async { false } }
+    func unlock(reason: String) async throws -> Date { Date().addingTimeInterval(90) }
+    func beatUnlock() async throws {}
+    func endUnlock() async {}
     var agentsAPI: (any AgentsAPI)? { nil }
     func pendingPairings() async throws -> [PairingInfo] { [] }
 }
@@ -118,6 +127,10 @@ struct LiveCoreService: CoreService {
     }
     func elevatedUntil() async -> Date? { await connection.elevatedUntil }
     func stepUp(reason: String) async throws -> Date { try await connection.stepUp(reason: reason) }
+    var supportsUnlock: Bool { get async { await connection.serverSupports(minor: coreMinorV010) } }
+    func unlock(reason: String) async throws -> Date { try await connection.unlock(reason: reason) }
+    func beatUnlock() async throws { try await connection.beatUnlock() }
+    func endUnlock() async { await connection.endUnlock() }
 
     func devices() async throws -> [DeviceInfo] {
         try await run { try await client.listDevices().ok.body.json.map(Self.device) }
@@ -190,6 +203,21 @@ struct LiveCoreService: CoreService {
                 return DeviceInvite(pairingID: id, name: name, scopes: scopes, link: try ConnectLink.parse(text))
             case .badRequest(let r): throw Self.fail(r)
             case .conflict(let r): throw Self.fail(r)
+            case .undocumented(let status, let p): throw await Self.status(status, p)
+            default: throw Self.unknown
+            }
+        }
+    }
+
+    /// `POST /runners/{id}/bundled`: says this Mac's app attests `runner` as the runner inside its own bundle (it read that
+    /// runner's enrolment file on this disk). Only that runner can then be given a real shell. A Core before minor 95 has no
+    /// such route and no real-shell rule to satisfy, so nothing is sent.
+    func attestBundledRunner(_ runner: String) async throws {
+        guard await connection.serverSupports(minor: coreMinorV010) else { return }
+        try await run {
+            switch try await client.attestBundledRunner(path: .init(id: runner)) {
+            case .ok: return
+            case .forbidden(let r): throw Self.fail(r)
             case .undocumented(let status, let p): throw await Self.status(status, p)
             default: throw Self.unknown
             }
@@ -387,6 +415,10 @@ struct LiveCoreService: CoreService {
         let b = try? JSONDecoder().decode(Components.Schemas.ErrorBody.self, from: data)
         return .http(
             status: code, code: b?.code ?? "error", message: b?.message ?? "The Core could not do that (\(code)).")
+    }
+    private static func fail(_ r: Components.Responses.Forbidden) -> CoreError {
+        let b = try? r.body.json
+        return .http(status: 403, code: b?.code ?? "forbidden", message: b?.message ?? "The Core refused that.")
     }
     private static func fail(_ r: Components.Responses.NotFound) -> CoreError {
         .http(status: 404, code: "not_found", message: (try? r.body.json)?.message ?? "The Core does not know that.")

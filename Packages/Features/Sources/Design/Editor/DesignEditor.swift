@@ -38,6 +38,9 @@ final class DesignEditor {
     @ObservationIgnored private let service: (any DesignService)?
     @ObservationIgnored private weak var backend: (any DesignEditBackend)?
     @ObservationIgnored private var pending = false
+    /// What a brand-new design starts with (its page and a frame of the default canvas); written once, when the canvas is up
+    /// and the design is still empty.
+    @ObservationIgnored var starter: [[String: DJSON]]?
     @ObservationIgnored private var lastPresence = ""
 
     init(doc: String, service: (any DesignService)? = nil) {
@@ -51,9 +54,20 @@ final class DesignEditor {
     func attach(_ backend: (any DesignEditBackend)?) {
         self.backend = backend
         reload()
+        if backend != nil, let ops = starter, layers.layers.isEmpty {
+            starter = nil
+            apply(ops)
+        }
     }
 
     var attached: Bool { backend != nil }
+
+    /// A picture of one frame (the composer's direction cards); nil until the engine lists it.
+    func sketch(frame id: String) -> FrameSketch? {
+        guard let b = backend else { return nil }
+        let list = b.tree().flatMap { try? JSONDecoder().decode([DesignLayer].self, from: $0) } ?? []
+        return FrameSketch.make(frame: id, layers: LayerTree(list)) { b.node($0).flatMap { EditorNode(json: $0) } }
+    }
 
     /// The document or selection may have changed. Reads are coalesced to one per 60 ms: a drag or a remote burst must not
     /// re-list a large document on every event.

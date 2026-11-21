@@ -37,6 +37,10 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
             [weak self] _ in
             MainActor.assumeIsolated { self?.applyPrefs() }
         }
+        NotificationCenter.default.addObserver(forName: AppLookPrefs.changed, object: nil, queue: .main) {
+            [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPrefs() }
+        }
         container.addSubview(term)
         container.addSubview(overlay)
         overlay.caretFrame = { [weak term] in term?.caretFrame ?? .zero }
@@ -159,6 +163,9 @@ final class TerminalSurface: NSObject, TerminalViewDelegate {
     }
 
     // MARK: size
+
+    /// The pane has been given a real size (the emulator then follows it).
+    var isLaidOut: Bool { container.bounds.width > 0 && container.bounds.height > 0 }
 
     var size: (cols: Int, rows: Int) { (term.getTerminal().cols, term.getTerminal().rows) }
 

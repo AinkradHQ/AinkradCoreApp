@@ -44,6 +44,7 @@ private final class SoftwareStepUpStore: KeyStore, @unchecked Sendable {
 }
 
 @MainActor private final class LiveHost: AdminHost {
+    func open(_ url: URL) {}  // never a real browser in a test
     let shell = ShellModel()
     var pausedReason: String?
     var elevationNotice: AdminNotice?

@@ -8,6 +8,7 @@ import Testing
 
 @MainActor
 final class FakeHost: AdminHost {
+    func open(_ url: URL) {}  // never a real browser in a test
     let shell = ShellModel()
     var pausedReason: String?
     var elevationNotice: AdminNotice?
@@ -361,5 +362,43 @@ struct SettingsAndRunTests {
     @Test func docsIsLastCaseSoOtherKeysStay() {
         #expect(ProjectSection.settings.key == "6" && ProjectSection.docs.key == "7")
         #expect(ProjectSection.allCases.filter { $0 != .settings }.map(\.title).suffix(2) == ["Brain", "Docs"])
+    }
+}
+
+struct RepoCopyTests {
+    private func repo(
+        state: String? = nil, reason: String? = nil, error: String? = nil, fetched: Date? = nil, since: Date? = nil
+    ) -> RepoItem {
+        RepoItem(
+            id: 1, name: "web", remoteURL: "https://github.com/acme/web.git", branch: "main", primary: true,
+            fetchedAt: fetched, fetchError: error, state: state, reason: reason, startedAt: since)
+    }
+
+    @Test func theCoresStateIsShownAsItIs() {
+        let t = Date(timeIntervalSince1970: 1_000)
+        #expect(repo(state: "fetching", since: t).copy == .fetching(since: t))
+        #expect(repo(state: "ready", fetched: t).copy == .ready)
+        let failed = repo(state: "failed", reason: "needs_github", error: "This repo is private.").copy
+        #expect(failed == .failed(.needsGithub, "This repo is private."))
+    }
+
+    @Test func aCoreThatSaysNoStateStillNeverSticksOnCopying() {
+        #expect(repo(error: "unreachable").copy == .failed(.other, "unreachable"))
+        #expect(repo(fetched: Date()).copy == .ready)
+        #expect(repo().copy == .fetching(since: nil))
+    }
+
+    @Test func onlyGithubAndSignInFailuresSendThePersonToConnections() {
+        #expect(RepoFailure(code: "needs_github").needsConnection && RepoFailure(code: "auth_failed").needsConnection)
+        for code in ["timeout", "not_found_or_private", "ssh_not_supported", "other", nil] {
+            #expect(!RepoFailure(code: code).needsConnection)
+        }
+    }
+
+    @Test func elapsedTimeIsInSecondsThenMinutes() {
+        let t = Date(timeIntervalSince1970: 0)
+        #expect(RepoCopy.elapsed(since: t, now: Date(timeIntervalSince1970: 40)) == "copying · 40 s")
+        #expect(RepoCopy.elapsed(since: t, now: Date(timeIntervalSince1970: 125)) == "copying · 2 min 5 s")
+        #expect(RepoCopy.elapsed(since: nil, now: t) == "copying…")
     }
 }

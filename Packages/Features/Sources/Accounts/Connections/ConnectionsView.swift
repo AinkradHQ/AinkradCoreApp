@@ -3,6 +3,7 @@ import SwiftUI
 
 /// The Connections pane (CN1, CN6): page tiles and the Connect action in the header, the page, status chips at the foot.
 struct ConnectionsView: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
     @FocusState private var paneFocus: Bool
 
@@ -14,10 +15,12 @@ struct ConnectionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             AppHeader {
-                AppFilterTile(title: "Connections", count: model.items.count, on: true, key: "") {}
+                AppFilterTile(title: "Connections", count: model.shown.count, on: true, key: "") {}
             } actions: {
-                AppActionTile(title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.blue, prominent: true) {
-                    ConnDialogs.openConnect(model, kind: nil)
+                AppActionTile(
+                    title: "Connect", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+                ) {
+                    model.beginAdd()
                 }
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(model.service == nil)
@@ -48,7 +51,7 @@ struct ConnectionsView: View {
             .onKeyPress(.downArrow) { arrow(1) }
             .coreSideKeys { arrow($0) }
             .onKeyPress(.upArrow) { arrow(-1) }
-            .onKeyPress(.return) { model.key("↩") ? .handled : .ignored }
+            .onKeyPress(.return) { model.key("⏎") ? .handled : .ignored }
             .onKeyPress(.delete) { model.key("⌫") ? .handled : .ignored }
             .onKeyPress(.escape) {
                 guard model.cursor != nil else { return .ignored }
@@ -56,24 +59,9 @@ struct ConnectionsView: View {
                 return .handled
             }
             .onKeyPress(characters: .letters) { model.key($0.characters.lowercased()) ? .handled : .ignored }
-            if !model.items.isEmpty {
-                HStack(spacing: Space.s2) {
-                    AppStatChip("checkmark.seal.fill", "\(model.connected) connected", GlassInk.green)
-                    if model.needLook > 0 {
-                        AppStatChip("exclamationmark.triangle.fill", "\(model.needLook) need a look", GlassInk.amber)
-                    }
-                    Spacer(minLength: 0)
-                    Text(
-                        model.cursor == nil
-                            ? "↑↓ move · ⌘N connect"
-                            : "↩ who can use it · T test · R rename · D default · ⌫ disconnect"
-                    ).coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
-                }
-                .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
-            }
         }
-        .paneLook(AccountsPrefs.shared.look)
+        .paneLook(AppLookPrefs.shared("connections").look)
+        .appLookTheme(AppLookPrefs.shared("connections"))
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("connections-pane")
@@ -94,7 +82,9 @@ struct ConnectionsView: View {
                     symbol: "exclamationmark.triangle", title: "Couldn't load connections",
                     text: "Your Core didn't answer. Nothing was changed.", tone: .fail
                 ) {
-                    AppActionTile(title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.blue) {
+                    AppActionTile(
+                        title: "Try again", symbol: "arrow.clockwise", key: "R", hue: GlassInk.accent(paneAccent)
+                    ) {
                         Task { await model.reload() }
                     }
                 }
@@ -103,55 +93,31 @@ struct ConnectionsView: View {
     }
 }
 
-/// CN1: one section per kind with its connections as cards, or the empty state.
+/// The list (mockup 10): a row per connection, then the services not connected yet; or the empty page with the tiles.
 struct ConnListPage: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: ConnectionsModel
-    private let columns = [GridItem(.adaptive(minimum: Space.s8 * 11), spacing: Space.s3, alignment: .top)]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s5) {
-            AccHeader(
-                title: "Connections",
-                detail: "Services Core signs in to for you, so your AI sessions can read issues and code.",
-                symbol: "link"
-            ) {
-                if !model.items.isEmpty {
-                    HStack(spacing: Space.s1) {
-                        ForEach(ConnFilter.allCases, id: \.self) { f in
-                            AppFilterTile(
-                                title: f.rawValue, count: model.items.filter { f.matches($0) }.count,
-                                on: model.filter == f, key: ""
-                            ) { withAnimation(.smooth(duration: 0.3)) { model.filter = f } }
-                        }
-                    }
-                }
+        if model.shown.isEmpty { empty } else { list }
+    }
+
+    private var list: some View {
+        let free = model.kinds.filter { k in !model.shown.contains { $0.kind == k.id } }
+        return VStack(alignment: .leading, spacing: Space.s2) {
+            VStack(alignment: .leading, spacing: Space.s1 / 2) {
+                Text("Connections").coreFont(size: MacTextSize.large, weight: .semibold)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Services your assistant can look at. You choose what it may do.")
+                    .foregroundStyle(GlassInk.secondary)
             }
-            if model.items.isEmpty {
-                empty
-            } else {
-                ForEach(model.liveKinds) { k in
-                    VStack(alignment: .leading, spacing: Space.s3) {
-                        HStack(spacing: Space.s3) {
-                            ConnTile(kind: k.id)
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(k.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                                let n = model.items.filter { $0.kind == k.id }.count
-                                Text("\(n) connection\(n == 1 ? "" : "s")").coreFont(size: MacTextSize.meta)
-                                    .foregroundStyle(GlassInk.secondary)
-                            }
-                            Spacer()
-                            AccLink(
-                                title: "Use your own app", symbol: "gearshape",
-                                help: "Advanced. Only for a self-hosted Core. Admins only."
-                            ) { ConnDialogs.openApp(model, k) }
-                            AccLink(title: "Connect another", symbol: "plus") {
-                                ConnDialogs.openConnect(model, kind: k.id)
-                            }
-                        }
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: Space.s3) {
-                            ForEach(model.items(of: k.id)) { c in ConnCard(model: model, item: c) }
-                        }
-                    }
+            .padding(.bottom, Space.s2)
+            ForEach(model.shown) { c in ConnRow(model: model, item: c) }
+            if !free.isEmpty {
+                Text("Connect another").coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(GlassInk.secondary).padding(.top, Space.s5).padding(.bottom, Space.s1)
+                HStack(spacing: Space.s2) {
+                    ForEach(free) { k in ConnAddTile(kind: k) { model.beginAdd(kind: k.id) } }
                 }
             }
         }
@@ -159,107 +125,125 @@ struct ConnListPage: View {
 
     /// Ainkrad signs in for you, so there is nothing to set up first.
     private var empty: some View {
-        AccStateCard(
-            symbol: "link", title: "Nothing connected yet",
-            text:
-                "Sign in to GitHub or Jira once, here. Core keeps the sign-in safe and lets your AI sessions read issues and code. They can't change anything until you allow it."
-        ) {
-            HStack(spacing: Space.s2) {
-                ForEach(model.liveKinds) { k in
-                    AppActionTile(
-                        title: "Connect \(k.name)", symbol: ConnLook.symbol(k.id), key: "", hue: GlassInk.blue,
-                        prominent: true
-                    ) { ConnDialogs.openConnect(model, kind: k.id) }
-                }
-            }
-            .frame(maxWidth: Space.s8 * 14, alignment: .leading)
+        VStack(spacing: Space.s2) {
+            IconTile("link", hue: GlassInk.accent(paneAccent), size: 72, bounce: false).connFloat().padding(
+                .top, Space.s8)
+            Text("Connect your first service").coreFont(size: MacTextSize.title, weight: .semibold)
+                .accessibilityAddTraits(.isHeader)
+            Text("Let your assistant read your code, tickets and chats. It never changes anything unless you say so.")
+                .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+                .frame(maxWidth: Space.s8 * 13).padding(.bottom, Space.s3)
+            ConnTiles(kinds: model.kinds) { model.beginAdd(kind: $0) }
         }
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("connections-empty")
     }
 }
 
-/// One connection: who it is, its state as a sentence, when it was used and by how many. Actions fade in on hover; a card
-/// that needs you shows "Sign in again" all the time.
-struct ConnCard: View {
+/// A service not connected yet, as a quiet tile under the list.
+struct ConnAddTile: View {
+    let kind: ConnKind
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.s3) {
+                ConnLogo(kind: kind.id)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(kind.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                    Text(kind.say).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Space.s3).padding(.vertical, Space.s3 - 2)
+            .frame(maxWidth: .infinity)
+            .background(GlassInk.well, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
+        }
+        .buttonStyle(CoreQuietPressStyle(radius: Radius.cardMac))
+        .accessibilityLabel("Connect \(kind.name)")
+    }
+}
+
+/// One connection: logo, service and who, what AI may do and how much it reaches, the state, and More.
+struct ConnRow: View {
     let model: ConnectionsModel
     let item: ConnItem
     @State private var menuOpen = false
     @State private var moreHover = false
     @Environment(\.corePalette) private var palette
 
-    /// The rarer actions: Test and Disconnect stay on the card.
-    private var menuItems: [CoreDropdownItem] {
-        let need = item.status == .needsLook
-        return [
-            CoreDropdownItem("Rename", symbol: "pencil", enabled: !need) { ConnDialogs.openRename(model, item) },
-            item.isDefault
-                ? CoreDropdownItem("Clear default", symbol: "star.slash", enabled: !need) {
-                    Task { await model.clearDefault(item) }
-                }
-                : CoreDropdownItem("Use by default", symbol: "star", enabled: !need) {
-                    Task { await model.makeDefault(item) }
-                },
-            CoreDropdownItem("Who can use it", symbol: "lock.shield", enabled: !need) {
-                ConnDialogs.openAccess(model, item)
-            },
-            CoreDropdownItem("Replace token", symbol: "key") { ConnDialogs.openReplace(model, item) },
-        ] + history
-    }
+    private var kind: ConnKind? { model.kind(item.kind) }
+    private var oauth: Bool { item.authMethod == "oauth" }
 
-    /// History moves into the menu (n35: a card shows Test and Disconnect only).
-    private var history: [CoreDropdownItem] {
-        model.host.shell.settings.hidden.contains("audit")
-            ? [] : [CoreDropdownItem("History", symbol: "clock.arrow.circlepath") { model.openHistory(item) }]
+    /// The four of the mockup first, then the rest of what a connection can do, Disconnect last.
+    private var menuItems: [CoreDropdownItem] {
+        let noun = kind?.resource ?? "places"
+        var out = [
+            CoreDropdownItem("What AI may do…", symbol: "eye") { model.beginEdit(item, at: .allow) },
+            CoreDropdownItem("Choose \(noun)…", symbol: "folder") { model.beginEdit(item, at: .choose) },
+            CoreDropdownItem("Sign in again", symbol: "arrow.clockwise", enabled: oauth) { model.beginAgain(item) },
+            CoreDropdownItem("Test connection", symbol: "checkmark.seal") {
+                Task {
+                    await model.test(item)
+                    if let said = model.tested[item.id] { model.host.shell.showToast(said) }
+                }
+            },
+            CoreDropdownItem("Rename…", symbol: "pencil") { ConnDialogs.openRename(model, item) },
+            item.isDefault
+                ? CoreDropdownItem("Clear default", symbol: "star.slash") { Task { await model.clearDefault(item) } }
+                : CoreDropdownItem("Use by default", symbol: "star") { Task { await model.makeDefault(item) } },
+        ]
+        if !oauth {
+            out.append(CoreDropdownItem("Replace token…", symbol: "key") { ConnDialogs.openReplace(model, item) })
+        }
+        if !model.host.shell.settings.hidden.contains("audit") {
+            out.append(CoreDropdownItem("History", symbol: "clock.arrow.circlepath") { model.openHistory(item) })
+        }
+        out.append(
+            CoreDropdownItem("Disconnect", symbol: "trash", destructive: true) { model.disconnectWithUndo(item) })
+        return out
     }
 
     var body: some View {
-        let (label, tone, symbol) = ConnLook.badge(item.status)
-        let need = item.status == .needsLook
+        let (label, tone, symbol) = ConnLook.chip(item)
         let on = model.cursor == item.id
-        AccPanel(spacing: Space.s2) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                ConnTile(kind: item.kind)
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: Space.s2) {
-                        Text(item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(2)
-                            .layoutPriority(1)
-                        if item.isDefault { AccChip(text: "Default") }
-                    }
-                    Text(item.identity).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: Space.s2)
-                StateBadge(label, tone: tone, symbol: symbol).layoutPriority(2)
+        HStack(spacing: Space.s4) {
+            ConnLogo(kind: item.kind)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(kind?.name ?? item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                Text(item.identity).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
-            // One line (n35); the rest of what the card used to say is in its tooltip.
-            Text(model.tested[item.id] ?? (need ? item.reason ?? "This sign-in stopped working." : model.access(item)))
-                .foregroundStyle(GlassInk.secondary).lineLimit(1)
-                .help("\(when) · \(item.users <= 1 ? "Only you" : "You and \(item.users - 1) AI sessions")")
-            HStack(spacing: Space.s2) {
-                if need {
-                    AccLink(title: "Sign in again", symbol: "arrow.clockwise") {
-                        ConnDialogs.openConnect(model, kind: item.kind, again: item.id)
-                    }
-                }
-                AccLink(title: model.testing == item.id ? "Testing…" : "Test") {
-                    Task { await model.test(item) }
-                }
-                AccLink(title: "Disconnect", danger: true) { ConnDialogs.openDisconnect(model, item) }
-                Spacer(minLength: 0)
-                CoreDropdown(items: menuItems, isPresented: $menuOpen) {
-                    Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
-                        .foregroundStyle(GlassInk.primary)
-                        .frame(width: MacSize.controlMd, height: MacSize.controlSm)
-                        .background(
-                            moreHover || menuOpen ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.chip)
-                        )
-                        .contentShape(coreShape(Radius.chip))
-                        .onHover { moreHover = $0 }
-                        .animation(Motion.out(Motion.hover), value: moreHover)
-                }
-                .help("More: rename, default, who can use it, replace the token, history")
-                .accessibilityLabel("More actions for \(item.name)")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(ConnAccess.lead(kind, allowed: item.allowed)).coreFont(
+                    size: MacTextSize.meta + 1, weight: .semibold)
+                Text(ConnAccess.scope(kind, only: item.only)).coreFont(size: MacTextSize.meta + 1)
+                    .foregroundStyle(GlassInk.secondary)
             }
+            .lineLimit(1).frame(width: 228, alignment: .leading)
+            StateBadge(label, tone: tone, symbol: symbol).frame(width: 132, alignment: .leading)
+                .help(item.reason ?? "")
+            Group {
+                if item.signInNeeded && oauth {
+                    Button("Sign in") { model.beginAgain(item) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                }
+            }
+            .frame(width: 68, alignment: .trailing)
+            CoreDropdown(items: menuItems, isPresented: $menuOpen) {
+                Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
+                    .foregroundStyle(GlassInk.primary)
+                    .frame(width: MacSize.controlMd, height: MacSize.controlSm)
+                    .background(moreHover || menuOpen ? GlassInk.wellHover : Color.clear, in: coreShape(Radius.chip))
+                    .contentShape(coreShape(Radius.chip))
+                    .onHover { moreHover = $0 }
+                    .animation(Motion.out(Motion.hover), value: moreHover)
+            }
+            .help("More")
+            .accessibilityLabel("More actions for \(kind?.name ?? item.name)")
         }
+        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+        .frame(minHeight: 68)
+        .background(GlassInk.well, in: coreShape(Radius.cardMac))
         .overlay { if on { coreShape(Radius.cardMac).fill(palette.navActive).allowsHitTesting(false) } }
         .contextMenu {
             ForEach(menuItems) { i in
@@ -267,15 +251,7 @@ struct ConnCard: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(item.name), \(label)")
+        .accessibilityLabel("\(kind?.name ?? item.name), \(item.identity), \(label)")
         .accessibilityAddTraits(on ? .isSelected : [])
-    }
-
-    private var when: String {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .short
-        if let u = item.lastUsed { return "Used \(f.localizedString(for: u, relativeTo: Date()))" }
-        if let c = item.lastChecked { return "Checked \(f.localizedString(for: c, relativeTo: Date()))" }
-        return "Not used yet"
     }
 }

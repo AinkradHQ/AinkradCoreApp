@@ -40,7 +40,7 @@ enum SessionShortcut: CaseIterable {
         let (k, m) = chord
         let key: String =
             switch k {
-            case "\r": "↩"
+            case "\r": "⏎"
             case "\u{F703}": "→"
             case "\u{F702}": "←"
             default: String(k).uppercased()
@@ -157,7 +157,7 @@ struct ShortcutSheet: View {
         (
             "Message field",
             [
-                ("↩", "Send, or queue it while a turn runs"), ("⇧↩", "A new line"),
+                ("⏎", "Send, or queue it while a turn runs"), ("⇧⏎", "A new line"),
                 ("↑", "Edit queued messages, or your last one (empty field)"), ("/", "Commands"),
                 ("⇧⇥", "Switch the mode: Asks first, Accepts edits, Plan"),
                 ("esc", "Stop the turn, or leave the field"),

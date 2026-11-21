@@ -1,5 +1,6 @@
 import Admin
 import AppKit
+import CoreKit
 import Foundation
 import Observation
 import Shell
@@ -26,10 +27,37 @@ public final class BrainModel {
     /// Where the wizard's Notes and docs look: the person's folders or a disk search. Tests and the Debug gallery replace it.
     @ObservationIgnored public var importPlaces: ImportPlaces? = ImportPlaces.shared
     /// The connected Core's API minor, from `GET /me`; nil until read. Gates what an older Core cannot answer.
+    /// The top-bar dropdown's numbers from a Core with API minor 95 (`BrainGlanceSource`); nil keeps the Rooms and Records counts.
+    var glanceData: GlanceData?
     public var apiMinor: Int? {
         didSet {
+            updateStatusPolling()
             importer?.review.canSameProject = remembersSameProject
             importer?.review.keepsInCommit = keepsInCommit
+        }
+    }
+    /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows it first; Explore is the console.
+    public let calm = BrainCalmModel()
+    public private(set) var exploring = false
+    public var calmAvailable: Bool { servesActivity && !isSample && service?.importRoutes != nil }
+    public func explore(_ on: Bool, tab: BrainTab? = nil) {
+        exploring = on
+        if let tab { self.tab = tab }
+        if !on { Task { await calm.reload() } }
+    }
+    /// The top-bar Brain icon's feed (E9-2).
+    public let status = BrainStatusModel()
+    /// The Core's status, areas and auto-import routes (API minor 95).
+    public var servesActivity: Bool { (apiMinor ?? 0) >= Int(coreMinorV010) }
+    private func updateStatusPolling() {
+        if servesActivity, let routes = service?.importRoutes, !isSample {
+            host.shell.brainStatus = { [weak self] in self?.status.chip }
+            host.shell.openBrain = { [weak self] in self?.show(.overview) }
+            status.start(routes)
+            calm.attach(routes: routes, service: service, rooms: { [weak self] in self?.rooms ?? [] })
+        } else {
+            host.shell.brainStatus = nil
+            status.stop()
         }
     }
     /// Import takes the ticked rooms in one call (Core API minor 73). The sample always has it.
@@ -90,11 +118,19 @@ public final class BrainModel {
         sync = SyncModel(host: host, service: service, sources: { sources() })
         registerActions()
         load = .loading
+        updateStatusPolling()
         Task { await reload() }
+    }
+
+    /// One sync of the Mac collectors without any screen (the background collector): reads the rooms, then syncs.
+    public func collectNow() async {
+        for _ in 0..<30 where sync == nil || load != .ready { try? await Task.sleep(for: .seconds(1)) }
+        await sync?.syncNow()
     }
 
     public func detach() {
         service = nil
+        updateStatusPolling()
         for id in Self.actionIDs { host.shell.launcher.unregister(id) }
         activity.reset()
         checks.reset()
@@ -104,6 +140,7 @@ public final class BrainModel {
         clearRoomView()
         rooms = []
         overview = nil
+        glanceData = nil
         viewingID = nil
         importer = nil
         sync?.stopTimer()
@@ -122,6 +159,7 @@ public final class BrainModel {
     public var visibleTabs: [BrainTab] {
         if isSample { return BrainTab.allCases }
         var tabs: [BrainTab] = service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
+        if calmAvailable { tabs.insert(contentsOf: [.records, .evidence], at: 0) }
         if service?.servesChanges == true { tabs.append(.activity) }
         return tabs
     }
@@ -180,7 +218,7 @@ public final class BrainModel {
 
     // MARK: loading
 
-    func reload() async {
+    public func reload() async {
         guard let service else { return }
         do {
             let st = try await service.setup()
@@ -211,7 +249,10 @@ public final class BrainModel {
             if let sync, sync.status == nil {
                 await sync.reload()
                 // Real Cores only: the sample has no Mac collectors to run.
-                if service.importRoutes != nil, !service.isSample { sync.startTimer() }
+                if service.importRoutes != nil, !service.isSample {
+                    sync.startTimer()
+                    BackgroundCollect.ensure()
+                }
             }
             if service.servesCandidates { await candidates.load(quiet: true) }
             if viewing == nil { viewingID = rs.first { $0.mounted }?.id ?? rs.first?.id }
@@ -284,7 +325,15 @@ public final class BrainModel {
         await reload()
     }
 
-    /// Opens a sealed room. Touch ID first; a cancelled one leaves the room sealed.
+    /// D-6: the app unlock opens every sealed room, once, with no prompt of its own. A room that refuses stays sealed.
+    public func openSealedRooms() async {
+        guard let service else { return }
+        let sealed = sealedRooms.map(\.id)
+        for id in sealed { try? await service.openRoom(id) }
+        if !sealed.isEmpty { await reload() }
+    }
+
+    /// Opens a sealed room. The app unlock covers it; a lapsed one asks Touch ID, and a cancelled one leaves the room sealed.
     @discardableResult
     public func open(_ id: String) async -> Bool {
         guard let service else { return false }
@@ -336,6 +385,12 @@ public final class BrainModel {
             let made = try await service.createRoom(draft)
             host.shell.showToast("Room \(made.name) created")
             await reload()
+            // Settings, Brain, Remember for: a new room keeps its sources for that long.
+            if let days = BrainOptions.newRoomRetention(BrainOptions.options.string(BrainOptions.remember, "forever")) {
+                _ = await candidates.change(
+                    made.id, PolicyChange(retentionDays: days),
+                    reason: "Remove the text of sources older than \(days) days in \(made.name) for good.")
+            }
             return true
         } catch is AdminDeclined {
             return false
@@ -359,6 +414,13 @@ public final class BrainModel {
     // MARK: shell
 
     /// Opens the pane on a tab.
+    /// Opens the Brain on an area the top bar counted (`me`, `rules`, `knowledge`, `timeline`, `places`): the calm Brain's page
+    /// when it is shown, else the console's overview.
+    func open(area: String) {
+        show(BrainAreaLink.tab(for: area))
+        if calmAvailable, !exploring, let page = BrainCalmModel.Page(rawValue: area) { calm.page = page }
+    }
+
     public func show(_ tab: BrainTab = .overview) {
         self.tab = tab
         var spec = PaneSpec(
@@ -450,11 +512,36 @@ public final class BrainModel {
             BrainHowItWorks.open($0.host.shell)
         }
         if service != nil { registerActions() }
+        // The top bar's Brain dropdown: a Core with API minor 95 tells what it does now, the five areas and what it learned
+        // today; an older one says how things are in Rooms and Records.
+        shell.brainRefresh = { [weak self] in await self?.refreshGlance() }
+        shell.brainOpenArea = { [weak self] area in self?.open(area: area) }
+        shell.brainUndoLearned = { [weak self] in self?.undoLearned() }
+        shell.brainGlance = { [weak self] in
+            guard let self, self.service != nil else { return nil }
+            if self.servesGlance, let d = self.glanceData { return BrainGlanceMaker.glance(d) }
+            let o = self.overview
+            let status =
+                switch o?.health {
+                case .paused?: "Paused"
+                case .needsYou?: "Something needs a look"
+                default: "Learning quietly in the background"
+                }
+            let records = self.rooms.reduce(0) { $0 + ($1.counts?.records ?? 0) }
+            return BrainGlance(
+                status: status, healthy: (o?.health ?? .healthy) == .healthy,
+                stats: [
+                    .init("Rooms", self.rooms.count), .init("Records", records), .init("To check", o?.needs.count ?? 0),
+                ])
+        }
         shell.settings.section(
             SettingsSection(
-                id: "brain-link", group: .apps, title: "Brain", sub: "Look of the memory app", symbol: "brain",
-                order: 5
-            ) { BrainLookSection(model: self) })
+                id: "brain-link", group: .apps, title: "Brain", sub: "Look and options of the memory app",
+                symbol: "brain", order: 5,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) { BrainLookSection(model: self, part: .look) },
+                    SettingsTab("options", "Options", order: 1) { BrainLookSection(model: self, part: .options) },
+                ]))
         // A locked Mac clears the room view from memory (security rule 7).
         lockWatch = DistributedNotificationCenter.default().addObserver(
             forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main

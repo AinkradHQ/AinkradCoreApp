@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Shell
 import SwiftUI
@@ -6,6 +7,7 @@ import SwiftUI
 /// the exact command or file in a well, where and when, a live countdown with a bar, then Deny on the left and Approve on the
 /// right. ⌘Return approves and ⌘⌫ denies while `keys` is on. Decided ones fold to a sentence; expired ones dim.
 struct ApprovalCardView: View {
+    @Environment(\.coreAccent) private var paneAccent
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
     var keys = false
@@ -37,13 +39,15 @@ struct ApprovalCardView: View {
         let busy = model.deciding.contains(request.id)
         let left = request.remaining(now: now)
         let ratio = left.map { $0 / Double(max(request.timeoutSecs ?? 1, 1)) } ?? 1
-        let hue = (left ?? 999) <= 20 ? GlassInk.red : (left ?? 999) <= 60 ? GlassInk.amber : GlassInk.blue
+        let hue =
+            (left ?? 999) <= 20 ? GlassInk.red : (left ?? 999) <= 60 ? GlassInk.amber : GlassInk.accent(paneAccent)
         let session = model.sessions.session(request.session)
         return VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
                 IconTile(ask.symbol, hue: GlassInk.amber, size: 44, bounce: request.id)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(who) wants to \(ask.verb)").coreFont(size: MacTextSize.title, weight: .bold)
+                    Text(ask.question).coreFont(size: MacTextSize.title, weight: .bold)
+                        .help("\(who) wants to \(ask.verb)")
                     Text(
                         "\(request.codeModeOp == nil ? "" : session?.project.map { "AI session in \($0) · " } ?? "AI session · ")On \(session.map { model.runnerName($0.runner) } ?? "a runner") · asked \(AgentWords.ago(request.requestedAt, now: now))"
                     )
@@ -69,6 +73,10 @@ struct ApprovalCardView: View {
                     Text(request.input).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(5)
                         .textSelection(.enabled).agentCopyMenu(request.input)
                     Spacer(minLength: 0)
+                    CoreIconButton(symbol: "doc.on.doc", label: "Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(request.input, forType: .string)
+                    }
                 }
                 .padding(Space.s3)
                 .background(GlassInk.well, in: coreShape(Radius.control))
@@ -92,6 +100,11 @@ struct ApprovalCardView: View {
                         GlassInk.secondary)
                 }
                 Spacer(minLength: 0)
+                if model.sessionTools, request.codeModeOp == nil {
+                    Button("Always for this project") { Task { await model.approveAlways(request) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(busy)
+                        .help("Approve this and every request like it in this project from now on. Safe requests only.")
+                }
                 answer(approve: true, busy: busy)
             }
         }
@@ -110,7 +123,7 @@ struct ApprovalCardView: View {
             }
         }
         .buttonStyle(CoreButtonStyle(approve ? .prominent : .secondary, size: .small))
-        .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
+        .environment(\.coreKeycap, approve ? "⌘⏎" : "⌘⌫")
         .disabled(busy)
         .help(
             approve
@@ -173,6 +186,17 @@ enum ApprovalWords {
         let verb: String
         let symbol: String
         let wellSymbol: String
+        /// The card's title, as a question: "Run this command?"
+        var question: String {
+            switch verb {
+            case "run a command": "Run this command?"
+            case "change a file": "Change this file?"
+            case "read files": "Read these files?"
+            case "reach the internet": "Reach the internet?"
+            case "use a secret": "Use a secret?"
+            default: verb.prefix(1).uppercased() + verb.dropFirst() + "?"
+            }
+        }
     }
 
     static func ask(_ tool: String) -> Ask {

@@ -17,7 +17,7 @@ struct LeylineView: View {
                 LeylineHome(model: model).transition(.opacity)
             }
         }
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("leyline"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)
@@ -30,7 +30,8 @@ struct LeylineView: View {
                 return .handled
             }
             if model.openID != nil {
-                model.closeHost()
+                // Inside a page behind Advanced, Esc goes back to the host's cards first.
+                if model.section != .overview { model.section = .overview } else { model.closeHost() }
                 return .handled
             }
             return .ignored
@@ -172,6 +173,11 @@ struct HostsGallery: View {
                         if !model.filter.isEmpty, model.shown.isEmpty {
                             Text("No host matches “\(model.filter)”.").foregroundStyle(GlassInk.secondary)
                                 .frame(maxWidth: .infinity)
+                        } else if model.filter.isEmpty, model.shown.isEmpty {
+                            Text(
+                                "No host fits “\(LeylineOptions.current.title)”. Change it in Settings, Leyline, Options."
+                            )
+                            .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity)
                         }
                     }
                     .padding(.horizontal, Space.s4).padding(.bottom, Space.s8 * 3)

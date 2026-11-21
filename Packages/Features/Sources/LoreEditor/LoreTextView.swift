@@ -73,6 +73,21 @@ final class LoreTextView: NSTextView {
         latency.record(CACurrentMediaTime() - t0)
     }
 
+    /// A table is a grid while the caret is elsewhere and text while it is inside: repaint when the selection moves.
+    override func setSelectedRanges(
+        _ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool
+    ) {
+        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        let loc = selectedRange().location
+        let inTable = loc < ts.length && ts.attribute(.loreTable, at: loc, effectiveRange: nil) != nil
+        if inTable || caretWasInTable { needsDisplay = true }
+        if inTable != caretWasInTable { controller?.onTable?(inTable) }
+        caretWasInTable = inTable
+    }
+    private var caretWasInTable = false
+    /// Text mode: tables always show their Markdown (E0-7), not a grid.
+    var tablesAsText = false
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         LoreInk.resolve(for: effectiveAppearance)

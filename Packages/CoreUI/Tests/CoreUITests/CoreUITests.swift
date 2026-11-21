@@ -157,3 +157,85 @@ struct KeyboardFocusTests {
         #expect(CoreInputMode.navigationKeys.contains(48), "Tab navigates")
     }
 }
+
+struct LookAssetTests {
+    @Test func everyWallpaperPresetShipsItsFiles() throws {
+        // Packages/CoreUI/Tests/CoreUITests/CoreUITests.swift -> repo root -> App/Mac/Wallpapers
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "App/Mac/Wallpapers")
+        for w in CoreWallpaper.presets where w.isFile {
+            for t in ["day", "night"] {
+                for f in ["wall-\(w.rawValue)-\(t).heic", "wall-\(w.rawValue)-\(t)-thumb.jpg"] {
+                    #expect(FileManager.default.fileExists(atPath: dir.appending(path: f).path), "\(f)")
+                }
+            }
+        }
+    }
+
+    @Test func accentsAreDistinctAndTitled() {
+        #expect(Set(CoreAccent.allCases.map(\.rawValue)).count == CoreAccent.allCases.count)
+        #expect(CoreAccent.allCases.count == 13 && !CoreAccent.allCases.map(\.rawValue).contains("gold"))
+        #expect(Set(CoreAccent.allCases.map { "\($0.fill)" }).count == CoreAccent.allCases.count)
+        #expect(CoreWallpaper.presets.count == 26)
+    }
+
+    @Test func wallpaperTabsPartitionThePresets() {
+        let photos = CoreWallpaper.presets(in: .photos)
+        let generated = CoreWallpaper.presets(in: .generated)
+        #expect(photos.count == 12 && generated.count == 14)
+        #expect(Set(photos + generated) == Set(CoreWallpaper.presets) && Set(photos).isDisjoint(with: generated))
+        #expect(CoreWallpaper.picture.group == .picture && CoreWallpaper.presets(in: .picture) == [.picture])
+    }
+}
+
+@MainActor struct AppLookPrefsBasicsTests {
+    private func suite() -> UserDefaults {
+        let name = "applook-test-\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
+    @Test func followsAppearanceByDefault() {
+        let p = AppLookPrefs(app: "lore", defaults: suite())
+        #expect(!p.own && p.palette == nil)
+    }
+
+    @Test func ownFlagRoundTrips() {
+        let d = suite()
+        let p = AppLookPrefs(app: "lore", defaults: d)
+        p.own = true
+        p.day = true
+        p.accent = .teal
+        let q = AppLookPrefs(app: "lore", defaults: d)
+        #expect(q.own && q.day && q.accent == .teal && q.palette?.isDay == true)
+        #expect(!AppLookPrefs(app: "design", defaults: d).own)
+    }
+}
+
+@MainActor struct AppOptionsTests {
+    private func suite() -> UserDefaults {
+        let name = "appopt-test-\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
+    @Test func fallsBackThenKeepsWhatWasSet() {
+        let d = suite()
+        let o = AppOptions(app: "lore", defaults: d)
+        #expect(o.bool("openLast", true) && o.string("size", "medium") == "medium")
+        o.set("openLast", false)
+        o.set("size", "large")
+        let again = AppOptions(app: "lore", defaults: d)
+        #expect(!again.bool("openLast", true) && again.string("size", "medium") == "large")
+        #expect(AppOptions(app: "design", defaults: d).bool("openLast", true), "options are per app")
+    }
+
+    @Test func bindingsWriteThrough() {
+        let o = AppOptions(app: "leyline", defaults: suite())
+        o.flag("calm", true).wrappedValue = false
+        #expect(!o.bool("calm", true))
+    }
+}

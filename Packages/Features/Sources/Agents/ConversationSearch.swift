@@ -32,7 +32,7 @@ enum ConversationSearch {
     }
 }
 
-/// The find bar over a conversation: the words, "3 of 12", previous / next, close. ↩ or ↓ next, ⇧↩ or ↑ previous, Esc closes.
+/// The find bar over a conversation: the words, "3 of 12", previous / next, close. ⏎ or ↓ next, ⇧⏎ or ↑ previous, Esc closes.
 struct ConversationFindBar: View {
     @Binding var query: String
     let count: Int
@@ -64,7 +64,7 @@ struct ConversationFindBar: View {
             CoreIconButton(symbol: "chevron.up", label: "Previous match") { step(-1) }.disabled(count == 0)
                 .help("Previous match (⇧⌘G)").keyHint(.findPrevious)
             CoreIconButton(symbol: "chevron.down", label: "Next match") { step(1) }.disabled(count == 0)
-                .help("Next match (↩ or ⌘G)").keyHint(.findNext)
+                .help("Next match (⏎ or ⌘G)").keyHint(.findNext)
             CoreIconButton(symbol: "xmark", label: "Close find") { close() }.help("Close (Esc)").keyHint("esc")
         }
         .coreFont(size: MacTextSize.body)

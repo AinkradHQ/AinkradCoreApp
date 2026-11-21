@@ -15,7 +15,15 @@ public final class ProjectsModel {
     var catalog: any RepoCatalog
     /// The Run page's reads and writes (spec, secrets, run). Set with the connection; the Debug demo brings its own.
     var runService: (any ProjectRunService)?
+    /// Run configurations and environments (Core 0.10, minor 95); nil on an older Core, so the page shows the old Run page.
+    var configsService: (any RunConfigsService)?
+    /// Code facts, usage, changes, Brain records and fetch tuning (minor 95); nil on an older Core.
+    var insightsService: (any ProjectInsightsService)?
     private(set) var catalogState = RepoCatalogState.loading
+    /// The Core can keep a runner preference (minor 95); older Cores are never asked.
+    private(set) var runnerSupported = false
+    /// The project the New Project wizard just made: its review step shows that project's repos copying.
+    internal(set) var wizardProjectID: Int64?
 
     internal(set) var projects: [ProjectItem] = []
     var load: ProjectsLoad = .notConnected
@@ -30,6 +38,10 @@ public final class ProjectsModel {
     /// ⌘N and the New Project button: the quick pop-over under the button.
     var quickOpen = false
     var quickName = ""
+    /// What a run gets unless a project says otherwise (Settings > Projects > Options); nil until read, or on a Core without it.
+    internal(set) var limits: ProjectLimits?
+    internal(set) var limitsState = LimitsState.loading
+    enum LimitsState: Equatable { case loading, ready, unsupported, failed }
     /// A refusal from the Core for the write in flight, in words.
     internal(set) var writeError: String?
     internal(set) var busy = false
@@ -64,6 +76,11 @@ public final class ProjectsModel {
     /// Opens a project's space on its Overview (from another app's link).
     public func openSpace(_ id: String) {
         guard let pid = Int64(id) else { return }
+        if ProjectsOptions.openIn == .newWorkspace, let p = project(pid) {
+            section = .overview
+            openInOwnPane(p)
+            return
+        }
         section = .overview
         show(project: pid)
     }
@@ -85,6 +102,13 @@ public final class ProjectsModel {
     public func attach(connection: CoreConnection) {
         lore = LiveLoreService(connection: connection)
         runService = LiveProjectRunService(connection: connection)
+        catalog = LiveRepoCatalog(connection: connection)
+        Task { [weak self] in
+            let ok = await connection.serverSupports(minor: coreMinorV010)
+            self?.runnerSupported = ok
+            self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
+            self?.insightsService = ok ? LiveProjectInsightsService(connection: connection) : nil
+        }
         use(LiveProjectsService(connection: connection))
     }
 
@@ -98,7 +122,13 @@ public final class ProjectsModel {
         service = nil
         lore = nil
         runService = nil
+        configsService = nil
+        insightsService = nil
         projects = []
+        limits = nil
+        limitsState = .loading
+        pollTask?.cancel()
+        pollTask = nil
         load = .notConnected
         openID = nil
         cursor = nil
@@ -115,10 +145,13 @@ public final class ProjectsModel {
     func reload() async {
         guard let service else { return }
         do {
-            let list = try await service.projects().sorted { $0.updatedAt > $1.updatedAt }
+            var all = try await service.projects()
+            // "Show archived projects" (Settings > Projects > Options): they come after the active ones in the same order.
+            if ProjectsOptions.showArchived { all += (try? await service.archivedProjects()) ?? [] }
+            let list = all.sorted { ($0.archived ? 1 : 0, $1.updatedAt) < ($1.archived ? 1 : 0, $0.updatedAt) }
             // One read of each run, in parallel: the gallery's tags and the top bar need them.
             let runs = await withTaskGroup(of: (Int64, ProjectRunState?).self) { group in
-                for p in list where !p.repos.isEmpty {
+                for p in list where !p.repos.isEmpty && !p.archived {
                     group.addTask { (p.id, try? await service.run(project: p.id)) }
                 }
                 var out: [Int64: ProjectRunState] = [:]
@@ -128,11 +161,57 @@ public final class ProjectsModel {
             runStates = runs
             projects = list.map(applying)
             load = .ready
+            syncLauncherProjects()
+            pollWhileCopying()
         } catch {
             // A list already on screen stays; only a first load that failed shows the failure.
             if projects.isEmpty { load = .failed(words(error)) }
         }
     }
+
+    @ObservationIgnored private var pollTask: Task<Void, Never>?
+    @ObservationIgnored private var registeredProjects: Set<String> = []
+
+    /// The twelve most recently touched projects as launcher entries (⌘K → Projects).
+    private func syncLauncherProjects() {
+        let recent = projects.prefix(12)
+        let ids = Set(recent.map { "project-\($0.id)" })
+        for gone in registeredProjects.subtracting(ids) { host.shell.launcher.unregister(gone) }
+        for p in recent {
+            host.shell.launcher.register(
+                LauncherEntry(
+                    id: "project-\(p.id)", title: p.name, sub: p.description.isEmpty ? "Project" : p.description,
+                    symbol: "folder", keywords: ["project", p.slug]
+                ) { [weak self] in self?.show(project: p.id) })
+        }
+        registeredProjects = ids
+    }
+
+    /// While the Core is copying a repo the page reads again every few seconds (the Core's `project.mirror_changed`
+    /// event usually does it sooner), so "copying" always ends in ready or a reason.
+    private func pollWhileCopying() {
+        let copying = projects.contains { $0.repos.contains { if case .fetching = $0.copy { true } else { false } } }
+        guard copying, pollTask == nil else { return }
+        pollTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            pollTask = nil
+            if !Task.isCancelled { await reload() }
+        }
+    }
+
+    /// "Fetch Now" and "Try again": the Core copies the repo again. The call lasts as long as the fetch, so it is not
+    /// awaited here; the Core says "fetching" at once and the page reads that.
+    func fetchRepo(_ project: ProjectItem, _ repo: RepoItem) {
+        guard let service else { return }
+        Task { _ = try? await service.fetch(project: project.id, repo: repo.id) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            await reload()
+        }
+    }
+
+    /// Opens the Connections flow (GitHub).
+    func connectGithub() { host.shell.launcher.entry("connections")?.run() }
 
     /// Reads the picker's repos (once per open of a sheet).
     func loadCatalog() async {
@@ -187,12 +266,22 @@ public final class ProjectsModel {
 
     func clearWriteError() { writeError = nil }
 
+    /// The wizard's "Open project": closes it and opens the new project's space.
+    func openWizardProject() {
+        host.shell.closeDialog()
+        if let id = wizardProjectID { openProject(id) }
+        wizardProjectID = nil
+    }
+
     // MARK: writes
 
     /// Creates the project and adds the picked repos, all behind one Touch ID. The new project opens. Returns false when
     /// nothing was created (the sheet stays open with its error, or the person did not elevate).
     @discardableResult
-    func create(name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = []) async -> Bool {
+    func create(
+        name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = [], expose: Bool? = nil,
+        runner: String? = nil, wizard: Bool = false
+    ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard let service, !busy, mayWrite() else { return false }
         if let problem = ProjectRules.nameProblem(name) ?? ProjectRules.slugProblem(slug) {
@@ -220,6 +309,9 @@ public final class ProjectsModel {
                         missed.append(r.name)
                     }
                 }
+                // The wizard's choices; a failure here never undoes the project (they can be changed in Settings).
+                if let expose { try? await service.setExpose(project: p.id, expose) }
+                if let runner, runnerSupported, runner != "auto" { try? await service.setRunner(project: p.id, runner) }
             }
         } catch is AdminDeclined {
             // Nothing was written if the project is still nil; if it exists the person saw Touch ID succeed.
@@ -236,6 +328,11 @@ public final class ProjectsModel {
         quickOpen = false
         quickName = ""
         await reload()
+        if wizard {
+            // The wizard stays up and shows the copying; "Open project" there opens the space.
+            wizardProjectID = made.id
+            return true
+        }
         openID = made.id
         host.shell.closeDialog()
         if missed.isEmpty {
@@ -300,9 +397,26 @@ public final class ProjectsModel {
 
     // MARK: navigation
 
+    /// Opens a project's space where Settings, Projects, Options says: in a pane of its own beside the gallery (the default), or
+    /// in the Projects pane in place of the gallery.
     func openProject(_ id: Int64) {
         section = .overview
+        if ProjectsOptions.openIn == .newWorkspace, let p = project(id) {
+            openInOwnPane(p)
+            return
+        }
         withAnimation(Motion.out(Motion.move)) { openID = id }
+    }
+
+    static func paneID(_ id: Int64) -> String { "project-\(id)" }
+
+    private func openInOwnPane(_ p: ProjectItem) {
+        let id = p.id
+        host.shell.openPane(
+            PaneSpec(id: Self.paneID(id), title: p.name, sub: "Project", symbol: "square.grid.2x2", minWidth: 720) {
+                ProjectPaneView(model: self, id: id)
+            })
+        Task { await reload() }
     }
 
     func closeProject() {
@@ -327,6 +441,7 @@ public final class ProjectsModel {
             id: "projects", title: "Projects", sub: "Home Core", symbol: "square.grid.2x2", minWidth: 720
         ) { ProjectsView(model: self) }
         spec.tab = "Projects"
+        spec.fullScreenOnly = true
         spec.onNew = { [weak self] in self?.newItem() }
         shell.openPane(spec)
         Task { await reload() }
@@ -336,6 +451,18 @@ public final class ProjectsModel {
 
     public func install() {
         let shell = host.shell
+        // Settings, Apps, Projects: its Look (follows Appearance unless turned off) and its Options.
+        shell.settings.section(
+            SettingsSection(
+                id: "projects", group: .apps, title: "Projects", sub: "Its look and what a run may use",
+                symbol: "square.grid.2x2", order: 1,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Projects", prefs: AppLookPrefs.shared("projects"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { ProjectsOptionsTab(model: self) },
+                ]))
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
             _ run: @escaping @MainActor (ProjectsModel) -> Void

@@ -21,7 +21,7 @@ struct DesignView: View {
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
-        .paneLook(nil, own: true)
+        .appLook(AppLookPrefs.shared("design"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)
@@ -44,13 +44,8 @@ struct DesignHome: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             TopBar(model: model)
-            HStack(alignment: .top, spacing: Space.s2) {
-                CategoryRail(model: model).frame(width: Space.s8 * 7 + Space.s2)
-                VStack(spacing: Space.s2) {
-                    Composer()
-                    wall
-                }
-            }
+            if model.load == .ready { KindFilterRow(model: model) }
+            wall
         }
     }
 
@@ -98,14 +93,32 @@ private struct TopBar: View {
             Text("Design").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
             if model.load == .ready { Text(model.summary).foregroundStyle(GlassInk.secondary) }
         } actions: {
-            FilterField(text: Binding(get: { model.filter }, set: { model.filter = $0 }), label: "Filter designs")
+            if model.composeSupported && !model.readOnly {
+                Button {
+                    Task { await model.drawWithAI() }
+                } label: {
+                    Label("Draw with AI", systemImage: "sparkles")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary))
+                .help("Make a new design and let AI draw three directions on it")
+                .accessibilityIdentifier("design-draw-ai-home")
+            }
             Button {
-                model.pick(.systems)
+                model.openNew()
             } label: {
-                Label("Design systems", systemImage: DesignCategory.systems.symbol)
+                Label("Advanced…", systemImage: "slider.horizontal.3")
             }
             .buttonStyle(CoreButtonStyle(.secondary))
-            .help("Show the design systems")
+            .help("New design (advanced): name, kind and project")
+            .accessibilityIdentifier("design-new-advanced")
+            Button {
+                Task { await model.quickNew() }
+            } label: {
+                Label("New design", systemImage: "plus")
+            }
+            .buttonStyle(CoreButtonStyle(.prominent))
+            .help("Make a blank design and open it")
+            .accessibilityIdentifier("design-new")
         }
         .padding(.top, Space.s2)
         .frame(maxWidth: .infinity)
@@ -113,96 +126,31 @@ private struct TopBar: View {
     }
 }
 
-/// The rail: Needs you, Drawing now, All designs; the kinds; the projects with something in them.
-/// TODO(design-system): proposal CoreNavRow (a flat rail row, filled only when selected or hovered, as in the mockup);
-/// until then the rail uses `CoreRow`, whose rows sit on the glass-card fill.
-private struct CategoryRail: View {
+/// The mockup's head row: the kind filter as a segmented control, then the search field (Design, `20-design.html`).
+private struct KindFilterRow: View {
     let model: DesignModel
+    private static let kinds: [(DesignCategory, String)] = [
+        (.all, "All"), (.screens, "Designs"), (.systems, "Design systems"), (.mockups, "Mockups"),
+    ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                ForEach([DesignCategory.needsYou, .drawing, .all]) { row($0) }
-                Color.clear.frame(height: Space.s2)
-                ForEach(DesignCategory.kinds) { row($0) }
-                if !model.railProjects.isEmpty {
-                    Text("Projects").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(GlassInk.secondary)
-                        .padding(.horizontal, Space.s3).padding(.top, Space.s4).padding(.bottom, Space.s1)
-                        .accessibilityAddTraits(.isHeader)
-                    ForEach(model.railProjects, id: \.ref.id) { p in
-                        CoreRow(
-                            p.ref.name, symbol: "folder", selected: model.project == p.ref.id,
-                            action: { model.pickProject(p.ref.id) }
-                        ) { CountBadge(p.count, tone: .quiet, showsZero: true) }
-                        .help(
-                            model.project == p.ref.id ? "Show every project" : "Only what is related to \(p.ref.name)")
-                    }
-                }
-            }
-            .padding(Space.s2)
+        HStack(spacing: Space.s3) {
+            CoreSegmented(
+                "Kind",
+                segments: Self.kinds.map { CoreSegment($0.0, $0.1) },
+                selection: Binding(
+                    get: { Self.kinds.contains { $0.0 == model.category } ? model.category : .all },
+                    set: { model.pick($0) }))
+            Spacer(minLength: 0)
+            FilterField(text: Binding(get: { model.filter }, set: { model.filter = $0 }), label: "Search designs")
+                .frame(width: Space.s8 * 5)
         }
-        .scrollIndicators(.never)
-        .frame(maxHeight: .infinity)
-        .coreWell(radius: Radius.pane)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("design-rail")
-    }
-
-    private func row(_ c: DesignCategory) -> some View {
-        let n = model.count(c)
-        return CoreRow(
-            c.title, symbol: c.symbol, selected: model.project == nil && model.category == c, action: { model.pick(c) }
-        ) {
-            CountBadge(n, tone: c == .needsYou && n > 0 ? .needsYou : .quiet, showsZero: true)
-        }
-        .accessibilityIdentifier("design-rail-\(c.rawValue)")
+        .padding(.horizontal, Space.s1)
+        .accessibilityIdentifier("design-kind-filter")
     }
 }
 
-/// The brief composer of the mockup. AI drawing from a brief is V7-02: until then the composer shows its parts, off, and says
-/// so on hover. TODO(V7-02): "Draw 3 directions" starts the AI session; the chips pick kind, project and system.
-private struct Composer: View {
-    @State private var brief = ""
-    @State private var vary = "layout"
-    private let soon = "Drawing from a brief arrives with AI drawing, in a later update"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            CoreTextArea(
-                nil, placeholder: "Describe what AI should design…", text: $brief, size: MacTextSize.title,
-                minHeight: Space.s8 + Space.s4, maxHeight: Space.s8 * 3)
-            HStack(spacing: Space.s2) {
-                chip("App screens", DesignCategory.screens.symbol)
-                chip("Project", "folder")
-                chip("Design system", DesignCategory.systems.symbol)
-                chip("Reference", "plus")
-                Text("Vary").foregroundStyle(GlassInk.secondary).padding(.leading, Space.s1)
-                CoreSegmented(
-                    "Vary",
-                    segments: [
-                        CoreSegment("layout", "Layout"), CoreSegment("colour", "Colour"),
-                        CoreSegment("imagery", "Imagery"),
-                    ],
-                    selection: $vary
-                )
-                .fixedSize()
-                Spacer(minLength: Space.s2)
-                Soon(prominent: true, help: soon) { Label("Draw 3 directions", systemImage: "sparkles") }
-            }
-        }
-        .disabled(true)
-        .padding(Space.s3)
-        .coreWell(radius: Radius.pane)
-        .help(soon)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("design-composer")
-    }
-
-    private func chip(_ title: String, _ symbol: String) -> some View {
-        Soon(prominent: false, help: soon) { Label(title, systemImage: symbol) }.controlSize(.small)
-    }
-}
+// The brief composer (describe what AI should design) stays out until AI drawing (E11-4): a disabled copy only looked broken.
 
 /// The wall: on All designs a section per category that has something; on one category its cards; Needs you and Drawing
 /// now say what will show there.
@@ -213,7 +161,7 @@ struct DesignWall: View {
 
     /// The skeletons' grid: as many columns of at least 256 pt as fit.
     static let columns = [GridItem(.adaptive(minimum: cardMin), spacing: Space.s4, alignment: .top)]
-    static let cardMin = Space.s8 * 8
+    static let cardMin = Space.s8 * 6
 
     /// The page's columns, as Photos and Finder do: as many 256 pt columns as fit the width, the same count for every
     /// section so columns line up from section to section. A short section leaves its trailing slots empty.
@@ -248,65 +196,33 @@ struct DesignWall: View {
                 "Designs waiting for your review, your notes or your approval show here.")
         case .drawing:
             empty("pencil", "Nothing is being drawn", "When AI draws a design you can watch it here, live.")
-        case .all:
-            let sections = DesignCategory.kinds.map { ($0, model.items(in: $0)) }.filter { !$0.1.isEmpty }
-            if sections.isEmpty {
-                emptyLibrary
-            } else {
-                if let p = model.project {
-                    // A project row is the rail's one selection: its name and count head the wall.
-                    HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                        Text(model.projectName(p)).coreFont(size: MacTextSize.title, weight: .semibold)
-                            .accessibilityAddTraits(.isHeader)
-                        Text("· \(model.items(in: .all).count)").foregroundStyle(GlassInk.secondary)
-                    }
-                    .padding(.horizontal, Space.s1)
-                }
-                ForEach(sections, id: \.0) { c, list in section(c.title, sub: nil, list) }
-            }
         default:
-            let list = model.items(in: model.category)
-            if list.isEmpty {
-                emptyLibrary
-            } else {
-                section(model.category.title, sub: model.project.map(model.projectName) ?? "all projects", list)
-            }
+            grid(model.items(in: model.category))
         }
     }
 
-    @ViewBuilder private var emptyLibrary: some View {
-        if !model.filter.isEmpty {
-            Text("Nothing matches “\(model.filter)”.").foregroundStyle(GlassInk.secondary)
-                .frame(maxWidth: .infinity).padding(.top, Space.s8)
-        } else {
-            empty(
-                model.category.symbol, "Nothing here yet",
-                "Designs, logos, icons and fonts land here when AI sessions or other devices add them to the Core.")
+    /// The mockup's one grid: the "New design" card first, then the designs. A search or kind with no match says so.
+    private func grid(_ list: [DesignItem]) -> some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            if width > 0 {
+                LazyVGrid(columns: Self.columns(width: width), spacing: Space.s4) {
+                    NewDesignCard(model: model, settled: settled)
+                    ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
+                        DesignCard(model: model, item: item, index: i + 1, settled: settled)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .transaction { $0.animation = nil }
+            }
+            if list.isEmpty {
+                Text("No designs match. Try another word, or start a new design.")
+                    .foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s1)
+            }
         }
     }
 
     private func empty(_ symbol: String, _ title: String, _ line: String) -> some View {
         CoreStateCard(symbol: symbol, title: title, line: line)
             .frame(maxWidth: .infinity).padding(.top, Space.s8)
-    }
-
-    private func section(_ title: String, sub: String?, _ list: [DesignItem]) -> some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).accessibilityAddTraits(.isHeader)
-                if let sub { Text(sub).foregroundStyle(GlassInk.secondary) }
-            }
-            .padding(.horizontal, Space.s1)
-            // Laid out once the width is known, and never animated between column counts (a resize re-flows at once).
-            if width > 0 {
-                LazyVGrid(columns: Self.columns(width: width), spacing: Space.s4) {
-                    ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
-                        DesignCard(model: model, item: item, index: i, settled: settled)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .transaction { $0.animation = nil }
-            }
-        }
     }
 }

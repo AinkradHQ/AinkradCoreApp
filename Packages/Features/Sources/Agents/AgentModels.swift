@@ -23,6 +23,10 @@ public struct AgentUsageInfo: Equatable, Sendable {
 public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public let id: String
     public var runner: String
+    /// Why the Core put it on that machine (`core`, `overflow`, `pinned`…); nil from a Core that does not say (E15).
+    public var placeReason: String?
+    /// The name of the machine it runs on (`placed_on`), for "Ran on X" before the hardware list has loaded.
+    public var placedOn: String?
     public var harness: String
     public var model: String?
     public var state: SessionState
@@ -56,6 +60,9 @@ public struct AgentSessionInfo: Identifiable, Equatable, Sendable {
     public var turnCostApproximate = false
     /// Whether its tool can stop one sub-agent on its own (Claude Code); Stop is hidden otherwise.
     public var canStopSubagents = false
+    /// How hard the tool thinks (`low`, `medium`, `high`, `max`), and whether this tool takes the setting at all (Core API 95).
+    public var effort: String?
+    public var canSetEffort = false
     /// Its row, for paging the list with `before`.
     public var index: Int64?
     /// Its chain, account, run and attempts (admins only; nil for any other device).
@@ -163,7 +170,8 @@ public struct ChainOption: Identifiable, Equatable, Sendable {
 }
 
 public struct NewAgentSession: Equatable, Sendable {
-    public var runner: String
+    /// nil lets the Core place it (E15: no runner to choose).
+    public var runner: String?
     public var harness: String
     public var model: String?
     /// Empty opens a live session that waits for the first message, like typing `claude` in a terminal.
@@ -183,7 +191,7 @@ public struct NewAgentSession: Equatable, Sendable {
     public var chain: Int64?
     public var agent: String?
     public init(
-        runner: String, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
+        runner: String?, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
         secrets: [String] = [], chain: Int64? = nil, agent: String? = nil, project: String? = nil,
         branch: String? = nil,
         base: String? = nil
@@ -208,6 +216,8 @@ public enum EntryKind: Equatable, Sendable {
     /// What a person (or the Citadel) told the agent.
     case user(String)
     case assistant(String)
+    /// The tool's reasoning (Claude thinking blocks, Core API 95): folded by default, one quiet line.
+    case thinking(String)
     case toolUse(id: String, name: String, summary: String)
     case toolResult(
         id: String, name: String?, ok: Bool, exitCode: Int?, output: String, durationMs: Int?)

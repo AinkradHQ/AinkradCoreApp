@@ -25,7 +25,8 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Shell", dependencies: [.product(name: "CoreUI", package: "CoreUI")],
+            name: "Shell",
+            dependencies: [.product(name: "CoreUI", package: "CoreUI"), .product(name: "CoreKit", package: "CoreKit")],
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(
@@ -36,7 +37,7 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
             ],
             resources: [.process("Resources")],
-            swiftSettings: [.swiftLanguageMode(.v6)]),
+            swiftSettings: [.swiftLanguageMode(.v6), .define("CORE_CLIENT_95")]),
         .target(
             name: "Terminals",
             dependencies: [
@@ -123,7 +124,8 @@ let package = Package(
         .target(
             name: "Pairing",
             dependencies: [
-                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "Projects", "Leyline", "Design", "Lore",
+                "Shell", "Agents", "Terminals", "Admin", "Accounts", "Brain", "BrainImport", "Projects", "Leyline",
+                "Design", "Lore",
                 .product(name: "CoreUI", package: "CoreUI"),
                 .product(name: "CoreKit", package: "CoreKit"),
                 .product(name: "AinkradClient", package: "AinkradClient"),
@@ -131,7 +133,7 @@ let package = Package(
             ],
             resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]),
-        .testTarget(name: "ShellTests", dependencies: ["Shell"]),
+        .testTarget(name: "ShellTests", dependencies: ["Shell", .product(name: "CoreKit", package: "CoreKit")]),
         .testTarget(
             name: "TerminalsTests",
             dependencies: ["Terminals", .product(name: "CoreKit", package: "CoreKit")]),

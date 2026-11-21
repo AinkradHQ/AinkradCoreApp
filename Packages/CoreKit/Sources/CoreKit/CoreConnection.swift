@@ -116,6 +116,50 @@ public actor CoreConnection {
     /// `reason` in the prompt), then the exchange. Returns when the elevation ends.
     @discardableResult
     public func stepUp(reason: String) async throws -> Date {
+        try await prove(reason: reason, session: false)
+    }
+
+    /// The app unlock (E1-1, D-5): the same proof with `purpose: session`. The Core then keeps it open while `beatUnlock` arrives
+    /// and until `endUnlock`; there is no time cap. Returns when it would lapse without another beat.
+    @discardableResult
+    public func unlock(reason: String) async throws -> Date {
+        try await prove(reason: reason, session: true)
+    }
+
+    /// A heartbeat. Throws `.stepUpRequired` when the Core holds no unlock (it restarted, or it lapsed): sign again.
+    @discardableResult
+    public func beatUnlock() async throws -> Date {
+        let res = try await sessions.perform(method: "POST", target: "/api/v1/auth/unlock/beat", body: Data("{}".utf8))
+        guard
+            let until = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["unlocked_until"]
+                as? String,
+            let t = Wire.parseTimestamp(until)
+        else { throw CoreError.protocolViolation("an unlock beat without unlocked_until") }
+        return Date(timeIntervalSince1970: TimeInterval(t))
+    }
+
+    /// A secret's plain value, for the app's Reveal (a danger route: a fresh step-up first). Needs a Core that serves it.
+    public func revealSecret(name: String) async throws -> String {
+        guard await serverSupports(minor: coreMinorV010) else {
+            throw CoreError.badRequest(message: "This Core is too old to show a secret. Update it first.")
+        }
+        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        let res = try await sessions.perform(
+            method: "POST", target: "/api/v1/secrets/\(enc)/reveal", body: Data("{}".utf8))
+        guard let v = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["value"] as? String else {
+            throw CoreError.protocolViolation("a reveal answer without a value")
+        }
+        return v
+    }
+
+    /// Ends the unlock now (the Mac locked or slept, or the app quits). Best effort: a Core that cannot be reached ends it on its own
+    /// when the beats stop.
+    public func endUnlock() async {
+        _ = try? await sessions.perform(method: "POST", target: "/api/v1/auth/unlock/end", body: Data("{}".utf8))
+        await sessions.setUnlockToken(nil)
+    }
+
+    private func prove(reason: String, session: Bool) async throws -> Date {
         guard let key = try keyStore.key(.stepup, reason: reason) else {
             throw CoreError.stepUpUnavailable("This device has no step-up key, so it cannot elevate.")
         }
@@ -128,20 +172,38 @@ public actor CoreConnection {
             let challenge = (try? JSONSerialization.jsonObject(with: ask.body) as? [String: Any])?["challenge"]
                 as? String, challenge.count == 43, Wire.unb64(challenge) != nil
         else { throw CoreError.protocolViolation("a step-up challenge that is not 32 bytes") }
-        let message = Wire.stepUpMessage(
-            coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID, challenge: challenge)
+        // A session proof signs its own V2 message with the purpose, so an action proof can never open the unlock.
+        let message =
+            session
+            ? Wire.stepUpMessageV2(
+                coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID,
+                challenge: challenge, purpose: "session")
+            : Wire.stepUpMessage(
+                coreFP: identity.coreFingerprint, deviceID: identity.deviceID, sessionID: sessionID,
+                challenge: challenge)
         let signature: Data
         do { signature = try await offloaded { try key.sign(message) } } catch {
             throw Self.stepUpFailure(error)
         }
-        let body = try JSONEncoder().encode(["challenge": challenge, "stepup_sig": Wire.b64(signature)])
+        var fields = ["challenge": challenge, "stepup_sig": Wire.b64(signature)]
+        if session { fields["purpose"] = "session" }
+        let body = try JSONEncoder().encode(fields)
         let done = try await sessions.perform(
             method: "POST", target: "/api/v1/auth/step-up", body: body, inSession: sessionID)
+        let field = session ? "unlocked_until" : "elevated_until"
         guard
-            let until = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["elevated_until"]
+            let until = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?[field]
                 as? String, let t = Wire.parseTimestamp(until)
-        else { throw CoreError.protocolViolation("a step-up answer without elevated_until") }
-        await sessions.noteElevation(until: t, sessionID: sessionID)
+        else { throw CoreError.protocolViolation("a step-up answer without \(field)") }
+        if session {
+            guard
+                let token = (try? JSONSerialization.jsonObject(with: done.body) as? [String: Any])?["unlock_token"]
+                    as? String
+            else { throw CoreError.protocolViolation("an unlock answer without unlock_token") }
+            await sessions.setUnlockToken(token)
+        } else {
+            await sessions.noteElevation(until: t, sessionID: sessionID)
+        }
         return Date(timeIntervalSince1970: TimeInterval(t))
     }
 

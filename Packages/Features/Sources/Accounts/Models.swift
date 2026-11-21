@@ -27,6 +27,8 @@ struct ProviderItem: Identifiable, Equatable, Sendable {
     var keyPrefix: String? = nil
     var testPath: String? = nil
     var version: Int64 = 1
+    /// A preset (OpenRouter, Groq...): shipped in code and read-only; absent on a Core below 0.10.
+    var preset = false
 }
 
 /// An account as a `read` device sees it: its key's last four characters, never the key.
@@ -53,6 +55,14 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var monthSpendUSDMicros: Int64?
     var monthLimitUSDMicros: Int64?
     var health: AccountHealthItem?
+    /// A runner-bound sign-in (Codex, OpenCode, Antigravity): the account only runs on one runner (E7-4).
+    var runnerBinding: RunnerBinding?
+    /// What the Core says may be left behind when this account is removed (Antigravity's keyring); nil when it says nothing.
+    var wipeNote: String?
+    /// False when the Core cannot make this account's sessions refuse a disallowed model; nil when it does not say.
+    var modelsEnforced: Bool?
+    /// The usage meter the Core works out (0.10); nil on an older Core or for a device without `admin`.
+    var meter: AccountMeterItem?
     var phase: AccountPhase { AccountPhase(state) }
     /// A Claude plan: a signed-in token the runner is lent, never an API key the gateway can test.
     var isPlan: Bool { provider == "claude-sub" }
@@ -65,6 +75,8 @@ struct AccountItem: Identifiable, Equatable, Sendable {
             && l.lastTest?.result == r.lastTest?.result && l.maxTokens == r.maxTokens
             && l.maxUSDMicros == r.maxUSDMicros && l.live == r.live && l.health == r.health
             && l.monthSpendUSDMicros == r.monthSpendUSDMicros && l.monthLimitUSDMicros == r.monthLimitUSDMicros
+            && l.runnerBinding == r.runnerBinding && l.wipeNote == r.wipeNote && l.modelsEnforced == r.modelsEnforced
+            && l.meter == r.meter
     }
 }
 
@@ -235,7 +247,7 @@ enum AccountsLoad: Equatable {
 }
 
 enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
-    case accounts, pools, chains, spending, budgets, costs, ledger, prices, connections
+    case accounts, pools, chains, spending, budgets, costs, ledger, prices
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -243,7 +255,6 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .pools: "Pools"
         case .chains: "Chains"
         case .spending: "Spending"
-        case .connections: "Connections"
         case .budgets: "Budgets"
         case .costs: "Costs and usage"
         case .ledger: "Ledger"
@@ -256,7 +267,6 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
         case .pools: "square.grid.2x2"
         case .chains: "link"
         case .spending: "dollarsign.circle"
-        case .connections: "link"
         case .budgets: "dollarsign.circle"
         case .costs: "chart.bar"
         case .ledger: "list.bullet"
@@ -266,7 +276,6 @@ enum AccountsPage: String, CaseIterable, Identifiable, Sendable {
     var isSpend: Bool { [.spending, .budgets, .costs, .ledger, .prices].contains(self) }
     static let groups: [(String?, [AccountsPage])] = [
         ("Accounts", [.accounts, .pools, .chains]), ("Spending", [.spending, .budgets, .costs, .ledger, .prices]),
-        ("Connections", [.connections]),
     ]
 }
 

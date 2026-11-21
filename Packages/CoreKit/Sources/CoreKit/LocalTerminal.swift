@@ -371,7 +371,7 @@ public final class LocalTerminalAttachment: @unchecked Sendable {
                 send(["type": "auth", "grant": g.grant, "sig": Wire.b64(sig)])
             } catch let e as CoreError {
                 switch CoreError.unwrapping(e) ?? e {
-                case .stepUpRequired: finish(.stepUpExpired)
+                case .stepUpRequired, .unlockRequired: finish(.stepUpExpired)
                 case .revoked: finish(.revoked)
                 case .forbiddenScope: finish(.scopeChanged)
                 case .http(let status, let code, _) where status == 403 && code.contains("step"): finish(.stepUpExpired)

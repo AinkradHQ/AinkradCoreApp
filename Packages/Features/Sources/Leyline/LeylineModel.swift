@@ -21,6 +21,12 @@ public final class LeylineModel {
     /// The paired device with this id (name, platform, key fingerprint), from the app's device list: who claimed a runner invite.
     public var deviceLookup: (@MainActor (String) -> RunnerClaimer?)?
 
+    /// How the runner this host was made into is doing: online, and the AI tool being installed. The app sets it from the
+    /// Runners list; nil shows the host's Runner card without live state.
+    public var runnerGlance: (@MainActor (String) -> RunnerGlance?)?
+    /// Opens a runner's page in Devices & Runners.
+    public var openRunner: (@MainActor (String) -> Void)?
+
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
     var knownHosts: [KnownHostItem] = []
@@ -145,6 +151,21 @@ public final class LeylineModel {
 
     // MARK: derived
 
+    /// Whether an address answers like an SSH server from the Core, for Add Host's live check.
+    func checkHost(_ address: String, _ port: Int) async throws -> HostCheck {
+        guard let service, !checkNeedsStepUp else { throw LeylineFailure.notYet }
+        do { return try await service.checkHost(address: address, port: port) } catch let e as LeylineFailure
+            where e.code == "step_up_required"
+        {
+            // The check needs a live step-up; typing never prompts for one, so it stays quiet until the person unlocks.
+            checkNeedsStepUp = true
+            throw e
+        }
+    }
+
+    /// The Core refused a host check for want of a step-up: Add Host stops asking while it is typed into.
+    var checkNeedsStepUp = false
+
     func hostItem(_ id: String?) -> HostItem? { id.flatMap { id in hosts.first { $0.id == id } } }
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
     var open: HostItem? { hostItem(openID) }
@@ -152,6 +173,8 @@ public final class LeylineModel {
     /// The gallery's cards after the Filter field.
     var shown: [HostItem] {
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
+        let hosts = LeylineOptions.filter(
+            hosts, show: LeylineOptions.current, opened: LeylineOptions.opened(), mine: LeylineOptions.mine())
         return q.isEmpty
             ? hosts
             : hosts.filter {
@@ -227,6 +250,7 @@ public final class LeylineModel {
             writeError = words(error)
             return false
         }
+        LeylineOptions.markMine(made.id)
         quickOpen = false
         quickText = ""
         await reload()
@@ -308,6 +332,9 @@ public final class LeylineModel {
         return true
     }
 
+    /// The Core refused an RSA key under 2048 bits (its sentence starts this way).
+    var keyTooWeak: Bool { writeError?.hasPrefix("This key is too weak") == true }
+
     /// Hands the Core a private key it keeps sealed. Needs Touch ID. The key text is not kept here.
     @discardableResult
     func importKey(name: String, privateKey: String, passphrase: String) async -> Bool {
@@ -317,10 +344,7 @@ public final class LeylineModel {
             writeError = "Give the key a name of up to 64 characters."
             return false
         }
-        guard privateKey.contains("BEGIN OPENSSH PRIVATE KEY") else {
-            writeError = "Paste an OpenSSH private key (it starts with BEGIN OPENSSH PRIVATE KEY)."
-            return false
-        }
+        // No format check here: OpenSSH and PEM keys both go to the Core, which decides and says why not.
         busy = true
         writeError = nil
         defer { busy = false }
@@ -352,11 +376,12 @@ public final class LeylineModel {
 
     func openHost(_ id: String) {
         section = .overview
-        withAnimation(Motion.out(Motion.move)) { openID = id }
+        LeylineOptions.markOpened(id)
+        if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = id } } else { openID = id }
     }
 
     func closeHost() {
-        withAnimation(Motion.out(Motion.move)) { openID = nil }
+        if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = nil } } else { openID = nil }
     }
 
     func newHost() {
@@ -365,6 +390,7 @@ public final class LeylineModel {
         page = .hosts
         quickText = ""
         writeError = nil
+        checkNeedsStepUp = false
         quickOpen = true
     }
 
@@ -387,6 +413,18 @@ public final class LeylineModel {
 
     public func install() {
         let shell = host.shell
+        // Settings, Apps, Leyline: Look (follows Appearance unless turned off) and Options.
+        shell.settings.section(
+            SettingsSection(
+                id: "leyline", group: .apps, title: "Leyline", sub: "Its look and what it shows",
+                symbol: "point.3.connected.trianglepath.dotted", order: 7,
+                tabs: [
+                    SettingsTab("look", "Look", order: 0) {
+                        AppLookSection(appName: "Leyline", prefs: AppLookPrefs.shared("leyline"))
+                            .foregroundStyle(GlassInk.primary)
+                    },
+                    SettingsTab("options", "Options", order: 1) { LeylineOptionsTab() },
+                ]))
         func entry(
             _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
             _ run: @escaping @MainActor (LeylineModel) -> Void

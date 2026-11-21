@@ -23,6 +23,10 @@ let corpus: [String] = [
     "```swift\nlet x = 1\n\nprint(x)\n```\n",
     "```\nunterminated fence\nstill code\n",
     "| A | B |\n| --- | :-: |\n| 1 | 2 |\n\nAfter the table.\n",
+    "a | b\n--|--\n1 | 2\n",
+    "|:--|--:|\n| **x** | `y` |\n",
+    "Intro line\n| a | b |\n|---|---|\n| 1 | 2 |\nafter\n",
+    "| a | b |\n| - | - |\n\n| c |\n|---|\n| d |\n",
     "<div class=\"x\">raw <b>html</b></div>\n\n<script>alert(1)</script>\n",
     "A [link](https://example.com/a?b=c) and <https://example.org> and https://example.net/x.\n",
     "Image ![chart](lore-attachment:abc123) and remote ![pixel](https://tracker.example/p.gif).\n",
@@ -66,6 +70,50 @@ let corpus: [String] = [
         let md = MarkdownWriter.markdown(text)
         #expect(md == "- a\n- b\n\n- c\n")
         #expect(MarkdownWriter.markdown(MarkdownReader.parse(md).0) == md)
+    }
+}
+
+@MainActor struct TableTests {
+    private func blocks(_ md: String) -> [(code: Bool, table: Bool, text: String)] {
+        let (s, _) = MarkdownReader.parse(md)
+        var out: [(Bool, Bool, String)] = []
+        (s.string as NSString).enumerateSubstrings(
+            in: NSRange(location: 0, length: s.length), options: .byParagraphs
+        ) { t, r, _, _ in
+            out.append(
+                (
+                    Block.at(s, r.location) == .code,
+                    s.attribute(.loreTable, at: r.location, effectiveRange: nil) != nil,
+                    t ?? ""
+                ))
+        }
+        return out
+    }
+
+    @Test(arguments: ["| a | b |\n|---|---|\n| 1 | 2 |\n", "a | b\n--|--\n1 | 2\n", "| a |\n| :-: |\n| 1 |\n"])
+    func tablesAreRecognisedWithOrWithoutEdgePipes(_ md: String) {
+        let b = blocks(md)
+        #expect(b.count == 1 && b[0].code && b[0].table)
+        #expect(b[0].text.components(separatedBy: "\u{2028}").count == 3)
+    }
+
+    @Test func aRuleOrHeadingUnderlineIsNotATable() {
+        #expect(blocks("Title\n---\n").allSatisfy { !$0.table })
+        #expect(blocks("| only a header |\n").allSatisfy { !$0.table })
+    }
+
+    @Test func aTableCanFollowAParagraphDirectly() {
+        let b = blocks("Intro\n| a | b |\n|---|---|\n| 1 | 2 |\n")
+        #expect(b.map(\.table) == [false, true])
+    }
+
+    @Test func editingACellWritesTheTableBack() {
+        let c = editor("a | b\n--|--\n1 | 2\n")
+        let tv = c.textView
+        let at = (tv.string as NSString).range(of: "1").location
+        tv.setSelectedRange(NSRange(location: at, length: 1))
+        tv.insertText("9", replacementRange: tv.selectedRange())
+        #expect(c.markdown() == "a | b\n--|--\n9 | 2\n")
     }
 }
 

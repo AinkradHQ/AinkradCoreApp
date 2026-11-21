@@ -106,9 +106,9 @@ extension AccountDialogs {
 }
 
 /// "Limits" on an account page: every way this account can be capped, in one card and in plain words. Each row says its
-/// kind: how many sessions at once, what one session may spend, the budget for a period, and the usage windows. Reading
-/// usage needs `admin` like the usage it comes from, so a device without it sees one line saying so.
+/// kind: how many sessions at once, what one session may spend, and the budgets. Usage windows are budgets now (0.10).
 struct AccountLimitsSection: View {
+    @Environment(\.coreAccent) private var paneAccent
     let model: AccountsModel
     let account: AccountItem
     let hue: Color
@@ -124,19 +124,12 @@ struct AccountLimitsSection: View {
     }
 
     var body: some View {
-        let rows = model.limits(of: account)
         let budgets = model.budgets.filter { $0.kind == "account" && $0.subject == String(account.id) }
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack {
                 Label("Limits", systemImage: "gauge.with.dots.needle.67percent")
                     .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
-                if model.limitsLoad == .ready {
-                    AccLink(title: "Add a usage limit", symbol: "plus", help: "Add a usage limit") {
-                        AccountDialogs.openLimit(model, account, editing: nil)
-                    }
-                    .disabled(model.readOnly)
-                }
             }
             LimitRow(
                 kind: "Sessions at once",
@@ -161,25 +154,6 @@ struct AccountLimitsSection: View {
                     model.detail = nil
                 }
             }
-            switch model.limitsLoad {
-            case .loading: AccSkeleton()
-            case .forbidden:
-                Text("This Mac can only look. Usage limits need a Mac you allowed to manage the Core.")
-                    .foregroundStyle(GlassInk.secondary)
-            case .failed(_, let message):
-                HStack(spacing: Space.s2) {
-                    Text("Could not load usage limits. \(message)").foregroundStyle(GlassInk.amberInk)
-                    Spacer(minLength: Space.s2)
-                    AccLink(title: "Try again", symbol: "arrow.clockwise") { Task { await model.reloadLimits() } }
-                }
-            case .ready:
-                if rows.isEmpty {
-                    Text("No usage limit. Add one to cap the tokens or messages this account may use in a window.")
-                        .foregroundStyle(GlassInk.secondary)
-                }
-                ForEach(rows) { row($0) }
-            }
-            if let e = model.writeError["limit-\(account.id)"] { AccIssue(text: e) }
         }
         .padding(Space.s4)
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -187,55 +161,6 @@ struct AccountLimitsSection: View {
         .task(id: account.id) { await model.reloadLimits() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-usage-limits")
-    }
-
-    private func row(_ l: LimitItem) -> some View {
-        let tone: Color =
-            switch l.standing {
-            case .reached: GlassInk.red
-            case .warning: GlassInk.amber
-            case .fine: GlassInk.blue
-            }
-        let ink: Color =
-            switch l.standing {
-            case .reached: GlassInk.redInk
-            case .warning: GlassInk.amberInk
-            case .fine: GlassInk.secondary
-            }
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: Space.s2) {
-                AccChip(text: "Usage window")
-                Text(UsageLimitWords.amount(l.cap, unit: l.unit)).coreFont(
-                    size: MacTextSize.headline, weight: .semibold)
-                Text(UsageLimitWords.window(l.windowSecs).lowercased()).foregroundStyle(GlassInk.secondary)
-                Spacer(minLength: Space.s2)
-                AccLink(title: "Change", symbol: "slider.horizontal.3") {
-                    AccountDialogs.openLimit(model, account, editing: l)
-                }
-                .disabled(model.readOnly)
-                AccLink(title: "Remove", symbol: "trash", danger: true) {
-                    AccountDialogs.openClearLimit(model, account, l)
-                }
-                .disabled(model.readOnly)
-            }
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    coreShape(3).fill(GlassInk.track)
-                    coreShape(3).fill(tone).frame(width: g.size.width * min(max(l.share, 0.02), 1))
-                    coreShape(1).fill(GlassInk.primary.opacity(0.6)).frame(width: 2)
-                        .offset(x: g.size.width * Double(l.warnPercent) / 100 - 1)
-                }
-            }
-            .frame(height: 8)
-            .animation(.smooth(duration: 0.4), value: l.share)
-            Text(
-                "\(UsageLimitWords.amount(l.used, unit: l.unit)) used, \(Int((l.share * 100).rounded()))%. Warns at \(l.warnPercent)%. \(UsageLimitWords.standing(l))"
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(ink)
-        }
-        .padding(Space.s2)
-        .background(GlassInk.well, in: coreShape(Radius.control))
-        .accessibilityElement(children: .combine)
     }
 }
 

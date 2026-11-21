@@ -45,6 +45,7 @@ struct AgentsListView: View {
         // The same light backing by day as the conversation screen, over the Look.
         .background(SessionInk.backing)
         .paneLook(AgentPrefs.shared.look)
+        .appLookTheme(AgentPrefs.shared.appLook)
         .clipShape(coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .background {
@@ -189,7 +190,7 @@ struct AgentsListView: View {
         .frame(height: Space.s6)
     }
 
-    /// Keyboard: the list holds focus, ↑↓ move the cursor, ↩ opens, P pins, E ends, A archives.
+    /// Keyboard: the list holds focus, ↑↓ move the cursor, ⏎ opens, P pins, E ends, A archives.
     private func list(
         _ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool, waiting waitingIDs: Set<String>
     ) -> some View {
@@ -215,7 +216,7 @@ struct AgentsListView: View {
                                     waiting: waitingIDs.contains(s.id), pinned: model.pinned.contains(s.id),
                                     selected: model.selected == s.id, compact: compact, showActivity: showActivity,
                                     now: now,
-                                    onPin: { model.togglePin(s.id) }, onEnd: { model.confirmEnd(s.id) }
+                                    onPin: { model.togglePin(s.id) }, onEnd: { model.end(s.id) }
                                 )
                                 .onTapGesture(count: 2) { model.openSession(s.id) }
                                 .onTapGesture {
@@ -232,7 +233,7 @@ struct AgentsListView: View {
                                 .contextMenu {
                                     Button("Open") { model.openSession(s.id) }
                                     Button(model.pinned.contains(s.id) ? "Unpin" : "Pin") { model.togglePin(s.id) }
-                                    if s.live { Button("End Session…") { model.confirmEnd(s.id) } }
+                                    if s.live { Button("End Session") { model.end(s.id) } }
                                     Button("Archive") { model.toggleArchive(s.id) }
                                     Button("Copy Title") {
                                         NSPasteboard.general.clearContents()
@@ -285,7 +286,6 @@ struct AgentsListView: View {
                     else { return .ignored }
                     switch key {
                     case "p": model.togglePin(id)
-                    case "e": model.confirmEnd(id)
                     case "a": model.toggleArchive(id)
                     default: return .ignored
                     }

@@ -51,8 +51,8 @@ public struct CoreStateCard: View {
 
 /// The one dialog footer: the way back on the left (`Cancel esc` unless the caller names another action), the main action on
 /// the right with its key. `danger` makes the primary the red button; `enabled: false` dims it and stops its key (and
-/// Return) from running it; `busy` shows the spinner and ignores a second press. Keys: `.cancel` (esc), `.primary` (↩),
-/// `.command` (⌘↩, for an action that removes something), `.escape` (esc without the keycap, for "Keep it").
+/// Return) from running it; `busy` shows the spinner and ignores a second press. Keys: `.cancel` (esc), `.primary` (⏎),
+/// `.command` (⌘⏎, for an action that removes something), `.escape` (esc without the keycap, for "Keep it").
 public struct CoreDialogFooter: View {
     let cancel: CoreAction?
     let primary: CoreAction?

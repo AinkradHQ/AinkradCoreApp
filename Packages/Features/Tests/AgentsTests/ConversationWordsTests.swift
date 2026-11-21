@@ -50,8 +50,9 @@ struct ConversationWordsTests {
         #expect(ConversationWords.took(120) == "2 min")
     }
 
-    @Test @MainActor func savedAgyFallsBackToClaude() {
-        #expect(AgentPrefs.harness("agy") == "claude")
+    @Test @MainActor func aSavedToolTheAppNoLongerOffersFallsBackToClaude() {
+        #expect(AgentPrefs.harness("agy") == "agy", "Antigravity is offered again")
+        #expect(AgentPrefs.harness("aider") == "claude")
         #expect(AgentPrefs.harness(nil) == "claude")
         #expect(AgentPrefs.harness("codex") == "codex")
     }
@@ -124,6 +125,6 @@ struct ConversationWordsTests {
     }
 
     @Test func theSheetOffersTheApprovedTools() {
-        #expect(NewSessionSheet.tools == ["claude", "codex", "opencode"])
+        #expect(NewSessionSheet.tools == ["claude", "codex", "opencode", "agy"])
     }
 }
