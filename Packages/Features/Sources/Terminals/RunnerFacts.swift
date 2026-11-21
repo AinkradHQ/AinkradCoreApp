@@ -137,25 +137,6 @@ struct RunnerFacts: Equatable {
         return "Can \(list) here"
     }
 
-    /// What a runner is doing, as the Runners tab and its summary tiles say it (mockup 12).
-    enum Live: String, CaseIterable, Identifiable {
-        case working = "Working"
-        case idle = "Idle"
-        case gettingReady = "Getting ready"
-        case offline = "Offline"
-        var id: String { rawValue }
-        /// The chip word: "Getting ready" shows as "Updating", as the mockup does.
-        var chip: String { self == .gettingReady ? "Updating" : rawValue }
-    }
-
-    /// Offline wins; then a tool install in flight; then any work running; else idle.
-    func live(installing: Bool) -> Live {
-        if status == .off { return .offline }
-        if installing { return .gettingReady }
-        let busy = (runner.slots?.agentsUsed ?? 0) + (runner.slots?.terminalsUsed ?? 0) > 0 || runner.load > 0
-        return busy ? .working : .idle
-    }
-
     /// The AI tools as the cards name them, with the key the runner reports them under.
     static let aiTools: [(key: String, name: String)] = [
         ("claude", "Claude"), ("codex", "Codex"), ("opencode", "OpenCode"), ("agy", "Antigravity"),

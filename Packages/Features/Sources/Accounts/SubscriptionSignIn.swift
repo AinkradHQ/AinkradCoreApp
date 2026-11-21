@@ -197,7 +197,7 @@ struct SubscriptionSignIn: View {
                 Spacer(minLength: Space.s3)
                 if noRunner {
                     Button("Try again") { model.signIn = nil }.buttonStyle(CoreButtonStyle(.secondary))
-                    Button("Open runners") {
+                    Button("Open Machines") {
                         finish()
                         model.openRunners()
                     }

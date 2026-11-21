@@ -1,6 +1,7 @@
 import CoreUI
 import Foundation
 import Shell
+import SwiftUI
 
 /// The person said no to Touch ID, or it did not elevate: the action did not run.
 public struct ElevationDeclined: Error {
@@ -70,12 +71,23 @@ public struct RunnerWork: Identifiable, Equatable, Sendable {
     public var title: String
     public var detail: String
     public var minutes: Int
-    public init(id: String, title: String, detail: String, minutes: Int) {
+    /// The AI tool that runs it ("Claude"), for the Machines row's line; nil when not known.
+    public var tool: String?
+    public init(id: String, title: String, detail: String, minutes: Int, tool: String? = nil) {
         self.id = id
         self.title = title
         self.detail = detail
         self.minutes = minutes
+        self.tool = tool
     }
+}
+
+/// Where Add machine starts.
+public enum AddMachineStart: Equatable, Sendable {
+    /// The three choices: This Mac, a server or another Mac, a phone or iPad.
+    case pick
+    /// A server or another Mac, with the machine's name already filled in (a Mac that only signs in: "Run work here").
+    case server(name: String?)
 }
 
 /// A person's device that reaches the Core, for the runner page's "Who may use it".
@@ -101,11 +113,25 @@ public protocol RunnerHost: AnyObject {
     func agentWork(on runner: String) -> [RunnerWork]
     func openAgent(_ id: String)
     func startAgent(on runner: String)
-    func addRunner()
+    func addMachine(_ start: AddMachineStart)
     func people() -> [RunnerPerson]
+    /// The phones, iPads and Macs that only sign in; nil before the Core answered (or when not connected).
+    func signInMachines() -> [SignInMachine]?
+    func reloadSignInMachines() async
+    /// A sign-in machine's own page (what it may do, rename, remove), drawn by the app that owns devices.
+    func signInPage(_ id: String, back: @escaping @MainActor () -> Void) -> AnyView
+    /// This Mac's work switch and its options, for the This Mac page; nil when this build has no runner inside.
+    func thisMacWork() -> AnyView?
     /// nil when it worked, else the reason in words.
     func renameRunner(_ id: String, to name: String) async -> String?
     func revokeRunner(_ id: String) async -> String?
+}
+
+extension RunnerHost {
+    public func signInMachines() -> [SignInMachine]? { nil }
+    public func reloadSignInMachines() async {}
+    public func signInPage(_ id: String, back: @escaping @MainActor () -> Void) -> AnyView { AnyView(EmptyView()) }
+    public func thisMacWork() -> AnyView? { nil }
 }
 
 extension TerminalHost {

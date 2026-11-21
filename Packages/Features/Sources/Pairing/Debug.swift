@@ -10,6 +10,8 @@ import Leyline
 import Lore
 import Projects
 import Shell
+import SwiftUI
+import Terminals
 
 /// Debug only: puts the app in a named state for the self-snapshot runner (no keys sent, nothing leaves the app).
 extension AppModel {
@@ -84,9 +86,9 @@ extension AppModel {
 
     public func debugClearNotice() { stepUpNotice = nil }
 
-    /// Opens a device's page (`name`), or the list when nil.
+    /// Opens a device's page in Machines (`name`), or the list when nil.
     public func debugDetail(named name: String?) {
-        devices.detailID = name.flatMap { n in devices.items.first { $0.name == n }?.id }
+        terminals?.openMachines(name.flatMap { n in devices.items.first { $0.name == n }?.id })
     }
 
     /// Live: revokes a device by name (as the Devices screen does), so the list can show the one-admin warning.
@@ -97,14 +99,14 @@ extension AppModel {
 
     public func debugOpenRename(named name: String) {
         guard let d = devices.items.first(where: { $0.name == name }) else { return }
-        devices.detailID = d.id
+        terminals?.openMachines(d.id)
         devices.renaming = true
     }
 
     /// The Access dialog (`kind: "scopes"`) or the Revoke dialog of a device, for screenshots.
     public func debugOpenDialog(_ kind: String, named name: String) {
         guard let d = devices.items.first(where: { $0.name == name }) else { return }
-        devices.detailID = d.id
+        terminals?.openMachines(d.id)
         shell.present(
             ShellDialog(id: kind) {
                 if kind == "scopes" { ScopesDialog(app: self, device: d) } else { RevokeDialog(app: self, device: d) }
@@ -237,7 +239,7 @@ extension AppModel {
     }
 
     public func debugOpenSettings(_ id: String) {
-        if let tab = HubTab.forEntry(id), id == "devices" || id == "mac-runner" { return openHub(tab) }
+        if let e = shell.launcher.entry(id), id == "devices" || id == "mac-runner" { return e.run() }
         shell.settings.selected = id
         shell.open(.settings)
     }
@@ -286,6 +288,38 @@ private final class DebugKeyStore: KeyStore, @unchecked Sendable {
     func wipe() throws {
         lock.withLock { stepup = nil }
         try base.wipe()
+    }
+}
+#endif
+
+#if DEBUG
+extension AppModel {
+    /// Machines on made-up machines (`MachinesDemo`): the real sign-in pages, This Mac's switch and Add machine, with no Core.
+    public func debugMachinesDemo() -> MachinesDemo {
+        devices.debugSet(
+            MachinesDemo.signIns.map {
+                DeviceInfo(
+                    id: $0.id, name: $0.name, kind: "device",
+                    platform: $0.platform == "ipados" ? "ipados" : $0.platform,
+                    keyStorage: "secure_enclave", scopes: $0.scopes, status: "active", lastUsed: $0.lastSeen,
+                    createdAt: $0.added)
+            })
+        return MachinesDemo(
+            shell: shell,
+            page: { [weak self] id, back in
+                guard let self else { return AnyView(EmptyView()) }
+                return AnyView(SignInPage(app: self, id: id, back: back))
+            },
+            thisMac: { [weak self] in self.map { AnyView(ThisMacWork(app: $0)) } },
+            add: { [weak self] start in
+                guard let self else { return }
+                let model = AddRunnerModel(app: self)
+                if case .server(let name) = start { model.startOnServer(name: name) }
+                self.shell.present(
+                    ShellDialog(id: "add-runner") {
+                        AddRunnerView(app: self, model: model, close: { [weak self] in self?.shell.closeDialog() })
+                    })
+            })
     }
 }
 #endif

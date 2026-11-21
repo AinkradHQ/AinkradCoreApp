@@ -287,7 +287,6 @@ public final class AppModel {
             let model = TerminalsModel(host: TerminalHostAdapter(app: self), connection: live.connection)
             model.install()
             terminals = model
-            model.openRunnersApp = { [weak self] in self?.openHub(.runners) }
             Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self else { return }
@@ -312,7 +311,7 @@ public final class AppModel {
                     RunnerGlance(online: $0.online, installing: $0.installing, percent: $0.percent)
                 }
             }
-            leyline.openRunner = { [weak self] id in self?.terminals?.openRunners(id) }
+            leyline.openRunner = { [weak self] id in self?.terminals?.openMachines(id) }
             // Who claimed a runner invite, from the device list the Admin app keeps.
             leyline.deviceLookup = { [weak self] id in
                 self?.devices.items.first { $0.id == id }.map {
@@ -440,15 +439,12 @@ public final class AppModel {
     static let adminOnly = ["core", "switches", "ops", "secrets", "audit", "activity", "lockouts"]
     /// The settings pages a device without `admin` does not see: Core stays (Forget lives there), its Limits tab does not.
     static let hiddenSettings = Set(adminOnly.filter { $0 != "core" } + ["core.limits"])
-    /// Whether this device holds `admin`: the This Mac tab of Devices & Runners is hidden without it.
+    /// Whether this device holds `admin`.
     private(set) var isAdminDevice = true
-    /// The tab the Devices & Runners app shows.
-    var hubTab: HubTab = .devices
     private var stashed: [LauncherEntry] = []
     func showAdminPages(_ admin: Bool) {
         shell.settings.hidden = admin ? [] : Self.hiddenSettings
         isAdminDevice = admin
-        if !admin, hubTab == .thisMac { hubTab = .devices }
         if admin {
             stashed.forEach(shell.launcher.register)
             stashed = []
@@ -726,14 +722,16 @@ public final class AppModel {
             })
     }
 
-    /// Add a runner (mockup 13): This Mac, another Mac, a server over SSH, or a server by command.
-    func openAddRunner() {
+    /// Add machine (mockup a-add): This Mac, a server or another Mac, or a phone or iPad. `.server(name:)` starts on the
+    /// server choices with the name filled in (a Mac that only signs in, from its page).
+    func openAddMachine(_ start: AddMachineStart = .pick) {
         guard service != nil else {
             shell.showToast("Connect to a Core first.")
             return
         }
         stepUpNotice = nil
         let model = AddRunnerModel(app: self)
+        if case .server(let name) = start { model.startOnServer(name: name) }
         shell.present(
             ShellDialog(
                 id: "add-runner",

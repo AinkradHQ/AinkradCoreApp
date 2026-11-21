@@ -34,8 +34,6 @@ final class DevicesModel {
     var dialogError: String?
     private(set) var busy = false
     var filter: DeviceFilter = .all
-    /// The device whose page is open (nil: the list).
-    var detailID: String? { didSet { renaming = false } }
     /// The name field on the device page is open (rename is inline, as in the prototype).
     var renaming = false
     private weak var host: AppModel?
@@ -43,7 +41,6 @@ final class DevicesModel {
     init(host: AppModel) { self.host = host }
 
     var shown: [DeviceInfo] { items.filter { filter.matches($0.kind) } }
-    var detail: DeviceInfo? { detailID.flatMap { id in items.first { $0.id == id } } }
 
     /// The one active device that can manage the Core, when there is exactly one: losing it means SSH to the host.
     var onlyAdmin: DeviceInfo? {
@@ -61,7 +58,20 @@ final class DevicesModel {
     var revoked: [DeviceInfo] { items.filter(\.revoked) }
     func isMe(_ d: DeviceInfo) -> Bool { d.id == myID }
 
+    #if DEBUG
+    /// Demos only: made-up devices, with no Core behind them.
+    private var sampled = false
+    func debugSet(_ list: [DeviceInfo]) {
+        sampled = true
+        items = list
+        load = .ready
+    }
+    #endif
+
     func reload() async {
+        #if DEBUG
+        if sampled { return }
+        #endif
         guard let service = host?.service else {
             load = .idle
             return

@@ -43,7 +43,7 @@ extension TerminalsModel {
     func syncDeck() {
         let deck = shell.hardwareDeck
         deck.pause = { [weak self] device, span in Task { await self?.pause(device, span) } }
-        deck.open = { [weak self] in self?.openRunners() }
+        deck.open = { [weak self] in self?.openMachines() }
         guard hardwareOn else {
             deck.bar = nil
             deck.jobByTerminal = [:]

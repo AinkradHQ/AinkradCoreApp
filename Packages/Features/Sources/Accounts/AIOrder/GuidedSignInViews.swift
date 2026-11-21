@@ -169,14 +169,14 @@ struct NoRunnerView: View {
             }
             if let i = install {
                 HStack(spacing: Space.s2) {
-                    AccLink(title: "Open runners", symbol: "server.rack", action: openRunners)
+                    AccLink(title: "Open Machines", symbol: "server.rack", action: openRunners)
                     Spacer(minLength: Space.s2)
                     AccDialogButtons(
                         confirm: i.progress?.state == .failed ? "Try again" : "Install on \(i.runner)",
                         cancelTitle: "Back", busy: i.running, enabled: !i.running, cancel: back, run: i.start)
                 }
             } else {
-                AccDialogButtons(confirm: "Open runners", cancelTitle: "Back", cancel: back, run: openRunners)
+                AccDialogButtons(confirm: "Open Machines", cancelTitle: "Back", cancel: back, run: openRunners)
             }
         }
         .accessibilityIdentifier("no-runner")

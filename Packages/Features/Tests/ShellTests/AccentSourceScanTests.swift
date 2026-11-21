@@ -10,7 +10,7 @@ struct AccentSourceScanTests {
         "Admin/AuditView.swift", "Admin/OpsView.swift", "Admin/SettingWords.swift", "Agents/SessionTile.swift",
         "Brain/RoomsTab.swift",
         "LoreEditor/LoreBlocks.swift", "Pairing/Controls.swift", "Pairing/Registration.swift",
-        "Shell/SettingsView.swift", "Terminals/RunnersRows.swift",
+        "Shell/SettingsView.swift",
     ]
 
     @Test func noViewReadsTheGlobalAccentDirectly() throws {

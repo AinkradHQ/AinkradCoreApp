@@ -59,7 +59,7 @@ import Testing
         ]
         let p = m.runnerProgress(name: r.name)
         #expect(p?.installing == "Claude" && p?.percent == 40 && p?.failure == "No network.")
-        #expect(m.live(r) == .gettingReady)
+        #expect(m.runningInstall(r.id)?.tool == "claude")
         #expect(m.runnerProgress(id: "nope") == nil)
     }
 
