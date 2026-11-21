@@ -191,7 +191,7 @@ struct AddAccountDialog: View {
             let name = flow.name(model)
             if c.none {
                 NoRunnerView(
-                    provider: name, choice: c,
+                    provider: name, choice: c, install: installOffer(c),
                     openRunners: {
                         // Setup hides the desktop: the Runners app would open behind it. Back to the pick there.
                         if embedded { return flow.back(model) }
@@ -208,6 +208,18 @@ struct AddAccountDialog: View {
         } else {
             signInRunning
         }
+    }
+
+    /// The install that lets a runner sign in, when the Core can do it.
+    private func installOffer(_ c: RunnerChoice) -> NoRunnerView.Install? {
+        guard let p = flow.provider(model), let target = flow.installing ?? c.installTarget(harness: p.harness) else {
+            return nil
+        }
+        let progress = model.installs["\(target.id)|\(p.harness)"]
+        return NoRunnerView.Install(
+            runner: target.name, progress: progress, waiting: flow.waitingRestart,
+            running: flow.installing != nil || progress?.state == .running, note: flow.installNote,
+            start: { Task { await flow.installThenSignIn(model, on: target) } })
     }
 
     private var signInRunning: some View {

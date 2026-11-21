@@ -24,6 +24,12 @@ final class AddAccountFlow {
     /// only, so every launch (and every new try) asks again.
     var consent = false
     private var runnerMethods: [String] = []
+    /// Installing the provider's app on a runner so it can sign in: the runner, and whether the app now waits for that
+    /// runner to restart with it (it reconnects once idle and then offers the sign-in).
+    var installing: AccountRunner?
+    var waitingRestart = false
+    /// Why the runner still cannot sign in after the install, when the app knows.
+    var installNote: String?
 
     /// Codex and Antigravity have rules of their own: no sign-in starts before the person agrees. OpenCode needs none.
     var needsConsent: Bool {
@@ -86,6 +92,41 @@ final class AddAccountFlow {
         runnerName = r.name
         runners = nil
         await m.startSignIn(provider: id, label: keyFlow.label, runner: r.id)
+    }
+
+    /// No runner can sign in: install the provider's app on `target` (Touch ID), wait until a runner offers the sign-in,
+    /// then go on as if it had been there. Back stops the wait.
+    func installThenSignIn(_ m: AccountsModel, on target: AccountRunner) async {
+        guard let p = provider(m), installing == nil else { return }
+        installing = target
+        waitingRestart = false
+        installNote = nil
+        defer {
+            installing = nil
+            waitingRestart = false
+        }
+        await m.install(p, on: target)
+        let key = "\(target.id)|\(p.harness)"
+        guard let first = m.installs[key], first.state != .failed else { return }
+        // The runner restarts by itself once the app is in and it is idle; up to ten minutes for both.
+        for _ in 0..<200 {
+            guard providerID == p.id, runners?.none == true else { return }
+            if m.installs[key]?.state == .failed { return }
+            if m.installs[key]?.state == .done, !waitingRestart {
+                waitingRestart = true
+                // A runner offers sign-ins only with AI sessions on: one more Touch ID when they are off.
+                installNote = await m.enableAgentsIfOff(target)
+            }
+            if let list = try? await m.service?.runners() {
+                let c = RunnerChoice.make(runners: list, harness: p.harness)
+                if !c.none {
+                    runners = c
+                    if c.only != nil, !needsConsent { await startOnRunner(m) }
+                    return
+                }
+            }
+            try? await Task.sleep(for: .seconds(3))
+        }
     }
 
     func style(_ m: AccountsModel) -> SignInStyle {

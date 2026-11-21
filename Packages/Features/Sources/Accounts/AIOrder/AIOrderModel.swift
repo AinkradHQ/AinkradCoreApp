@@ -3,12 +3,11 @@ import CoreUI
 import Foundation
 
 enum AdvancedTab: String, CaseIterable, Sendable {
-    case limits, models, agents
+    case limits, models
     var title: String {
         switch self {
         case .limits: "Limits"
         case .models: "Models and prices"
-        case .agents: "Per-agent order"
         }
     }
 }
