@@ -75,7 +75,7 @@ struct UpdatesModelTests {
         let c = CoreUpdateCheck.decode(
             json(
                 #"{"checked_at":"2026-11-21T10:00:00Z","current_version":"0.10.2","latest_version":"0.10.3","#
-                    + #""latest_runner_version":"0.10.3","status":"available"}"#))
+                    + #""runner_latest_version":"0.10.3","status":"available"}"#))
         #expect(c?.status == .available && c?.latest == "0.10.3" && c?.latestRunner == "0.10.3")
         // A status this app does not know reads as no feed.
         #expect(CoreUpdateCheck.decode(json(#"{"status":"later"}"#))?.status == .feedUnavailable)

@@ -31,14 +31,12 @@ public struct CoreUpdateCheck: Equatable, Sendable {
 
     /// The answer, read leniently so a newer Core's extra fields are used and an older Core's missing ones are not needed.
     public static func decode(_ data: Data) -> CoreUpdateCheck? {
-        struct Runner: Decodable { var latest_version: String? }
         struct Wire: Decodable {
             var checked_at: String?
             var status: String?
             var current_version: String?
             var latest_version: String?
-            var latest_runner_version: String?
-            var runner: Runner?
+            var runner_latest_version: String?
             var reason: String?
         }
         guard let w = try? JSONDecoder().decode(Wire.self, from: data), let status = w.status else { return nil }
@@ -47,7 +45,7 @@ public struct CoreUpdateCheck: Equatable, Sendable {
         let at = w.checked_at.flatMap { full.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) } ?? Date()
         return CoreUpdateCheck(
             at: at, status: Status(rawValue: status) ?? .feedUnavailable, current: w.current_version,
-            latest: w.latest_version, latestRunner: w.latest_runner_version ?? w.runner?.latest_version,
+            latest: w.latest_version, latestRunner: w.runner_latest_version,
             reason: w.reason)
     }
 }
