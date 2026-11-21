@@ -62,3 +62,10 @@ struct BrainHomeMapTests {
         #expect(spots.allSatisfy { $0.x > 0.1 && $0.x < 0.9 && $0.y > 0.1 && $0.y < 0.9 })
     }
 }
+
+@Test func theSortStepSaysHowFarAndHowLongIsLeft() {
+    let r = SemanticProgress(done: 3210, total: 12391)
+    #expect(SortStep.count(r, left: nil) == "3,210 of 12,391")
+    #expect(SortStep.count(r, left: .seconds(330)) == "3,210 of 12,391 · about 6 min left")
+    #expect(SortStep.count(r, left: .seconds(40)) == "3,210 of 12,391 · under a minute left")
+}

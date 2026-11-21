@@ -12,9 +12,7 @@ struct SortStep: View {
             Text(headline).coreFont(size: MacTextSize.headline, weight: .semibold)
             Text("Not sure about one? Fix it later in Places. Nothing is final.")
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            if case .waiting = auto.sort {
-                CoreBusyBar().accessibilityHidden(true)
-            }
+            if case .waiting = auto.sort { progress(auto) }
             if let why = auto.failure {
                 CoreNotice(symbol: "exclamationmark.triangle", title: why, tone: .fail) { EmptyView() }
             }
@@ -44,6 +42,36 @@ struct SortStep: View {
         .accessibilityIdentifier("brain-import-sort")
     }
 
+    /// What the Core is doing now, how far, and the time left (Ahmed, 2026-11-21: no progress, no ETA, no word on what it did).
+    @ViewBuilder private func progress(_ auto: AutoFlow) -> some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            if let r = auto.reading {
+                CoreMeter(Double(r.done) / Double(max(r.total, 1)), label: "Sorting progress")
+            } else {
+                CoreBusyBar().accessibilityHidden(true)
+            }
+            HStack(spacing: Space.s2) {
+                Text(auto.sortPhase).coreFont(size: MacTextSize.meta, weight: .semibold)
+                Spacer(minLength: Space.s2)
+                if let r = auto.reading {
+                    Text(Self.count(r, left: auto.readingLeft)).coreFont(size: MacTextSize.meta).monospacedDigit()
+                        .foregroundStyle(GlassInk.secondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// "3,210 of 12,391 · about 6 min left".
+    static func count(_ r: SemanticProgress, left: Duration?) -> String {
+        var s = "\(r.done.formatted()) of \(r.total.formatted())"
+        if let left {
+            let m = Int((Double(left.components.seconds) / 60).rounded(.up))
+            s += m <= 1 ? " · under a minute left" : " · about \(m) min left"
+        }
+        return s
+    }
+
     private var canContinue: Bool {
         switch model.auto.sort {
         case .sorted, .nothing: true
@@ -54,7 +82,7 @@ struct SortStep: View {
     private var headline: String {
         let items = model.counts.stored.formatted()
         switch model.auto.sort {
-        case .waiting: return "Sorting into places"
+        case .waiting: return "Sorting \(items) items into places"
         case .sorted(let n):
             return "Sorted \(items) items into \(BrainWords.plural(n, "place", "places")), all accepted"
         case .undone(let n): return "Undone. \(n.formatted()) items are back in one pile for now."
