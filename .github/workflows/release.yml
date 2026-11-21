@@ -58,18 +58,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
         run: scripts/release.sh --release
-      - name: Upload (dmg first, signed pointers, appcast last)
-        env:
-          RELEASE_UPLOAD_TOKEN_APP: ${{ secrets.RELEASE_UPLOAD_TOKEN_APP }}
-        run: |
-          set -euo pipefail
-          base=https://ainkrad.io/releases
-          put() { curl -fsS --proto '=https' --tlsv1.2 --retry 3 -X PUT -H "Authorization: Bearer $RELEASE_UPLOAD_TOKEN_APP" --data-binary "@$2" -o /dev/null "$base/upload/app/$1"; echo "uploaded app/$1"; }
-          for f in build/release/*.dmg; do put "$(basename "$f")" "$f"; done
-          put latest.json.sig build/release/latest.json.sig   # the signature first: the Worker verifies latest.json against it
-          put latest.json build/release/latest.json
-          put appcast.xml build/release/appcast.xml
-      - name: GitHub release
+      - name: GitHub release (the dmg, before any pointer names it)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -78,6 +67,17 @@ jobs:
             notes="$notes"$'\n\n'"**WARNING: this build is NOT notarized by Apple.** macOS will warn on first open (right-click, Open). Notarization needs the App Store Connect API key secrets."
           fi
           gh release create "$GITHUB_REF_NAME" build/release/*.dmg --title "Ainkrad ${GITHUB_REF_NAME#app-v}" --notes "$notes"
+      - name: Upload the signed pointers to ainkrad.io (appcast last)
+        env:
+          RELEASE_UPLOAD_TOKEN_APP: ${{ secrets.RELEASE_UPLOAD_TOKEN_APP }}
+        run: |
+          set -euo pipefail
+          base=https://ainkrad.io/releases
+          put() { curl -fsS --proto '=https' --tlsv1.2 --retry 3 -X PUT -H "Authorization: Bearer $RELEASE_UPLOAD_TOKEN_APP" --data-binary "@$2" -o /dev/null "$base/upload/app/$1"; echo "uploaded app/$1"; }
+          # The dmg lives on the GitHub release (step above): a Worker upload takes at most 100 MB.
+          put latest.json.sig build/release/latest.json.sig   # the signature first: the Worker verifies latest.json against it
+          put latest.json build/release/latest.json
+          put appcast.xml build/release/appcast.xml
       - name: Delete the temporary keychain
         if: always()
         run: |
