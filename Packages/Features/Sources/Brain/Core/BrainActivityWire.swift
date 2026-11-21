@@ -99,14 +99,18 @@ public struct LearningWire: Codable, Sendable, Equatable {
         public var sources: Int
         public var read: Int
         public var learned: Int
-        /// `pending`, `learning`, `waiting` or `done`.
+        /// `pending`, `learning`, `waiting`, `done`, or `failed` (from a Core that tells failures apart).
         public var state: String
         public var provider: String?
         public var costUsdMicros: Int
+        /// A failed place: when the Core tries it again (ISO 8601) and why, in its words. Absent from an older Core.
+        public var retryAt: String?
+        public var failure: String?
         public var id: String { room }
         enum CodingKeys: String, CodingKey {
-            case room, name, sources, read, learned, state, provider
+            case room, name, sources, read, learned, state, provider, failure
             case costUsdMicros = "cost_usd_micros"
+            case retryAt = "retry_at"
         }
     }
 

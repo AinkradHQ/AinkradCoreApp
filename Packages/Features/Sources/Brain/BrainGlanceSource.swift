@@ -132,6 +132,13 @@ extension BrainModel {
 // MARK: an import under way
 
 extension ImportModel {
+    /// "Waiting for you to review 7 places": the Brain dropdown's line while the review waits (nothing is filed before).
+    static func waiting(places n: Int) -> String {
+        n == 0
+            ? "Waiting for you to approve the import"
+            : "Waiting for you to review \(BrainWords.plural(n, "place", "places"))"
+    }
+
     /// What the top bar, its dropdown and Brain Home say about this import; nil when none runs.
     var glance: BrainGlance.Importing? {
         guard isActive else { return nil }
@@ -150,12 +157,14 @@ extension ImportModel {
             if case .sorted(let n) = auto.sort {
                 return .init(step: step, line: "Sorted into \(BrainWords.plural(n, "place", "places"))", progress: 1)
             }
-            if let r = auto.reading {
+            if review.semanticState == "pending" || auto.sort == .checking {
+                let p = review.semanticProgress
                 return .init(
-                    step: step, line: auto.sortPhase, detail: SortStep.count(r, left: auto.readingLeft),
-                    progress: Double(r.done) / Double(max(r.total, 1)))
+                    step: step, line: "The local model is reading your work",
+                    detail: p.map { SortStep.count($0, left: review.readingLeft) },
+                    progress: p.map { Double($0.done) / Double(max($0.total, 1)) })
             }
-            return .init(step: step, line: auto.sortPhase)
+            return .init(step: step, line: Self.waiting(places: review.places.count), progress: 1)
         case .importing:
             guard autoSort, let l = auto.learning, !l.places.isEmpty else {
                 return .init(step: step, line: autoSort ? "Learning from your work" : "Importing the checked rooms")

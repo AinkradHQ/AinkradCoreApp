@@ -89,7 +89,7 @@ struct ImportWizard: View {
                             ReviewStep(model: model, close: close)
                         }
                     case .importing:
-                        if model.autoSort { LearnStep(model: model) } else { ImportingStep(model: model) }
+                        if model.autoSort { LearnStep(model: model, close: close) } else { ImportingStep(model: model) }
                     case .done:
                         if model.autoSort {
                             AutoDoneStep(brain: brain, model: model, close: close)

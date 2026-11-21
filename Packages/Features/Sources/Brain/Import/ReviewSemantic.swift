@@ -89,6 +89,7 @@ extension ReviewModel {
         guard let run, let v = try? await routes.semantic(run: run) else { return }
         let finished = semantic?.state == "pending" && v.state != "pending"
         semantic = v
+        if v.state == "pending", let p = v.progress, p.total > 0 { notePace(p) } else { readingLeft = nil }
         // The Core tidied the rooms when the step finished: the cards on screen are the old ones.
         if finished { await refresh() }
     }
@@ -99,6 +100,8 @@ extension ReviewModel {
         watching = nil
         guard cards.contains(where: { $0.semantic == "pending" || $0.semantic == "ready" }) else {
             semantic = nil
+            // Without the local model the calm Core still tidies by names and sizes; one quiet read gets its summary.
+            if readsPrepared { watching = Task { [weak self] in await self?.readSemantic() } }
             return
         }
         let wait = pollEvery
@@ -109,6 +112,18 @@ extension ReviewModel {
                 try? await Task.sleep(for: wait)
             }
         }
+    }
+
+    /// A new reading of the local model's progress: the time left at the pace measured since the first one.
+    func notePace(_ p: SemanticProgress, now: ContinuousClock.Instant = .now) {
+        guard let first = pace else {
+            pace = (now, p.done)
+            return
+        }
+        let read = p.done - first.done
+        let took = now - first.at
+        guard read > 0, took > .seconds(5) else { return }
+        readingLeft = took / read * max(0, p.total - p.done)
     }
 
     public func stopWatching() {

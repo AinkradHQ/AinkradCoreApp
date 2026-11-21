@@ -24,6 +24,9 @@ public final class BrainDemo {
         "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
         "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
         "import-review-unchecked", "room-ai-access",
+        // Review before filing (2026-11-21): Sort is the review of the places the Core prepared, then Learn.
+        "import-sort-preparing", "import-sort", "import-sort-rename", "import-sort-merge", "import-sort-drop",
+        "import-learn",
         // The room Overview, in the order of brain-overview/index.html (layout B).
         "room-overview", "room-overview-sources", "room-overview-approved", "room-overview-edit",
         "room-overview-writing", "room-overview-not-written", "room-overview-failed", "room-overview-needs-account",
@@ -79,7 +82,7 @@ public final class BrainDemo {
         shell.launcherOpen = false
         shell.topMenu = nil
         shell.coreLink = .live
-        model.demoCalm = scene.hasPrefix("calm")
+        model.demoCalm = scene.hasPrefix("calm") || scene.hasPrefix("import-sort") || scene == "import-learn"
         model.demoImport = nil
         model.detach()
         model.inboxState.list = .waiting
@@ -139,10 +142,14 @@ public final class BrainDemo {
         // Every scene can open Import (⌘I); the wizard lists invented sources and never reads this Mac.
         s.imports = true
         s.semantic =
-            scene == "import-review-ai-ready" || scene == "import-review-ai-changes"
-            ? "ready"
-            : scene == "import-review-ai-pending"
-                ? "pending" : scene == "import-review-ai-declined" ? "declined" : "off"
+            scene == "import-sort-preparing"
+            ? "places-pending"
+            : scene.hasPrefix("import-sort") || scene == "import-learn"
+                ? "places"
+                : scene == "import-review-ai-ready" || scene == "import-review-ai-changes"
+                    ? "ready"
+                    : scene == "import-review-ai-pending"
+                        ? "pending" : scene == "import-review-ai-declined" ? "declined" : "off"
         let places = SampleImportSource.demoPlaces(
             scene.hasPrefix("import-where-d") || scene == "import-where-searching" ? .disk : .folders,
             endless: scene == "import-where-searching")
@@ -234,6 +241,22 @@ public final class BrainDemo {
             if scene == "import-review-ai-changes", let r = model.importer?.review {
                 await r.watching?.value
                 await r.openChanges()
+            }
+        case let s where s.hasPrefix("import-sort") || s == "import-learn":
+            model.show(.overview)
+            await model.openReview(SampleImportTransport.run)
+            guard let m = model.importer else { return }
+            await m.beginSort()
+            await m.review.readSemantic()
+            if s == "import-sort-rename" {
+                m.review.focus = "lumen"
+                m.review.renaming = "lumen"
+            }
+            if s == "import-sort-merge" { m.review.mergingFor = "lumen" }
+            if s == "import-learn" { m.beginLearning() }
+            if s == "import-sort-drop" {
+                model.host.shell.closeDialog()
+                model.host.shell.toggleMenu(.brain)
             }
         case let s where s.hasPrefix("room-overview"):
             model.show(.rooms)
