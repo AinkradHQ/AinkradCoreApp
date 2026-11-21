@@ -1,13 +1,12 @@
 import CoreUI
 import SwiftUI
 
-/// Settings, Core (D-11, mockup 03-settings): Overview, Updates and Backup for everyone; Network, Storage and Logs behind
+/// Settings, Core (D-11, mockup 03-settings): Overview and Backup for everyone (updates are Settings, Updates); Network, Storage and Logs behind
 /// the one Advanced switch. Facts come from `shell.home.health` and the connection; what has no service yet says so.
 extension ShellModel {
     func coreTabs() -> [SettingsTab] {
         [
             SettingsTab("overview", "Overview", order: 0) { CoreOverviewTab(shell: self) },
-            SettingsTab("updates", "Updates", order: 1) { CoreUpdatesTab(shell: self) },
             SettingsTab("backup", "Backup", order: 2) { CoreBackupTab(shell: self) },
             SettingsTab("network", "Network", order: 3, advanced: true) { CoreNetworkTab(shell: self) },
             SettingsTab("storage", "Storage", order: 4, advanced: true) { CoreStorageTab(shell: self) },
@@ -110,75 +109,6 @@ struct CoreOverviewTab: View {
         } else {
             fact("Name", "How this Core shows up on your devices", value: shell.home.coreName)
         }
-    }
-}
-
-/// Update choice and hour live on the Core (Core 0.10); installing an update is E12's, so "check now" says whether a feed answered.
-struct CoreUpdatesTab: View {
-    @Environment(\.coreAccent) private var paneAccent
-    @Bindable var shell: ShellModel
-
-    /// Where an update may install: the stored hour always shows, even when it is not one of these.
-    private var hours: [CoreSelectOption<Int>] {
-        var list = [(3, "Night, around 3:00"), (6, "Early morning, around 6:00"), (22, "Late evening, around 22:00")]
-        let now = shell.corePage.prefs.updateHour
-        if !list.contains(where: { $0.0 == now }) { list.append((now, "Around \(now):00")) }
-        return list.map { CoreSelectOption($0.0, $0.1) }
-    }
-
-    var body: some View {
-        let h = shell.home.health
-        VStack(alignment: .leading, spacing: Space.s4) {
-            GlassSection(
-                "Updates", sub: "Core, runners and this app", symbol: "arrow.down.circle",
-                hue: GlassInk.accent(paneAccent)
-            ) {
-                VStack(spacing: Space.s2) {
-                    fact("Core version", value: h?.version ?? "Not reported yet")
-                    fact("Running for", value: h?.uptime ?? "Not reported yet")
-                    if shell.corePage.supported {
-                        CoreRow(
-                            "Update by themselves", subtitle: "App, Core and runners",
-                            trailing: {
-                                CoreSwitch(
-                                    isOn: Binding(
-                                        get: { shell.corePage.prefs.autoUpdate },
-                                        set: { on in Task { await shell.corePage.save(autoUpdate: on) } }))
-                            })
-                        CoreRow(
-                            "Install at", subtitle: "Core restarts for about 10 seconds",
-                            trailing: {
-                                CoreSelect(
-                                    nil,
-                                    selection: Binding(
-                                        get: { shell.corePage.prefs.updateHour },
-                                        set: { hour in Task { await shell.corePage.save(updateHour: hour) } }),
-                                    options: hours
-                                )
-                                .frame(width: Space.s8 * 5)
-                            })
-                    }
-                }
-            }
-            if shell.corePage.supported {
-                HStack(spacing: Space.s3) {
-                    AppActionTile(
-                        title: shell.corePage.checking ? "Checking…" : "Check now", symbol: "arrow.clockwise", key: "",
-                        hue: GlassInk.slate
-                    ) { Task { await shell.corePage.checkNow() } }
-                    .disabled(shell.corePage.checking)
-                    Text(checkLine).foregroundStyle(GlassInk.secondary)
-                }
-            }
-        }
-        .foregroundStyle(GlassInk.primary)
-        .task { await shell.corePage.load() }
-    }
-
-    private var checkLine: String {
-        if let note = shell.corePage.checkNote { return note }
-        guard let at = shell.corePage.prefs.updateCheckedAt else { return "Not checked yet" }
-        return "Last checked \(at.formatted(.relative(presentation: .named)))"
     }
 }
 

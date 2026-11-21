@@ -21,7 +21,6 @@ private actor FakeCore: CorePageSource {
         return stored
     }
     func storage() async throws -> CorePageStorage { CorePageStorage(backups: 5, backupsCount: 2) }
-    func checkUpdate() async throws -> (at: Date, feed: Bool) { (Date(timeIntervalSince1970: 100), false) }
     var backupInfo = CoreBackups(schedule: "daily")
     var started = 0
     func backups() async throws -> CoreBackups? { backupInfo }
@@ -74,15 +73,6 @@ struct CorePageModelTests {
         await core.setRefuse(true)
         await m.save(name: "Nope")
         #expect(m.failure == "No." && m.prefs.name == "Home")
-    }
-
-    @Test func checkNowRecordsTheTimeAndSaysThereIsNoFeed() async {
-        let m = CorePageModel()
-        m.source = FakeCore()
-        await m.load()
-        await m.checkNow()
-        #expect(m.prefs.updateCheckedAt == Date(timeIntervalSince1970: 100))
-        #expect(m.checkNote?.contains("No release feed") == true)
     }
 
     @Test func droppingTheSourceClearsEverything() async {

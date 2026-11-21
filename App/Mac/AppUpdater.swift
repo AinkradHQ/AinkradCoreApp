@@ -30,12 +30,10 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         controller = SPUStandardUpdaterController(
             startingUpdater: start, updaterDelegate: self, userDriverDelegate: nil)
         showInstalledNews()
-        shell.settings.section(
-            SettingsSection(
-                id: "updates", group: .general, title: "Updates", sub: "Ainkrad updates itself",
-                symbol: "arrow.down.circle",
-                order: 6
-            ) { UpdatesSection(version: Self.version) { [weak self] in self?.check() } })
+        // Settings, Updates (Shell's page) shows the version and runs these.
+        shell.updates.appVersion = Self.version
+        shell.updates.checkApp = { [weak self] in self?.check() }
+        shell.updates.installApp = { [weak self] in self?.restartNow() }
     }
 
     static var version: String {
@@ -60,6 +58,7 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         immediateInstallationBlock immediateInstallHandler: @escaping () -> Void
     ) -> Bool {
         installNow = immediateInstallHandler
+        shell.updates.appReady = item.displayVersionString
         WhatsNewStore.save(version: item.displayVersionString, items: WhatsNew.parse(item.itemDescription ?? ""))
         shell.showToast(
             "A new version is ready. Ainkrad \(item.displayVersionString) restarts when you are idle.", kind: .info,
@@ -83,31 +82,12 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         idleTask?.cancel()
         let go = installNow
         installNow = nil
+        shell.updates.appReady = nil
         go?()
     }
 
     private static func idleSeconds() -> TimeInterval {
         // kCGAnyInputEventType: the time since any key, click or pointer move.
         CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: UInt32.max)!)
-    }
-}
-
-/// Settings, Mac, Updates: the version and a button for the person who wants to look now.
-private struct UpdatesSection: View {
-    let version: String
-    let check: () -> Void
-
-    var body: some View {
-        GlassSection(
-            "Updates", sub: "Ainkrad, the Core and the runners update by themselves, at night.",
-            symbol: "arrow.down.circle", hue: GlassInk.blue
-        ) {
-            HStack(spacing: Space.s3) {
-                Text("Version \(version)").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
-                Spacer(minLength: Space.s3)
-                Button("Check for updates", action: check).buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            }
-        }
-        .foregroundStyle(GlassInk.primary)
     }
 }

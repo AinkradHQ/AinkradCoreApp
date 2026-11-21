@@ -52,8 +52,6 @@ public protocol CorePageSource: Sendable {
     func prefs() async throws -> CorePagePrefs
     func set(name: String?, crashReports: Bool?, autoUpdate: Bool?, updateHour: Int?) async throws -> CorePagePrefs
     func storage() async throws -> CorePageStorage
-    /// Runs "check now": when it ran, and whether a release feed answered.
-    func checkUpdate() async throws -> (at: Date, feed: Bool)
     /// The backup schedule and history from the Core machine's helper; nil where the Core cannot say.
     func backups() async throws -> CoreBackups?
     /// Starts a backup on the Core machine.
@@ -81,9 +79,6 @@ public final class CorePageModel {
     public private(set) var supported = false
     public private(set) var prefs = CorePagePrefs()
     public private(set) var storage: CorePageStorage?
-    public private(set) var checking = false
-    /// One line about the last check: "No release feed yet", or nil.
-    public private(set) var checkNote: String?
     public private(set) var failure: String?
     public private(set) var backups: CoreBackups?
     public private(set) var backupStarting = false
@@ -102,7 +97,6 @@ public final class CorePageModel {
         backups = nil
         retention = nil
         backupNote = nil
-        checkNote = nil
     }
 
     public func load() async {
@@ -173,17 +167,13 @@ public final class CorePageModel {
         }
     }
 
-    public func checkNow() async {
-        guard let source, supported, !checking else { return }
-        checking = true
-        defer { checking = false }
-        do {
-            let r = try await source.checkUpdate()
-            prefs.updateCheckedAt = r.at
-            checkNote = r.feed ? "Checked just now." : "Checked. No release feed is set up on this Core yet."
-            failure = nil
-        } catch { failure = Self.words(error) }
+    #if DEBUG
+    /// Demo scenes: the Core's preferences without a Core; `supported: false` plays an older Core.
+    public func debugSet(prefs: CorePagePrefs, supported: Bool = true) {
+        self.supported = supported
+        self.prefs = prefs
     }
+    #endif
 
     static func words(_ error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? "The Core did not accept that."

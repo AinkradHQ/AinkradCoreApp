@@ -368,8 +368,13 @@ extension ShellModel {
         later("notifications", .general, "Notifications", "bell", 2, "Notification settings")
         settings.section(
             SettingsSection(
-                id: "core", group: .core, title: "Core", sub: "This Core, its updates and its backups",
+                id: "core", group: .core, title: "Core", sub: "This Core and its backups",
                 symbol: "server.rack", order: 0, advancedSwitch: true, tabs: coreTabs()))
+        settings.section(
+            SettingsSection(
+                id: "updates", group: .general, title: "Updates", sub: "The Core, the runners and this app",
+                symbol: "arrow.down.circle", order: 6
+            ) { UpdatesPage(shell: self) })
         later("lockouts", .core, "Lockouts", "lock", 6, "Lockouts", advancedOnly: true)
         settings.section(
             SettingsSection(

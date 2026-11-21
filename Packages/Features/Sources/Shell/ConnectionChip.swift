@@ -127,7 +127,7 @@ struct ConnectionPanel: View {
             if shell.coreUpdate.visible {
                 CoreUpdatePanel(
                     status: shell.coreUpdate, update: { shell.startCoreUpdate?() },
-                    news: { shell.coreUpdateNews?() }, what: { showWhatHappened() })
+                    news: { shell.coreUpdateNews?() }, what: { shell.showWhatHappened() })
             }
             let devices = shell.devicesGlance?() ?? []
             if !devices.isEmpty {
@@ -168,14 +168,6 @@ struct ConnectionPanel: View {
         let label: String
         var share: Double?
         var low = false
-    }
-
-    /// The run's steps with their times, as the mockup's "What happened".
-    private func showWhatHappened() {
-        let lines = shell.coreUpdate.events.map { "\($0.at.formatted(date: .omitted, time: .shortened)) · \($0.text)" }
-        shell.presentSheet(
-            title: "What happened", message: (lines + [shell.coreUpdate.errorWords]).joined(separator: "\n"),
-            actions: [ShellSheetAction("Done", primary: true)])
     }
 
     /// Memory, Disk and Response with a bar each when the Core says the share (the whole machine's memory, the disk, the

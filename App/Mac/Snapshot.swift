@@ -29,6 +29,7 @@ enum SnapshotRunner {
         if let log = env["CORE_SCROLL_BENCH"] { return await ScrollBenchRun.run(app, log: log, env: env) }
         if let dir = env["CORE_ESC_CHECK"] { return await EscapeCheck.run(app, dir: dir) }
         if let dir = env["CORE_A11Y_AUDIT"] { return await A11yAudit.run(app, dir: dir, env: env) }
+        if let dir = env["CORE_UPDATES_SNAPSHOT"] { return await UpdatesSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_HOME_SNAPSHOT"] { return await HomeSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_PAIR_SNAPSHOT"] { return await PairingSnapshots.run(app, dir: dir, env: env) }
         if let dir = env["CORE_ACC_SNAPSHOT"] { return await AccountsSnapshots.run(app, dir: dir, env: env) }
