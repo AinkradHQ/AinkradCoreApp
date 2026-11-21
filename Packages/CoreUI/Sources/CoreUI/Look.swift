@@ -154,8 +154,8 @@ struct FrameModifier: ViewModifier {
             .shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
     }
 
-    /// The launcher follows Appearance like the panes (Ahmed, 2026-11-21).
-    private static let floating: Set<LookPart> = [.dialogs, .popups, .dropdowns]
+    /// The launcher and dialogs follow Appearance like the panes (Ahmed, 2026-11-21).
+    private static let floating: Set<LookPart> = [.popups, .dropdowns]
 }
 
 /// What a pane's content asks of the pane's background: Appearance's Look, its app's own, or nothing because it draws its
