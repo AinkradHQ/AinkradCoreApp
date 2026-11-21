@@ -55,4 +55,9 @@ public final class BrainStatusModel {
         default: return "Unlock your Core"
         }
     }
+
+    #if DEBUG
+    /// Debug demo only: a status as if the Core had answered.
+    func demo(_ a: BrainActivityWire?) { activity = a }
+    #endif
 }

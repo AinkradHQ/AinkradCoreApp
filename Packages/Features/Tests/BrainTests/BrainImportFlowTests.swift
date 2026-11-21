@@ -135,6 +135,8 @@ struct BrainImportFlowTests {
         #expect(t.count("POST /modules/brain/v1/imports/r1/collected") == 1)
         #expect(m.counts.stored == 2 && m.itemsFound == 2 && m.fraction == 1)
         #expect(m.review.visible.map(\.id) == ["alpha", "acme", "unsorted"])
+        // Under way until done: the top bar, its dropdown and Brain Home read this.
+        #expect(m.glance?.step == "Review" && m.glance?.progress == 1)
     }
 
     @Test func aCoreThatSays5xxIsWaitedForNotFailedAndTheImportContinuesByItself() async {

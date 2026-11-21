@@ -128,3 +128,78 @@ extension BrainModel {
         }
     }
 }
+
+// MARK: an import under way
+
+extension ImportModel {
+    /// What the top bar, its dropdown and Brain Home say about this import; nil when none runs.
+    var glance: BrainGlance.Importing? {
+        guard isActive else { return nil }
+        let names = autoSort ? ImportWizard.autoSteps : ImportWizard.steps
+        let step = names[step.rawValue]
+        switch self.step {
+        case .collecting:
+            if phase == .discovering { return .init(step: step, line: "Sorting into rooms") }
+            let t = itemsDone
+            return .init(
+                step: step, line: "Reading your sessions",
+                detail: t.total == 0 ? nil : "\(t.done.formatted()) of \(t.total.formatted())",
+                progress: t.total == 0 ? nil : Double(t.done) / Double(t.total))
+        case .review:
+            guard autoSort else { return .init(step: step, line: "Waiting for you to review the rooms", progress: 1) }
+            if case .sorted(let n) = auto.sort {
+                return .init(step: step, line: "Sorted into \(BrainWords.plural(n, "place", "places"))", progress: 1)
+            }
+            return .init(step: step, line: "Sorting into places")
+        case .importing:
+            guard autoSort, let l = auto.learning, !l.places.isEmpty else {
+                return .init(step: step, line: autoSort ? "Learning from your work" : "Importing the checked rooms")
+            }
+            let read = l.places.reduce(0) { $0 + $1.read }
+            let all = l.places.reduce(0) { $0 + $1.sources }
+            return .init(
+                step: step, line: "Learning from your work",
+                detail: all == 0 ? nil : "\(read.formatted()) of \(all.formatted())",
+                progress: all == 0 ? nil : min(1, Double(read) / Double(all)))
+        case .sources, .done: return nil
+        }
+    }
+}
+
+extension BrainModel {
+    /// The import under way, if any (the Debug demo can stand one in).
+    var importGlance: BrainGlance.Importing? {
+        #if DEBUG
+        if let demoImport { return demoImport }
+        #endif
+        return importer?.glance
+    }
+
+    /// The top-bar icon's state: an import under way counts as working, else the Core's status call.
+    var topChip: Shell.BrainChip? {
+        guard let i = importGlance else { return status.chip }
+        return Shell.BrainChip(
+            state: "working", line: "Importing: \(i.line)", needs: [], attention: status.chip?.attention ?? false,
+            progress: i.progress)
+    }
+}
+
+extension BrainModel {
+    /// The dropdown's numbers, before the import under way is added.
+    var baseGlance: BrainGlance? {
+        if self.servesGlance, let d = self.glanceData { return BrainGlanceMaker.glance(d) }
+        let o = self.overview
+        let status =
+            switch o?.health {
+            case .paused?: "Paused"
+            case .needsYou?: "Something needs a look"
+            default: "Learning quietly in the background"
+            }
+        let records = self.rooms.reduce(0) { $0 + ($1.counts?.records ?? 0) }
+        return BrainGlance(
+            status: status, healthy: (o?.health ?? .healthy) == .healthy,
+            stats: [
+                .init("Rooms", self.rooms.count), .init("Records", records), .init("To check", o?.needs.count ?? 0),
+            ])
+    }
+}

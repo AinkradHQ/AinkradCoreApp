@@ -39,7 +39,17 @@ public final class BrainModel {
     /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows it first; Explore is the console.
     public let calm = BrainCalmModel()
     public private(set) var exploring = false
-    public var calmAvailable: Bool { servesActivity && !isSample && service?.importRoutes != nil }
+    public var calmAvailable: Bool {
+        #if DEBUG
+        if demoCalm { return true }
+        #endif
+        return servesActivity && !isSample && service?.importRoutes != nil
+    }
+    #if DEBUG
+    /// Debug demo only: the calm Brain on the sample data, and an import shown as under way.
+    var demoCalm = false
+    var demoImport: BrainGlance.Importing?
+    #endif
     public func explore(_ on: Bool, tab: BrainTab? = nil) {
         exploring = on
         if let tab { self.tab = tab }
@@ -50,13 +60,13 @@ public final class BrainModel {
     /// The Core's status, areas and auto-import routes (API minor 95).
     public var servesActivity: Bool { (apiMinor ?? 0) >= Int(coreMinorV010) }
     private func updateStatusPolling() {
+        // The icon also works while an import runs, on any Core.
+        host.shell.brainStatus = { [weak self] in self?.topChip }
         if servesActivity, let routes = service?.importRoutes, !isSample {
-            host.shell.brainStatus = { [weak self] in self?.status.chip }
             host.shell.openBrain = { [weak self] in self?.show(.overview) }
             status.start(routes)
             calm.attach(routes: routes, service: service, rooms: { [weak self] in self?.rooms ?? [] })
         } else {
-            host.shell.brainStatus = nil
             status.stop()
         }
     }
@@ -132,6 +142,7 @@ public final class BrainModel {
         service = nil
         updateStatusPolling()
         for id in Self.actionIDs { host.shell.launcher.unregister(id) }
+        host.shell.brainOpenImport = nil
         activity.reset()
         checks.reset()
         changes.reset()
@@ -473,7 +484,9 @@ public final class BrainModel {
     /// The room actions need a service to act on: registered when one attaches, withdrawn when it goes.
     private func registerActions() {
         guard installed else { return }
+        host.shell.brainOpenImport = nil
         if service?.importRoutes != nil {
+            host.shell.brainOpenImport = { [weak self] in self?.openImport() }
             entry(
                 "brain-import", "Import into the Brain…", "Collect your AI sessions into rooms",
                 "square.and.arrow.down",
@@ -519,20 +532,9 @@ public final class BrainModel {
         shell.brainUndoLearned = { [weak self] in self?.undoLearned() }
         shell.brainGlance = { [weak self] in
             guard let self, self.service != nil else { return nil }
-            if self.servesGlance, let d = self.glanceData { return BrainGlanceMaker.glance(d) }
-            let o = self.overview
-            let status =
-                switch o?.health {
-                case .paused?: "Paused"
-                case .needsYou?: "Something needs a look"
-                default: "Learning quietly in the background"
-                }
-            let records = self.rooms.reduce(0) { $0 + ($1.counts?.records ?? 0) }
-            return BrainGlance(
-                status: status, healthy: (o?.health ?? .healthy) == .healthy,
-                stats: [
-                    .init("Rooms", self.rooms.count), .init("Records", records), .init("To check", o?.needs.count ?? 0),
-                ])
+            var g = self.baseGlance
+            g?.importing = self.importGlance
+            return g
         }
         shell.settings.section(
             SettingsSection(

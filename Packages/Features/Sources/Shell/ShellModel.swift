@@ -188,6 +188,25 @@ public struct BrainGlance: Sendable, Equatable {
     public let flowStep: Int?
     /// Things it learned today, with an Undo in the dropdown; 0 hides the row.
     public let learned: Int
+    /// An import under way, with its step and how far it is; nil when none runs.
+    public var importing: Importing?
+    /// An import in progress, as the top bar, the dropdown and Brain Home show it.
+    public struct Importing: Sendable, Equatable {
+        /// The wizard's step: "Collect", "Sort", "Learn"...
+        public let step: String
+        /// "Reading your sessions".
+        public let line: String
+        /// "9,928 of 12,391", when counted.
+        public let detail: String?
+        /// 0...1 when known; nil draws a busy bar.
+        public let progress: Double?
+        public init(step: String, line: String, detail: String? = nil, progress: Double? = nil) {
+            self.step = step
+            self.line = line
+            self.detail = detail
+            self.progress = progress
+        }
+    }
     public init(
         status: String, healthy: Bool, doing: String? = nil, progress: Double? = nil, stats: [Stat] = [],
         flowStep: Int? = nil, learned: Int = 0
@@ -347,6 +366,8 @@ public final class ShellModel {
     public var sessionCounts: (@MainActor () -> (running: Int, needYou: Int))?
     /// The Brain icon's state (E9-2), supplied by Brain from the Core's status call. Nil hides the icon (an older Core, or no Brain).
     public var brainStatus: (@MainActor () -> BrainChip?)?
+    /// Opens the Brain's import panel (a new one, or the one under way); nil when the Brain cannot import.
+    public var brainOpenImport: (@MainActor () -> Void)?
     /// Opens the Brain from the icon's panel.
     public var openBrain: (@MainActor () -> Void)?
     public var brainPanelOpen = false
@@ -830,10 +851,13 @@ public struct BrainChip: Equatable, Sendable {
     public var needs: [String]
     /// A distil or overview failed in the last day.
     public var attention: Bool
-    public init(state: String, line: String, needs: [String], attention: Bool) {
+    /// How far the work is (an import), 0...1; nil when not counted.
+    public var progress: Double?
+    public init(state: String, line: String, needs: [String], attention: Bool, progress: Double? = nil) {
         self.state = state
         self.line = line
         self.needs = needs
         self.attention = attention
+        self.progress = progress
     }
 }

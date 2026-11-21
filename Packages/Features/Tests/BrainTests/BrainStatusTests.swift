@@ -51,3 +51,14 @@ struct AutoImportTests {
         #expect(a.areas[0].area == "rules" && a.places == 2)
     }
 }
+
+@MainActor
+struct BrainHomeMapTests {
+    /// Every area has its own spot inside the map: integer division once put them all at (0, 0), in the corner.
+    @Test func everyAreaHasItsOwnSpotInsideTheMap() {
+        let spots = BrainCalmModel.Page.allCases.filter { $0 != .home }.compactMap { RadialMap.spots[$0] }
+        #expect(spots.count == 5)
+        #expect(Set(spots.map { "\($0.x),\($0.y)" }).count == 5)
+        #expect(spots.allSatisfy { $0.x > 0.1 && $0.x < 0.9 && $0.y > 0.1 && $0.y < 0.9 })
+    }
+}
