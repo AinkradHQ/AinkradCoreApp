@@ -44,7 +44,6 @@ struct AddRunnerView: View {
             }
             .animation(reduce ? .easeOut(duration: Motion.hover) : Motion.out(Motion.ui), value: model.step)
         }
-        .background(WindowSharingGuard())
         .task(id: model.step) {
             // The connect screen looks at the Core every two seconds until it is connected or failed.
             while model.step == .connect, !Task.isCancelled {

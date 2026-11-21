@@ -303,7 +303,6 @@ struct SetupWizardView: View {
             )
             .disabled(busy)
             .accessibilityIdentifier("connect-link-field")
-            .background { if !model.linkText.isEmpty { WindowSharingGuard() } }
             if let p = model.picked {
                 CoreNotice(
                     symbol: model.pickedMismatch ? "exclamationmark.triangle" : "server.rack",

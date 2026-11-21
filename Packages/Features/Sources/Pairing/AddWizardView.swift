@@ -38,7 +38,6 @@ struct AddWizardView: View {
             }
             .animation(reduce ? .easeOut(duration: Motion.hover) : Motion.out(Motion.ui), value: model.step)
         }
-        .background(WindowSharingGuard())
         .accessibilityIdentifier("add-wizard")
     }
 
