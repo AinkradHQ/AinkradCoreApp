@@ -40,7 +40,7 @@ struct SetupWizardView: View {
             .foregroundStyle(palette.text)
             .coreFont(size: MacTextSize.body)
             .padding(EdgeInsets(top: 28, leading: 36, bottom: 24, trailing: 36))  // the approved 02 Setup card
-            .coreFrame(radius: Radius.pane, part: .dialogs)
+            .coreFrame(radius: Radius.pane, part: .panes)
             .frame(width: 780)
             .accessibilityElement(children: .contain)
         }

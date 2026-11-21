@@ -6,6 +6,8 @@ import SwiftUI
 public struct RootView: View {
     @Bindable var app: AppModel
     @Environment(\.colorScheme) private var scheme
+    /// Appearance's Look, for the setup surfaces that sit outside the desktop (the desktop sets its own the same way).
+    @Bindable private var look = LookPrefs.shared
 
     public init(app: AppModel) { self.app = app }
 
@@ -26,6 +28,7 @@ public struct RootView: View {
             case .blocked(let f): blocked(f)
             }
         }
+        .environment(\.coreLook, look.look)
         .task { await app.start() }
         .coreTheme()
         .coreConfirm(

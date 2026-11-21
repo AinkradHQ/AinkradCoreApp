@@ -34,7 +34,7 @@ struct SetupTourView: View {
                 .coreFont(size: MacTextSize.body)
                 .padding(Space.s6)
                 // The Look page shows the pane's own look, so the sliders can be seen working on the card itself.
-                .coreFrame(radius: Radius.pane, part: step == .look ? .panes : .dialogs)
+                .coreFrame(radius: Radius.pane, part: .panes)
                 .frame(width: Space.s8 * 22)
                 .accessibilityElement(children: .contain)
             }
