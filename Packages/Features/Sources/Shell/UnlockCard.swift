@@ -11,7 +11,6 @@ struct UnlockCard: View {
     /// sheet looks better, and two surfaces read as "still locked after I scanned").
     var sheetUp = false
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(\.corePalette) private var palette
     @State private var breathe = false
 
     private var checking: Bool { shell.lock == .checking }
@@ -34,46 +33,52 @@ struct UnlockCard: View {
         .transition(.opacity)
     }
 
+    /// The same card as the Touch ID sheet (StepUpSheet): the tile with its halos, "Touch the sensor", one quiet action
+    /// (Ahmed, 2026-11-21: the sheet's style is much better). The sheet itself replaces it while Touch ID is asked.
     private var card: some View {
-        VStack(spacing: Space.s2) {
+        VStack(spacing: Space.s4) {
             ZStack {
-                coreShape(Radius.pane).fill(
-                    GlassInk.accent(paneAccent).opacity(checking ? 0.3 : breathe ? 0.34 : 0.18)
-                )
-                .frame(width: 96, height: 96)
-                Image(systemName: "touchid").font(.system(size: 48, weight: .light))
-                    .foregroundStyle(GlassInk.accent(paneAccent))
-                    .symbolEffect(.pulse, options: .repeating, isActive: checking && !reduce)
+                if !reduce {
+                    ForEach(0..<2, id: \.self) { i in
+                        coreShape(Radius.pane).stroke(GlassInk.accent(paneAccent).opacity(0.35), lineWidth: 1.5)
+                            .frame(width: 112, height: 112)
+                            .coreScaleEffect(1 + CGFloat(i + 1) * 0.16)
+                            .opacity(breathe ? 0.9 : 0.4)
+                    }
+                }
+                coreShape(Radius.pane).fill(GlassInk.accent(paneAccent).opacity(0.4))
+                    .frame(width: 112, height: 112)
+                VStack(spacing: Space.s1) {
+                    Image(systemName: "touchid").font(.system(size: 44, weight: .light))
+                        .symbolEffect(.pulse, options: .repeating, isActive: checking && !reduce)
+                    Text("Touch ID").coreFont(size: MacTextSize.body)
+                }
+                .foregroundStyle(GlassInk.primary)
             }
-            .padding(.top, Space.s1).padding(.bottom, Space.s3)
+            .frame(width: 170, height: 170)
             .accessibilityHidden(true)
-            Text("Unlock Ainkrad").coreFont(size: MacTextSize.large + 4, weight: .bold)
-                .accessibilityAddTraits(.isHeader)
-            Text(checking ? "Checking…" : "Touch the sensor to open your Core")
-                .coreFont(size: MacTextSize.body).foregroundStyle(palette.text2)
-                .contentTransition(.opacity)
-            Button {
-                shell.unlock?()
-            } label: {
-                Label("Use Touch ID", systemImage: "touchid")
+            VStack(spacing: Space.s2) {
+                Text(checking ? "Checking…" : "Touch the sensor")
+                    .coreFont(size: MacTextSize.large + 6, weight: .bold)
+                    .contentTransition(.opacity)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Unlock Ainkrad.").foregroundStyle(GlassInk.secondary)
             }
-            .buttonStyle(CoreButtonStyle(.prominent))
-            .coreShortcut(.primary)
-            .disabled(checking)
-            .padding(.top, Space.s3)
-            Button("Use password instead") { shell.unlock?() }
+            Button("Use Touch ID") { shell.unlock?() }
                 .buttonStyle(CoreButtonStyle(.plain))
+                .coreShortcut(.primary)
                 .disabled(checking)
-            HStack(spacing: Space.s1) {
+            HStack(spacing: Space.s2) {
                 Image(systemName: "lock").accessibilityHidden(true)
-                Text("Stays open until your Mac locks or sleeps")
+                Text("Stays open until your Mac locks or sleeps").coreFont(size: MacTextSize.body, weight: .semibold)
             }
-            .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            .padding(.top, Space.s3)
+            .foregroundStyle(GlassInk.secondary)
         }
-        .padding(.horizontal, Space.s6).padding(.vertical, Space.s6)
-        .frame(width: Space.s8 * 8)
+        .foregroundStyle(GlassInk.primary)
+        .padding(Space.s6)
+        .frame(width: Space.s8 * 13)
         .corePanel(radius: Radius.pane + Space.s1, padding: 0)
+        .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Unlock Ainkrad")
         .accessibilityIdentifier("unlock")

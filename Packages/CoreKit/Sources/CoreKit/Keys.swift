@@ -40,14 +40,14 @@ struct SoftwareKey: DeviceKey {
 /// (`LocalAuthenticationView`) bound to it, so macOS asks inside the app's own sheet instead of a second system panel.
 /// One use: the signature takes it.
 public enum StepUpAuthContext {
-    // ponytail: one shared slot, set on the main actor just before the step-up and taken by its signature; a per-call
-    // parameter through KeyStore if step-ups ever run in parallel.
+    // ponytail: one shared slot, set on the main actor just before the step-up and used by every signature of it until
+    // `clear()`; a per-call parameter through KeyStore if step-ups ever run in parallel.
+    // Kept for the whole step-up, not one signature: an unlock that signs twice (a renewed session, a retry) took the
+    // context with the first and the second asked for Touch ID again (Ahmed, 2026-11-21: "asks me twice").
     nonisolated(unsafe) private static var slot: LAContext?
     public static func prepare(_ context: LAContext) { slot = context }
-    static func take() -> LAContext? {
-        defer { slot = nil }
-        return slot
-    }
+    public static func clear() { slot = nil }
+    static func take() -> LAContext? { slot }
 }
 
 struct SecureEnclaveKey: DeviceKey {
