@@ -246,4 +246,36 @@ struct FailingService: TerminalService {
         let r = NewTerminalModel.refusal(e, runner: "mac-studio")
         #expect(r.title == "This runner was started with --terminal-user; restart it without it to open terminals.")
     }
+
+    /// A terminal ended with `exit` is reaped, and the Core answers 404 `not_found` for it. 404 means gone: it leaves the list
+    /// (so its row stops polling), and Close on it just removes it instead of failing.
+    @Test func notFoundMeansGone() async {
+        #expect(TerminalItem.isGone(CoreError.http(status: 404, code: "not_found", message: "no such terminal")))
+        #expect(!TerminalItem.isGone(CoreError.rateLimited(retryAfter: nil)))
+        #expect(!TerminalItem.isGone(CoreError.http(status: 409, code: "conflict", message: "busy")))
+
+        let (m, svc) = await make([runner()])
+        svc.terminalList = [item("t_1"), item("t_2")]
+        await m.reload()
+        let s = m.session(for: "t_1")!
+        svc.terminalList = [item("t_2")]  // `exit` in t_1: reaped on the Core; this app's list is stale
+        await s.refresh()
+        #expect(m.items.map { $0.id } == ["t_2"] && s.item.isEnded)
+
+        // Close on a terminal the Core already forgot: no error, it just leaves the list.
+        let s2 = m.session(for: "t_2")!
+        svc.terminalList = []
+        #expect(await s2.end())
+        #expect(m.items.isEmpty)
+    }
+
+    /// Close on an ended terminal takes it off the list at once and asks the Core to forget it.
+    @Test func closeOnAnEndedTerminalRemovesIt() async {
+        let (m, svc) = await make([runner()])
+        svc.terminalList = [item("t_x", status: "exited", code: 0)]
+        await m.reload()
+        TileAction.run(.end, "t_x", m)
+        #expect(m.items.isEmpty)
+        #expect(await until { svc.closed == ["t_x"] })
+    }
 }

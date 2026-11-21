@@ -11,6 +11,8 @@ public final class TerminalsDemo {
         let shell: ShellModel
         var isElevated = true
         var elevationNotice: ElevationNotice?
+        var macID: String?
+        var thisMacRunnerID: String? { macID }
         init(shell: ShellModel) { self.shell = shell }
         func clearElevationNotice() { elevationNotice = nil }
         func elevated<T>(_ reason: String, done: String, keepsEdit: Bool, _ op: () async throws -> T) async throws -> T
@@ -47,15 +49,28 @@ public final class TerminalsDemo {
         var refusal: CoreError?
         func terminals() async throws -> [TerminalItem] { terminalList }
         func terminal(_ id: String) async throws -> TerminalItem {
-            guard let t = terminalList.first(where: { $0.id == id }) else { throw CoreError.offline("gone") }
+            // As the Core does: a terminal that is not listed (reaped after `exit`) is 404.
+            guard let t = terminalList.first(where: { $0.id == id }) else {
+                throw CoreError.http(status: 404, code: "not_found", message: "no such terminal")
+            }
             return t
+        }
+        var tails: [String: [String]] = [:]
+        /// Reaped on the Core while this app's list is stale (a reload that failed): every look at them is 404.
+        var gone: Set<String> = []
+        func tail(_ id: String, lines: Int) async throws -> [String] {
+            if gone.contains(id) { throw CoreError.http(status: 404, code: "not_found", message: "no such terminal") }
+            _ = try await terminal(id)
+            return tails[id] ?? ["~/acme-shop $ git status"]
         }
         func runners() async throws -> [RunnerItem] { runnerList }
         func create(runner: String, program: String?, session: String?, rows: Int, cols: Int) async throws
             -> TerminalItem
         {
             if let refusal { throw refusal }
-            return item("t_new", runner: runner, attached: 0)
+            let t = item("t_new", runner: runner, attached: 0, ageMinutes: 0)
+            terminalList.insert(t, at: 0)
+            return t
         }
         func close(_ id: String) async throws -> TerminalItem { try await terminal(id) }
         func signal(_ id: String, _ name: String) async throws {}
@@ -129,11 +144,12 @@ public final class TerminalsDemo {
         "runner-login-shell",
         "runner-degraded", "runner-offline-detail", "runner-busy", "new-terminal", "new-busy", "new-offline",
         "new-stepup", "end-confirm", "launcher", "bell", "instant", "instant-large",
-        "recording",
+        "recording", "rows", "rows-gone", "rows-mac-none", "rows-quick-core",
     ]
 
     func reset() {
         service.refusal = nil
+        service.gone = []
         service.runnerList = [
             Self.runner("mac-studio", arch: "aarch64", load: 2, capacity: 4, avg1: 3.1, cores: 16),
             Self.runner("linux-01", arch: "x86_64", load: 0, capacity: 2, avg1: 1.2, cores: 8),
@@ -160,6 +176,7 @@ public final class TerminalsDemo {
         ]
         host.elevationNotice = nil
         host.isElevated = true
+        host.macID = nil
         model.recording = [:]
     }
 
@@ -294,8 +311,44 @@ public final class TerminalsDemo {
             await model.reload()
             model.openList()
             shell.bellOpen = true
+        case "rows", "rows-gone", "rows-quick-core":
+            // rows-gone: `exit` in a Core shell; the Core reaps it and answers 404 while this app's list is stale.
+            await rows()
+            if scene == "rows-gone" {
+                // The list has settled; now t_core1 is reaped. Its row's next look (within 3 s) gets 404 and drops it.
+                try? await Task.sleep(for: .seconds(1))
+                service.gone = ["t_core1"]
+                try? await Task.sleep(for: .seconds(3.5))
+            } else if scene == "rows-quick-core" {
+                model.quickNew()
+            }
+        case "rows-mac-none":
+            model.openList()
+            model.newOnThisMac()
         default: break
         }
+    }
+
+    /// The list as rows: This Mac's real shells, the Core sandbox, then the other machines, with an ended one.
+    private func rows() async {
+        host.macID = "mac-studio"
+        var core = Self.runner("core", arch: "aarch64", load: 1, capacity: 8, avg1: 0.8, cores: 8)
+        core.name = "Core"
+        core.builtIn = true
+        service.runnerList.append(core)
+        for i in [0, 3] { service.terminalList[i].sandbox = "real" }
+        service.terminalList.insert(Self.item("t_core1", runner: "core", attached: 0, ageMinutes: 2), at: 0)
+        service.terminalList.insert(Self.item("t_core2", runner: "core", attached: 0, ageMinutes: 12), at: 0)
+        service.terminalList.removeAll { $0.status == "reaped" }
+        service.tails = [
+            "t_core1": ["$ ./scripts/clean.sh", "removed 12 old files"],
+            "t_core2": ["GET /api/health 200"],
+            id(2): ["$ make test", "ok  38 passed"],
+            id(3): ["listening on :8080"],
+        ]
+        await model.reload()
+        model.openList()
+        model.selected = id(2)
     }
 }
 #endif

@@ -29,6 +29,8 @@ final class TerminalSession {
     @ObservationIgnored private(set) var outputTimes: [Date] = []
     @ObservationIgnored var onBell: (() -> Void)?
     @ObservationIgnored var onChange: (() -> Void)?
+    /// The Core answered 404 for this terminal: it is gone (reaped after `exit`, or closed elsewhere).
+    @ObservationIgnored var onGone: (() -> Void)?
 
     init(item: TerminalItem, runner: RunnerItem?, service: any TerminalService, host: any TerminalHost) {
         self.id = item.id
@@ -194,7 +196,7 @@ final class TerminalSession {
 
     /// The socket dropped: ask again after the last byte, never prompting for Touch ID by itself.
     private func reconnect() {
-        guard item.status != "exited" else {
+        guard !item.isEnded else {
             link = .none
             return
         }
@@ -271,7 +273,16 @@ final class TerminalSession {
     }
 
     func refresh() async {
-        if let t = try? await service.terminal(id) { item = t }
+        do { item = try await service.terminal(id) } catch  where TerminalItem.isGone(error) { gone() } catch {}
+    }
+
+    /// The Core no longer has it: stop reattaching, show it ended, and tell the list to drop it.
+    private func gone() {
+        reattach?.cancel()
+        detach()
+        item.status = "reaped"
+        onChange?()
+        onGone?()
     }
 
     #if DEBUG
@@ -368,7 +379,12 @@ final class TerminalSession {
             host.shell.showToast("The terminal on \(machine) was ended")
             onChange?()
             return true
-        } catch is ElevationDeclined { return false } catch {
+        } catch is ElevationDeclined { return false } catch  where TerminalItem.isGone(error) {
+            // Already gone (ended with `exit`): nothing to end, so it just leaves the list.
+            gone()
+            host.shell.showToast("The terminal on \(machine) had already ended")
+            return true
+        } catch {
             host.shell.showToast(CoreError.unwrapping(error)?.localizedDescription ?? error.localizedDescription)
             return false
         }
