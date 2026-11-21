@@ -24,7 +24,7 @@ struct BrainM3Tests {
         let (m, _, c) = await make(noLocalModel: true)
         defer { withExtendedLifetime(m) {} }
         #expect(c.items.count == 7 && m.tabCount(.inbox) == 7)
-        #expect(c.inbox.queuedItems == 23 && c.inbox.queued.map(\.name) == ["Personal notes", "acme-shop"])
+        #expect(c.inbox.queuedItems == 23 && c.inbox.queued.map(\.name) == ["Personal notes", "Acme Shop"])
         #expect(c.selected?.id == "c1")
     }
 

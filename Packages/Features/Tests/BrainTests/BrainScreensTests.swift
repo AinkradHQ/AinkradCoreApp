@@ -148,7 +148,7 @@ struct BrainScreensTests {
     @Test func aRealCoreShowsInboxRoomsSourcesAndActivity() {
         let m = BrainModel(host: FakeHost())
         m.use(CoreBrainService(transport: FakeBrainTransport()))
-        #expect(m.visibleTabs == [.inbox, .rooms, .sources, .activity] && m.currentTab == .inbox)
+        #expect(m.visibleTabs == [.rooms, .inbox, .sources, .activity] && m.currentTab == .rooms)
         m.tab = .sources
         #expect(m.currentTab == .sources)
     }

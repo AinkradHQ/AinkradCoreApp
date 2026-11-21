@@ -10,34 +10,37 @@ public final class BrainDemo {
     let model: BrainModel
     public init(model: BrainModel) { self.model = model }
 
-    public static let scenes = [
-        "overview", "overview-healthy", "overview-paused", "rooms", "room", "new-room", "sealed", "unavailable",
-        "activity", "activity-blocked", "egress",
-        "egress-local", "activity-empty", "activity-error", "checks", "checks-running", "checks-paused",
-        "checks-offline",
-        "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
-        "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed", "inbox-error",
-        // The Brain M3 states of brain-m3.html, in the mockup's order.
-        "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
-        "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms", "worst-inbox",
-        "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
-        "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
-        "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
-        "import-review-unchecked", "room-ai-access",
-        // Review before filing (2026-11-21): Sort is the review of the places the Core prepared, then Learn.
-        "import-sort-preparing", "import-sort", "import-sort-rename", "import-sort-merge", "import-sort-drop",
-        "import-learn",
-        // The room Overview, in the order of brain-overview/index.html (layout B).
-        "room-overview", "room-overview-sources", "room-overview-approved", "room-overview-edit",
-        "room-overview-writing", "room-overview-not-written", "room-overview-failed", "room-overview-needs-account",
-        "room-overview-cloud-off",
-        // The writing stages (API minor 75), each with the clock of its own.
-        "room-overview-stage-queued", "room-overview-stage-waiting-runner", "room-overview-stage-picking",
-        "room-overview-stage-writing", "room-overview-stage-reading", "room-overview-stage-retrying",
-        "room-overview-stage-none",
-        // The calm Brain Home (mockup 15): fresh, a few things like a first real Brain, full, and an import under way.
-        "calm-fresh", "calm-few", "calm-home", "calm-import", "calm-import-drop",
-    ]
+    public static let scenes =
+        [
+            "overview", "overview-healthy", "overview-paused", "rooms", "room", "new-room", "sealed", "unavailable",
+            "activity", "activity-blocked", "egress",
+            "egress-local", "activity-empty", "activity-error", "checks", "checks-running", "checks-paused",
+            "checks-offline",
+            "empty", "error", "offline", "rebuilding", "embedding-down", "inbox",
+            "inbox-conflict", "inbox-blocked", "inbox-noroom", "inbox-assign", "inbox-empty", "inbox-sealed",
+            "inbox-error",
+            // The Brain M3 states of brain-m3.html, in the mockup's order.
+            "m3-inbox", "m3-edit", "m3-queued", "m3-rules", "m3-local", "m3-room-queued", "m3-sources", "m3-runner-on",
+            "inbox-offline", "loading", "inbox-noroom-selected", "sources", "worst-overview", "worst-rooms",
+            "worst-inbox",
+            "import", "import-where-folders", "import-where-disk", "import-where-searching", "import-review",
+            "import-review-ai-pending", "import-review-ai-ready", "import-review-ai-changes", "ai-settings",
+            "import-review-ai-declined", "import-review-same-menu", "import-review-same-project",
+            "import-review-unchecked", "room-ai-access",
+            // Review before filing (2026-11-21): Sort is the review of the places the Core prepared, then Learn.
+            "import-sort-preparing", "import-sort", "import-sort-rename", "import-sort-merge", "import-sort-drop",
+            "import-learn",
+            // The room Overview, in the order of brain-overview/index.html (layout B).
+            "room-overview", "room-overview-sources", "room-overview-approved", "room-overview-edit",
+            "room-overview-writing", "room-overview-not-written", "room-overview-failed", "room-overview-needs-account",
+            "room-overview-cloud-off",
+            // The writing stages (API minor 75), each with the clock of its own.
+            "room-overview-stage-queued", "room-overview-stage-waiting-runner", "room-overview-stage-picking",
+            "room-overview-stage-writing", "room-overview-stage-reading", "room-overview-stage-retrying",
+            "room-overview-stage-none",
+            // The calm Brain Home (mockup 15): fresh, a few things like a first real Brain, full, and an import under way.
+            "calm-fresh", "calm-few", "calm-home", "calm-import", "calm-import-drop",
+        ] + walk
 
     private func inbox(_ list: InboxList, room: String? = nil) async {
         model.show(.inbox)
@@ -105,7 +108,9 @@ public final class BrainDemo {
         case "worst-overview", "worst-rooms", "worst-inbox": s.worst = true
         default: break
         }
-        if scene == "room-ai-access" { s.m3 = true }
+        if scene == "room-ai-access" || scene == "calm-inbox" || scene == "calm-place" { s.m3 = true }
+        // The place detail opens on its Overview; the sample place has none written yet (the empty state).
+        if scene == "calm-place" { s.overview = .notWritten }
         if scene.hasPrefix("room-overview") {
             s.m3 = true
             s.overview =
@@ -160,7 +165,7 @@ public final class BrainDemo {
             await model.reload()
         }
         if scene.hasPrefix("calm") {
-            showCalm(scene)
+            if Self.walk.contains(scene) { await showWalk(scene) } else { showCalm(scene) }
             return
         }
         if scene.hasPrefix("m3-") {
@@ -288,7 +293,7 @@ public final class BrainDemo {
 extension BrainDemo {
     /// The calm Brain Home on invented numbers: `calm-fresh` nothing yet, `calm-few` a first Brain (a couple of things about
     /// you, the rest empty), `calm-home` a full one at work, `calm-import` an import collecting, `-drop` with the dropdown.
-    private func showCalm(_ scene: String) {
+    func showCalm(_ scene: String) {
         let few = scene != "calm-home"
         func ago(_ s: Double) -> String { ISO8601DateFormatter().string(from: Date().addingTimeInterval(-s)) }
         func area(_ a: String, _ n: Int, _ today: Int, _ latest: String?) -> BrainAreasWire.Summary {
