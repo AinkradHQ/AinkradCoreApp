@@ -5,7 +5,10 @@ import SwiftUI
 /// Where the Core's self-update stands (`GET /system/update`, E12-3): the words and step states of the mockup's Core pop-up.
 public struct CoreUpdateStatus: Equatable, Sendable {
     public enum Phase: String, Sendable {
-        case idle, snapshot, install, health, done
+        case idle, snapshot, install
+        /// The Core restarts on the new version (an updater that writes this step; others go from install to health).
+        case restart
+        case health, done
         case rolledBack = "rolled_back"
         case failed
     }
@@ -26,14 +29,14 @@ public struct CoreUpdateStatus: Equatable, Sendable {
     public var events: [Event] = []
     public init() {}
 
-    public var running: Bool { [.snapshot, .install, .health].contains(phase) }
+    public var running: Bool { [.snapshot, .install, .restart, .health].contains(phase) }
 
     /// The three steps in the order the updater runs them. A rolled-back run ends with the health check failed.
     public var steps: [StepState] {
         let order: [Phase] = [.snapshot, .install, .health]
         switch phase {
-        case .snapshot, .install, .health:
-            let at = order.firstIndex(of: phase) ?? 0
+        case .snapshot, .install, .restart, .health:
+            let at = order.firstIndex(of: phase == .restart ? .install : phase) ?? 0
             return order.indices.map { $0 < at ? .done : $0 == at ? .now : .wait }
         case .done: return [.done, .done, .done]
         case .rolledBack: return [.done, .done, .fail]
@@ -84,7 +87,7 @@ public struct CoreUpdateStatus: Equatable, Sendable {
         guard let w = try? JSONDecoder().decode(Wire.self, from: data) else { return nil }
         var s = CoreUpdateStatus()
         s.current = w.current ?? ""
-        s.phase = Phase(rawValue: w.state ?? "idle") ?? .idle
+        s.phase = w.state == "restarting" ? .restart : Phase(rawValue: w.state ?? "idle") ?? .idle
         s.available = w.available
         s.to = w.to
         s.progress = min(1, max(0, w.progress ?? 0))

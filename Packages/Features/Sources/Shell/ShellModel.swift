@@ -324,7 +324,9 @@ public final class ShellModel {
     /// Takes back what the Brain learned today.
     public var brainUndoLearned: (@MainActor () -> Void)?
     /// The Core's self-update (E12-3): what its pop-up shows. The app fills it from `GET /system/update`.
-    public var coreUpdate = CoreUpdateStatus()
+    public var coreUpdate = CoreUpdateStatus() {
+        didSet { if coreUpdate != oldValue { updates.receive(coreUpdate) } }
+    }
     /// "Update now" and "Try again now" in the pop-up; nil until the app has a Core that serves the route.
     public var startCoreUpdate: (@MainActor () -> Void)?
     /// "What is new" for the Core's last update, and the update's own words under "See what happened".
@@ -423,6 +425,7 @@ public final class ShellModel {
         spaces = [Workspace(id: currentSpace)]
         launcher.attach(defaults)
         installBuiltInSettings()
+        updates.publish = { [weak self] s in if self?.coreUpdate != s { self?.coreUpdate = s } }
         NSApp?.appearance = theme.appearance
         // Follow the sun changes sides at 07:00 and 18:00: look again every minute.
         Task { @MainActor [weak self] in

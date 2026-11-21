@@ -32,7 +32,8 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         showInstalledNews()
         // Settings, Updates (Shell's page) shows the version and runs these.
         shell.updates.appVersion = Self.version
-        shell.updates.checkApp = { [weak self] in self?.check() }
+        // The tab's Check now looks quietly (no Sparkle window); the menu's Check for Updates… keeps Sparkle's own.
+        shell.updates.checkApp = { [weak self] in self?.controller?.updater.checkForUpdatesInBackground() }
         shell.updates.installApp = { [weak self] in self?.restartNow() }
     }
 
@@ -51,6 +52,15 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
 
     // MARK: SPUUpdaterDelegate
 
+    /// The automatic download started: Settings, Updates shows it downloading in the background.
+    func updater(_ updater: SPUUpdater, willDownloadUpdate item: SUAppcastItem, with request: NSMutableURLRequest) {
+        shell.updates.appDownloading = item.displayVersionString
+    }
+
+    func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: any Error) {
+        shell.updates.appDownloading = nil
+    }
+
     /// An update is downloaded and will install when the app quits. Handled here: keep its notes for after the relaunch, say
     /// so, and restart by ourselves once the Mac is idle.
     func updater(
@@ -58,6 +68,7 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
         immediateInstallationBlock immediateInstallHandler: @escaping () -> Void
     ) -> Bool {
         installNow = immediateInstallHandler
+        shell.updates.appDownloading = nil
         shell.updates.appReady = item.displayVersionString
         WhatsNewStore.save(version: item.displayVersionString, items: WhatsNew.parse(item.itemDescription ?? ""))
         shell.showToast(

@@ -61,8 +61,14 @@ final class CoreUpdateFeed {
         } catch is StepUpDeclined {
             return
         } catch {
-            shell.showToast(
-                CoreError.unwrapping(error)?.localizedDescription ?? "The update did not start.", kind: .warn)
+            // Plain words only: a cancel says nothing, the Core's 429 says when to try again (never "Too many requests").
+            switch UpdatesOutcome.of(error) {
+            case .silent: return
+            case .wait(let s):
+                let m = max(1, Int((s / 60).rounded(.up)))
+                shell.showToast("Core needs \(m == 1 ? "a minute" : "\(m) minutes") before the next try.", kind: .info)
+            case .words(let w): shell.showToast(w, kind: .warn)
+            }
         }
     }
 
