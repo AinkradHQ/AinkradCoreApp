@@ -177,6 +177,19 @@ enum SnapshotRunner {
         shell.toggleFocusMode()
         await shot("08-focus")
         shell.toggleFocusMode()
+        // Workspaces (06-workspaces): the top-bar indicator and no bottom bar, the overview of every workspace, and the
+        // last app of a workspace closing (it goes at once and a neighbour comes up).
+        shell.newSpace()
+        pane("lore")
+        shell.switchSpace(to: 0)
+        await shot("15a-ws-indicator")
+        shell.toggleSpaces()
+        await shot("15b-overview-all")
+        shell.overviewOpen = false
+        shell.switchSpace(to: shell.spaces.count - 1)
+        for p in shell.panes { shell.dismissPane(p.id) }
+        shell.toast = nil
+        await shot("15c-last-app-closed")
         shell.closeAllPanes()
         shell.show(.home)
         shell.open(.settings)

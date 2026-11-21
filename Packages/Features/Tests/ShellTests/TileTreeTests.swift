@@ -124,4 +124,17 @@ struct TileTreeTests {
         #expect(TileTree.dropTarget(at: CGPoint(x: 200, y: 100), frames: frames, excluding: "a") == nil)
         #expect(TileTree.dropTarget(at: CGPoint(x: 406, y: 100), frames: frames, excluding: "a") == nil)
     }
+
+    @Test func panesSideBySideInsideAStackKeepTheirMinimums() {
+        // a over (b | c): the column needs b + c side by side, and b keeps its minimum.
+        var t = tree("a", "b")
+        t.drop("b", on: "a", edge: .bottom)
+        t.open("c")
+        t.drop("c", on: "b", edge: .right)
+        let mins: [String: CGFloat] = ["a": 340, "b": 700, "c": 400]
+        #expect(TileTree.minWidth(t.root!, gap: gap, leaf: { mins[$0]! }) == 700 + 400 + gap)
+        let l = layout(t, width: 1200, mins: mins)
+        #expect(!l.isStrip && l.frames["b"]!.width >= 700 - 0.01 && l.frames["c"]!.width >= 400 - 0.01)
+        #expect(layout(t, width: 1000, mins: mins).isStrip)
+    }
 }

@@ -186,7 +186,7 @@ struct TileTree: Equatable, Sendable {
         } else {
             columns = [root]
         }
-        let mins = columns.map { $0.leaves.map(minWidth).max() ?? 0 }
+        let mins = columns.map { Self.minWidth($0, gap: gap, leaf: minWidth) }
         let need = mins.reduce(0, +) + gap * CGFloat(max(columns.count - 1, 0))
         let strip = need > container.width + 0.5
         let width = max(container.width, need)
@@ -203,7 +203,8 @@ struct TileTree: Equatable, Sendable {
         var x: CGFloat = 0
         for (i, col) in columns.enumerated() {
             let cell = CGRect(x: x, y: 0, width: widths[i], height: height)
-            Self.place(col, cell, gap: gap, path: root == col && columns.count == 1 ? [] : [i], into: &out)
+            Self.place(
+                col, cell, gap: gap, path: root == col && columns.count == 1 ? [] : [i], minWidth: minWidth, into: &out)
             if i < columns.count - 1 {
                 let share = avail > 0 ? 1 / avail : 0
                 out.seams.append(
@@ -218,21 +219,37 @@ struct TileTree: Equatable, Sendable {
         return out
     }
 
-    private static func place(_ node: TileNode, _ r: CGRect, gap: CGFloat, path: [Int], into out: inout TileLayout) {
+    /// The narrowest a node can be: side by side its panes' minimums add up (with the gaps), stacked the widest wins.
+    static func minWidth(_ node: TileNode, gap: CGFloat, leaf: (String) -> CGFloat) -> CGFloat {
+        switch node {
+        case .leaf(let id): leaf(id)
+        case .split(.horizontal, _, let kids):
+            kids.map { minWidth($0, gap: gap, leaf: leaf) }.reduce(0, +) + gap * CGFloat(kids.count - 1)
+        case .split(.vertical, _, let kids): kids.map { minWidth($0, gap: gap, leaf: leaf) }.max() ?? 0
+        }
+    }
+
+    private static func place(
+        _ node: TileNode, _ r: CGRect, gap: CGFloat, path: [Int], minWidth: (String) -> CGFloat,
+        into out: inout TileLayout
+    ) {
         switch node {
         case .leaf(let id): out.frames[id] = r
         case .split(let axis, let f, let kids):
             let horizontal = axis == .horizontal
             let total = horizontal ? r.width : r.height
             let avail = total - gap * CGFloat(kids.count - 1)
+            // Side by side inside a column, each pane still keeps its minimum width.
+            let kidMins = horizontal ? kids.map { Self.minWidth($0, gap: gap, leaf: minWidth) } : []
+            let lens = horizontal ? fitted(kidMins, f, available: avail) : f.map { $0 * avail }
             var p = horizontal ? r.minX : r.minY
             for (i, kid) in kids.enumerated() {
-                let len = avail * f[i]
+                let len = lens[i]
                 let cell =
                     horizontal
                     ? CGRect(x: p, y: r.minY, width: len, height: r.height)
                     : CGRect(x: r.minX, y: p, width: r.width, height: len)
-                place(kid, cell, gap: gap, path: path + [i], into: &out)
+                place(kid, cell, gap: gap, path: path + [i], minWidth: minWidth, into: &out)
                 p += len
                 if i < kids.count - 1 {
                     out.seams.append(
@@ -241,8 +258,9 @@ struct TileTree: Equatable, Sendable {
                             frame: horizontal
                                 ? CGRect(x: p, y: r.minY, width: gap, height: r.height)
                                 : CGRect(x: r.minX, y: p, width: r.width, height: gap),
-                            origin: horizontal ? r.minX : r.minY, available: avail, minLeft: minFraction,
-                            minRight: minFraction))
+                            origin: horizontal ? r.minX : r.minY, available: avail,
+                            minLeft: horizontal ? max(minFraction, kidMins[i] / max(avail, 1)) : minFraction,
+                            minRight: horizontal ? max(minFraction, kidMins[i + 1] / max(avail, 1)) : minFraction))
                     p += gap
                 }
             }

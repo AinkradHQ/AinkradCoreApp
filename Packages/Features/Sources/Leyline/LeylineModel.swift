@@ -401,7 +401,7 @@ public final class LeylineModel {
         let shell = host.shell
         var spec = PaneSpec(
             id: "leyline", title: "Leyline", sub: "Home Core", symbol: "point.3.connected.trianglepath.dotted",
-            minWidth: 720
+            minWidth: 860
         ) { LeylineView(model: self) }
         spec.tab = "Leyline"
         spec.onNew = { [weak self] in self?.newItem() }

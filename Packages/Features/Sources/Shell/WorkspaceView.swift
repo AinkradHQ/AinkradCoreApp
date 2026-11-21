@@ -15,12 +15,19 @@ struct WorkspaceView: View {
     @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
 
+    /// Debug: `CORE_PANE_WIDTH=<pt>` gives the workspace exactly that width, to see what an app needs (min-width probe).
+    #if DEBUG
+    private static let probeWidth = ProcessInfo.processInfo.environment["CORE_PANE_WIDTH"].flatMap(Double.init)
+        .map { CGFloat($0) }
+    #else
+    private static let probeWidth: CGFloat? = nil
+    #endif
+
     var body: some View {
         GeometryReader { geo in
             let area = CGSize(
-                width: geo.size.width - ShellMetrics.paneInset * 2,
-                height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset
-                    - (shell.spaces.count > 1 ? SpaceBar.height : 0))
+                width: Self.probeWidth ?? geo.size.width - ShellMetrics.paneInset * 2,
+                height: geo.size.height - ShellMetrics.topBar - ShellMetrics.paneInset)
             let mins = Dictionary(uniqueKeysWithValues: shell.panes.map { ($0.id, $0.minWidth) })
             let tiled = shell.tree.layout(
                 minWidth: { mins[$0] ?? ShellMetrics.paneMinWidth }, container: area, gap: ShellMetrics.paneGap,
@@ -29,7 +36,6 @@ struct WorkspaceView: View {
             // Apps are never stacked (D-14): what does not fit opens a workspace, and a window shrunk later scrolls sideways.
             let layout = tiled
             ZStack(alignment: .topLeading) {
-                if shell.panes.isEmpty { EmptyWorkspace(shell: shell) }
                 // The strip scrolls by its own offset, not a ScrollView: a terminal pane takes every scroll event, so
                 // sideways swipes are caught for the whole workspace (StripSwipe), and picking a pane slides it into view.
                 let maxX = focus == nil && layout.isStrip ? max(0, layout.contentWidth - area.width) : 0
@@ -92,15 +98,8 @@ struct WorkspaceView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if shell.spaces.count > 1 { SpaceBar(shell: shell) }
-            }
-            .overlay(alignment: .bottom) {
                 if let note = shell.spaceNote { SpaceNoteCard(shell: shell, note: note) }
             }
-            .overlay {
-                if shell.spacesOpen && shell.surface == .workspace { SpaceStrip(shell: shell) }
-            }
-            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: shell.spacesOpen)
             .onChange(of: area.width, initial: true) { _, w in shell.workspaceWidth = w }
             .coordinateSpace(name: "wsroot")
         }

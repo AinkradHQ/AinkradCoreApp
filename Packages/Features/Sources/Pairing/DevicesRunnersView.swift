@@ -25,9 +25,10 @@ extension AppModel {
     /// Opens Devices & Runners on `tab`.
     func openHub(_ tab: HubTab) {
         hubTab = tab
+        // 1160: a runner row with every harness chip, its load and its cores line clips below it (measured, CORE_PANE_WIDTH).
         var spec = PaneSpec(
             id: "devices-runners", title: "Devices & Runners", sub: "Home Core", symbol: "iphone.and.arrow.forward",
-            minWidth: 720
+            minWidth: 1160
         ) { DevicesRunnersView(app: self) }
         spec.tab = "Devices & Runners"
         shell.openPane(spec)

@@ -122,23 +122,24 @@ extension ShellModel {
         switchSpace(to: (spaceIndex + step + spaces.count) % spaces.count)
     }
 
-    /// A new, empty workspace: it shows the empty card and goes Home after three seconds unless you open an app or stay.
+    /// A new, empty workspace (⌃N): it waits for an app; leaving it empty drops it.
     public func newSpace() {
         animate {
             enterSpace(addSpace())
             surface = .workspace
             spaceNote = nil
+            overviewOpen = false
         }
     }
 
-    /// The empty workspace's countdown ran out: it closes (when another exists) and the app goes Home.
-    public func closeEmptySpace() {
-        guard surface == .workspace, panes.isEmpty else { return }
-        animate {
-            if spaces.count > 1, let k = spaces.firstIndex(where: { $0.id == currentSpace }) {
-                spaces.remove(at: k)
-                load(max(0, k - 1))
-            }
+    /// The current workspace lost its last app: it closes at once and its neighbour comes up; with none left, Home does.
+    /// No animation of its own: callers already animate.
+    func closeEmptySpace() {
+        guard panes.isEmpty else { return }
+        if spaces.count > 1, let k = spaces.firstIndex(where: { $0.id == currentSpace }) {
+            spaces.remove(at: k)
+            load(max(0, k - 1))
+        } else {
             surface = .home
         }
     }
@@ -148,9 +149,9 @@ extension ShellModel {
         spaceNote = nil
     }
 
-    /// ⌃↑: every workspace as a thumbnail.
-    public func toggleSpaces() {
-        guard spaces.count > 1 || !panes.isEmpty else { return }
-        spacesOpen.toggle()
-    }
+    /// ⌃↑ / ⇧⌘O: the overview, every workspace as a tile.
+    public func toggleSpaces() { overviewOpen.toggle() }
+
+    /// A workspace's tiling, for its overview tile (the current one's lives in `tree`).
+    func spaceTree(_ index: Int) -> TileTree { spaces[index].id == currentSpace ? tree : spaces[index].tree }
 }

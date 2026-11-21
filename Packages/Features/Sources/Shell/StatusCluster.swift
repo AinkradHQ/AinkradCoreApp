@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// Top right, icons only (E2-2, D-10): Home, Workspace, then Core, Runners and Brain with their dropdowns, the bell and the launcher.
+/// Top right, icons only (E2-2, D-10): the workspace indicator, Home, Workspace, then Core, Runners and Brain with their dropdowns, the bell and the launcher.
 /// Running work is a badge on Runners; what needs you is the mark on the bell.
 struct StatusCluster: View {
     @Bindable var shell: ShellModel
@@ -14,6 +14,7 @@ struct StatusCluster: View {
         let reconnecting: Bool = if case .reconnecting? = shell.chipState { true } else { false }
         // One even gap between every icon (Ahmed, 2026-11-21: the extra gaps before the bell and the emblem looked off).
         HStack(spacing: Space.s1) {
+            if shell.surface == .workspace || shell.spaces.count > 1 { SpaceIndicator(shell: shell) }
             TopBarIcon(
                 .home, label: "Home", symbol: "house", on: shell.surface == .home && !shell.coverOpen
             ) { shell.show(.home) }
