@@ -23,8 +23,13 @@ public struct RootView: View {
                         .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
                 }
             case .desktop:
+                // Setup waits for the unlock: locked, the Unlock card (and Touch ID) must be what shows, never hidden under it.
                 ShellView(shell: app.shell)
-                    .overlay { SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell) }
+                    .overlay {
+                        if app.shell.lock == .open {
+                            SetupTourView(model: app.tour, accounts: app.accounts, shell: app.shell)
+                        }
+                    }
             case .blocked(let f): blocked(f)
             }
         }

@@ -143,7 +143,7 @@ public final class AppModel {
             guard let self else { return }
             Task { await self.openDesktop() }
         }
-        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile) { [weak self] items in
+        tour = SetupTourModel(macRunner: macRunner, profile: shell.profile, store: .standard) { [weak self] items in
             await self?.saveMeProfile(items) ?? false
         }
         wizard.armTour = { [weak self] in self?.tour.arm() }
@@ -152,6 +152,7 @@ public final class AppModel {
         admin = AdminModel(host: AdminHostAdapter(app: self))
         accounts = AccountsModel(host: AdminHostAdapter(app: self))
         tour.accountCount = { [weak accounts] in accounts?.accountCount ?? 0 }
+        shell.setupOpen = { [weak tour] in tour?.step != nil && tour?.detour == nil }
         brain = BrainModel(host: AdminHostAdapter(app: self))
         projects = ProjectsModel(host: AdminHostAdapter(app: self))
         leyline = LeylineModel(host: AdminHostAdapter(app: self))

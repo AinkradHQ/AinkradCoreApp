@@ -190,6 +190,8 @@ extension AppModel {
     public func debugCloseDialog() { shell.closeDialog() }
     /// Snapshots: leave a first-run scene for the (sample) desktop.
     public func debugShowDesktop() { phase = .desktop }
+    /// The setup that follows pairing, open on the desktop (`on`), or finished.
+    public func debugPairedSetup(_ on: Bool) { on ? tour.begin() : tour.finish() }
     /// Settings > Devices with its About block, the admin pages for a read-only device, the bell clearing an alarm and the terminal toast, on
     /// sample data (no Core is reached).
     public static let gapScenes = [

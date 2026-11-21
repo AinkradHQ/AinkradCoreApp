@@ -47,7 +47,11 @@ public struct ShellView: View {
             || shell.topDialog != nil || shell.sheet != nil
     }
 
-    private var base: some View {
+    @ViewBuilder private var base: some View {
+        if shell.setupOpen() { sky } else { desktop }
+    }
+
+    private var desktop: some View {
         ZStack {
             sky
             HomeView(shell: shell)

@@ -24,7 +24,15 @@ enum HomeSnapshots {
             app.debugFirstRun(scene)
             await shot("setup-\(i + 1)-\(scene)")
         }
+        // Just paired: setup over the wallpaper, Home hidden; locked, the Unlock card shows instead; Home only once setup ends.
         app.debugShowDesktop()
+        app.debugPairedSetup(true)
+        await shot("paired-setup", wait: 2.5)
+        shell.lock = .locked
+        await shot("paired-setup-locked")
+        shell.lock = .open
+        await shot("paired-setup-unlocked")
+        app.debugPairedSetup(false)
         await shot("home", wait: 2.5)
         shell.debugForceQuickHover = true
         await shot("quick-hover")

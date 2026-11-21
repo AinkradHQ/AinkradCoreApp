@@ -29,7 +29,10 @@ final class SetupTourModel {
 
     /// The first Core version that has `PUT /brain/me/profile`. The coordinator renumbers it at integration.
 
-    private(set) var step: Step?
+    private(set) var step: Step? {
+        // The page in progress survives a quit, so setup resumes there until it is finished or skipped.
+        didSet { if detour == nil { store?.set(step?.rawValue, forKey: Self.stepKey) } }
+    }
     private(set) var detour: Detour?
     /// This Mac's own record of the name (the Home greeting); the name question writes to it.
     private let userProfile: UserProfile?
@@ -44,12 +47,16 @@ final class SetupTourModel {
     private let done: @MainActor () -> Void
     /// Whether the person came through the wizard of this launch: only then does the tour run.
     private(set) var pending = false
+    /// Where the unfinished setup is kept between launches (nil: not kept, as in tests).
+    private let store: UserDefaults?
+    private static let stepKey = "setup.tour.step"
 
     init(
         macRunner: MacRunnerModel?, profile userProfile: UserProfile? = nil,
-        save: @escaping @MainActor ([SetupProfile.Item]) async -> Bool,
+        store: UserDefaults? = nil, save: @escaping @MainActor ([SetupProfile.Item]) async -> Bool,
         done: @escaping @MainActor () -> Void = {}
     ) {
+        self.store = store
         self.macRunner = macRunner
         self.userProfile = userProfile
         self.save = save
@@ -59,13 +66,18 @@ final class SetupTourModel {
     var isActive: Bool { step != nil }
 
     /// The wizard paired a new Core: the tour starts once the desktop is open.
-    func arm() { pending = true }
+    func arm() {
+        pending = true
+        store?.set(Step.role.rawValue, forKey: Self.stepKey)
+    }
 
     /// Starts the tour when it is armed.
     func startIfArmed() {
-        guard pending else { return }
+        let saved = (store?.object(forKey: Self.stepKey) as? Int).flatMap(Step.init(rawValue:))
+        guard pending || saved != nil else { return }
         pending = false
         begin()
+        if let saved { step = saved }
     }
 
     func begin() {

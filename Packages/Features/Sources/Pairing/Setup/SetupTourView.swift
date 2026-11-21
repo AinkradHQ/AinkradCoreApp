@@ -15,14 +15,11 @@ struct SetupTourView: View {
     var body: some View {
         if let step = model.step {
             ZStack {
-                // Dims the desktop and keeps it from taking clicks while setup is open.
-                Color.black.opacity(0.18).ignoresSafeArea().contentShape(Rectangle())
+                // Keeps the wallpaper behind from taking clicks while setup is open (the desktop is hidden until it ends).
+                Color.clear.ignoresSafeArea().contentShape(Rectangle())
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    HStack(spacing: Space.s3) {
-                        Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
-                            .accessibilityHidden(true)
-                        SetupBars(at: step.bar)
-                    }
+                    // The approved setup header (02 Setup): the progress bars alone, centred, as on the welcome page.
+                    SetupBars(at: step.bar).frame(maxWidth: .infinity)
                     ScrollView {
                         page(step).id(step).transition(.opacity.combined(with: .offset(x: coreMove(reduce, 12))))
                             .padding(.vertical, Space.s1)
@@ -32,10 +29,10 @@ struct SetupTourView: View {
                 }
                 .foregroundStyle(palette.text)
                 .coreFont(size: MacTextSize.body)
-                .padding(Space.s6)
+                .padding(EdgeInsets(top: 28, leading: 36, bottom: 24, trailing: 36))  // the approved 02 Setup card
                 // The Look page shows the pane's own look, so the sliders can be seen working on the card itself.
                 .coreFrame(radius: Radius.pane, part: .panes)
-                .frame(width: Space.s8 * 22)
+                .frame(width: 780)
                 .accessibilityElement(children: .contain)
             }
             .animation(reduce ? .easeOut(duration: 0.2) : Motion.out(Motion.ui), value: step)
