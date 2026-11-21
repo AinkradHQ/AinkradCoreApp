@@ -59,13 +59,13 @@ public struct ConfirmCard: View {
                 ForEach(Array(choices.enumerated()), id: \.element.id) { i, c in
                     ChoiceTile(
                         choice: c, on: i == selected,
-                        keys: i == 0 ? "esc" : i == choices.count - 1 ? (c.destructive ? "⌘↩" : "↩") : nil
+                        keys: i == 0 ? "esc" : i == choices.count - 1 ? (c.destructive ? "⌘⏎" : "⏎") : nil
                     ) { run(i) }
                     .onHover { if $0 { selected = i } }
                 }
             }
             .coreRise(shown, 2)
-            Text("\(coreArrowKeys()) choose · ↩ run the highlighted · esc cancel").coreFont(size: MacTextSize.meta)
+            Text("\(coreArrowKeys()) choose · ⏎ run the highlighted · esc cancel").coreFont(size: MacTextSize.meta)
                 .foregroundStyle(GlassInk.secondary.opacity(0.8))
         }
         .foregroundStyle(GlassInk.primary)
@@ -197,7 +197,7 @@ public struct ModalCard: View {
                     let n = i < lead ? i + 1 : i
                     ChoiceTile(
                         choice: c.choice, on: hovered == nil ? i == lead : hovered == i,
-                        keys: i == lead ? "↩" : "⌘\(n)"
+                        keys: i == lead ? "⏎" : "⌘\(n)"
                     ) {
                         c.choice.run()
                     }

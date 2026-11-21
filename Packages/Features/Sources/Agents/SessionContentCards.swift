@@ -32,19 +32,19 @@ struct PlanCard: View {
                     Button(action: actions.goAhead) {
                         HStack(spacing: Space.s2) {
                             Text("Go Ahead")
-                            Text("⌘↩").coreFont(size: MacTextSize.meta).opacity(0.7)
+                            Text("⌘⏎").coreFont(size: MacTextSize.meta).opacity(0.7)
                         }
                     }
                     .buttonStyle(GraphiteButtonStyle())
-                    .help("Approve the plan: the agent starts building it (⌘↩)").keyHint(.goAhead)
+                    .help("Approve the plan: the agent starts building it (⌘⏎)").keyHint(.goAhead)
                     Button(action: actions.change) {
                         HStack(spacing: Space.s2) {
                             Text("Change Plan…")
-                            Text("⇧⌘↩").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
+                            Text("⇧⌘⏎").coreFont(size: MacTextSize.meta).foregroundStyle(SessionInk.text2)
                         }
                     }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .medium))
-                    .help("Write what to change in the plan (⇧⌘↩)").keyHint(.changePlan)
+                    .help("Write what to change in the plan (⇧⌘⏎)").keyHint(.changePlan)
                 }
             }
         }

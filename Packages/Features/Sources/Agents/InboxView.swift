@@ -178,7 +178,7 @@ struct NotificationsSection: View {
             Spacer(minLength: Space.s3)
             if p == .notAsked {
                 AppActionTile(
-                    title: "Turn on", symbol: "bell.badge", key: "↩", hue: GlassInk.accent(paneAccent), prominent: true
+                    title: "Turn on", symbol: "bell.badge", key: "⏎", hue: GlassInk.accent(paneAccent), prominent: true
                 ) {
                     Task { await model.turnOnNotifications() }
                 }

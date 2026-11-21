@@ -168,7 +168,7 @@ struct SessionView: View {
             .onKeyPress(characters: CharacterSet(charactersIn: "/")) { _ in typing ? .ignored : write(s) }
             .onKeyPress(.downArrow) { typing ? .ignored : latest() }
             .onKeyPress(.end) { typing ? .ignored : latest() }
-            // The session's shortcuts (⌘F, ⌘↩, ⇧⌘R…), wherever the keyboard is in the pane; the message field hands over the
+            // The session's shortcuts (⌘F, ⌘⏎, ⇧⌘R…), wherever the keyboard is in the pane; the message field hands over the
             // same ones itself (ComposerKeys.command). ⌥↑ ⌥↓ jump between your messages.
             .onKeyPress(phases: .down) { press in
                 guard let key = SessionShortcut.match(press.key.character, press.modifiers) else { return .ignored }
@@ -305,7 +305,7 @@ struct SessionView: View {
         case .findNext, .findPrevious:
             guard finding else { return false }
             findStep(key == .findNext ? 1 : -1)
-        // A waiting approval's own buttons hold ⌘↩ and ⌘⌫; with none, ⌘↩ and ⇧⌘↩ answer the newest plan.
+        // A waiting approval's own buttons hold ⌘⏎ and ⌘⌫; with none, ⌘⏎ and ⇧⌘⏎ answer the newest plan.
         case .goAhead, .changePlan:
             guard !pending, model.canReply(s), latestPlan != nil else { return false }
             let a = planActions(s)

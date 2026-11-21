@@ -78,8 +78,16 @@ private struct CoreButtonBody: View {
                 configuration.label.opacity(busy ? 0 : 1)
                 if busy { ProgressView().controlSize(.small).tint(ink) }
             }
+            // The key that runs this button, shown on it (Ahmed, 2026-11-05 and again 2026-11-21: every action keyboard
+            // driven, the key visible).
+            if let keycap {
+                // fixedSize: a keycap never gives way to its label ("Deny ⌘⌫" drew as "⌘…" on a small button).
+                Text(keycap).coreFont(size: 10, weight: .medium, design: .rounded).fixedSize()
+                    .padding(.horizontal, 5).frame(minHeight: 16)
+                    .background(solid ? .white.opacity(0.2) : GlassInk.lift(0.16), in: coreShape(5))
+                    .accessibilityHidden(true)
+            }
         }
-        // The key still runs the button; it shows in the hover tooltip, not on the button (Ahmed, 2026-11-15: calmer).
         .help(keycap ?? "")
         .coreFont(size: size.text, weight: .semibold)
         .foregroundStyle(ink)
@@ -177,7 +185,7 @@ extension EnvironmentValues {
 public enum ModalKey {
     case cancel
     case primary
-    /// ⌘↩: the main action of a dialog that removes something, so Return alone never destroys.
+    /// ⌘⏎: the main action of a dialog that removes something, so Return alone never destroys.
     case command
     /// Esc without the keycap, for a way back that is not called Cancel or Close.
     case escape
@@ -186,8 +194,8 @@ public enum ModalKey {
     var label: String {
         switch self {
         case .cancel: "esc"
-        case .primary: "↩"
-        case .command: "⌘↩"
+        case .primary: "⏎"
+        case .command: "⌘⏎"
         case .escape: ""
         case .number(let n): "⌘\(n)"
         }

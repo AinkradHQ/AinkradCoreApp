@@ -51,7 +51,7 @@ struct SourceBadge: View {
     }
 }
 
-/// A button label with its key beside it, like the prototype's "Approve ⌘↩".
+/// A button label with its key beside it, like the prototype's "Approve ⌘⏎".
 struct KeyLabel: View {
     let title: String
     let key: String?

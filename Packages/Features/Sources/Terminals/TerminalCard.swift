@@ -117,7 +117,7 @@ struct TerminalCard: View {
     private var actions: some View {
         HStack(spacing: Space.s1) {
             Button("Open") { TileAction.run(.open, item.id, model) }
-                .buttonStyle(CoreButtonStyle(.secondary)).help("Open this terminal next to the list (↩)")
+                .buttonStyle(CoreButtonStyle(.secondary)).help("Open this terminal next to the list (⏎)")
             if !item.isEnded {
                 Button("Close") { TileAction.run(.end, item.id, model) }
                     .buttonStyle(CoreButtonStyle(.secondary)).help("Close this terminal (⌫)")

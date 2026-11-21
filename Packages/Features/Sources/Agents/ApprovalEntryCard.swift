@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// One approval in the transcript (N33), one card in the agent's column: what the agent wants in a sentence, the short
-/// command (full text on hover), and the result. While it waits it carries Approve and Deny (⌘↩ and ⌘⌫ on the first one).
+/// command (full text on hover), and the result. While it waits it carries Approve and Deny (⌘⏎ and ⌘⌫ on the first one).
 struct ApprovalEntryCard: View {
     @Bindable var model: AgentsModel
     let request: ApprovalRequest
@@ -104,7 +104,7 @@ struct ApprovalEntryCard: View {
                 base.buttonStyle(CoreButtonStyle(.secondary, size: .medium))
             }
         }
-        .environment(\.coreKeycap, approve ? "⌘↩" : "⌘⌫")
+        .environment(\.coreKeycap, approve ? "⌘⏎" : "⌘⌫")
         .disabled(busy)
         .help(
             approve
@@ -112,7 +112,7 @@ struct ApprovalEntryCard: View {
                 : "Tell \(who) no (⌘Delete). It carries on without it."
         )
         .accessibilityLabel(approve ? "Approve \(request.tool)" : "Deny \(request.tool)")
-        .keyHint(live ? (approve ? "⌘↩" : "⌘⌫") : "")
+        .keyHint(live ? (approve ? "⌘⏎" : "⌘⌫") : "")
         return Group {
             if live {
                 if approve {

@@ -9,7 +9,7 @@ struct ComposerKeys {
     var down: () -> Bool
     var tab: () -> Bool
     var escape: () -> Bool
-    /// A session shortcut (⌘F, ⌘↩, ⇧⌘R…, `SessionShortcut`): true when the session took it.
+    /// A session shortcut (⌘F, ⌘⏎, ⇧⌘R…, `SessionShortcut`): true when the session took it.
     var command: (NSEvent) -> Bool = { _ in false }
     /// ⇧⇥: the session's next mode (as in Claude Code).
     var backtab: () -> Bool = { false }

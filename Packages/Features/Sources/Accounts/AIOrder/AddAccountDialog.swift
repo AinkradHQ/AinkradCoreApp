@@ -284,7 +284,7 @@ struct AddAccountDialog: View {
                 }.buttonStyle(CoreButtonStyle(.secondary))
                 Spacer(minLength: Space.s2)
                 Button("Done", action: close).buttonStyle(CoreButtonStyle(.prominent))
-                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "↩")
+                    .keyboardShortcut(.defaultAction).environment(\.coreKeycap, "⏎")
             }
             .padding(.top, Space.s3)
         }

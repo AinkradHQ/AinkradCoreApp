@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Inbox: what the distillations proposed, across the open rooms. The list is on the left, the chosen candidate on the
 /// right with its sources and Accept, Edit and Reject; Edit swaps the right side for a form. The keyboard drives it:
-/// ↑ ↓ move, Return accepts, E edits, ⌫ rejects, ⌘↩ saves an edit, Esc cancels it.
+/// ↑ ↓ move, Return accepts, E edits, ⌫ rejects, ⌘⏎ saves an edit, Esc cancels it.
 struct CandidateInboxTab: View {
     let model: BrainModel
     private var c: BrainCandidates { model.candidates }
@@ -315,7 +315,7 @@ private struct CandidateDetail: View {
                     Button {
                         Task { await state.accept(c.id) }
                     } label: {
-                        ActionLabel(title: "Accept", key: "↩")
+                        ActionLabel(title: "Accept", key: "⏎")
                     }
                     .buttonStyle(CoreButtonStyle(.prominent))
                     Button {
@@ -400,7 +400,7 @@ private struct CandidateEditForm: View {
                     Button {
                         Task { await state.saveEdit() }
                     } label: {
-                        ActionLabel(title: "Save and accept", key: "⌘↩")
+                        ActionLabel(title: "Save and accept", key: "⌘⏎")
                     }
                     .buttonStyle(CoreButtonStyle(.prominent))
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.busy)

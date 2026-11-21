@@ -283,7 +283,7 @@
     "~/AinkradCore $ cargo test -p citadel" : {
 
     },
-    "↩ open · D detach · E end · S running command · R rename" : {
+    "⏎ open · D detach · E end · S running command · R rename" : {
 
     }
   },

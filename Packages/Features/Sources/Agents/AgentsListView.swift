@@ -190,7 +190,7 @@ struct AgentsListView: View {
         .frame(height: Space.s6)
     }
 
-    /// Keyboard: the list holds focus, ↑↓ move the cursor, ↩ opens, P pins, E ends, A archives.
+    /// Keyboard: the list holds focus, ↑↓ move the cursor, ⏎ opens, P pins, E ends, A archives.
     private func list(
         _ groups: [SessionGroup], _ rows: [AgentSessionInfo], compact: Bool, waiting waitingIDs: Set<String>
     ) -> some View {

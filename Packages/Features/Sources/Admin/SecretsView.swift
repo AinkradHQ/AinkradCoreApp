@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Settings, Security, Secrets (N24, ui-fixes secrets.html): a line with the count and the two actions, the test-values
 /// notice, search and the runner filter, then one section per group with one flat row per secret. Values go in and never
-/// come back. Arrows move the cursor row; ↩ lets a runner use it, E gives it a new value, ⌫ deletes it, ⌘N adds one.
+/// come back. Arrows move the cursor row; ⏎ lets a runner use it, E gives it a new value, ⌫ deletes it, ⌘N adds one.
 struct SecretsSection: View {
     let admin: AdminModel
     @State private var cursor: String?
@@ -380,7 +380,7 @@ private struct SecretRow: View {
             } label: {
                 Label("Let a runner use it", systemImage: "server.rack")
             }
-            .environment(\.coreKeycap, "↩").help("Let a runner use \(secret.name) for a short time (↩)")
+            .environment(\.coreKeycap, "⏎").help("Let a runner use \(secret.name) for a short time (⏎)")
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             if secret.kind == "text" {
                 Button(model.revealed[secret.name] == nil ? "Reveal" : "Hide") {
@@ -429,7 +429,7 @@ private struct SecretKeyHints: View {
     var body: some View {
         HStack(spacing: Space.s4) {
             hint(["↑", "↓"], "move")
-            hint(["↩"], "let a runner use it")
+            hint(["⏎"], "let a runner use it")
             hint(["E"], "new value")
             hint(["⌫"], "delete")
             hint(["⌘N"], "new secret")

@@ -126,7 +126,7 @@ final class StepUpModel {
 
     private var cancelled = false
 
-    /// The sheet's buttons and keys: Try again (↩) after a miss, Cancel (esc) at any time.
+    /// The sheet's buttons and keys: Try again (⏎) after a miss, Cancel (esc) at any time.
     func retry() { choice?.resume(returning: true) }
     func cancel() {
         cancelled = true

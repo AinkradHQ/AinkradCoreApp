@@ -133,7 +133,7 @@ enum AccountsKeys {
         case .accounts where m.detail != nil:
             "esc back · V test · T turn on/off · P add to a pool · K new key · L at once · S per session · ⌫ remove"
         case .accounts where m.aiOrderOn: "⌥↑ ⌥↓ move the row in focus · ⌘N add an account"
-        case .accounts: "↑↓ move · ↩ open · ⌘N add an account"
+        case .accounts: "↑↓ move · ⏎ open · ⌘N add an account"
         case .pools: "\(coreArrowKeys()) pool · ↑↓ account · D default · A add · ⌫ remove"
         case .chains: "\(coreArrowKeys()) chain · D default · E edit · ⌘N new chain"
         case .budgets: "↑↓ move · E edit · R raise · ⌫ remove · ⌘N new budget"

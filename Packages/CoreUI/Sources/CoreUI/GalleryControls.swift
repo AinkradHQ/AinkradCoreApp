@@ -84,7 +84,7 @@ extension CoreUIGallery {
                 CoreKeycap("⌘K")
                 CoreKeycap("⌥⌘N")
                 CoreKeycap("esc")
-                CoreKeycap("↩")
+                CoreKeycap("⏎")
             }
         }
     }

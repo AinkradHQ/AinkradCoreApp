@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// A memory waiting for you. Keys on the focused card: ⌘↩ approve, ⌘⌫ reject, E edit, up and down move.
+/// A memory waiting for you. Keys on the focused card: ⌘⏎ approve, ⌘⌫ reject, E edit, up and down move.
 struct CandidateCard: View {
     @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
@@ -34,7 +34,7 @@ struct CandidateCard: View {
                 Spacer(minLength: Space.s2)
                 Button("Approve with options…", action: advanced).buttonStyle(CoreButtonStyle(.plain))
                     .help("Choose who it applies to, who said so and when it ends.")
-                Button(action: approve) { KeyLabel("Approve", key: "⌘↩") }
+                Button(action: approve) { KeyLabel("Approve", key: "⌘⏎") }
                     .buttonStyle(CoreButtonStyle(.prominent)).help(
                         "Approve with the room defaults. AI sessions can use it at once.")
             }

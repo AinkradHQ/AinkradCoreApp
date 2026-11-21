@@ -19,7 +19,7 @@ struct OverviewView: View {
                 IconTile("square.grid.2x2", hue: GlassInk.accent(paneAccent), size: 40, bounce: shown)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Overview").coreFont(size: MacTextSize.large + 2, weight: .bold)
-                    Text("\(panes.count) apps open · \(coreArrowKeys()) ↑ ↓ choose · ↩ or 1–9 open · esc close")
+                    Text("\(panes.count) apps open · \(coreArrowKeys()) ↑ ↓ choose · ⏎ or 1–9 open · esc close")
                         .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }

@@ -139,11 +139,11 @@ public final class ConnectionsModel {
         cursor = ids[min(max(i + step, 0), ids.count - 1)]
     }
 
-    /// A key on the row under the cursor: ↩ what AI may do (or sign in again), T test, R rename, D default, ⌫ disconnect.
+    /// A key on the row under the cursor: ⏎ what AI may do (or sign in again), T test, R rename, D default, ⌫ disconnect.
     func key(_ k: String) -> Bool {
         guard let c = cursor.flatMap(item) else { return false }
         switch k {
-        case "↩":
+        case "⏎":
             if c.status == .needsLook && c.authMethod == "oauth" {
                 beginAgain(c)
             } else {
