@@ -22,7 +22,8 @@ struct SortStep: View {
             } else {
                 HStack(spacing: Space.s3) {
                     Button("Close", action: close).buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-                    if case .sorted = auto.sort {
+                    // Undo only where the Core can do it: a sort it recorded as its own.
+                    if case .sorted = auto.sort, auto.canUndo {
                         Button {
                             Task { await model.undoSort() }
                         } label: {
@@ -87,7 +88,10 @@ struct SortStep: View {
             let n = model.counts.stored > 0 ? model.counts.stored : model.auto.reading?.total ?? 0
             return n > 0 ? "Sorting \(n.formatted()) items into places" : "Sorting your work into places"
         case .sorted(let n):
-            return "Sorted \(items) items into \(BrainWords.plural(n, "place", "places")), all accepted"
+            let places = BrainWords.plural(n, "place", "places")
+            // The item count is lost when the app restarts mid-import: no number rather than "0 items".
+            return model.counts.stored > 0
+                ? "Sorted \(items) items into \(places), all accepted" : "Sorted into \(places), all accepted"
         case .undone(let n): return "Undone. \(n.formatted()) items are back in one pile for now."
         case .nothing: return "Nothing was sorted by itself. Sort it yourself, or keep going."
         }
