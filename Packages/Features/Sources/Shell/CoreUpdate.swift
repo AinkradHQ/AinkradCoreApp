@@ -123,10 +123,14 @@ struct CoreUpdatePanel: View {
             ) {
                 stepList
                 row(symbol: "arrow.uturn.backward", title: "Went back", sub: "Restored from the snapshot", state: .done)
+                if status.error != nil {
+                    Text(status.errorWords).coreFont(size: MacTextSize.meta, weight: .medium)
+                }
                 Text("We will try again tonight. If it keeps failing we will tell you.")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
                 HStack(spacing: Space.s2) {
                     Button("Try again now", action: update).buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                        .keyboardShortcut("u").help("Try again now  ⌘U")
                     Button("See what happened", action: what).buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
             }
@@ -143,6 +147,7 @@ struct CoreUpdatePanel: View {
                 text: "It installs by itself tonight. Or update now.", tone: .queue
             ) {
                 Button("Update now", action: update).buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                    .keyboardShortcut("u").help("Update now  ⌘U")
             }
         }
     }
@@ -199,5 +204,15 @@ struct CoreUpdatePanel: View {
         .padding(Space.s3)
         .background(GlassInk.well, in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
+    }
+}
+
+extension ShellModel {
+    /// The run's steps with their times, as the mockup's "What happened".
+    func showWhatHappened() {
+        let lines = coreUpdate.events.map { "\($0.at.formatted(date: .omitted, time: .shortened)) · \($0.text)" }
+        presentSheet(
+            title: "What happened", message: (lines + [coreUpdate.errorWords]).joined(separator: "\n"),
+            actions: [ShellSheetAction("Done", primary: true)])
     }
 }

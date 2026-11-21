@@ -35,13 +35,6 @@ struct LiveCorePageSource: CorePageSource {
         }
     }
 
-    func checkUpdate() async throws -> (at: Date, feed: Bool) {
-        try await run {
-            let r = try await client.checkCoreUpdate().ok.body.json
-            return (r.checkedAt, r.status != "feed_unavailable")
-        }
-    }
-
     func backups() async throws -> CoreBackups? { try await run { try await connection.backupStatus() } }
 
     func backupNow() async throws { try await run { try await connection.startBackup() } }
@@ -56,6 +49,43 @@ struct LiveCorePageSource: CorePageSource {
         CorePagePrefs(
             name: p.name, crashReports: p.crashReports ?? false, autoUpdate: p.autoUpdate ?? true,
             updateHour: p.updateHour.map { Int($0) } ?? 3, updateCheckedAt: p.updateCheckedAt)
+    }
+
+    private func run<T>(_ body: () async throws -> T) async throws -> T {
+        do { return try await body() } catch { throw CoreFailure.of(error) ?? error }
+    }
+}
+
+/// Settings, Updates over the signed connection. The check is read raw so the fields a newer Core adds (the runner's latest,
+/// the reason a feed did not answer) are used without a new client, and an older Core's answer still reads.
+struct LiveUpdatesSource: UpdatesSource {
+    let connection: CoreConnection
+    private var client: Client { connection.client }
+
+    func supported() async -> Bool { await connection.serverSupports(minor: coreMinorV010) }
+
+    func check() async throws -> CoreUpdateCheck {
+        let data = try await run {
+            try await connection.signedRequest(method: "POST", target: "/api/v1/core/update/check")
+        }
+        guard let c = CoreUpdateCheck.decode(data) else {
+            throw CoreError.invalidInput("The Core's answer did not read.")
+        }
+        return c
+    }
+
+    func runners() async throws -> [UpdatableRunner] {
+        try await run {
+            try await client.listRunners().ok.body.json.map {
+                UpdatableRunner(
+                    id: $0.id, name: $0.name, version: $0.version, online: $0.online ?? false,
+                    behind: $0.updateAvailable ?? false, updating: $0.updating ?? false, builtIn: $0.builtIn ?? false)
+            }
+        }
+    }
+
+    func updateRunner(_ id: String) async throws {
+        try await run { _ = try await client.updateRunner(path: .init(id: id)).accepted }
     }
 
     private func run<T>(_ body: () async throws -> T) async throws -> T {

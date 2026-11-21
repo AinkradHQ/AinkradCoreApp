@@ -268,12 +268,16 @@ public final class AppModel {
         if let live = service as? LiveCoreService {
             homeFeed = HomeFeed(shell: shell, source: LiveHomeSource(connection: live.connection))
             shell.corePage.source = LiveCorePageSource(connection: live.connection)
-            shell.corePage.gate = { [weak self] reason, op in
+            let gate: @MainActor (String, @escaping @MainActor () async throws -> Void) async throws -> Void = {
+                [weak self] reason, op in
                 guard let self else { throw CancellationError() }
                 do { try await self.elevated(reason, done: "changed") { try await op() } } catch is StepUpDeclined {
                     throw CancellationError()
                 }
             }
+            shell.corePage.gate = gate
+            shell.updates.source = LiveUpdatesSource(connection: live.connection)
+            shell.updates.gate = gate
             let updates = CoreUpdateFeed(shell: shell, connection: live.connection) { [weak self] op in
                 guard let self else { return }
                 try await self.elevated("Update the Core", done: "The update did not start.") { try await op() }
@@ -1018,6 +1022,7 @@ public final class AppModel {
         homeFeed?.stop()
         homeFeed = nil
         shell.corePage.source = nil
+        shell.updates.source = nil
         coreUpdateFeed?.stop()
         coreUpdateFeed = nil
         agents.detach()

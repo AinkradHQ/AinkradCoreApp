@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run one snapshot walk of a built Debug app on the MacBook Air (`ssh air`) and pull the PNGs back. Builds nothing.
 #   scripts/air-shots.sh <Ainkrad.app> <walk> [night|day] [outdir]
-# walk: admin|home|agents|terminals|accounts|brain|pairing|shell|gallery|projects|leyline|design|lore|lore-space   (default theme night, outdir ./air-shots)
+# walk: admin|home|agents|terminals|accounts|brain|pairing|shell|gallery|projects|leyline|design|lore|lore-space|updates   (default theme night, outdir ./air-shots)
 # Prints the app's stderr (SNAP lines) from the Air; set SCENES=a,b to limit the admin walk.
 # DESIGN_SCENE=<dir on the Air> opens designs on that canvas scene (doc.bin, system.bin, images; see DesignCanvasHookup).
 set -euo pipefail
@@ -9,7 +9,7 @@ APP=${1:?usage: air-shots.sh <Ainkrad.app> <walk> [night|day] [outdir]}; WALK=${
 case $WALK in
   admin) VAR=CORE_ADMIN_SNAPSHOT;; home) VAR=CORE_HOME_SNAPSHOT;; agents) VAR=CORE_AGENTS_SNAPSHOT;;
   terminals) VAR=CORE_TERM_SNAPSHOT;; accounts) VAR=CORE_ACC_SNAPSHOT;; brain) VAR=CORE_BRAIN_SNAPSHOT;;
-  pairing) VAR=CORE_PAIR_SNAPSHOT;; shell) VAR=CORE_SNAPSHOT;; gallery) VAR=CORE_GALLERY_SNAPSHOT;; projects) VAR=CORE_PROJECTS_SNAPSHOT;; leyline) VAR=CORE_LEYLINE_SNAPSHOT;; design) VAR=CORE_DESIGN_SNAPSHOT;; lore) VAR=CORE_LORE_SNAPSHOT;; lore-space) VAR=CORE_LORE_SPACE_SNAPSHOT;;
+  pairing) VAR=CORE_PAIR_SNAPSHOT;; shell) VAR=CORE_SNAPSHOT;; gallery) VAR=CORE_GALLERY_SNAPSHOT;; projects) VAR=CORE_PROJECTS_SNAPSHOT;; leyline) VAR=CORE_LEYLINE_SNAPSHOT;; design) VAR=CORE_DESIGN_SNAPSHOT;; lore) VAR=CORE_LORE_SNAPSHOT;; lore-space) VAR=CORE_LORE_SPACE_SNAPSHOT;; updates) VAR=CORE_UPDATES_SNAPSHOT;;
   *) echo "unknown walk $WALK" >&2; exit 2;;
 esac
 [ "$THEME" = night ] && T=dark || T=light

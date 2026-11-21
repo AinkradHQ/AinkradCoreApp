@@ -3,7 +3,7 @@ import Shell
 import SwiftUI
 
 /// Settings, Apps, Runners (E2-4): Look, and the two options the mockup shows. Both are the real switches: "Update runners
-/// automatically" is the Core's automatic-update setting (the one on Core, Updates), and "Use this Mac as a runner" is the
+/// automatically" is the Core's automatic-update setting (the one on Settings, Updates), and "Use this Mac as a runner" is the
 /// This Mac switch of Devices & Runners.
 struct RunnersOptionsTab: View {
     @Environment(\.coreAccent) private var paneAccent
@@ -18,7 +18,7 @@ struct RunnersOptionsTab: View {
                 if app.shell.corePage.supported {
                     OptionSwitchRow(
                         "Update runners automatically",
-                        sub: "At night, one at a time. The same switch as Core, Updates",
+                        sub: "At night, one at a time. The same switch as Settings, Updates",
                         symbol: "arrow.down.circle",
                         isOn: Binding(
                             get: { app.shell.corePage.prefs.autoUpdate },
