@@ -105,6 +105,8 @@ protocol AccountsService: Sendable {
     func setAccountName(account: Int64, name: String?) async throws -> AccountItem
     /// `startLogin` naming the account it makes.
     func startLogin(provider: String, label: String, displayName: String?, runner: String?) async throws -> LoginItem
+    /// The account page's days, sessions and last check (API minor 98, degraded below). Wire in `AccountDetailWire.swift`.
+    func detailData(_ a: AccountItem, now: Date) async -> AccountDetailData
 }
 
 /// A placement with real ids: the Core takes ids, never "the default" (nil lets the Core use its own default).

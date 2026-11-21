@@ -358,6 +358,7 @@ public final class AccountsDemo {
             ]
         }
         func costs(account: Int64?) async throws -> [CostItem] {
+            if let detailCosts { return detailCosts.filter { account == nil || $0.accountID == account } }
             let models = [
                 ("anthropic", "claude-sonnet-4-5", 1), ("openai", "gpt-5-codex", 3), ("google", "gemini-2.5-pro", 5),
             ]
@@ -434,6 +435,9 @@ public final class AccountsDemo {
             }
         }
         var keyFails: String?
+        /// The account page sample (`AccountDetailDemo`): its scene, its days and sessions, and its key's cost events.
+        var detailScene: String?
+        var detailCosts: [CostItem]?
         /// The AI order sample (`AIOrderDemo`): on, the Core speaks API minor 95.
         var order010 = false
         /// Models the demo's person switched off, by account (0.10).
@@ -507,6 +511,8 @@ public final class AccountsDemo {
         "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
         "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices", "ai-order-rename",
     ]
+    /// The account page's six states (`AccountDetailDemo`), walked after the scenes above.
+    public static let detailScenes = AccountDetailDemo.scenes
 
     let model: AccountsModel
     private let setNotice: @MainActor (AdminNotice?) -> Void
@@ -520,6 +526,9 @@ public final class AccountsDemo {
         await show(scene)
         model.opener = { NSWorkspace.shared.open($0) }
     }
+
+    /// The snapshot walk's Reduce Motion pass (`CORE_REDUCE_MOTION=1`): the account page draws its still fallback.
+    public func setReduceMotion(_ on: Bool) { model.debugReduceMotion = on }
 
     public func show(_ scene: String) async {
         if scene.hasPrefix("conn-") { return await showConnections(scene) }
@@ -540,6 +549,13 @@ public final class AccountsDemo {
         model.advancedOpen = false
         model.advancedTab = .limits
         model.installs = [:]
+        model.detail = nil  // the account page reads its days and sessions again for each scene
+        model.detailData = [:]
+        model.planChecks = [:]
+        model.checking = nil  // a check left running by the scene before
+        model.testing = nil
+        model.detailTech = false
+        model.detailMore = false
         switch scene {
         case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
@@ -548,6 +564,7 @@ public final class AccountsDemo {
             svc.useAIOrderSample(limitHit: scene == "ai-order-limit-hit")
             svc.noLogin = scene.hasPrefix("ai-order-add-install")
         case "connect-installing": svc.noLogin = true
+        case _ where AccountDetailDemo.scenes.contains(scene): svc.useDetailSample(scene)
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "overview-gate-throwaway": svc.gateState = GateState(mode: 1, providerAccounts: 0)
         case "overview-empty":
@@ -602,12 +619,17 @@ public final class AccountsDemo {
             case "account-cooling": 2
             case "account-unhealthy": 4
             case "account-disabled": 6
+            case _ where AccountDetailDemo.scenes.contains(scene): scene == "detail-api" ? 3 : 1
             default: nil
             }
         model.show(page, account: detail, pool: scene == "pools-second" || scene == "delete-pool" ? 2 : nil)
         try? await Task.sleep(for: .milliseconds(600))
         if scene == "accounts-need" { model.filter = .need }
         switch scene {
+        case "detail-checking": Task { await model.checkNow(model.account(1)!) }
+        case "detail-checked":
+            await model.checkNow(model.account(1)!)
+            try? await Task.sleep(for: .milliseconds(400))
         case "ai-order-add-pick": AccountDialogs.openConnect(model, provider: nil)
         case "ai-order-add-key": AccountDialogs.openConnect(model, provider: "anthropic")
         case "ai-order-add-signin": AccountDialogs.openConnect(model, provider: "codex-sub")

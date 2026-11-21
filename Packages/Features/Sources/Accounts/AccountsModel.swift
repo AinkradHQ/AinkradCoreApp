@@ -70,6 +70,15 @@ public final class AccountsModel {
     var checking: Int64?
     var planChecks: [Int64: (check: PlanCheck, at: Date)] = [:]
     var checkNote: [Int64: String] = [:]
+    /// The account page's chart, sessions and last check, by account (`watchDetail`).
+    var detailData: [Int64: AccountDetailData] = [:]
+    /// Counts `use(_:)`: a new connection reads the open account page again.
+    private(set) var serviceEpoch = 0
+    /// The account page's ⋯ menu, open (⌘.), and its technical details shown (⌘D).
+    var detailMore = false
+    var detailTech = false
+    /// Debug only: draw the account page's Reduce Motion fallback (the snapshot walk's `CORE_REDUCE_MOTION=1`).
+    var debugReduceMotion = false
     /// Tool installs the Connect wizard started or saw, by "runner|tool" (N22).
     var installs: [String: ToolProgress] = [:]
     /// Budgets (Spend), read when the Spend pages open.
@@ -105,6 +114,7 @@ public final class AccountsModel {
 
     func use(_ service: any AccountsService) {
         self.service = service
+        serviceEpoch += 1
         usage = []
         limitsLoad = .loading
         Task { await reload() }

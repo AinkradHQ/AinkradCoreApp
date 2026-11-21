@@ -105,65 +105,6 @@ extension AccountDialogs {
     }
 }
 
-/// "Limits" on an account page: every way this account can be capped, in one card and in plain words. Each row says its
-/// kind: how many sessions at once, what one session may spend, and the budgets. Usage windows are budgets now (0.10).
-struct AccountLimitsSection: View {
-    @Environment(\.coreAccent) private var paneAccent
-    let model: AccountsModel
-    let account: AccountItem
-    let hue: Color
-
-    private var sessionWords: String {
-        switch (account.maxTokens, account.maxUSDMicros) {
-        case (nil, nil): "No limit. A session may spend as much as it needs."
-        case (let t?, nil): "Core stops a session at \(AccountsNumbers.tokens(t))."
-        case (nil, let u?): "Core stops a session at \(AccountsNumbers.usd(u))."
-        case (let t?, let u?):
-            "Core stops a session at \(AccountsNumbers.tokens(t)) or \(AccountsNumbers.usd(u)), whichever comes first."
-        }
-    }
-
-    var body: some View {
-        let budgets = model.budgets.filter { $0.kind == "account" && $0.subject == String(account.id) }
-        VStack(alignment: .leading, spacing: Space.s2) {
-            HStack {
-                Label("Limits", systemImage: "gauge.with.dots.needle.67percent")
-                    .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
-                Spacer(minLength: Space.s2)
-            }
-            LimitRow(
-                kind: "Sessions at once",
-                title: account.cap == 0 ? "No limit" : "Up to \(account.cap) at the same time",
-                detail: "More sessions than that wait for a free place.", change: "Change"
-            ) { AccountDialogs.openCap(model, account) }
-            .disabled(model.readOnly)
-            LimitRow(
-                kind: "Each session", title: sessionWords, detail: nil, change: "Change"
-            ) { AccountDialogs.openLimits(model, account) }
-            .disabled(model.readOnly)
-            if let e = model.writeError["cap-\(account.id)"] ?? model.writeError["limits-\(account.id)"] {
-                AccIssue(text: e)
-            }
-            ForEach(budgets) { b in
-                LimitRow(
-                    kind: "Budget", title: AccountBudgetLine.text(b),
-                    detail: b.standing == .stopped ? "Spent. New work on this account is stopped." : nil,
-                    change: "Open Budgets"
-                ) {
-                    model.page = .budgets
-                    model.detail = nil
-                }
-            }
-        }
-        .padding(Space.s4)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .coreWell()
-        .task(id: account.id) { await model.reloadLimits() }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("account-usage-limits")
-    }
-}
-
 /// Add a usage limit, or change one: unit, window, the cap and where the warning starts (5% steps).
 struct LimitDialog: View {
     let model: AccountsModel

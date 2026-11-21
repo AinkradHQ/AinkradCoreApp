@@ -96,7 +96,8 @@ struct AccountVerdict: Equatable, Sendable {
 
 extension AccountsModel {
     func verdict(_ a: AccountItem) -> AccountVerdict {
-        AccountVerdict.of(a, limits: limits(of: a), budgets: budgets, inPool: !pools(of: a).isEmpty)
+        // 0.10: every entry of the AI order is a hidden one-account pool, so an account is always reachable.
+        AccountVerdict.of(a, limits: limits(of: a), budgets: budgets, inPool: aiOrderOn || !pools(of: a).isEmpty)
     }
     /// Counted by the same verdict that every card shows.
     var readyAccounts: Int { accounts.filter { verdict($0).isReady }.count }
