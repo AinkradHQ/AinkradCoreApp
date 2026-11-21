@@ -93,7 +93,7 @@ struct LauncherView: View {
                     var target = lines[new].id
                     // A suggestion is drawn with its row's first cell.
                     if case .pick = lines[new], new % 2 == 1 { target = lines[new - 1].id }
-                    withAnimation(reduce ? nil : Motion.out(0.18)) { proxy.scrollTo(target) }
+                    proxy.scrollTo(target)
                 }
             }
             footer
@@ -386,16 +386,14 @@ struct LauncherView: View {
         return .handled
     }
 
-    /// The keyboard moves the highlight with a glide and scrolls along on the same curve.
-    private func glide(_ to: Int) {
-        withAnimation(reduce ? nil : Motion.out(0.18)) { selection = to }
-    }
+    /// The keyboard moves the highlight at once (Ahmed, 2026-11-21: fast and instant, no glide).
+    private func glide(_ to: Int) { selection = to }
 
     /// The pointer glides it too, on a short spring that redirects as the pointer moves on instead of queueing one glide
     /// per row it crossed (that lag read as a glitch).
     private func point(_ to: Int) {
         guard to != selection else { return }
-        withAnimation(reduce ? nil : .spring(duration: 0.14, bounce: 0)) { selection = to }
+        selection = to
     }
 
     // MARK: acting

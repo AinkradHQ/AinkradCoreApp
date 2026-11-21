@@ -70,8 +70,8 @@ public struct ShellView: View {
                 Spacer(minLength: 0)
             }
         }
-        .saturation(scrimmed ? 0.9 : 1)
-        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: scrimmed)
+        // No colour filter on the desktop under the launcher or a dialog (2026-11-21): it redrew the whole desktop, wallpaper
+        // and widgets into a second layer every frame, and made the launcher slow. The dim does the job alone.
     }
 
     /// Reconnecting and offline show a banner under the status cluster; the Home Core button says the same in words. A link notice
