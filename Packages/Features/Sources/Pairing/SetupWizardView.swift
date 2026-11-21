@@ -9,8 +9,6 @@ struct SetupWizardView: View {
     @Bindable var model: SetupWizardModel
     /// "Pair with a code" instead: the older flow for a Core whose first device already exists.
     let useCode: () -> Void
-    /// The welcome cards: About you and Your look open those setup pages before a Core is connected.
-    let startTour: (SetupTourModel.Detour) -> Void
     @Environment(\.corePalette) private var palette
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -41,9 +39,9 @@ struct SetupWizardView: View {
             }
             .foregroundStyle(palette.text)
             .coreFont(size: MacTextSize.body)
-            .padding(Space.s6)
+            .padding(EdgeInsets(top: 28, leading: 36, bottom: 24, trailing: 36))  // the approved 02 Setup card
             .coreFrame(radius: Radius.pane, part: .dialogs)
-            .frame(width: Space.s8 * 17)
+            .frame(width: 780)
             .accessibilityElement(children: .contain)
         }
         .coreTheme()
@@ -69,26 +67,19 @@ struct SetupWizardView: View {
 
     private var screen: Stage { model.stage == .choose && !model.welcomed ? .welcome : Stage(model.stage) }
 
-    /// The bar this screen lights (of seven, see `SetupBars`) and its name.
-    private var step: (Int, String) {
+    /// The bar this screen lights (of seven, see `SetupBars`). Setup is one guided path: the bars show where you are and
+    /// are never a way to jump.
+    private var step: Int {
         switch model.stage {
-        case .choose: model.welcomed ? (1, "Your Core") : (0, "Welcome")
-        case .install: (1, "Install Core")
-        case .connect, .connecting: (1, "Connect")
-        case .waiting: (1, "Waiting for your Core")
-        case .found: (1, "Your Core is here")
-        case .nearby: (1, "Find your Core")
-        case .failed: (0, "Connect to a Core")
+        case .choose: model.welcomed ? 1 : 0
+        case .failed: 0
+        default: 1
         }
     }
 
+    /// The approved setup header (02 Setup): the progress bars alone, centred.
     private var header: some View {
-        HStack(spacing: Space.s2) {
-            Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: MacSize.controlMd)
-                .accessibilityHidden(true)
-            SetupBars(at: step.0)
-            Text(step.1).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(palette.text2)
-        }
+        SetupBars(at: step).frame(maxWidth: .infinity)
     }
 
     private func title(_ t: String) -> some View {
@@ -102,39 +93,41 @@ struct SetupWizardView: View {
     // MARK: 0, welcome
 
     private var welcome: some View {
-        VStack(alignment: .leading, spacing: Space.s4) {
-            Text("Welcome to Ainkrad").coreFont(size: MacTextSize.large, weight: .semibold)
-                .accessibilityAddTraits(.isHeader)
-            note(
-                "Your Core keeps your work, notes and AI in one calm place. Setup takes about three minutes, and you can skip anything."
-            )
-            HStack(alignment: .top, spacing: Space.s3) {
-                welcomeTile("server.rack", "Your Core", "One place for everything") { model.getStarted() }
-                welcomeTile("person", "About you", "So the AI knows you") { startTour(.you) }
-                welcomeTile("sparkles", "Your look", "Make it yours") { startTour(.look) }
+        VStack(spacing: Space.s4) {
+            WelcomeHero()
+            VStack(spacing: Space.s2) {
+                Text("Welcome to Ainkrad").coreFont(size: 28, weight: .bold).tracking(-0.84)
+                    .accessibilityAddTraits(.isHeader)
+                note(
+                    "Your Core keeps your work, notes and AI in one calm place. Setup takes about three minutes, and you can skip anything."
+                )
+                .multilineTextAlignment(.center)
             }
+            // What setup covers, in order. Not buttons: setup is one guided path, started only by Get started.
+            HStack(spacing: Space.s3) {
+                welcomeTile("server.rack", "Your Core", "One place for everything")
+                welcomeTile("person", "About you", "So the AI knows you")
+                welcomeTile("sparkles", "Your look", "Make it yours")
+            }
+            .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button("Get started") { model.getStarted() }.buttonStyle(CoreButtonStyle(.prominent, size: .large))
                     .coreShortcut(.primary)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
-    private func welcomeTile(_ symbol: String, _ title: String, _ sub: String, open: @escaping () -> Void) -> some View
-    {
-        Button(action: open) {
-            VStack(spacing: Space.s1) {
-                IconTile(symbol, hue: GlassInk.accent(paneAccent), size: 36)
-                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
-            }
-            .frame(maxWidth: .infinity).padding(Space.s4).coreWell()
-            .contentShape(coreShape(Radius.cardMac))
+    private func welcomeTile(_ symbol: String, _ title: String, _ sub: String) -> some View {
+        VStack(spacing: Space.s1) {
+            IconTile(symbol, hue: GlassInk.accent(paneAccent), size: 28)
+            Text(title).coreFont(size: MacTextSize.headline, weight: .semibold)
+            Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2).lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
-        .buttonStyle(CoreQuietPressStyle())
+        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(Space.s4).coreWell()
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: 1, new or existing
@@ -407,5 +400,45 @@ private struct PrimaryKey: ViewModifier {
     let on: Bool
     func body(content: Content) -> some View {
         if on { content.coreShortcut(.primary) } else { content }
+    }
+}
+
+/// The welcome hero from the approved 02 Setup mockup: the emblem on a large accent tile, with four soft accent squares
+/// floating slowly around it. Still under Reduce Motion.
+private struct WelcomeHero: View {
+    @Environment(\.coreAccent) private var accent
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var up = false
+
+    /// Size, centre as a fraction of the hero, float period and phase: the mockup's four orbs.
+    private let orbs: [(CGFloat, CGPoint, Double, Double)] = [
+        (40, CGPoint(x: 0.24 + 0.03, y: 0.26), 6, 0), (24, CGPoint(x: 0.32 + 0.02, y: 0.81), 6, 3),
+        (30, CGPoint(x: 0.76 - 0.03, y: 0.31), 6, 2), (20, CGPoint(x: 0.68 - 0.01, y: 0.80), 6, 4),
+    ]
+
+    var body: some View {
+        GeometryReader { g in
+            ZStack {
+                ForEach(orbs.indices, id: \.self) { i in
+                    let (size, at, period, phase) = orbs[i]
+                    coreShape(size < 28 ? 6 : 12).fill(GlassInk.accent(accent).opacity(0.16))
+                        .frame(width: size, height: size)
+                        .offset(y: up ? -4 : 0)
+                        .animation(
+                            reduce ? nil : .easeInOut(duration: period / 2).repeatForever().delay(phase / 2), value: up
+                        )
+                        .position(x: g.size.width * at.x, y: g.size.height * at.y)
+                }
+                Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: 52, height: 52)
+                    .frame(width: 104, height: 104)
+                    .background(GlassInk.accent(accent).opacity(0.16), in: coreShape(28))
+                    .offset(y: up ? -4 : 0)
+                    .animation(reduce ? nil : .easeInOut(duration: 2.5).repeatForever(), value: up)
+                    .position(x: g.size.width / 2, y: g.size.height / 2)
+            }
+        }
+        .frame(height: 190)
+        .onAppear { if !reduce { up = true } }
+        .accessibilityHidden(true)
     }
 }
