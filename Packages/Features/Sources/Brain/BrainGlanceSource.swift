@@ -150,7 +150,12 @@ extension ImportModel {
             if case .sorted(let n) = auto.sort {
                 return .init(step: step, line: "Sorted into \(BrainWords.plural(n, "place", "places"))", progress: 1)
             }
-            return .init(step: step, line: "Sorting into places")
+            if let r = auto.reading {
+                return .init(
+                    step: step, line: auto.sortPhase, detail: SortStep.count(r, left: auto.readingLeft),
+                    progress: Double(r.done) / Double(max(r.total, 1)))
+            }
+            return .init(step: step, line: auto.sortPhase)
         case .importing:
             guard autoSort, let l = auto.learning, !l.places.isEmpty else {
                 return .init(step: step, line: autoSort ? "Learning from your work" : "Importing the checked rooms")
