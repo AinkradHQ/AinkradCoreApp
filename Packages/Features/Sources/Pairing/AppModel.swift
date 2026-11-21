@@ -278,6 +278,7 @@ public final class AppModel {
             shell.corePage.gate = gate
             shell.updates.source = LiveUpdatesSource(connection: live.connection)
             shell.updates.gate = gate
+            shell.updates.macRunnerID = macRunner.runnerID
             let updates = CoreUpdateFeed(shell: shell, connection: live.connection) { [weak self] op in
                 guard let self else { return }
                 try await self.elevated("Update the Core", done: "The update did not start.") { try await op() }
@@ -290,6 +291,7 @@ public final class AppModel {
             Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self else { return }
+                    self.shell.updates.macRunnerID = self.macRunner.runnerID
                     let working = self.macRunner.runnerID.flatMap { self.terminals?.isWorking(runner: $0) } ?? false
                     self.macRunner.holdAwake(working)
                     try? await Task.sleep(for: .seconds(15))

@@ -88,6 +88,20 @@ struct LiveUpdatesSource: UpdatesSource {
         try await run { _ = try await client.updateRunner(path: .init(id: id)).accepted }
     }
 
+    func coreStatus() async throws -> CoreUpdateStatus {
+        let data = try await run {
+            try await connection.signedRequest(method: "GET", target: "/api/v1/system/update")
+        }
+        guard let s = CoreUpdateStatus.decode(data) else {
+            throw CoreError.invalidInput("The Core's answer did not read.")
+        }
+        return s
+    }
+
+    func startCore() async throws {
+        try await run { _ = try await connection.signedRequest(method: "POST", target: "/api/v1/system/update") }
+    }
+
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() } catch { throw CoreFailure.of(error) ?? error }
     }

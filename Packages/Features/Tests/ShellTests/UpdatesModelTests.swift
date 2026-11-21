@@ -1,3 +1,4 @@
+import CoreKit
 import Foundation
 import Testing
 
@@ -11,6 +12,31 @@ private actor FakeUpdates: UpdatesSource {
     var list: [UpdatableRunner] = []
     var asked: [String] = []
     var refuse = false
+    /// Answers for `coreStatus`, one per read; nil throws (the Core restarting). The last one repeats.
+    var statuses: [CoreUpdateStatus?] = []
+    var started = 0
+    var startError: (any Error)?
+    func coreStatus() async throws -> CoreUpdateStatus {
+        let s = statuses.count > 1 ? statuses.removeFirst() : statuses.first ?? CoreUpdateStatus()
+        guard let s else { throw CoreError.offline("connection refused") }
+        if s.phase == .done {
+            for i in list.indices where list[i].builtIn { list[i].version = s.current }
+        }
+        return s
+    }
+    func startCore() async throws {
+        if let startError { throw startError }
+        started += 1
+    }
+    func set(statuses: [CoreUpdateStatus?]) { self.statuses = statuses }
+    func set(startError: (any Error)?) { self.startError = startError }
+    func finish(_ id: String) {
+        if let i = list.firstIndex(where: { $0.id == id }) {
+            list[i].updating = false
+            list[i].behind = false
+            list[i].version = "0.10.3"
+        }
+    }
     func supported() async -> Bool { minor }
     func check() async throws -> CoreUpdateCheck { answer }
     func runners() async throws -> [UpdatableRunner] { list }
@@ -35,7 +61,7 @@ struct UpdatesModelTests {
         await m.load()
         await m.checkNow()
         #expect(m.check?.status == .upToDate)
-        #expect(m.checkWords(lastChecked: nil) == "Up to date. Checked just now.")
+        #expect(m.checkWords(lastChecked: nil).hasPrefix("Checked ") && m.target == nil)
     }
 
     @Test func available() async {
@@ -45,7 +71,7 @@ struct UpdatesModelTests {
         m.source = core
         await m.load()
         await m.checkNow()
-        #expect(m.check?.latest == "0.10.3" && m.checkWords(lastChecked: nil) == "Core 0.10.3 is ready.")
+        #expect(m.check?.latest == "0.10.3" && m.target == "0.10.3")
     }
 
     @Test func feedUnavailableSaysTheCoresReason() async {
@@ -92,60 +118,189 @@ struct UpdatesModelTests {
         #expect(m.check == nil && m.checkWords(lastChecked: nil) == "This Core is too old to check for updates.")
     }
 
-    @Test func runnerStates() {
+    @Test func runnerStatesTellTheCoreHostTheMacAndTheOthersApart() {
         let m = UpdatesModel()
+        m.macRunnerID = "mac"
         let rs = [
             UpdatableRunner(id: "a", name: "Attic", version: "0.10.1", behind: true),
             UpdatableRunner(id: "b", name: "Basement", version: "0.10.2"),
             UpdatableRunner(id: "c", name: "Cellar", version: "0.10.1", online: false, behind: true),
-            UpdatableRunner(id: "d", name: "This Mac", version: "0.10.1", behind: true, builtIn: true),
+            UpdatableRunner(id: "host", name: "Core host", version: "0.10.1", behind: true, builtIn: true),
+            UpdatableRunner(id: "mac", name: "Laptop", version: "0.10.1", behind: true),
             UpdatableRunner(id: "e", name: "Shed", version: "0.10.1", behind: true, updating: true),
             UpdatableRunner(id: "f", name: "Garage", version: "0.10.1", behind: true),
         ]
-        m.debugSet(check: nil, runners: rs, asked: ["f"])
-        #expect(rs.map(m.state) == [.behind, .upToDate, .offline, .withApp, .updating, .starting])
+        m.debugSet(check: nil, runners: rs, queue: ["f"])
+        #expect(rs.map(m.state) == [.behind, .upToDate, .offline, .withCore, .withApp, .updating, .queued])
         #expect(m.behind.map(\.id) == ["a"])
+        // The Core host leads the Runners section; the Mac's own runner is not in it (it sits under This Mac app).
+        #expect(m.listed.map(\.id) == ["host", "a", "b", "c", "e", "f"])
+        #expect(m.macRunner?.id == "mac" && m.hostRunner?.id == "host")
     }
 
-    @Test func updateAllAsksOnceBehindTheGateAndShowsThemUpdating() async {
+    @Test func aDeclinedUnlockAsksNothingAndARefusalShowsPlainWords() async {
+        let core = FakeUpdates()
+        await core.set(list: [UpdatableRunner(id: "a", name: "Attic", version: "0.10.1", behind: true)])
+        let m = UpdatesModel()
+        m.pause = { _ in }
+        m.source = core
+        await m.load()
+        m.gate = { _, _ in throw CancellationError() }
+        await m.update(runner: "a")
+        #expect(await core.asked.isEmpty && m.failure == nil && m.asked.isEmpty)
+        m.gate = nil
+        await core.set(refuse: true)
+        await m.update(runner: "a")
+        // A refusal that is not the Core's own answer never shows its raw text.
+        #expect(m.failure == UpdatesOutcome.generic && m.asked.isEmpty)
+    }
+
+    @Test func cancellationsAreSilentEvenWhenTheClientWrapsThem() {
+        struct ClientError: Error, LocalizedError {
+            var operationID = "listRunners"
+            var underlyingError: any Error = CancellationError()
+            var errorDescription: String? {
+                "Client error - operationID: listRunners, underlying error: CancellationError()"
+            }
+        }
+        #expect(UpdatesOutcome.of(ClientError()) == .silent)
+        #expect(UpdatesOutcome.of(URLError(.cancelled)) == .silent)
+        #expect(UpdatesOutcome.of(CoreError.stepUpCancelled) == .silent)
+        #expect(UpdatesOutcome.of(CoreError.rateLimited(retryAfter: 248)) == .wait(248))
+        #expect(UpdatesOutcome.of(URLError(.badServerResponse)) == .words(UpdatesOutcome.generic))
+        #expect(
+            UpdatesOutcome.of(CoreError.http(status: 409, code: "busy", message: "An update is already running."))
+                == .words("An update is already running."))
+    }
+
+    @Test func aRateLimitBecomesTheCountdownAndUnlocks() async {
+        let core = FakeUpdates()
+        await core.set(startError: CoreError.rateLimited(retryAfter: 248))
+        var clock = Date(timeIntervalSince1970: 1000)
+        let m = UpdatesModel()
+        m.now = { clock }
+        m.pause = { _ in }
+        m.source = core
+        var s = CoreUpdateStatus()
+        s.current = "0.10.2"
+        s.available = "0.10.3"
+        await core.set(statuses: [s])
+        await m.load()
+        #expect(m.hero == .available && m.canUpdateEverything)
+        await m.updateEverything()
+        #expect(m.waitLeft(at: clock) == 248 && m.failure == nil && !m.pressed && m.run == nil)
+        // Pressed again during the wait: nothing is sent.
+        await core.set(startError: nil)
+        await m.updateEverything()
+        #expect(await core.started == 0)
+        clock = clock.addingTimeInterval(249)
+        #expect(m.waitLeft(at: clock) == nil)
+    }
+
+    /// The whole run as Oracle showed it: snapshot, install, the connection drops while the Core restarts, health, done;
+    /// then the Linux runners one at a time, never the Mac's own.
+    @Test func updateEverythingFollowsTheRestartThenTheRunnersInOrder() async {
         let core = FakeUpdates()
         await core.set(list: [
-            UpdatableRunner(id: "a", name: "Attic", version: "0.10.1", behind: true),
-            UpdatableRunner(id: "b", name: "Basement", version: "0.10.1", behind: true),
+            UpdatableRunner(id: "host", name: "Core host", version: "0.10.2", behind: true, builtIn: true),
+            UpdatableRunner(id: "a", name: "build-box", version: "0.10.2", behind: true),
+            UpdatableRunner(id: "mac", name: "Laptop", version: "0.10.1", behind: true),
+            UpdatableRunner(id: "b", name: "lab-pi", version: "0.10.2", behind: true),
         ])
+        func st(_ p: CoreUpdateStatus.Phase, _ current: String = "0.10.2") -> CoreUpdateStatus {
+            var s = CoreUpdateStatus()
+            s.current = current
+            s.phase = p
+            s.available = p == .done ? nil : "0.10.3"
+            s.to = p == .idle ? nil : "0.10.3"
+            return s
+        }
+        await core.set(statuses: [
+            st(.idle), st(.snapshot), st(.install), nil, nil, st(.health, "0.10.3"), st(.done, "0.10.3"),
+        ])
+        var clock = Date(timeIntervalSince1970: 1000)
         let m = UpdatesModel()
-        m.source = core
+        m.macRunnerID = "mac"
+        m.now = { clock }
+        var seen: [String] = []
+        m.pause = { s in
+            clock = clock.addingTimeInterval(s)
+            if let r = m.run { seen.append("\(r.step.name)\(r.gapSince == nil ? "" : " gap")") }
+            // Runners finish while the model waits on them.
+            for id in ["a", "b"] where m.updatingSince[id] != nil || m.asked[id] != nil {
+                await core.finish(id)
+            }
+        }
         var reasons: [String] = []
         m.gate = { reason, op in
             reasons.append(reason)
             try await op()
         }
-        await m.load()
-        await m.updateAllBehind()
-        #expect(reasons == ["Update 2 runners."])
-        #expect(await core.asked == ["a", "b"])
-        #expect(m.runners.allSatisfy { m.state($0) == .updating })
-    }
-
-    @Test func aDeclinedUnlockAsksNothingAndARefusalShowsItsWords() async {
-        let core = FakeUpdates()
-        await core.set(list: [UpdatableRunner(id: "a", name: "Attic", version: "0.10.1", behind: true)])
-        let m = UpdatesModel()
         m.source = core
         await m.load()
-        m.gate = { _, _ in throw CancellationError() }
-        await m.update(runner: "a")
-        #expect(await core.asked.isEmpty && m.failure == nil)
-        m.gate = nil
-        await core.set(refuse: true)
-        await m.update(runner: "a")
-        #expect(m.failure == "The runner is offline." && m.asked.isEmpty)
+        await m.updateEverything()
+        #expect(seen.contains("Install") && seen.contains("Restart gap") && seen.contains("Health check"))
+        #expect(reasons == ["Update the Core to 0.10.3.", "Update build-box.", "Update lab-pi."])
+        #expect(await core.asked == ["a", "b"])
+        #expect(m.finished?.version == "0.10.3" && m.hero == .done && !m.pressed && m.queue.isEmpty)
+    }
+
+    @Test func updateEverythingLocksAtTheFirstPress() async {
+        let core = FakeUpdates()
+        var s = CoreUpdateStatus()
+        s.current = "0.10.2"
+        s.available = "0.10.3"
+        var done = s
+        done.phase = .done
+        done.current = "0.10.3"
+        done.available = nil
+        await core.set(statuses: [s, done])
+        let m = UpdatesModel()
+        m.pause = { _ in }
+        m.source = core
+        await m.load()
+        var second: Task<Void, Never>?
+        m.gate = { _, op in
+            // The second press lands while Touch ID is still up.
+            #expect(m.pressed)
+            second = Task { await m.updateEverything() }
+            await second?.value
+            try await op()
+        }
+        await m.updateEverything()
+        #expect(await core.started == 1 && !m.pressed)
+    }
+
+    @Test func theRestartGapShowsThenReconnects() {
+        let m = UpdatesModel()
+        var clock = Date(timeIntervalSince1970: 1000)
+        m.now = { clock }
+        var s = CoreUpdateStatus()
+        s.current = "0.10.2"
+        s.phase = .install
+        s.to = "0.10.3"
+        m.receive(s)
+        #expect(m.run?.step == .install && m.hero == .updating)
+        clock = clock.addingTimeInterval(3)
+        m.debugDrop()
+        #expect(m.run?.step == .restart && m.run?.gapSeconds(at: clock.addingTimeInterval(2)) == 3)
+        #expect(m.run?.took[.install] == 3)
+        clock = clock.addingTimeInterval(4)
+        s.phase = .health
+        m.receive(s)
+        #expect(m.run?.gapSince == nil && m.run?.backAt == clock && m.run?.step == .health)
+        #expect(m.run?.took[.restart] == 4)
+        s.phase = .rolledBack
+        s.error = "health_failed"
+        m.receive(s)
+        #expect(m.run == nil && m.hero == .wentBack)
     }
 
     @Test func installingAndRolledBackSteps() {
         var s = CoreUpdateStatus()
         s.phase = .install
         #expect(s.running && s.steps == [.done, .now, .wait])
+        #expect(CoreUpdateStatus.decode(json(#"{"state":"restarting"}"#))?.phase == .restart)
         s.phase = .rolledBack
         s.error = "health_failed"
         #expect(!s.running && s.visible && s.steps == [.done, .done, .fail])

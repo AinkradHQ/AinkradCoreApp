@@ -3,13 +3,16 @@ import AppKit
 import Pairing
 import Shell
 
-/// Debug only. `CORE_UPDATES_SNAPSHOT=<dir> [CORE_THEME=light|dark]` (with `CORE_DEMO=1`) opens Settings, Updates on made-up
-/// data, one scene per state (up to date, available, installing, rolled back, no feed, an older Core, the app ready to install),
-/// captures the window and quits. No Core is reached, no key events.
+/// Debug only. `CORE_UPDATES_SNAPSHOT=<dir> [CORE_THEME=light|dark] [CORE_REDUCE_MOTION=1]` (with `CORE_DEMO=1`) opens
+/// Settings, Updates on made-up data and walks the mockup's states (`Designs/core/0-10/review/updates`): up to date, an
+/// update ready, updating (install, the restart gap, reconnected, health), the runners following, done, went back, one
+/// runner updating, and this app downloading and ready. Captures the window per state and quits. No Core is reached.
+/// `CORE_REDUCE_MOTION=1` draws the page's Reduce Motion fallback without touching the Mac's setting.
 @MainActor
 enum UpdatesSnapshots {
     static func run(_ app: AppModel, dir: String, env: [String: String]) async {
         let theme = env["CORE_THEME"] == "light" ? "day" : "night"
+        let reduce = env["CORE_REDUCE_MOTION"] == "1"
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
         guard let window = await SnapshotCapture.mainWindow() else { return log("no main window") }
@@ -17,75 +20,144 @@ enum UpdatesSnapshots {
         app.debugShowDesktop()
         app.debugPairedSetup(false)
         let u = shell.updates
-        u.appVersion = "0.10.2"
+        u.debugReduceMotion = reduce
+        u.macRunnerID = "mac"
+        u.appVersion = "0.10.1"
         u.checkApp = {}
-        shell.startCoreUpdate = {}
+        u.installApp = {}
         shell.coreUpdateNews = {}
         shell.home.health = CoreHealthFacts(version: "0.10.2", uptimeSecs: 86_400 * 3)
         shell.corePage.debugSet(prefs: CorePagePrefs(autoUpdate: true, updateHour: 3))
-        let runners = [
-            UpdatableRunner(id: "r1", name: "Attic box", version: "0.10.1", behind: true),
-            UpdatableRunner(id: "r2", name: "Studio tower", version: "0.10.2"),
-            UpdatableRunner(id: "r3", name: "Garage pi", version: "0.10.0", online: false, behind: true),
-            UpdatableRunner(id: "r4", name: "This Mac", version: "0.10.1", behind: true, builtIn: true),
-        ]
-        func status(_ phase: CoreUpdateStatus.Phase, available: String? = nil, error: String? = nil) -> CoreUpdateStatus
-        {
+        shell.open(.settings)
+        shell.settings.selected = "updates"
+
+        let old = "0.10.2"
+        let new = "0.10.3"
+        func runners(_ v: String, buildBox: String? = nil, behind: Bool = false) -> [UpdatableRunner] {
+            [
+                UpdatableRunner(id: "host", name: "Core host", version: v, behind: behind, builtIn: true),
+                UpdatableRunner(id: "bb", name: "build-box", version: buildBox ?? v, behind: behind),
+                UpdatableRunner(id: "lab", name: "lab-pi", version: v, behind: behind),
+                UpdatableRunner(id: "mac", name: "Studio laptop", version: "0.10.1"),
+            ]
+        }
+        func status(_ phase: CoreUpdateStatus.Phase, current: String = old, error: String? = nil) -> CoreUpdateStatus {
             var s = CoreUpdateStatus()
-            s.current = "0.10.2"
+            s.current = current
             s.phase = phase
-            s.available = available
-            s.to = phase == .idle ? nil : "0.10.3"
-            s.progress = phase == .install ? 0.55 : phase == .done ? 1 : 0.2
+            s.available = phase == .done || current == new ? nil : new
+            s.to = phase == .idle ? nil : new
             s.error = error
             return s
         }
-        let at = Date().addingTimeInterval(-60)
-        func check(_ st: CoreUpdateCheck.Status, latest: String? = nil, reason: String? = nil) -> CoreUpdateCheck {
-            CoreUpdateCheck(at: at, status: st, current: "0.10.2", latest: latest, latestRunner: latest, reason: reason)
+        let checked = CoreUpdateCheck(at: Date().addingTimeInterval(-120), status: .upToDate, current: new)
+        let ready = CoreUpdateCheck(
+            at: Date().addingTimeInterval(-120), status: .available, current: old, latest: new, latestRunner: new)
+        /// A run `secs` into its current step, with the steps before it done in their usual times.
+        func run(_ step: CoreRun.Step, secs: Double, gap: Double? = nil, back: Bool = false) -> CoreRun {
+            let now = Date()
+            var r = CoreRun(from: old, to: new, at: now.addingTimeInterval(-60))
+            for s in CoreRun.Step.allCases where s.rawValue < step.rawValue { r.took[s] = s.expected }
+            r.step = step
+            r.stepAt = now.addingTimeInterval(-secs)
+            r.gapSince = gap.map { now.addingTimeInterval(-$0) }
+            r.backAt = back ? now.addingTimeInterval(-0.5) : nil
+            return r
         }
-        shell.open(.settings)
-        shell.settings.selected = "updates"
-        let scenes: [(String, CoreUpdateStatus, CoreUpdateCheck?, [UpdatableRunner], Set<String>)] = [
+
+        let scenes: [(String, () -> Void)] = [
+            ("1-up-to-date", { u.debugSet(check: checked, runners: runners(new), core: status(.idle, current: new)) }),
+            ("2-core-update-ready", { u.debugSet(check: ready, runners: runners(old), core: status(.idle)) }),
             (
-                "up-to-date", status(.idle), check(.upToDate),
-                runners.map { r in
-                    var r = r
-                    r.behind = false
-                    return r
-                }, []
-            ),
-            ("available", status(.idle, available: "0.10.3"), check(.available, latest: "0.10.3"), runners, []),
-            ("installing", status(.install), check(.available, latest: "0.10.3"), runners, ["r1"]),
-            (
-                "rolled-back", status(.rolledBack, error: "health_failed"), check(.available, latest: "0.10.3"),
-                runners, []
+                "3a-updating-install",
+                { u.debugSet(check: ready, runners: runners(old), core: status(.install), run: run(.install, secs: 3)) }
             ),
             (
-                "feed-unavailable", status(.idle),
-                check(.feedUnavailable, reason: "The release server did not answer."), runners, []
+                "3b-updating-restart-gap",
+                {
+                    u.debugSet(
+                        check: ready, runners: runners(old), core: status(.install),
+                        run: run(.restart, secs: 2.5, gap: 2.5))
+                }
+            ),
+            (
+                "3c-updating-reconnected",
+                {
+                    u.debugSet(
+                        check: ready, runners: runners(old), core: status(.install, current: new),
+                        run: run(.restart, secs: 5, back: true))
+                }
+            ),
+            (
+                "3d-updating-health",
+                {
+                    u.debugSet(
+                        check: ready, runners: runners(old), core: status(.health, current: new),
+                        run: run(.health, secs: 2))
+                }
+            ),
+            (
+                "3e-runners-follow",
+                {
+                    var rs = runners(old, behind: true)
+                    rs[0].version = new
+                    rs[0].behind = false
+                    u.debugSet(
+                        check: ready, runners: rs, core: status(.done, current: new), queue: ["bb", "lab"],
+                        updating: ["bb": Date().addingTimeInterval(-9)], chaining: true)
+                }
+            ),
+            (
+                "4-done",
+                {
+                    u.debugSet(
+                        check: checked, runners: runners(new), core: status(.done, current: new),
+                        finished: UpdatesFinished(version: new, runners: 3, seconds: 31))
+                }
+            ),
+            (
+                "5-rolled-back",
+                {
+                    u.debugSet(
+                        check: ready, runners: runners(old), core: status(.rolledBack, error: "health_failed"),
+                        retryAt: Date().addingTimeInterval(248))
+                }
+            ),
+            (
+                "6-runner-updating",
+                {
+                    var rs = runners(new, buildBox: old)
+                    rs[1].behind = true
+                    u.debugSet(
+                        check: checked, runners: rs, core: status(.idle, current: new),
+                        updating: ["bb": Date().addingTimeInterval(-12)])
+                }
+            ),
+            (
+                "7a-mac-downloading",
+                {
+                    u.appDownloading = "0.10.2"
+                    u.debugSet(check: checked, runners: runners(new), core: status(.idle, current: new))
+                }
+            ),
+            (
+                "7b-mac-ready",
+                {
+                    u.appDownloading = nil
+                    u.appReady = "0.10.2"
+                    u.debugSet(check: checked, runners: runners(new), core: status(.idle, current: new))
+                }
             ),
         ]
-        for (name, s, c, rs, asked) in scenes {
-            shell.coreUpdate = s
-            u.debugSet(check: c, runners: rs, asked: asked)
-            await shot(window, dir, "updates-\(name)", theme)
+        let only = env["CORE_UPDATES_SCENES"].flatMap { $0.isEmpty ? nil : $0 }?.split(separator: ",").map(String.init)
+        for (name, set) in scenes where only?.contains { name.hasPrefix($0) } ?? true {
+            set()
+            try? await Task.sleep(for: .seconds(1.8))
+            let file = "\(dir)/\(name)-\(theme)\(reduce ? "-reduce" : "")-app.png"
+            log("shot \(name) \(SnapshotCapture.png(window, to: file) ? "ok" : "FAILED")")
         }
-        // An older Core: no update routes, no prefs; the app half still works and has a download ready.
-        shell.coreUpdate = status(.idle)
-        shell.corePage.debugSet(prefs: CorePagePrefs(), supported: false)
-        u.source = nil
-        u.appReady = "0.10.3"
-        u.installApp = {}
-        await shot(window, dir, "updates-older-core-app-ready", theme)
         shell.overlay = nil
         NSApp.terminate(nil)
-    }
-
-    private static func shot(_ window: NSWindow, _ dir: String, _ name: String, _ theme: String) async {
-        try? await Task.sleep(for: .seconds(1.8))
-        let file = "\(dir)/\(name)-\(theme)-app.png"
-        log("shot \(name) \(SnapshotCapture.png(window, to: file) ? "ok" : "FAILED")")
     }
 
     private static func log(_ s: String) { FileHandle.standardError.write(Data("SNAP \(s)\n".utf8)) }
