@@ -166,7 +166,7 @@ public enum SampleWorld {
                     ])
             }
         case "runners":
-            PaneSpec(id: id, title: "Runners", sub: "3 machines", symbol: "server.rack") {
+            PaneSpec(id: id, title: "Runners", sub: "3 machines", symbol: "server.rack", minWidth: 1160) {
                 SampleList(
                     rows: [
                         ("mac-studio", "macOS 27 · 2 of 4 slots", SessionState.running),
@@ -183,7 +183,7 @@ public enum SampleWorld {
                     ])
             }
         default:
-            PaneSpec(id: id, title: "Accounts", sub: "Home Core", symbol: "creditcard", minWidth: 560) {
+            PaneSpec(id: id, title: "Accounts", sub: "Home Core", symbol: "creditcard", minWidth: 860) {
                 SampleList(
                     rows: [
                         ("Accounts", "3 providers, all ready", SessionState.running),

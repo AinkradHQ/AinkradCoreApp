@@ -218,8 +218,6 @@ public final class ShellModel {
     public var workspaceWidth: CGFloat = 0
     /// Why the newest workspace was opened (the note card says it once).
     public var spaceNote: SpaceNote?
-    /// The workspace switcher strip (⌃↑).
-    public var spacesOpen = false
     /// Set while the launcher opens something with ⌘↵: the app comes next to the current one, even from another workspace.
     public var openBeside = false
     /// The open panes of the current workspace, in reading order of the tiling tree.
@@ -235,7 +233,7 @@ public final class ShellModel {
     public var launcherOpen = false
     /// ⇧⌘A: the launcher holding the active pane's actions instead of apps.
     public var actionsOpen = false
-    /// ⇧⌘O: every open app as a card to pick from.
+    /// ⇧⌘O / ⌃↑: every workspace as a tile to pick from.
     public var overviewOpen = false
     /// Names the person gave tabs, by pane id; the tab being renamed in place.
     /// Kept on this Mac across launches (pane ids are stable: terminal-<id>, agents, runners…).
@@ -506,7 +504,10 @@ public final class ShellModel {
                 let left = panes
                 if focusedPane == id { focusedPane = left.first?.id }
                 if activePane == id { activePane = left.isEmpty ? nil : left[min(i, left.count - 1)].id }
-                if left.isEmpty { focusedPane = nil }
+                if left.isEmpty {
+                    focusedPane = nil
+                    closeEmptySpace()
+                }
             } else if let k = spaces.firstIndex(where: { $0.id == home }) {
                 allPanes.remove(at: all)
                 paneSpace[id] = nil
@@ -668,8 +669,6 @@ public final class ShellModel {
             topMenu = nil
         } else if launcherOpen {
             launcherOpen = false
-        } else if spacesOpen {
-            spacesOpen = false
         } else if actionsOpen {
             actionsOpen = false
         } else if overviewOpen {

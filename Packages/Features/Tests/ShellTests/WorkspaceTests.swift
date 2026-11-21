@@ -67,22 +67,24 @@ struct WorkspaceTests {
         #expect(shell.spaceIndex == 1)
     }
 
-    @Test func anEmptyWorkspaceClosesAndGoesHome() {
+    @Test func closingTheLastAppOfWorkspaceTwoOfThreeLandsOnANeighbour() {
         let shell = ShellModel()
+        shell.workspaceWidth = 3000
         shell.openPane(spec("a"))
-        shell.newSpace()
-        #expect(shell.spaces.count == 2 && shell.panes.isEmpty && shell.surface == .workspace)
-        shell.closeEmptySpace()
-        #expect(shell.surface == .home && shell.spaces.count == 1 && shell.panes.map(\.id) == ["a"])
-        shell.closeEmptySpace()
-        #expect(shell.surface == .home)
+        shell.openPane(spec("design", full: true))
+        shell.openPane(spec("b"))
+        shell.switchSpace(to: 1)
+        #expect(shell.spaces.count == 3 && shell.panes.map(\.id) == ["design"])
+        shell.dismissPane("design")
+        #expect(shell.spaces.count == 2 && shell.surface == .workspace)
+        #expect(shell.spaceIndex == 0 && shell.panes.map(\.id) == ["a"])
     }
 
-    @Test func closingTheLastAppLeavesAnEmptyWorkspaceThatCanStay() {
+    @Test func closingTheLastAppOfTheOnlyWorkspaceGoesHome() {
         let shell = ShellModel()
         shell.openPane(spec("a"))
-        shell.closePane("a")
-        #expect(shell.panes.isEmpty && shell.spaces.count == 1 && shell.surface == .workspace)
+        shell.dismissPane("a")
+        #expect(shell.panes.isEmpty && shell.spaces.count == 1 && shell.surface == .home)
     }
 
     @Test func leavingAnEmptyWorkspaceDropsIt() {
@@ -113,5 +115,22 @@ struct WorkspaceTests {
         #expect(shell.surface == .home)
         shell.toggleSurface()
         #expect(shell.surface == .workspace && shell.panes.map(\.id) == ["a"])
+    }
+
+    @Test func twoAppsThatFitAtTheirMinimumsSitSideBySide() {
+        let shell = ShellModel()
+        shell.workspaceWidth = 1704
+        shell.openPane(spec("accounts", minWidth: 860))
+        shell.openPane(spec("terminals", minWidth: 560))
+        #expect(shell.spaces.count == 1 && shell.panes.map(\.id) == ["accounts", "terminals"])
+    }
+
+    @Test func twoAppsThatDoNotFitAtTheirMinimumsGetAWorkspaceEach() {
+        let shell = ShellModel()
+        shell.workspaceWidth = 1704
+        shell.openPane(spec("accounts", minWidth: 860))
+        shell.openPane(spec("devices-runners", minWidth: 1160))
+        #expect(shell.spaces.count == 2 && shell.panes.map(\.id) == ["devices-runners"])
+        #expect(shell.spaceNote?.fullScreen == false)
     }
 }

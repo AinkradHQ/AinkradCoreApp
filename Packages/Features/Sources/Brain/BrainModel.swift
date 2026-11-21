@@ -424,7 +424,7 @@ public final class BrainModel {
     public func show(_ tab: BrainTab = .overview) {
         self.tab = tab
         var spec = PaneSpec(
-            id: "brain", title: "Brain", sub: viewing?.name, symbol: "brain", chip: chip, minWidth: 720
+            id: "brain", title: "Brain", sub: viewing?.name, symbol: "brain", chip: chip, minWidth: 900
         ) { BrainPane(model: self) }
         spec.tab = "Brain"
         host.shell.openPane(spec)

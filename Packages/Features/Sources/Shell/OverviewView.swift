@@ -2,116 +2,159 @@ import AppKit
 import CoreUI
 import SwiftUI
 
-/// Overview (⇧⌘O): every open app as a card, like Mission Control. Pick one with the arrows and Return, its number, or a
-/// click; it comes to the front (out of the stack if it was there). Esc closes.
+/// Overview (⌃↑, ⇧⌘O, or a click on the top-bar indicator; 06-workspaces `overview`): every workspace as a tile with its
+/// apps laid out as they are tiled, the current one lit, and a new one at the end. ← → choose, ⏎ or 1–9 open, N new, esc
+/// closes. Opening a workspace switches to it.
 struct OverviewView: View {
     @Environment(\.coreAccent) private var paneAccent
+    @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @Bindable var shell: ShellModel
     @State private var selected = 0
     @State private var shown = false
     @State private var monitor: Any?
-    @Namespace private var lens
+
+    private static let tileWidth: CGFloat = 200
+    private static let miniHeight: CGFloat = 112
 
     var body: some View {
-        let panes = shell.panes
-        VStack(alignment: .leading, spacing: Space.s4) {
-            HStack(spacing: Space.s3) {
-                IconTile("square.grid.2x2", hue: GlassInk.accent(paneAccent), size: 40, bounce: shown)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Overview").coreFont(size: MacTextSize.large + 2, weight: .bold)
-                    Text("\(panes.count) apps open · \(coreArrowKeys()) ↑ ↓ choose · ⏎ or 1–9 open · esc close")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                }
+        // ponytail: one row; past ~7 workspaces it runs wider than the screen. Wrap or scroll if that ever happens.
+        HStack(spacing: Space.s3) {
+            ForEach(shell.spaces.indices, id: \.self) { i in
+                tile(i)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: Space.s3)], spacing: Space.s3) {
-                ForEach(Array(panes.enumerated()), id: \.element.id) { i, p in
-                    card(p, index: i, on: i == selected)
-                        .onTapGesture { open(i) }
-                        .coreActivates { open(i) }
-                        .onHover { if $0 { selected = i } }
-                        .coreRise(shown, i)
-                }
-            }
+            newTile
         }
-        .foregroundStyle(GlassInk.primary)
-        .padding(Space.s6)
-        .frame(maxWidth: Space.s8 * 34)
-        .corePanel(radius: Radius.pane + Space.s1, padding: 0, part: .popups)
+        .padding(Space.s3)
+        .coreFrame(radius: Radius.pane, part: .popups)
         .shadow(color: GlassInk.shade(0.35), radius: 40, y: 16)
-        .coreScaleEffect(shown ? 1 : 0.94).opacity(shown ? 1 : 0)
+        .offset(y: shown || reduce ? 0 : -14)
+        .opacity(shown ? 1 : 0)
         .animation(Motion.out(Motion.ui), value: shown)
-        .animation(.spring(duration: 0.25), value: selected)
+        .coreAnimation(Motion.out(Motion.hover), value: selected)
+        .padding(.top, ShellMetrics.topBar + Space.s1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {
-            selected = panes.firstIndex { $0.id == shell.activePane } ?? 0
+            selected = shell.spaceIndex
             shown = true
-            listen(count: panes.count)
+            listen()
         }
         .onDisappear { if let monitor { NSEvent.removeMonitor(monitor) } }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Overview")
+        .accessibilityLabel("All workspaces")
     }
 
-    private func card(_ p: PaneSpec, index: Int, on: Bool) -> some View {
-        let state: Color? = p.chip.map {
-            $0.tone == .fail
-                ? GlassInk.red
-                : $0.tone == .warn ? GlassInk.amber : $0.tone == .queue ? GlassInk.slate : GlassInk.green
-        }
-        return VStack(alignment: .leading, spacing: Space.s3) {
-            HStack {
-                IconTile(p.symbol, hue: on ? GlassInk.accent(paneAccent) : GlassInk.slate, size: 44, bounce: on)
-                Spacer()
-                if index < 9 {
-                    Text("\(index + 1)").coreFont(size: MacTextSize.meta, weight: .bold, design: .rounded)
-                        .frame(width: 22, height: 22).background(GlassInk.lift(0.14), in: coreShape(Radius.chip))
-                }
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(shell.tabName(p)).coreFont(size: MacTextSize.headline + 1, weight: .semibold).lineLimit(1)
+    private func tile(_ i: Int) -> some View {
+        let current = i == shell.spaceIndex
+        let id = shell.spaces[i].id
+        let apps = shell.allPanes.filter { shell.paneSpace[$0.id] == id }
+        return Button {
+            open(i)
+        } label: {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                mini(i, apps: apps, current: current)
                 HStack(spacing: Space.s1) {
-                    if let state { coreShape(1.5).fill(state).frame(width: 6, height: 6) }
-                    Text([p.title, p.chip?.label].compactMap { $0 }.joined(separator: " · "))
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    Text("Workspace \(i + 1)").coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
+                    if current {
+                        Text("Now").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    }
+                    Spacer(minLength: 0)
+                    if i < 9 { CoreKeycap("⌃\(i + 1)") }
                 }
+                .padding(.horizontal, 2)
+            }
+            .padding(6)
+            .frame(width: Self.tileWidth)
+            .background(selected == i ? palette.navActive : .clear, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
+        }
+        .buttonStyle(.coreQuietPress)
+        .onHover { if $0 { selected = i } }
+        .accessibilityLabel(
+            "Workspace \(i + 1)\(current ? ", current" : ""), "
+                + (apps.isEmpty ? "empty" : apps.map { shell.tabName($0) }.joined(separator: ", "))
+        )
+        .accessibilityAddTraits(selected == i ? .isSelected : [])
+    }
+
+    /// The workspace as it is tiled: each app a small rounded rect with its icon and name.
+    private func mini(_ i: Int, apps: [PaneSpec], current: Bool) -> some View {
+        let size = CGSize(width: Self.tileWidth - 12 - Space.s2 * 2, height: Self.miniHeight - Space.s2 * 2)
+        let frames = shell.spaceTree(i).layout(minWidth: { _ in 0 }, container: size, gap: 4, minHeight: 0).frames
+        return ZStack(alignment: .topLeading) {
+            if apps.isEmpty {
+                Text("Empty").coreFont(size: MacTextSize.meta).foregroundStyle(palette.text2)
+                    .frame(width: size.width, height: size.height)
+            }
+            ForEach(apps) { p in
+                let f = frames[p.id] ?? CGRect(origin: .zero, size: size)
+                VStack(alignment: .leading, spacing: 2) {
+                    Image(systemName: p.symbol).coreFont(size: MacTextSize.meta, weight: .medium)
+                    Text(shell.tabName(p)).coreFont(size: MacTextSize.meta - 1, weight: .medium).lineLimit(1)
+                }
+                .foregroundStyle(current ? palette.text : palette.text2)
+                .padding(Space.s1)
+                .frame(width: f.width, height: f.height, alignment: .topLeading)
+                .background(
+                    current ? GlassInk.accent(paneAccent).opacity(0.28) : GlassInk.lift(0.12),
+                    in: coreShape(Radius.chip)
+                )
+                .offset(x: f.minX, y: f.minY)
             }
         }
-        .padding(Space.s4)
-        .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
-        .background {
-            if on {
-                coreShape(Radius.cardMac).fill(GlassInk.accent(paneAccent).opacity(0.22))
-                    .matchedGeometryEffect(id: "pick", in: lens)
-            } else {
-                coreShape(Radius.cardMac).fill(GlassInk.well)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
+        .padding(Space.s2)
+        .coreWell(radius: Radius.control)
+        .accessibilityHidden(true)
+    }
+
+    private var newTile: some View {
+        let i = shell.spaces.count
+        return Button {
+            shell.newSpace()
+        } label: {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                Image(systemName: "plus").font(.system(size: 20, weight: .regular)).foregroundStyle(palette.text2)
+                    .frame(maxWidth: .infinity).frame(height: Self.miniHeight)
+                    .background(GlassInk.lift(0.05), in: coreShape(Radius.control))
+                HStack(spacing: Space.s1) {
+                    Text("New workspace").coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
+                    Spacer(minLength: 0)
+                    CoreKeycap("N")
+                }
+                .padding(.horizontal, 2)
             }
+            .padding(6)
+            .frame(width: Self.tileWidth)
+            .background(selected == i ? palette.navActive : .clear, in: coreShape(Radius.cardMac))
+            .contentShape(coreShape(Radius.cardMac))
         }
-        .coreScaleEffect(on ? 1.03 : 1)
-        .contentShape(coreShape(Radius.cardMac))
-        .accessibilityLabel(shell.tabName(p))
-        .accessibilityAddTraits(on ? .isSelected : [])
+        .buttonStyle(.coreQuietPress)
+        .onHover { if $0 { selected = i } }
+        .accessibilityLabel("New workspace")
+        .accessibilityAddTraits(selected == i ? .isSelected : [])
     }
 
     private func open(_ i: Int) {
-        guard shell.panes.indices.contains(i) else { return }
-        let id = shell.panes[i].id
+        guard shell.spaces.indices.contains(i) else { return shell.newSpace() }
         shell.overviewOpen = false
-        shell.surface = .workspace
-        shell.activePane = id
-        if shell.focusedPane != nil { shell.focusedPane = id }
+        shell.switchSpace(to: i)
     }
 
-    private func listen(count: Int) {
+    private func listen() {
         guard monitor == nil else { return }
-        let cols = 4
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            guard e.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return e }
+            let last = shell.spaces.count
             switch e.keyCode {
             case 123: selected = max(selected - 1, 0)
-            case 124: selected = min(selected + 1, count - 1)
-            case 125: selected = min(selected + cols, count - 1)
-            case 126: selected = max(selected - cols, 0)
+            case 124: selected = min(selected + 1, last)
             case 36, 76: open(selected)
             default:
-                if let c = e.charactersIgnoringModifiers, let n = Int(c), n >= 1, n <= 9 {
+                let c = e.charactersIgnoringModifiers?.lowercased()
+                if c == "n" {
+                    shell.newSpace()
+                } else if let c, let n = Int(c), n >= 1, n <= min(9, last) {
                     open(n - 1)
                 } else {
                     return e

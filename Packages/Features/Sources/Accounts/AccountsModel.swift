@@ -588,7 +588,7 @@ public final class AccountsModel {
         let shell = host.shell
         var spec = PaneSpec(
             id: "accounts", title: "Accounts", sub: "Home Core", symbol: "creditcard",
-            chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 720
+            chip: PaneChip("Connected", tone: .run, symbol: "checkmark.circle"), minWidth: 860
         ) { AccountsView(model: self) }
         spec.tab = "Accounts"
         spec.onNew = { [weak self] in self?.newItem() }

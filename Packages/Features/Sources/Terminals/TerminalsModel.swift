@@ -406,8 +406,9 @@ public final class TerminalsModel {
             Task { await reload() }
             return
         }
+        // 1160: the runner rows clip below it, as in Devices & Runners.
         shell.openPane(
-            PaneSpec(id: "runners", title: "Hardware", sub: "Home Core", symbol: "server.rack", minWidth: 480) {
+            PaneSpec(id: "runners", title: "Hardware", sub: "Home Core", symbol: "server.rack", minWidth: 1160) {
                 HardwareView(model: self)
             })
         Task { await reload() }
