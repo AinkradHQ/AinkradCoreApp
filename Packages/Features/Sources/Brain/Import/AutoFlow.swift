@@ -17,6 +17,8 @@ public final class AutoFlow {
     }
 
     public private(set) var sort: Sort = .waiting
+    /// The Core recorded this sort as its own (GET /auto-imports lists the run): only then can it be undone.
+    public private(set) var canUndo = false
     /// While sorting: what the Core does now, in words, and how far the local model has read (nil when it is not reading).
     public private(set) var sortPhase = "Getting ready to sort"
     public private(set) var reading: SemanticProgress?
@@ -38,6 +40,7 @@ public final class AutoFlow {
     func watchSort(run: String) {
         task?.cancel()
         sort = .waiting
+        canUndo = false
         reading = nil
         readingLeft = nil
         pace = nil
@@ -46,6 +49,7 @@ public final class AutoFlow {
             while !Task.isCancelled, let self {
                 if let all = try? await routes.autoImports(), let a = all.first(where: { $0.run == run }) {
                     sort = .sorted(rooms: a.rooms)
+                    canUndo = true
                     return
                 }
                 if let v = try? await routes.run(run), v.state == "committed" {
