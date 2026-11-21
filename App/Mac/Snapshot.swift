@@ -192,6 +192,53 @@ enum SnapshotRunner {
         for p in shell.panes { shell.dismissPane(p.id) }
         shell.toast = nil
         await shot("15c-last-app-closed")
+        // Placement and the tab strip of every workspace (2026-11-21): apps join while they fit, the next one gets a
+        // workspace, and the strip shows the other workspaces as icon groups.
+        shell.closeAllPanes()
+        pane("agents")
+        pane("terminals")
+        await shot("16a-two-apps-one-workspace")
+        pane("brain")
+        await shot("16b-third-app-fits")
+        pane("citadel")
+        await shot("16c-fourth-app-new-workspace")
+        shell.spaceNote = nil
+        pane("runners")
+        await shot("16d-strip-three-workspaces")
+        shell.goTo("terminals")
+        await shot("16e-strip-jump-back")
+        for id in ["core", "lore", "leyline", "projects"] { pane(id) }
+        shell.spaceNote = nil
+        shell.goTo("agents")
+        for (id, name) in [
+            ("agents", "Checkout plan review"), ("terminals", "acme-shop logs"), ("brain", "Weekly notes"),
+        ] {
+            shell.tabNames[id] = name
+        }
+        await shot("16f-strip-many-apps")
+        // More than the strip has room for: the names fold, all but the active one first, then that one too.
+        shell.openPane(PaneSpec(id: "notes", title: "Notes", sub: "Weekly review", symbol: "note.text") { Color.clear })
+        shell.tabNames["notes"] = "Weekly review notes"
+        let wide = [
+            "paintbrush.pointed", "text.book.closed", "square.grid.2x2", "point.3.connected.trianglepath.dotted",
+        ]
+        for (i, symbol) in (wide + wide).enumerated() {
+            var s = PaneSpec(id: "full-\(i)", title: "App \(i)", symbol: symbol) { Color.clear }
+            s.fullScreenOnly = true
+            shell.openPane(s)
+        }
+        shell.spaceNote = nil
+        shell.goTo("agents")
+        await shot("16g-strip-names-fold")
+        for (i, symbol) in (wide + wide).enumerated() {
+            var s = PaneSpec(id: "more-\(i)", title: "More \(i)", symbol: symbol) { Color.clear }
+            s.fullScreenOnly = true
+            shell.openPane(s)
+        }
+        shell.spaceNote = nil
+        shell.goTo("agents")
+        await shot("16h-strip-icons-only")
+        shell.tabNames = [:]
         shell.closeAllPanes()
         shell.show(.home)
         shell.open(.settings)

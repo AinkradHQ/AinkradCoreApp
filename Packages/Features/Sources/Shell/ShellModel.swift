@@ -235,6 +235,8 @@ public final class ShellModel {
     var paneSpace: [String: UUID] = [:]
     /// The width the workspace has for panes; set by the workspace view. Zero means not measured yet, and everything fits.
     public var workspaceWidth: CGFloat = 0
+    /// Its height, for stacking apps; zero means not measured yet, and apps only go side by side.
+    public var workspaceHeight: CGFloat = 0
     /// Why the newest workspace was opened (the note card says it once).
     public var spaceNote: SpaceNote?
     /// Set while the launcher opens something with ⌘↵: the app comes next to the current one, even from another workspace.
@@ -489,11 +491,8 @@ public final class ShellModel {
                 if openBeside && home != currentSpace { bringHere(spec.id) } else { enterSpace(home) }
                 if focusedPane != nil { focusedPane = spec.id }
             } else {
-                if needsNewSpace(for: spec) { openSpace(for: spec) }
                 allPanes.append(spec)
-                paneSpace[spec.id] = currentSpace
-                tree.open(spec.id)
-                focusedPane = nil
+                place(spec)
             }
             activePane = spec.id
             surface = .workspace
@@ -613,7 +612,8 @@ public final class ShellModel {
         tree.resize(seam, gap: gap, position: position)
     }
 
-    private func syncOrder() {
+    /// The current workspace's panes follow the tiling's reading order (the tabs read left to right, top to bottom).
+    func syncOrder() {
         let mine = tree.leaves.compactMap { id in allPanes.first { $0.id == id } }
         allPanes = allPanes.filter { paneSpace[$0.id] != currentSpace } + mine
     }

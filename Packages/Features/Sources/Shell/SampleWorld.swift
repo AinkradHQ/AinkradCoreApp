@@ -165,6 +165,14 @@ public enum SampleWorld {
                         ("zsh", "~/acme-shop · mac-studio", .ended),
                     ])
             }
+        case "brain":
+            PaneSpec(id: id, title: "Brain", sub: "Home Core", symbol: "brain") {
+                SampleList(
+                    rows: [
+                        ("Weekly notes", "12 new notes", SessionState.running),
+                        ("acme-shop", "3 rules learned", .ended),
+                    ])
+            }
         case "runners":
             PaneSpec(id: id, title: "Machines", sub: "3 machines", symbol: "desktopcomputer", minWidth: 880) {
                 SampleList(

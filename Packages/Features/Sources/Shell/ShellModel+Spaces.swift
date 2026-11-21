@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// One workspace: its own set of side-by-side apps (D-14). Apps are never stacked; one that does not fit opens a new workspace.
+/// One workspace: its own tiling of apps. A new app joins while every pane keeps its minimum (`place`); otherwise it opens a new one.
 public struct Workspace: Identifiable {
     public let id: UUID
     var tree = TileTree()
@@ -37,18 +37,34 @@ extension ShellModel {
         return allPanes.filter { paneSpace[$0.id] == id }.count
     }
 
-    /// Side by side at their minimum widths, with the gaps, inside the width the workspace has.
-    func fits(_ spec: PaneSpec) -> Bool {
-        guard workspaceWidth > 0 else { return true }
-        let all = panes + [spec]
-        let need = all.map(\.minWidth).reduce(0, +) + ShellMetrics.paneGap * CGFloat(all.count - 1)
-        return need <= workspaceWidth
-    }
-
-    /// A full-screen app gets a workspace alone and nothing joins it; any other app joins the current one while it fits.
-    func needsNewSpace(for spec: PaneSpec) -> Bool {
-        guard !panes.isEmpty else { return false }
-        return spec.fullScreenOnly || panes.contains { $0.fullScreenOnly } || !fits(spec)
+    /// The one placement rule every way of opening an app goes through (launcher, top bar, keys, links, notifications, ⇧⌘T,
+    /// ⌘↵): `spec` joins the current workspace when the tiling can give every pane, old and new, its minimum width and height
+    /// (side by side first, then stacked under the roomiest pane); only when it cannot, or a full-screen app is involved, it
+    /// opens a workspace of its own, which becomes the current one. `spec` must not be placed yet.
+    func place(_ spec: PaneSpec) {
+        if !panes.isEmpty {
+            let mins = Dictionary((panes + [spec]).map { ($0.id, CGSize(width: $0.minWidth, height: $0.minHeight)) }) {
+                a, _ in a
+            }
+            let area = CGSize(width: workspaceWidth, height: workspaceHeight)
+            let joined =
+                spec.fullScreenOnly || panes.contains { $0.fullScreenOnly }
+                ? nil
+                : tree.placing(spec.id, in: area, gap: ShellMetrics.paneGap) {
+                    mins[$0] ?? CGSize(width: ShellMetrics.paneMinWidth, height: ShellMetrics.paneMinHeight)
+                }
+            if let joined {
+                tree = joined
+            } else {
+                openSpace(for: spec)
+                tree.open(spec.id)
+            }
+        } else {
+            tree.open(spec.id)
+        }
+        paneSpace[spec.id] = currentSpace
+        focusedPane = nil
+        syncOrder()
     }
 
     /// Makes a workspace for `spec` and goes there. No animation of its own: callers already animate.
@@ -71,10 +87,23 @@ extension ShellModel {
         if spaces[k].focused == id { spaces[k].focused = nil }
         if spaces[k].tree.leaves.isEmpty { spaces.remove(at: k) }
         paneSpace[id] = nil
-        if needsNewSpace(for: spec) { openSpace(for: spec) }
-        paneSpace[id] = currentSpace
-        tree.open(id)
-        focusedPane = nil
+        place(spec)
+    }
+
+    /// A workspace's apps in the reading order of its tiling, for its group in the tab strip.
+    func panes(inSpace index: Int) -> [PaneSpec] {
+        guard spaces.indices.contains(index) else { return [] }
+        return spaceTree(index).leaves.compactMap { id in allPanes.first { $0.id == id } }
+    }
+
+    /// A click on an app in another workspace's group: that workspace comes up with the app picked.
+    public func goTo(_ id: String) {
+        guard let home = paneSpace[id], let i = spaces.firstIndex(where: { $0.id == home }) else { return }
+        switchSpace(to: i)
+        animate {
+            activePane = id
+            if focusedPane != nil { focusedPane = id }
+        }
     }
 
     /// Adds an empty workspace after the current one.
