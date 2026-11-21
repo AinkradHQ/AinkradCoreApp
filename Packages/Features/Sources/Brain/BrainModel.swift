@@ -36,9 +36,10 @@ public final class BrainModel {
             importer?.review.keepsInCommit = keepsInCommit
         }
     }
-    /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows it first; Explore is the console.
+    /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows them in the sidebar.
     public let calm = BrainCalmModel()
-    public private(set) var exploring = false
+    /// Places shows one place's detail (true) or the grid of places (false).
+    public var placeOpen = false
     public var calmAvailable: Bool {
         #if DEBUG
         if demoCalm { return true }
@@ -50,10 +51,15 @@ public final class BrainModel {
     var demoCalm = false
     var demoImport: BrainGlance.Importing?
     #endif
-    public func explore(_ on: Bool, tab: BrainTab? = nil) {
-        exploring = on
-        if let tab { self.tab = tab }
-        if !on { Task { await calm.reload() } }
+    /// The old "Explore" switch, kept for the Import wizard's "Open the Brain": on opens the search, off goes Home.
+    /// ponytail: drop once Import/ calls `go(_:)` (another lane owns it).
+    public func explore(_ on: Bool) { go(on ? .records : .overview) }
+
+    /// Moves to a sidebar section; Home and the four areas load what they show.
+    public func go(_ t: BrainTab) {
+        tab = t
+        guard calmAvailable, let p = t.calmPage, p != .places else { return }
+        Task { await calm.open(p) }
     }
     /// The top-bar Brain icon's feed (E9-2).
     public let status = BrainStatusModel()
@@ -164,17 +170,24 @@ public final class BrainModel {
     public var isSample: Bool { service?.isSample ?? false }
     /// A real Core makes rooms by an import, not by a button.
     public var canMakeRooms: Bool { isSample }
-    /// The tab bar: only where the Brain has rooms to look at.
+    /// The sidebar: only where the Brain has rooms to look at.
     public var tabsVisible: Bool { load != .unavailable && setup == .ready }
-    /// A real Core serves the Inbox, rooms and sources; Overview, Activity and Checks are on the sample only for now.
+    /// The sections this Core has, in sidebar order. Home and the four areas need the calm Brain (API minor 95); the
+    /// sample's Home is the console overview. Checks are on the sample only for now. `records` is the search (⌘E).
     public var visibleTabs: [BrainTab] {
-        if isSample { return BrainTab.allCases }
-        var tabs: [BrainTab] = service?.servesCandidates == true ? [.inbox, .rooms, .sources] : [.rooms, .sources]
-        if calmAvailable { tabs.insert(contentsOf: [.records, .evidence], at: 0) }
-        if service?.servesChanges == true { tabs.append(.activity) }
+        var tabs: [BrainTab] = calmAvailable || isSample ? [.overview] : []
+        if calmAvailable { tabs += [.me, .rules, .knowledge, .timeline] }
+        tabs.append(.rooms)
+        if isSample || service?.servesCandidates == true { tabs.append(.inbox) }
+        tabs.append(.sources)
+        if isSample || service?.servesChanges == true { tabs.append(.activity) }
+        if isSample { tabs.append(.checks) }
+        if calmAvailable { tabs.append(.records) }
         return tabs
     }
-    /// The tab on screen: the chosen one, or the first this Core has.
+    /// The rows of the sidebar: every section but the search, which has its field.
+    public var sidebarTabs: [BrainTab] { visibleTabs.filter { $0 != .records } }
+    /// The section on screen: the chosen one, or the first this Core has.
     public var currentTab: BrainTab { visibleTabs.contains(tab) ? tab : visibleTabs[0] }
 
     /// The time under a room's count: when this Mac last synced, else what the room itself says.
@@ -306,11 +319,12 @@ public final class BrainModel {
         host.shell.updatePane("brain", sub: .some(viewing?.name))
     }
 
-    /// Opens one room's view in the Rooms tab (a mounted room only).
+    /// Opens one room's view in Places (a mounted room only).
     public func inspect(_ id: String) async {
         BrainRoutes.log.notice("inspect \(id, privacy: .public)")
         clearRoomView(overview: false)
         inspectingID = id
+        placeOpen = true
         guard let service, room(id)?.lock == nil else { return }
         do {
             let d = try await service.room(id)
@@ -424,16 +438,16 @@ public final class BrainModel {
 
     // MARK: shell
 
-    /// Opens the pane on a tab.
-    /// Opens the Brain on an area the top bar counted (`me`, `rules`, `knowledge`, `timeline`, `places`): the calm Brain's page
-    /// when it is shown, else the console's overview.
+    /// Opens the Brain on the section the top bar counted (`me`, `rules`, `knowledge`, `timeline`, `places`, …).
     func open(area: String) {
-        show(BrainAreaLink.tab(for: area))
-        if calmAvailable, !exploring, let page = BrainCalmModel.Page(rawValue: area) { calm.page = page }
+        let t = BrainAreaLink.tab(for: area)
+        if t == .rooms { placeOpen = false }
+        show(t)
     }
 
+    /// Opens the pane on a sidebar section.
     public func show(_ tab: BrainTab = .overview) {
-        self.tab = tab
+        go(tab)
         var spec = PaneSpec(
             id: "brain", title: "Brain", sub: viewing?.name, symbol: "brain", chip: chip, minWidth: 900
         ) { BrainPane(model: self) }

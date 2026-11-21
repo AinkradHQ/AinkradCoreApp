@@ -27,7 +27,7 @@ struct SampleM3: Sendable {
             room("core", "AinkradCore", .product, .approvedCloud, 1412, [cc, .init("Codex", 301), .init("Docs", 269)]),
             room(
                 "app", "AinkradCoreApp", .product, .approvedCloud, 688, [.init("Claude Code", 512), .init("Docs", 176)]),
-            room("acme-shop", "acme-shop", .product, .local, 204, [.init("Claude Code", 204)]),
+            room("acme-shop", "Acme Shop", .product, .local, 204, [.init("Claude Code", 204)]),
             room("personal", "Personal notes", .personal, .local, 1032, [.init("Vault", 1032)]),
         ]
     }
@@ -121,12 +121,12 @@ struct SampleM3: Sendable {
                         "…full screen only, no resize, no exit…")
                 ]),
             cand(
-                "c6", "acme-shop", "acme-shop", .fact,
+                "c6", "acme-shop", "Acme Shop", .fact,
                 "Tenant dashboards read from the API, never from the database.",
                 "Claude Code", "2 Nov",
                 [
                     src(
-                        "s7", "Claude Code session", "acme-shop · 2 Nov, 15:30",
+                        "s7", "Claude Code session", "Acme Shop · 2 Nov, 15:30",
                         "…the dashboard only talks to the API…")
                 ]),
             cand(
@@ -170,7 +170,7 @@ struct SampleM3: Sendable {
             s.m3 && s.noLocalModel
             ? [
                 QueuedRoom(room: "personal", name: "Personal notes", items: 14),
-                QueuedRoom(room: "acme-shop", name: "acme-shop", items: 9),
+                QueuedRoom(room: "acme-shop", name: "Acme Shop", items: 9),
             ]
             : []
         policies =

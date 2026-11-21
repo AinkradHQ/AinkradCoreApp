@@ -2,65 +2,9 @@ import CoreUI
 import Shell
 import SwiftUI
 
-/// The calm Brain (mockup 15): a sidebar of the areas and, beside it, the home map or one area. Explore is the full console.
-struct BrainCalmView: View {
-    let brain: BrainModel
-    var calm: BrainCalmModel { brain.calm }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            CalmSide(brain: brain)
-            VStack(alignment: .leading, spacing: Space.s4) {
-                if let n = calm.notice {
-                    CoreNotice(symbol: "exclamationmark.triangle", title: n, tone: .fail) { EmptyView() }
-                }
-                Group {
-                    switch calm.page {
-                    case .home: CalmHome(brain: brain)
-                    case .places: CalmPlaces(brain: brain)
-                    default: CalmArea(brain: brain)
-                    }
-                }
-                .id(calm.page)
-                .transition(.opacity)
-            }
-            .padding(.horizontal, Space.s6).padding(.vertical, Space.s3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .animation(Motion.out(Motion.ui), value: calm.page)
-        .task { await calm.reload() }
-        .accessibilityIdentifier("brain-calm")
-    }
-}
-
-private struct CalmSide: View {
-    let brain: BrainModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(BrainCalmModel.Page.allCases, id: \.self) { p in
-                CoreRow(p.title, symbol: p.symbol, selected: brain.calm.page == p) {
-                    Task { await brain.calm.open(p) }
-                }
-                .accessibilityIdentifier("brain-area-\(p.rawValue)")
-            }
-            Spacer(minLength: Space.s4)
-            Button {
-                brain.explore(true)
-            } label: {
-                Label("Explore everything", systemImage: "magnifyingglass")
-            }
-            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            .accessibilityIdentifier("brain-explore")
-        }
-        .padding(Space.s3)
-        .frame(width: Space.s8 * 7)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
 /// The home map: the five areas around the Brain, live counts, and on the right what it is doing and what it learned.
 /// A fresh Brain (nothing in any area) leads with Import.
-private struct CalmHome: View {
+struct CalmHome: View {
     let brain: BrainModel
     private var calm: BrainCalmModel { brain.calm }
 
@@ -110,15 +54,17 @@ private struct CalmHome: View {
                 Label(brain.importGlance == nil ? "Import…" : "Open import", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(CoreButtonStyle(.secondary))
-            .keyboardShortcut("i", modifiers: .command).environment(\.coreKeycap, "⌘I")
+            .environment(\.coreKeycap, "⌘I")
             .accessibilityIdentifier("brain-home-import")
+            // ⌘I and ⌘E are the whole app's keys (BrainCalmView); the buttons only show them.
             Button {
-                brain.explore(true)
+                brain.go(.records)
+                calm.askSearch()
             } label: {
                 Label("Explore", systemImage: "magnifyingglass")
             }
             .buttonStyle(CoreButtonStyle(.secondary))
-            .keyboardShortcut("e", modifiers: .command).environment(\.coreKeycap, "⌘E")
+            .environment(\.coreKeycap, "⌘E")
             .accessibilityIdentifier("brain-home-explore")
         }
     }
@@ -139,7 +85,7 @@ private struct CalmHome: View {
         RadialMap(
             nodes: nodes, working: brain.topChip?.state == "working",
             label: brain.status.chip?.state == "needs_you" ? "Paused" : "Learning 24/7"
-        ) { p in Task { await calm.open(p) } }
+        ) { p in brain.go(p.tab) }
     }
 }
 
@@ -226,7 +172,7 @@ private struct DoingNow: View {
 }
 
 /// "What I learned today": what Brain saved by itself and the imports it accepted, each with Undo. The newest few; the rest
-/// are in Explore.
+/// are in the search.
 private struct Learned: View {
     let brain: BrainModel
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -255,7 +201,7 @@ private struct Learned: View {
                 }
             }
             if more > 0 {
-                Button("See all \(calm.learned.count) in Explore") { brain.explore(true, tab: .records) }
+                Button("See all \(calm.learned.count)") { brain.go(.records) }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small))
                     .accessibilityIdentifier("brain-learned-more")
             }
