@@ -595,6 +595,28 @@ extension ImportModel {
         auto.watchLearning(run: run) { [weak self] in await self?.finishAuto() }
     }
 
+    /// After a restart or a reconnect: picks up the newest import the Core is still busy with. A run in review opens at
+    /// Sort; a committed run whose places are not all learned opens at Learn, so Doing now and ⌘I show its progress.
+    /// False when there is none, or the Core has no `GET /imports` (before API minor 96): nothing changes then.
+    func restoreUnderWay() async -> Bool {
+        guard autoSort, run == nil, step == .sources, let runs = try? await routes.imports() else { return false }
+        for r in runs where ["review", "committed"].contains(r.state) {
+            if let saved = resume?.load(), saved.run == r.run { resumeState = saved }
+            if r.state == "review" {
+                guard await reviewExisting(r.run) else { return false }
+                await beginSort()
+                return true
+            }
+            // Only the newest committed run: an older one finished learning before it.
+            guard let l = try? await routes.learning(run: r.run), !l.done, !l.places.isEmpty else { return false }
+            run = r.run
+            step = .importing
+            auto.watchLearning(run: r.run) { [weak self] in await self?.finishAuto() }
+            return true
+        }
+        return false
+    }
+
     private func finishAuto() async {
         resume?.clear()
         if let since = started, let service {
