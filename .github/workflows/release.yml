@@ -64,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           base=https://ainkrad.io/releases
-          put() { curl -fsS --proto '=https' --tlsv1.3 --retry 3 -X PUT -H "Authorization: Bearer $RELEASE_UPLOAD_TOKEN_APP" --data-binary "@$2" -o /dev/null "$base/upload/app/$1"; echo "uploaded app/$1"; }
+          put() { curl -fsS --proto '=https' --tlsv1.2 --retry 3 -X PUT -H "Authorization: Bearer $RELEASE_UPLOAD_TOKEN_APP" --data-binary "@$2" -o /dev/null "$base/upload/app/$1"; echo "uploaded app/$1"; }
           for f in build/release/*.dmg; do put "$(basename "$f")" "$f"; done
           put latest.json.sig build/release/latest.json.sig   # the signature first: the Worker verifies latest.json against it
           put latest.json build/release/latest.json
