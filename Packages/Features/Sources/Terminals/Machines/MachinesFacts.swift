@@ -15,10 +15,11 @@ enum MachineStatus: String, Equatable, Sendable {
         switch RunnerStatus(r) {
         case .off: self = .offline
         case .degraded: self = .notAnswering
-        case .busy: self = .working
-        case .ok:
+        case .busy, .ok:
+            // Working means Ainkrad's work on it (Ahmed, 2026-11-22: "This Mac" read Working at 100% busy while no
+            // session ran; the load was other apps). A high load with nothing of ours running stays Idle.
             let used = (r.slots?.agentsUsed ?? 0) + (r.slots?.terminalsUsed ?? 0)
-            self = used > 0 || (r.slots == nil && r.load > 0) ? .working : .idle
+            self = used > 0 || (r.slots == nil && r.load > 0 && RunnerStatus(r) == .ok) ? .working : .idle
         }
     }
 

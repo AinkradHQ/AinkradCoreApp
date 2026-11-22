@@ -57,7 +57,7 @@ extension TerminalsModel {
             }
             if let termWords { return termWords + " open" }
             if let i = runningInstall(r.id) { return "Installing \(RunnerTools.name(i.tool)) · \(i.percent)%" }
-            if RunnerStatus(r) == .busy { return "Very busy: new work waits or goes elsewhere" }
+            if RunnerStatus(r) == .busy { return "Busy with other apps · new AI work goes elsewhere" }
             return r.builtIn ? "Inside your Core · ready for work" : "Ready for work"
         }
     }
