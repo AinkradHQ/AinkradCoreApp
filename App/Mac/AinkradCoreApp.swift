@@ -25,6 +25,7 @@ struct AinkradCoreApp: App {
         // One window, forced full screen (plan D9). `Window` is single-instance and, being first, is the one opened at launch.
         Window("Ainkrad", id: "main") {
             RootView(app: app)
+                .fillsWindow()
                 .background(FullScreenEnforcer())
                 .onOpenURL { app.open(url: $0) }
                 #if DEBUG
