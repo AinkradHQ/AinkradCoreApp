@@ -37,7 +37,7 @@ struct OrderSeat: Equatable, Identifiable, Sendable {
     var provider: String
     var poolID: Int64?
     var isNew = false
-    var isPlan: Bool { provider == "claude-sub" }
+    var isPlan: Bool { provider.hasSuffix("-sub") }
     /// `tech`, or `creative + other` when accounts share the seat.
     var title: String { labels.joined(separator: " + ") }
 }

@@ -23,8 +23,12 @@ struct ModelsTab: View {
                 } else if !listed.isEmpty {
                     HStack(spacing: Space.s3) {
                         head("Model").frame(maxWidth: .infinity, alignment: .leading)
-                        head("Input, per million words").frame(width: Space.s8 * 5, alignment: .leading)
-                        head("Output, per million words").frame(width: Space.s8 * 5, alignment: .leading)
+                        if a.isPlan {
+                            head("Price").frame(width: Space.s8 * 10 + Space.s3, alignment: .leading)
+                        } else {
+                            head("Input, per million words").frame(width: Space.s8 * 5, alignment: .leading)
+                            head("Output, per million words").frame(width: Space.s8 * 5, alignment: .leading)
+                        }
                         Color.clear.frame(width: ModelAllowRow.switchWidth, height: 1)
                     }
                     ForEach(listed) { r in
@@ -32,8 +36,12 @@ struct ModelsTab: View {
                             .id("\(a.id)-\(r.model)-\(r.inputMicro ?? -1)-\(r.outputMicro ?? -1)")
                     }
                 } else if rows.isEmpty {
-                    Text("No prices for this provider yet. Calls to it count as tokens, not as spend.")
-                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    Text(
+                        a.isPlan
+                            ? "Its models show here once the Core lists them or a session runs one."
+                            : "No prices for this provider yet. Calls to it count as tokens, not as spend."
+                    )
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 } else {
                     HStack(spacing: Space.s3) {
                         head("Model").frame(maxWidth: .infinity, alignment: .leading)
@@ -48,8 +56,10 @@ struct ModelsTab: View {
                     )
                     .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("models-unenforced")
                 }
-                Text("Prices are filled in for you. Change them only if your plan differs.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                if !a.isPlan {
+                    Text("Prices are filled in for you. Change them only if your plan differs.")
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                }
             } else {
                 Text("Add an account first.").foregroundStyle(GlassInk.secondary)
             }
@@ -93,8 +103,14 @@ private struct ModelAllowRow: View {
                 Text(row.model).coreFont(size: MacTextSize.body, design: .monospaced).lineLimit(1)
                     .foregroundStyle(row.allowed ? GlassInk.primary : GlassInk.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                field($input).frame(width: Space.s8 * 5)
-                field($output).frame(width: Space.s8 * 5)
+                if account.isPlan {
+                    // A plan bills nothing per token (Ahmed, 2026-11-22: plans had no models at all).
+                    Text("Included in your plan").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        .frame(width: Space.s8 * 10 + Space.s3, alignment: .leading)
+                } else {
+                    field($input).frame(width: Space.s8 * 5)
+                    field($output).frame(width: Space.s8 * 5)
+                }
                 CoreSwitch(
                     "",
                     isOn: Binding(

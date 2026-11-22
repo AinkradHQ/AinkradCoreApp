@@ -67,7 +67,7 @@ struct AccountItem: Identifiable, Equatable, Sendable {
     var meter: AccountMeterItem?
     var phase: AccountPhase { AccountPhase(state) }
     /// A Claude plan: a signed-in token the runner is lent, never an API key the gateway can test.
-    var isPlan: Bool { provider == "claude-sub" }
+    var isPlan: Bool { provider.hasSuffix("-sub") }
 
     static func == (l: Self, r: Self) -> Bool {
         l.id == r.id && l.provider == r.provider && l.label == r.label && l.displayName == r.displayName
