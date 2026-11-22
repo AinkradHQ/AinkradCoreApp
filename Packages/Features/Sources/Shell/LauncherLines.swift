@@ -118,11 +118,16 @@ enum LauncherLines {
         return out
     }
 
-    /// A query: hits grouped by section, the section with the best hit first.
+    /// A query: hits grouped by section. Apps always lead (Ahmed, 2026-11-22: "prioritize the apps first"), then the
+    /// section with the best hit; apps are never cut off by the result limit.
     @MainActor static func results(_ rows: [LauncherRow]) -> [LauncherLine] {
-        let by = Dictionary(grouping: rows.prefix(maxResults), by: { LauncherSection.of($0.entry) })
+        let apps = rows.filter { LauncherSection.of($0.entry) == .apps }
+        let kept = apps + rows.filter { LauncherSection.of($0.entry) != .apps }.prefix(max(0, maxResults - apps.count))
+        let by = Dictionary(grouping: kept, by: { LauncherSection.of($0.entry) })
         let best = by.mapValues { $0.map(\.score).max() ?? 0 }
-        return by.keys.sorted { (best[$0] ?? 0, -$0.rawValue) > (best[$1] ?? 0, -$1.rawValue) }.flatMap { s in
+        return by.keys.sorted {
+            ($0 == .apps ? 1 : 0, best[$0] ?? 0, -$0.rawValue) > ($1 == .apps ? 1 : 0, best[$1] ?? 0, -$1.rawValue)
+        }.flatMap { s in
             (by[s] ?? []).sorted { $0.score > $1.score }.map { LauncherLine.item($0, heading: s.title, nested: false) }
         }
     }
