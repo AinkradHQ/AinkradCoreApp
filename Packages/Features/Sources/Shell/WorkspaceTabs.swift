@@ -90,25 +90,37 @@ private struct SpaceAppIcon: View {
     let spec: PaneSpec
     let space: Int
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         Button {
             shell.goTo(spec.id)
         } label: {
-            Image(systemName: spec.symbol).coreFont(size: MacTextSize.body, weight: .medium)
-                .foregroundStyle(hovering ? GlassInk.primary : GlassInk.secondary)
-                .frame(width: MacSize.controlMd, height: MacSize.controlMd)
-                .overlay(alignment: .topTrailing) {
-                    if let c = PaneTab.stateColor(spec) {
-                        coreShape(1.5).fill(c).frame(width: 6, height: 6).padding(Space.s1)
-                    }
+            // Hover opens the icon into a tab with its name (Ahmed, 2026-11-22); leaving folds it back.
+            HStack(spacing: Space.s1) {
+                Image(systemName: spec.symbol).coreFont(size: MacTextSize.body, weight: .medium)
+                    .frame(width: MacSize.controlMd - Space.s2, height: MacSize.controlMd)
+                if hovering {
+                    Text(shell.tabName(spec)).coreFont(size: MacTextSize.body).lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.trailing, Space.s2)
+                        .transition(.opacity.combined(with: .move(edge: .leading)))
                 }
-                .background(hovering ? GlassInk.lift(0.1) : .clear, in: coreShape(Radius.control))
-                .contentShape(coreShape(Radius.control))
+            }
+            .foregroundStyle(hovering ? GlassInk.primary : GlassInk.secondary)
+            .padding(.leading, Space.s1)
+            .frame(minWidth: MacSize.controlMd, minHeight: MacSize.controlMd)
+            .overlay(alignment: .topTrailing) {
+                if let c = PaneTab.stateColor(spec) {
+                    coreShape(1.5).fill(c).frame(width: 6, height: 6).padding(Space.s1)
+                }
+            }
+            .background(hovering ? GlassInk.lift(0.1) : .clear, in: coreShape(Radius.control))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: hovering)
         .help("\(shell.tabName(spec)) · Workspace \(space + 1)\(spec.chip.map { " · \($0.label)" } ?? "")")
         .accessibilityLabel(spec.chip.map { "\(shell.tabName(spec)), \($0.label)" } ?? shell.tabName(spec))
         .accessibilityHint("Goes to workspace \(space + 1)")
@@ -155,7 +167,7 @@ struct PaneTab: View {
                         draft = shell.tabName(spec)
                         editing = true
                     }
-            } else if !compact {
+            } else if !compact || hovering {
                 Text(shell.tabName(spec)).coreFont(size: MacTextSize.body, weight: on ? .semibold : .regular)
                     .foregroundStyle(on ? GlassInk.primary : GlassInk.secondary).lineLimit(1)
                     .frame(maxWidth: Space.s8 * 5).fixedSize(horizontal: true, vertical: false)
