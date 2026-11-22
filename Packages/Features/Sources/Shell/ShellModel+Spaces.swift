@@ -10,17 +10,7 @@ public struct Workspace: Identifiable {
     init(id: UUID = UUID()) { self.id = id }
 }
 
-/// The one-time card that says why an app opened in a workspace of its own.
-public struct SpaceNote: Equatable, Sendable {
-    public let app: String
-    public let fullScreen: Bool
-    /// The 1-based number of the workspace to go back to with ⌃←.
-    public let backTo: Int
-}
-
 extension ShellModel {
-    static let spaceNoteKey = "ainkrad.core.workspace.noteHidden"
-
     /// 0-based place of the workspace on screen.
     public var spaceIndex: Int { spaces.firstIndex { $0.id == currentSpace } ?? 0 }
 
@@ -69,11 +59,7 @@ extension ShellModel {
 
     /// Makes a workspace for `spec` and goes there. No animation of its own: callers already animate.
     func openSpace(for spec: PaneSpec) {
-        let back = spaceIndex + 1
         enterSpace(addSpace())
-        if !defaults.bool(forKey: Self.spaceNoteKey) {
-            spaceNote = SpaceNote(app: spec.tab ?? spec.title, fullScreen: spec.fullScreenOnly, backTo: back)
-        }
     }
 
     /// ⌘↵ on an app that is open in another workspace: it moves here, beside the current app, or into a new workspace when it
@@ -141,7 +127,6 @@ extension ShellModel {
         animate {
             enterSpace(spaces[index].id)
             surface = .workspace
-            spaceNote = nil
         }
     }
 
@@ -156,7 +141,6 @@ extension ShellModel {
         animate {
             enterSpace(addSpace())
             surface = .workspace
-            spaceNote = nil
             overviewOpen = false
         }
     }
@@ -171,11 +155,6 @@ extension ShellModel {
         } else {
             surface = .home
         }
-    }
-
-    public func dismissSpaceNote(forever: Bool) {
-        if forever { defaults.set(true, forKey: Self.spaceNoteKey) }
-        spaceNote = nil
     }
 
     /// ⌃↑ / ⇧⌘O: the overview, every workspace as a tile.

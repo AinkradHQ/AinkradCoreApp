@@ -237,8 +237,6 @@ public final class ShellModel {
     public var workspaceWidth: CGFloat = 0
     /// Its height, for stacking apps; zero means not measured yet, and apps only go side by side.
     public var workspaceHeight: CGFloat = 0
-    /// Why the newest workspace was opened (the note card says it once).
-    public var spaceNote: SpaceNote?
     /// Set while the launcher opens something with ⌘↵: the app comes next to the current one, even from another workspace.
     public var openBeside = false
     /// The open panes of the current workspace, in reading order of the tiling tree.

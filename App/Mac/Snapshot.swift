@@ -202,7 +202,6 @@ enum SnapshotRunner {
         await shot("16b-third-app-fits")
         pane("citadel")
         await shot("16c-fourth-app-new-workspace")
-        shell.spaceNote = nil
         // Back to the first workspace: a terminal (a list app) stacks under one of the three instead of a new workspace.
         shell.goTo("agents")
         shell.openPane(
@@ -217,7 +216,6 @@ enum SnapshotRunner {
         shell.goTo("terminals")
         await shot("16e-strip-jump-back")
         for id in ["core", "lore", "leyline", "projects"] { pane(id) }
-        shell.spaceNote = nil
         shell.goTo("agents")
         for (id, name) in [
             ("agents", "Checkout plan review"), ("terminals", "acme-shop logs"), ("brain", "Weekly notes"),
@@ -236,7 +234,6 @@ enum SnapshotRunner {
             s.fullScreenOnly = true
             shell.openPane(s)
         }
-        shell.spaceNote = nil
         shell.goTo("agents")
         await shot("16g-strip-names-fold")
         for (i, symbol) in (wide + wide).enumerated() {
@@ -244,7 +241,6 @@ enum SnapshotRunner {
             s.fullScreenOnly = true
             shell.openPane(s)
         }
-        shell.spaceNote = nil
         shell.goTo("agents")
         await shot("16h-strip-icons-only")
         shell.tabNames = [:]

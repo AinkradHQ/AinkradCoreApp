@@ -103,9 +103,6 @@ struct WorkspaceView: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
-            .overlay(alignment: .bottom) {
-                if let note = shell.spaceNote { SpaceNoteCard(shell: shell, note: note) }
-            }
             .onChange(of: area, initial: true) { _, a in
                 shell.workspaceWidth = a.width
                 shell.workspaceHeight = a.height

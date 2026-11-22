@@ -23,7 +23,7 @@ struct WorkspaceTests {
         shell.openPane(spec("b"))
         shell.openPane(spec("c"))
         #expect(shell.spaces.count == 2)
-        #expect(shell.panes.map(\.id) == ["c"] && shell.allPanes.count == 3 && shell.spaceNote?.fullScreen == false)
+        #expect(shell.panes.map(\.id) == ["c"] && shell.allPanes.count == 3)
     }
 
     @Test func aFullScreenAppGetsItsOwnWorkspaceAndNothingJoinsIt() {
@@ -31,7 +31,7 @@ struct WorkspaceTests {
         shell.workspaceWidth = 3000
         shell.openPane(spec("a"))
         shell.openPane(spec("design", full: true))
-        #expect(shell.spaces.count == 2 && shell.panes.map(\.id) == ["design"] && shell.spaceNote?.fullScreen == true)
+        #expect(shell.spaces.count == 2 && shell.panes.map(\.id) == ["design"])
         shell.openPane(spec("b"))
         #expect(shell.spaces.count == 3 && shell.panes.map(\.id) == ["b"])
         shell.switchSpace(to: 0)
@@ -131,6 +131,5 @@ struct WorkspaceTests {
         shell.openPane(spec("accounts", minWidth: 860))
         shell.openPane(spec("devices-runners", minWidth: 1160))
         #expect(shell.spaces.count == 2 && shell.panes.map(\.id) == ["devices-runners"])
-        #expect(shell.spaceNote?.fullScreen == false)
     }
 }
