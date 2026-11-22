@@ -285,8 +285,11 @@ struct MachinePage: View {
                 Text("\(Int((b * 100).rounded()))% busy").coreFont(size: MacTextSize.body, weight: .semibold)
                     .monospacedDigit().fixedSize()
                 CoreMeter(b, low: b >= 0.85, label: "\(name) busy")
-                Text(Machines.room(runner) ?? (RunnerStatus(runner) == .busy ? "Very busy: new work waits" : ""))
-                    .foregroundStyle(palette.text2).lineLimit(1).fixedSize()
+                Text(
+                    Machines.room(runner)
+                        ?? (RunnerStatus(runner) == .busy ? "Busy with other apps: new AI work goes elsewhere" : "")
+                )
+                .foregroundStyle(palette.text2).lineLimit(1).fixedSize()
             }
             .padding(Space.s4)
             .frame(maxWidth: .infinity, alignment: .leading)

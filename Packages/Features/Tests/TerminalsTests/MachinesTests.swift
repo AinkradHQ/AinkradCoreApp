@@ -27,7 +27,10 @@ struct MachinesTests {
         working.slots = RunnerSlotFacts(agentsUsed: 1, agentsCapacity: 4, terminalsUsed: 0, terminalsCapacity: 4)
         #expect(MachineStatus(working) == .working)
         #expect(MachineStatus(runner()) == .working, "an older runner with no slots works when it has load")
-        #expect(MachineStatus(runner(avg1: 40)) == .working, "very busy is working, not a status of its own")
+        #expect(MachineStatus(runner(avg1: 40)) == .idle, "busy with other apps and nothing of ours running is Idle")
+        var busyAndOurs = runner(avg1: 40)
+        busyAndOurs.slots = RunnerSlotFacts(agentsUsed: 1, agentsCapacity: 4, terminalsUsed: 0, terminalsCapacity: 4)
+        #expect(MachineStatus(busyAndOurs) == .working)
     }
 
     @Test func doesWorkPutsThisMacFirstThenTheCoreThenByName() {
