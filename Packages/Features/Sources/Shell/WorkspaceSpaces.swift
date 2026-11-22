@@ -30,37 +30,3 @@ struct SpaceIndicator: View {
         .accessibilityHint("Shows all workspaces")
     }
 }
-
-/// Why this app is in a workspace of its own, said once (06-workspaces `new-space`).
-struct SpaceNoteCard: View {
-    @Bindable var shell: ShellModel
-    let note: SpaceNote
-    @Environment(\.corePalette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            Text(
-                note.fullScreen
-                    ? "\(note.app) opened in its own workspace" : "\(note.app) did not fit, so it has a workspace"
-            )
-            .coreFont(size: MacTextSize.body, weight: .semibold)
-            Text(
-                (note.fullScreen
-                    ? "\(note.app) needs the whole screen, so it did not squeeze in beside your other apps."
-                    : "There was no room beside your other apps, so \(note.app) did not squeeze in.")
-                    + " Press ⌃← to go back to Workspace \(note.backTo)."
-            )
-            .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Don't show this again") { shell.dismissSpaceNote(forever: true) }.buttonStyle(.corePlain)
-                Spacer()
-                Button("Got it") { shell.dismissSpaceNote(forever: false) }.buttonStyle(.coreProminent)
-            }
-        }
-        .padding(Space.s4)
-        .frame(width: Space.s8 * 11)
-        .coreGlass(radius: Radius.pane, interactive: false)
-        .padding(.bottom, Space.s4)
-        .accessibilityElement(children: .contain)
-    }
-}
