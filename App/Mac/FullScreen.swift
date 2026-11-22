@@ -94,8 +94,10 @@ private final class EnforcerView: NSView {
     }
 
     /// In full screen but narrower than the screen: tiled. Leaving full screen makes `didExitFullScreen` bring it straight back.
+    /// Taller than the screen (the content once raised the window's minimum past it): back to the screen's frame.
     @MainActor private static func restoreIfTiled(_ window: NSWindow) {
         guard settled, window.styleMask.contains(.fullScreen), let screen = window.screen else { return }
+        if window.frame.height > screen.frame.height + 1 { return window.setFrame(screen.frame, display: true) }
         guard window.frame.width < screen.frame.width - 1 else { return }
         window.toggleFullScreen(nil)
     }

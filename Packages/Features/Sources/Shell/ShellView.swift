@@ -239,3 +239,13 @@ public struct ShellView: View {
         .transition(.opacity)
     }
 }
+
+extension View {
+    /// The window's root: it takes whatever size the window has and never asks for a minimum. The `Window` scene
+    /// (`.windowResizability(.contentMinSize)`) makes the content's smallest size the window's minimum, and the reconnect
+    /// banner's words, wrapped at zero width, asked for 2174 pt: the full-screen window grew past the bottom of the screen and
+    /// Home, the greeting and the Unlock card were centred in it, a third of a screen too low (2026-11-22).
+    public func fillsWindow() -> some View {
+        frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+}
