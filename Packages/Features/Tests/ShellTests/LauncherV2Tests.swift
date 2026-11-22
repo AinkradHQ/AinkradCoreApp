@@ -87,6 +87,17 @@ struct LauncherV2Tests {
         #expect(lines.first?.heading == LauncherSection.apps.title)
     }
 
+    /// Apps lead even when a session or note matches the words better (Ahmed, 2026-11-22).
+    @Test func appsLeadEvenWhenAnotherHitScoresHigher() {
+        let es = [
+            entry("brain"), entry("agents.s-brain import"), entry("note-brain"), entry("brain dump", action: true),
+        ]
+        let lines = LauncherLines.results(
+            Fuzzy.rank(es, query: "brain import", recents: [])
+                + Fuzzy.rank(es, query: "brain", recents: []).filter { $0.entry.id == "brain" })
+        #expect(lines.first?.heading == LauncherSection.apps.title)
+    }
+
     @Test func tabJumpsBetweenGroupsAndWraps() {
         let es = [entry("app"), entry("agents.s-1"), entry("go", action: true)]
         let lines = LauncherLines.browse(entries: es, picks: [], open: .apps)
