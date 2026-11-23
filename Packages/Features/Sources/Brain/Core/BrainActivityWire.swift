@@ -38,12 +38,23 @@ public struct BrainAreasWire: Codable, Sendable, Equatable {
         public var count: Int
         public var today: Int
         public var latest: String?
+        /// API minor 101: 14 daily counts, oldest first, the last one today. Absent from an older Core.
+        public var series: [Int]?
         public var id: String { area }
+    }
+
+    /// API minor 101: how many current rules are Always, Never and Prefer.
+    public var ruleKinds: RuleKinds?
+    public struct RuleKinds: Codable, Sendable, Equatable {
+        public var always: Int
+        public var never: Int
+        public var prefer: Int
     }
 
     enum CodingKeys: String, CodingKey {
         case areas, places, evidence
         case lockedRooms = "locked_rooms"
+        case ruleKinds = "rule_kinds"
     }
 }
 
@@ -58,9 +69,21 @@ public struct BrainAreaRecordWire: Codable, Sendable, Equatable, Identifiable {
     public var support: Int
     public var createdAt: String
     public var seenAt: String
+    /// API minor 101, rules only: `always`, `never` or `prefer`.
+    public var kind: String?
+    /// API minor 101: a rule held in two or more places, and those places.
+    public var everywhere: Bool?
+    public var rooms: [RoomRef]?
+    /// API minor 101: false for a rule kept but not handed to AI sessions.
+    public var following: Bool?
+
+    public struct RoomRef: Codable, Sendable, Equatable {
+        public var room: String
+        public var name: String
+    }
 
     enum CodingKeys: String, CodingKey {
-        case id, room, type, body, tags, support
+        case id, room, type, body, tags, support, kind, everywhere, rooms, following
         case roomName = "room_name"
         case createdAt = "created_at"
         case seenAt = "seen_at"
@@ -137,8 +160,10 @@ public struct LearnedWire: Codable, Sendable, Equatable, Identifiable {
     public var area: String
     public var body: String
     public var createdAt: String
+    /// API minor 101, rules only: `always`, `never` or `prefer`.
+    public var kind: String?
     enum CodingKeys: String, CodingKey {
-        case id, room, type, area, body
+        case id, room, type, area, body, kind
         case roomName = "room_name"
         case createdAt = "created_at"
     }

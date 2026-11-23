@@ -72,7 +72,9 @@ public final class BrainModel {
         if servesActivity, let routes = service?.importRoutes, !isSample {
             host.shell.openBrain = { [weak self] in self?.show(.overview) }
             status.start(routes)
-            calm.attach(routes: routes, service: service, rooms: { [weak self] in self?.rooms ?? [] })
+            calm.attach(
+                routes: routes, service: service, v101: (apiMinor ?? 0) >= coreMinorBrainRedesign,
+                rooms: { [weak self] in self?.rooms ?? [] })
         } else {
             status.stop()
         }
@@ -550,6 +552,8 @@ public final class BrainModel {
             guard let self, self.service != nil else { return nil }
             var g = self.baseGlance
             g?.importing = self.importGlance
+            g?.toCheck = max(0, self.tabCount(.inbox))
+            g?.learningFrom = self.calm.places?.first { $0.learning && $0.room != "me" }?.name
             return g
         }
         shell.settings.section(

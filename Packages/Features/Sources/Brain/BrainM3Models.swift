@@ -138,6 +138,9 @@ public struct InboxCandidate: Sendable, Hashable, Identifiable {
     public var edited = false
     /// The Core's creation time, so the list reads newest first.
     public var sortKey = ""
+    /// API minor 101: why Brain asks (`conflict`, `single_source`, `duplicate`, `other`) and what it clashes with.
+    public var reason: String?
+    public var otherBody: String?
     public init(
         id: String, room: String, roomName: String, kind: CandidateKind, text: String, app: String = "",
         date: String = "", distilled: String = "", account: String = "", sources: [CandidateSource] = [],

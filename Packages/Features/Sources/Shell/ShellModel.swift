@@ -207,6 +207,35 @@ public struct BrainGlance: Sendable, Equatable {
             self.progress = progress
         }
     }
+    /// The redesigned dropdown (a Core with `GET /areas`): how much it knows and from how many places, one tile per area
+    /// with what it took in today and (API minor 101) its last two weeks, the newest thing learned and when, what waits
+    /// to be checked, and the place it learns from now. Empty tiles keep the plain `stats`.
+    public var known: Int?
+    public var places: Int?
+    public var tiles: [Tile] = []
+    public var latest: String?
+    public var lastLearned: String?
+    public var toCheck = 0
+    public var learningFrom: String?
+    public struct Tile: Sendable, Equatable, Identifiable {
+        public var id: String { area }
+        /// `knowledge`, `rules`, `timeline` or `me`.
+        public let area: String
+        public let label: String
+        public let symbol: String
+        public let count: Int
+        public let today: Int
+        /// Oldest first, the last one today; nil from a Core without it.
+        public let series: [Int]?
+        public init(area: String, label: String, symbol: String, count: Int, today: Int, series: [Int]?) {
+            self.area = area
+            self.label = label
+            self.symbol = symbol
+            self.count = count
+            self.today = today
+            self.series = series
+        }
+    }
     public init(
         status: String, healthy: Bool, doing: String? = nil, progress: Double? = nil, stats: [Stat] = [],
         flowStep: Int? = nil, learned: Int = 0

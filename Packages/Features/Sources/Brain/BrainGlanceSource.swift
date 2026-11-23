@@ -24,12 +24,21 @@ struct GlanceAreas: Decodable, Equatable {
     struct Summary: Decodable, Equatable {
         var area: String
         var count: Int
+        var today: Int?
+        /// API minor 101: the last 14 days, oldest first.
+        var series: [Int]?
     }
 }
 
 struct GlanceLearned: Decodable, Equatable {
     var id: String
     var room: String
+    var body: String?
+    var createdAt: String?
+    enum CodingKeys: String, CodingKey {
+        case id, room, body
+        case createdAt = "created_at"
+    }
 }
 
 /// One read of the three routes.
@@ -56,15 +65,20 @@ extension BrainRoutes {
 
 enum BrainGlanceMaker {
     static let areaOrder: [(key: String, label: String)] = [
-        ("me", "Me"), ("rules", "Rules"), ("knowledge", "Knowledge"), ("timeline", "Timeline"),
+        ("me", "About you"), ("rules", "Rules"), ("knowledge", "Knowledge"), ("timeline", "Timeline"),
+    ]
+    /// The dropdown's tiles, in the redesign's order.
+    static let tileOrder: [(key: String, label: String, symbol: String)] = [
+        ("knowledge", "Knowledge", "sparkles"), ("rules", "Rules", "checkmark"), ("timeline", "Timeline", "clock"),
+        ("me", "About you", "person"),
     ]
 
     static func status(_ a: GlanceActivity) -> String {
         switch a.state {
         case "locked": "Locked. Unlock your Core to let it learn"
         case "needs_you": a.needs.first.map(need) ?? "Paused until it has what it needs"
-        case "working": "Learning quietly in the background"
-        default: "Learning quietly in the background"
+        case "working": "Learning"
+        default: "Up to date"
         }
     }
 
@@ -83,9 +97,9 @@ enum BrainGlanceMaker {
         let waiting = a.distilling + a.queued
         let done = a.rooms > 0 ? Double(max(a.rooms - waiting, 0)) / Double(a.rooms) : nil
         func places(_ n: Int) -> String { "\(n) \(n == 1 ? "place" : "places")" }
-        if a.distilling > 0 { return (1, "Tidying \(places(a.distilling)) into Knowledge", done) }
+        if a.distilling > 0 { return (1, "Understanding \(places(a.distilling))", done) }
         if a.overviews > 0 { return (2, "Writing an overview of your places", done) }
-        if a.queued > 0 { return (0, "Collecting from \(places(a.queued))", done) }
+        if a.queued > 0 { return (0, "Reading \(places(a.queued))", done) }
         return nil
     }
 
@@ -95,9 +109,22 @@ enum BrainGlanceMaker {
         let stats =
             areaOrder.map { BrainGlance.Stat($0.label, counts[$0.key] ?? 0, area: $0.key) }
             + [BrainGlance.Stat("Places", d.areas.places, area: "places")]
-        return BrainGlance(
+        var g = BrainGlance(
             status: status(d.activity), healthy: d.activity.health == "ok", doing: doing?.line,
             progress: doing?.progress, stats: stats, flowStep: doing?.step, learned: d.learned.count)
+        let by = Dictionary(d.areas.areas.map { ($0.area, $0) }, uniquingKeysWith: { a, _ in a })
+        g.tiles = tileOrder.map { t in
+            let s = by[t.key]
+            return .init(
+                area: t.key, label: t.label, symbol: t.symbol, count: s?.count ?? 0, today: s?.today ?? 0,
+                series: s?.series)
+        }
+        g.known = d.areas.areas.reduce(0) { $0 + $1.count }
+        g.places = d.areas.places
+        let newest = d.learned.max { ($0.createdAt ?? "") < ($1.createdAt ?? "") }
+        g.latest = newest?.body
+        g.lastLearned = SyncWords.date(newest?.createdAt).map { SyncWords.agoInLine($0) }
+        return g
     }
 }
 
@@ -111,19 +138,28 @@ extension BrainModel {
         if let d = try? await routes.glanceData() { glanceData = d }
     }
 
-    /// Archives what was learned today (kept, never deleted) and says so.
+    /// Forgets what was learned today (archived, never deleted); the toast's Undo puts it all back.
     func undoLearned() {
         guard let routes = service?.importRoutes, let d = glanceData, !d.learned.isEmpty else { return }
         let shell = host.shell
         Task { @MainActor in
-            var undone = 0
-            for l in d.learned where (try? await routes.glanceArchive(room: l.room, id: l.id)) != nil { undone += 1 }
+            var undone: [GlanceLearned] = []
+            for l in d.learned where (try? await routes.glanceArchive(room: l.room, id: l.id)) != nil {
+                undone.append(l)
+            }
             glanceData?.learned.removeAll()
+            let n = undone.count
             shell.showToast(
-                undone == d.learned.count
-                    ? "Took back \(undone) \(undone == 1 ? "thing" : "things") it learned today."
-                    : "Took back \(undone) of \(d.learned.count). The rest could not be reached.",
-                kind: undone == d.learned.count ? .ok : .warn)
+                n == d.learned.count
+                    ? "Forgot \(n) \(n == 1 ? "thing" : "things") learned today · kept in the archive"
+                    : "Forgot \(n) of \(d.learned.count). The rest could not be reached.",
+                kind: n == d.learned.count ? .ok : .warn
+            ) {
+                Task {
+                    for l in undone { try? await routes.restoreRecord(room: l.room, id: l.id) }
+                    await self.refreshGlance()
+                }
+            }
             await refreshGlance()
         }
     }
@@ -202,6 +238,9 @@ extension BrainModel {
     /// The dropdown's numbers, before the import under way is added.
     var baseGlance: BrainGlance? {
         if self.servesGlance, let d = self.glanceData { return BrainGlanceMaker.glance(d) }
+        #if DEBUG
+        if demoCalm, let g = demoGlance { return g }
+        #endif
         let o = self.overview
         let status =
             switch o?.health {
@@ -217,3 +256,22 @@ extension BrainModel {
             ])
     }
 }
+
+#if DEBUG
+extension BrainModel {
+    /// Debug demo only: the dropdown read from the demo's areas and status, as a Core with them would answer.
+    var demoGlance: BrainGlance? {
+        guard let a = calm.areas, let act = status.activity else { return nil }
+        let activity = GlanceActivity(
+            state: act.state, health: act.health, rooms: act.rooms, distilling: act.distilling, queued: act.queued,
+            overviews: act.overviews, needs: act.needs.map { .init(kind: $0.kind) })
+        let areas = GlanceAreas(
+            areas: a.areas.map { .init(area: $0.area, count: $0.count, today: $0.today, series: $0.series) },
+            places: calm.places?.count ?? a.places)
+        let learned = calm.learned.map {
+            GlanceLearned(id: $0.id, room: $0.room, body: $0.body, createdAt: $0.createdAt)
+        }
+        return BrainGlanceMaker.glance(GlanceData(activity: activity, areas: areas, learned: learned))
+    }
+}
+#endif

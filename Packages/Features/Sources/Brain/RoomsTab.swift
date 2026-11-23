@@ -4,7 +4,6 @@ import SwiftUI
 /// Places (mockup 15): every room as a card with its kind, count, AI and last sync; a card opens the place, with a way
 /// back. A sealed place shows its name only, and the way to open it. Choosing another place clears the old one from memory.
 struct RoomsTab: View {
-    @Environment(\.coreAccent) private var paneAccent
     let model: BrainModel
 
     var body: some View {
@@ -40,117 +39,35 @@ struct RoomsTab: View {
     }
 
     private var grid: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            BrainPageHead(
-                "Places",
-                "\(BrainWords.plural(model.rooms.count, "place", "places")). Each one is its own room, and nothing crosses between them."
+        VStack(alignment: .leading, spacing: Space.s4) {
+            BrainHead(
+                symbol: "folder", title: "Places", count: PlaceCards.count(model),
+                sub: "Each project is its own place. What Brain learns in one stays there."
             ) {
                 if let sync = model.sync { SyncNowTile(sync: sync) }
                 if model.canMakeRooms {
-                    AppActionTile(
-                        title: "New room (advanced)…", symbol: "slider.horizontal.3", key: "⌥⌘N",
-                        hue: GlassInk.accent(paneAccent)
-                    ) {
-                        BrainSheets.openNewRoom(model)
-                    }
-                    .keyboardShortcut("n", modifiers: [.command, .option])
-                    AppActionTile(
-                        title: "New room", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
-                    ) {
+                    Button {
                         Task { await model.quickRoom() }
+                    } label: {
+                        Label("New Place…", systemImage: "plus")
                     }
-                    .keyboardShortcut("n", modifiers: .command)
+                    .buttonStyle(CoreButtonStyle(.secondary))
+                    .keyboardShortcut("n", modifiers: .command).environment(\.coreKeycap, "⌘N")
+                    .help("Make a new place (⌘N); ⌥⌘N to choose its kind")
+                    .background {
+                        Button("New Place (Advanced)") { BrainSheets.openNewRoom(model) }
+                            .keyboardShortcut("n", modifiers: [.command, .option])
+                            .opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+                    }
                 }
             }
             ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Space.s8 * 8), spacing: Space.s3, alignment: .top)],
-                    alignment: .leading, spacing: Space.s3
-                ) {
-                    ForEach(model.rooms) { r in PlaceCard(model: model, room: r) }
-                }
+                PlaceCards(model: model)
                 Text(SyncWords.neverRead).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, Space.s2)
             }
             .scrollIndicators(.automatic)
         }
-    }
-}
-
-/// One place: its icon, name and kind; what is in it; its count, its AI and when it last took something new.
-private struct PlaceCard: View {
-    let model: BrainModel
-    let room: RoomSummary
-
-    var body: some View {
-        Button(action: pick) {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: room.lock == nil ? "folder" : "lock").coreFont(size: MacTextSize.body)
-                        .frame(width: Space.s6, height: Space.s6)
-                        .background(GlassInk.well, in: coreShape(Radius.chip))
-                        .accessibilityHidden(true)
-                    Text(room.name).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(1)
-                    Spacer(minLength: Space.s2)
-                    Text(room.kind.label).coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(GlassInk.secondary)
-                        .padding(.horizontal, Space.s2).padding(.vertical, 2)
-                        .background(GlassInk.well, in: coreShape(Radius.chip))
-                }
-                Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: Space.s2)
-                HStack(spacing: Space.s3) {
-                    Text(room.counts.map { "\($0.records.formatted()) known" } ?? "Sealed").monospacedDigit()
-                    if waiting {
-                        Text("Needs a local model").foregroundStyle(GlassInk.amberInk)
-                    } else {
-                        Text(policyLabel).foregroundStyle(GlassInk.secondary)
-                    }
-                    Spacer(minLength: Space.s2)
-                    if let when = model.lastSyncLabel(room) { Text(when).foregroundStyle(GlassInk.secondary) }
-                }
-                .coreFont(size: MacTextSize.meta)
-            }
-            .padding(Space.s4)
-            .frame(maxWidth: .infinity, minHeight: Space.s8 * 4, alignment: .topLeading)
-            .coreWell()
-            .contentShape(coreShape(Radius.cardMac))
-        }
-        .buttonStyle(.plain)
-        .help(room.help)
-        .contextMenu {
-            if room.lock == nil {
-                Button("Seal Room") { Task { await model.seal(room.id) } }
-            } else {
-                Button("Open with Touch ID") { Task { await model.open(room.id) } }
-            }
-        }
-        .accessibilityIdentifier("brain-room-\(room.id)")
-    }
-
-    private var policy: RoomPolicy? { model.candidates.policy(room.id) }
-    private var waiting: Bool { policy?.needsLocalModel ?? false }
-    private var policyLabel: String {
-        (policy.map { $0.model == .localOnly } ?? (room.provider == .local)) ? "Local only" : "Cloud"
-    }
-
-    private var subtitle: String {
-        if room.lock != nil { return "Sealed · \(room.kind.label)" }
-        // Sources named with capitals ("Claude Code 842") are listed as they are; record types are counted and pluralised.
-        let shares = room.counts?.byType ?? []
-        let types =
-            shares.contains { $0.type.first?.isUppercase == true }
-            ? shares.filter { $0.count > 0 }.map { "\($0.type) \($0.count.formatted())" }.joined(separator: " · ")
-            : BrainWords.breakdown(shares)
-        return types.isEmpty ? "\(room.kind.label) · \(room.mode.label)" : types
-    }
-
-    private func pick() {
-        model.view(room.id)
-        model.placeOpen = true
-        guard room.lock == nil else { return }
-        Task { await model.inspect(room.id) }
     }
 }
 
