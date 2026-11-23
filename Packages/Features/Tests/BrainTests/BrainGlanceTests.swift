@@ -20,9 +20,9 @@ struct BrainGlanceTests {
             try data(
                 #"{"state":"working","health":"ok","rooms":10,"distilling":2,"queued":3,"overviews":0,"failed":0,"needs":[]}"#,
                 learned: #"[{"id":"a","room":"r1","area":"me","body":"x"},{"id":"b","room":"r1"}]"#))
-        #expect(g.flowStep == 1 && g.doing == "Tidying 2 places into Knowledge")
+        #expect(g.flowStep == 1 && g.doing == "Understanding 2 places")
         #expect(g.progress == 0.5 && g.healthy && g.learned == 2)
-        #expect(g.stats.map(\.label) == ["Me", "Rules", "Knowledge", "Timeline", "Places"])
+        #expect(g.stats.map(\.label) == ["About you", "Rules", "Knowledge", "Timeline", "Places"])
         #expect(g.stats.map(\.count) == [14, 38, 0, 0, 21])
         #expect(g.stats.map(\.area) == ["me", "rules", "knowledge", "timeline", "places"])
     }

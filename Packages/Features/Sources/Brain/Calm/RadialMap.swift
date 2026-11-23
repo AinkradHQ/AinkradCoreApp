@@ -1,173 +1,184 @@
 import CoreUI
 import SwiftUI
 
-/// One area card on the home map.
-struct RadialNode: Identifiable {
+/// A source on the home map: what Brain reads, what it read, and whether it reads it now.
+struct MapSource: Identifiable {
+    let id: String
+    let symbol: String
+    let title: String
+    let line: String
+    let live: Bool
+}
+
+/// An area on the home map's right: its name, count and what it took in today.
+struct MapShelf: Identifiable {
     let page: BrainCalmModel.Page
     let count: Int
-    let line: String
     let today: Int
     var id: String { page.rawValue }
 }
 
-/// The home map of mockup 15: the Brain tile in the middle and the area cards around it, joined by dashed lines. While Brain works,
-/// the dashes crawl and small packets flow along each line toward the centre, and the cards float gently. Reduce Motion, a pane
-/// that is not on screen, or an idle Brain: lines static, no packets, no float (the timeline is paused, not just ignored).
-struct RadialMap: View {
-    @Environment(\.coreAccent) private var paneAccent
-    let nodes: [RadialNode]
+/// The live map of the Brain redesign: the sources on the left, the Brain in the middle and the four areas on the right,
+/// joined by wires. Idle, it is still. While Brain learns, light runs along the wires from the source it reads to the areas
+/// that grow, and a halo breathes around the Brain. Reduce Motion: no travelling light, the live wires fade in and out
+/// instead and the counts change in place. Off screen or in the background the timeline is paused, not just ignored.
+struct BrainMap: View {
+    let sources: [MapSource]
+    let shelves: [MapShelf]
     let working: Bool
-    let label: String
+    let line: String
     let open: (BrainCalmModel.Page) -> Void
 
+    @Environment(\.coreAccent) private var accent
+    @Environment(\.corePalette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.scenePhase) private var phase
     @State private var onScreen = false
-    @State private var shown = false
 
-    /// Positions in the mockup's 876 x 740 map, as fractions. `Double` on purpose: as bare literals `190 / 876` picked
-    /// `CGPoint(x: Int, y: Int)` and divided as integers to 0, which put every card in the map's top-left corner.
-    static let spots: [BrainCalmModel.Page: CGPoint] = [
-        .me: CGPoint(x: 190.0 / 876, y: 120.0 / 740), .rules: CGPoint(x: 686.0 / 876, y: 120.0 / 740),
-        .knowledge: CGPoint(x: 130.0 / 876, y: 400.0 / 740), .timeline: CGPoint(x: 746.0 / 876, y: 400.0 / 740),
-        .places: CGPoint(x: 438.0 / 876, y: 620.0 / 740),
-    ]
-    private static let centre = CGPoint(x: 0.5, y: 360.0 / 740)
+    private static let srcW: CGFloat = 188
+    private static let shelfW: CGFloat = 236
+    private static let rowH: CGFloat = 50
+    private static let gap: CGFloat = 10
+    private static let core: CGFloat = 64
 
-    private var animating: Bool { working && !reduce && onScreen && phase == .active }
+    private var ticking: Bool { working && onScreen && phase == .active }
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !animating)) { ctx in
-                let t = animating ? ctx.date.timeIntervalSinceReferenceDate : 0
-                ZStack {
-                    Canvas { gc, sz in draw(&gc, sz, t) }
-                    centre(size, t)
-                    ForEach(Array(nodes.enumerated()), id: \.element.id) { i, node in
-                        let p = point(node.page, size)
-                        card(node)
-                            .frame(width: cardWidth(size), height: Self.cardHeight)
-                            .position(x: p.x, y: p.y + float(t, i))
-                            .coreRise(shown, i)
+            TimelineView(.animation(minimumInterval: reduce ? 1.0 / 10 : 1.0 / 30, paused: !ticking)) { ctx in
+                let t = ticking ? ctx.date.timeIntervalSinceReferenceDate : 0
+                ZStack(alignment: .topLeading) {
+                    Canvas { gc, sz in wires(&gc, sz, t) }
+                    ForEach(Array(sources.enumerated()), id: \.element.id) { i, s in
+                        source(s).frame(width: Self.srcW, height: Self.rowH)
+                            .position(x: Self.srcW / 2 + Space.s8 + Space.s5, y: y(i, of: sources.count, size))
+                    }
+                    centre(t).position(x: size.width / 2, y: size.height / 2 + Space.s3)
+                    ForEach(Array(shelves.enumerated()), id: \.element.id) { i, s in
+                        shelf(s).frame(width: Self.shelfW, height: Self.rowH - Space.s1)
+                            .position(
+                                x: size.width - Self.shelfW / 2 - Space.s8, y: y(i, of: shelves.count, size, step: 48))
                     }
                 }
             }
         }
-        .frame(minHeight: Space.s8 * 18)
-        .onAppear {
-            onScreen = true
-            shown = true
-        }
+        .frame(height: 224)
+        .onAppear { onScreen = true }
         .onDisappear { onScreen = false }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("brain-map")
     }
 
-    private static let cardHeight = Space.s8 * 4
-    private func cardWidth(_ s: CGSize) -> CGFloat { min(250, max(170, s.width * 0.28)) }
-    /// A card's centre, kept inside the map so a narrow or short pane never pushes a card over the title or the edge.
-    private func point(_ p: BrainCalmModel.Page, _ s: CGSize) -> CGPoint {
-        let f = Self.spots[p] ?? Self.centre
-        let w = cardWidth(s) / 2
-        let h = Self.cardHeight / 2
-        return CGPoint(
-            x: min(max(f.x * s.width, w), max(s.width - w, w)), y: min(max(f.y * s.height, h), max(s.height - h, h)))
+    /// Row `i` of `n`, centred on the map.
+    private func y(_ i: Int, of n: Int, _ s: CGSize, step: CGFloat = rowH + gap) -> CGFloat {
+        s.height / 2 + (CGFloat(i) - CGFloat(n - 1) / 2) * step
     }
-    private func middle(_ s: CGSize) -> CGPoint { CGPoint(x: Self.centre.x * s.width, y: Self.centre.y * s.height) }
-    /// Where the line from the centre meets the card's edge: the line stops there instead of running under the glass card.
-    private func edge(_ p: CGPoint, to c: CGPoint, half: CGSize) -> CGPoint {
-        let dx = c.x - p.x
-        let dy = c.y - p.y
-        let k = min(dx == 0 ? .infinity : half.width / abs(dx), dy == 0 ? .infinity : half.height / abs(dy))
-        guard k < 1 else { return p }
-        return CGPoint(x: p.x + dx * k, y: p.y + dy * k)
-    }
-    /// Each card floats up and down a few points on its own seven-second loop.
-    private func float(_ t: Double, _ i: Int) -> CGFloat { CGFloat(sin(t * 2 * .pi / 7 + Double(i) * 1.3) * 3) }
 
-    private func draw(_ gc: inout GraphicsContext, _ sz: CGSize, _ t: Double) {
-        let c = middle(sz)
-        for (i, n) in nodes.enumerated() {
-            let p = edge(point(n.page, sz), to: c, half: CGSize(width: cardWidth(sz) / 2, height: Self.cardHeight / 2))
-            var path = Path()
-            path.move(to: p)
-            path.addLine(to: c)
-            let phase = CGFloat(t * 6)
-            gc.stroke(
-                path, with: .color(.secondary.opacity(0.55)),
-                style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [3, 7], dashPhase: -phase))
-            guard animating else { continue }
-            // Two packets per line, a few seconds apart, flowing toward the centre.
-            for k in 0..<2 {
-                let u = (t / 5.0 + Double(i) * 0.19 + Double(k) * 0.5).truncatingRemainder(dividingBy: 1)
-                let pt = CGPoint(x: p.x + (c.x - p.x) * u, y: p.y + (c.y - p.y) * u)
-                let fade = sin(u * .pi)
-                gc.fill(
-                    Path(roundedRect: CGRect(x: pt.x - 3, y: pt.y - 3, width: 6, height: 6), cornerRadius: 2),
-                    with: .color(GlassInk.accent(paneAccent).opacity(0.9 * fade)))
-            }
+    private func wires(_ gc: inout GraphicsContext, _ sz: CGSize, _ t: Double) {
+        let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
+        let inX = c.x - Self.core / 2 - Space.s5
+        let outX = c.x + Self.core / 2 + Space.s5
+        let left = Self.srcW + Space.s8 + Space.s5 + Space.s8
+        let right = sz.width - Self.shelfW - Space.s8 - Space.s2
+        for (i, s) in sources.enumerated() {
+            draw(
+                &gc, from: CGPoint(x: left, y: y(i, of: sources.count, sz)), to: CGPoint(x: inX, y: c.y), live: s.live,
+                t, i)
+        }
+        for (i, s) in shelves.enumerated() {
+            let live = working && s.today > 0
+            draw(
+                &gc, from: CGPoint(x: outX, y: c.y), to: CGPoint(x: right, y: y(i, of: shelves.count, sz, step: 48)),
+                live: live, t, i + 3)
         }
     }
 
-    /// Two halo rings around the tile: they swell and fade on a four-second loop, half a loop apart. Static (fixed size and
-    /// strength) when nothing animates.
-    private func halo(_ t: Double, _ k: Int) -> some View {
-        let u = animating ? (t / 4 + Double(k) * 0.5).truncatingRemainder(dividingBy: 1) : 0.3 + Double(k) * 0.35
-        return coreShape(Radius.cardMac + 4)
-            .stroke(GlassInk.accent(paneAccent).opacity(animating ? 0.45 * (1 - u) : 0.16), lineWidth: 1.5)
-            .frame(width: Space.s8 * 2, height: Space.s8 * 2)
-            .scaleEffect(1 + 0.7 * u)
-            .accessibilityHidden(true)
+    /// One wire: a soft curve, the accent when live; while learning, a short light runs along it (or, with Reduce
+    /// Motion, the whole wire fades in and out).
+    private func draw(_ gc: inout GraphicsContext, from a: CGPoint, to b: CGPoint, live: Bool, _ t: Double, _ k: Int) {
+        var p = Path()
+        p.move(to: a)
+        let mx = (a.x + b.x) / 2
+        p.addCurve(to: b, control1: CGPoint(x: mx, y: a.y), control2: CGPoint(x: mx, y: b.y))
+        let lit = live && working
+        let pulse = reduce && ticking ? 0.55 + 0.35 * sin(t * 2 * .pi / 2.4 + Double(k)) : 1
+        gc.stroke(
+            p, with: .color(lit ? GlassInk.accent(accent).opacity(0.8 * pulse) : palette.track),
+            style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+        guard lit, ticking, !reduce else { return }
+        let u = (t / 1.8 + Double(k) * 0.23).truncatingRemainder(dividingBy: 1)
+        gc.stroke(
+            p.trimmedPath(from: max(0, u - 0.12), to: u), with: .color(GlassInk.accent(accent)),
+            style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
     }
 
-    private func centre(_ s: CGSize, _ t: Double) -> some View {
-        let c = middle(s)
-        return VStack(spacing: Space.s2) {
+    private func source(_ s: MapSource) -> some View {
+        HStack(spacing: Space.s3) {
+            BrainTile(symbol: s.symbol, lit: s.live && working)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(s.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                Text(s.line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    .contentTransition(.opacity)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, Space.s3)
+        .frame(maxHeight: .infinity)
+        .background(GlassInk.well, in: coreShape(Radius.control))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func centre(_ t: Double) -> some View {
+        let u = (t / 3).truncatingRemainder(dividingBy: 1)
+        return VStack(spacing: Space.s3) {
             ZStack {
-                halo(t, 0)
-                halo(t, 1)
-                Image(systemName: "brain").font(.system(size: 28)).frame(width: Space.s8 * 2, height: Space.s8 * 2)
-                    .background(GlassInk.accent(paneAccent).opacity(0.18), in: coreShape(Radius.cardMac))
-                    .accessibilityHidden(true)
+                if ticking {
+                    // The halo: a rounded rect that swells and fades; with Reduce Motion it only fades.
+                    coreShape(Radius.pane + 4).fill(GlassInk.accent(accent).opacity(0.22 * (1 - u)))
+                        .frame(width: Self.core, height: Self.core)
+                        .scaleEffect(reduce ? 1.25 : 1 + 0.45 * u)
+                }
+                Image(systemName: "brain").font(.system(size: 26, weight: .regular)).foregroundStyle(palette.primary)
+                    .frame(width: Self.core, height: Self.core)
+                    .background(GlassInk.accent(accent).opacity(0.2), in: coreShape(Radius.pane))
             }
-            HStack(spacing: Space.s1) {
-                RoundedRectangle(cornerRadius: 2).fill(working ? Color.green : Color.secondary).frame(
-                    width: 6, height: 6)
-                Text(label).coreFont(size: MacTextSize.meta, weight: .semibold)
+            .accessibilityHidden(true)
+            HStack(spacing: Space.s1 + 2) {
+                if working { coreShape(2).fill(palette.success).frame(width: 6, height: 6).accessibilityHidden(true) }
+                Text(line).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    .contentTransition(.opacity)
             }
+            .fixedSize()
         }
-        .position(c)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: line)
     }
 
-    private func card(_ node: RadialNode) -> some View {
+    private func shelf(_ s: MapShelf) -> some View {
         Button {
-            open(node.page)
+            open(s.page)
         } label: {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                HStack {
-                    Image(systemName: node.page.symbol).accessibilityHidden(true)
-                    Text(node.page == .rules ? "Rules" : node.page.title)
-                        .coreFont(size: MacTextSize.headline, weight: .semibold)
-                    Spacer()
-                    Image(systemName: "chevron.right").foregroundStyle(GlassInk.secondary)
+            HStack(spacing: Space.s2) {
+                coreShape(2).fill(s.page == .me ? GlassInk.slate : GlassInk.accent(accent)).frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+                Text(s.page.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                Spacer(minLength: Space.s2)
+                if s.today > 0 {
+                    Text("+\(s.today.formatted())").coreFont(size: MacTextSize.body, weight: .semibold)
+                        .foregroundStyle(palette.success).monospacedDigit().contentTransition(.numericText())
+                        .frame(minWidth: Space.s8 + Space.s2, alignment: .trailing)
                 }
-                HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                    Text("\(node.count)").coreFont(size: MacTextSize.title, weight: .semibold).monospacedDigit()
-                        .contentTransition(.numericText())
-                    if node.today > 0 {
-                        Text("+\(node.today) today").coreFont(size: MacTextSize.meta).foregroundStyle(
-                            GlassInk.accent(paneAccent))
-                    }
-                }
-                Text(node.line).lineLimit(2).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                Spacer(minLength: 0)
+                Text(s.count.formatted()).coreFont(size: MacTextSize.body, weight: .semibold).monospacedDigit()
+                    .contentTransition(.numericText()).frame(minWidth: Space.s8 + Space.s5, alignment: .trailing)
             }
-            .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).coreWell()
-            // An empty area stays on the map, quiet (mockup 15, fresh Brain).
-            .opacity(node.count == 0 ? 0.5 : 1)
+            .padding(.horizontal, Space.s3)
+            .frame(maxHeight: .infinity)
+            .background(GlassInk.well, in: coreShape(Radius.control))
+            .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("brain-node-\(node.page.rawValue)")
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: s.count)
+        .help("Open \(s.page.title)")
+        .accessibilityIdentifier("brain-shelf-\(s.page.rawValue)")
     }
 }

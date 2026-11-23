@@ -124,9 +124,17 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
     public var items: Int?
     /// For a `runner-<id>` source: the runner now.
     public var runner: RunnerNowWire?
+    /// API minor 101: everything read, read this week, the last read, and whether it reads now. Absent before.
+    public var readTotal: Int?
+    public var readWeek: Int?
+    public var lastReadAt: String?
+    public var reading: Bool?
     enum CodingKeys: String, CodingKey {
-        case id, device, kind, enabled, roots, cursor, items, runner
+        case id, device, kind, enabled, roots, cursor, items, runner, reading
         case lastRun = "last_run"
+        case readTotal = "read_total"
+        case readWeek = "read_week"
+        case lastReadAt = "last_read_at"
     }
     public init(
         id: String, device: String, kind: String, enabled: Bool = true, roots: [String] = [],
@@ -153,6 +161,10 @@ public struct SourceWire: Codable, Sendable, Equatable, Identifiable {
         lastRun = try c.decodeIfPresent(String.self, forKey: .lastRun)
         items = try c.decodeIfPresent(Int.self, forKey: .items)
         runner = try c.decodeIfPresent(RunnerNowWire.self, forKey: .runner)
+        readTotal = try c.decodeIfPresent(Int.self, forKey: .readTotal)
+        readWeek = try c.decodeIfPresent(Int.self, forKey: .readWeek)
+        lastReadAt = try c.decodeIfPresent(String.self, forKey: .lastReadAt)
+        reading = try c.decodeIfPresent(Bool.self, forKey: .reading)
     }
 
     /// The Core's own AI-session collector.

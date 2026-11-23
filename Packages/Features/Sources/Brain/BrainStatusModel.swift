@@ -47,6 +47,16 @@ public final class BrainStatusModel {
         }
     }
 
+    /// What it does now, as the map and the dropdown say it: "Understanding 3 places"; nil when idle.
+    static func doing(_ a: BrainActivityWire) -> String? {
+        guard a.state == "working" else { return nil }
+        func places(_ n: Int) -> String { "\(n) \(n == 1 ? "place" : "places")" }
+        if a.distilling > 0 { return "Understanding \(places(a.distilling))" }
+        if a.overviews > 0 { return "Writing an overview of your places" }
+        if a.queued > 0 { return "Reading \(places(a.queued))" }
+        return nil
+    }
+
     static func need(_ n: BrainActivityWire.Need) -> String {
         switch n.kind {
         case "ai_account": return "Brain needs an AI account"

@@ -47,6 +47,12 @@ public enum SyncWords {
         }
     }
 
+    /// `ago` inside a sentence: "learned yesterday", "learned 15 Nov" (a date keeps its capital).
+    public static func agoInLine(_ d: Date, now: Date = Date()) -> String {
+        let a = ago(d, now: now)
+        return a.first?.isNumber == true ? a : a.prefix(1).lowercased() + a.dropFirst()
+    }
+
     public static func banner(_ b: SyncBanner) -> (title: String, text: String) {
         switch b {
         case .none: return ("", "")

@@ -319,7 +319,8 @@ public enum BrainTab: String, Sendable, CaseIterable, Hashable {
     var title: String {
         switch self {
         case .overview: "Home"
-        case .rules: "Rules & preferences"
+        case .me: "About you"
+        case .rules: "Rules"
         case .rooms: "Places"
         case .inbox: "To check"
         case .records: "Search"
@@ -329,8 +330,8 @@ public enum BrainTab: String, Sendable, CaseIterable, Hashable {
     var symbol: String {
         switch self {
         case .inbox: "tray"
-        case .sources: "arrow.triangle.2.circlepath"
-        case .activity: "list.bullet.rectangle"
+        case .sources: "square.and.arrow.down"
+        case .activity: "doc.text"
         case .checks: "stethoscope"
         case .records: "magnifyingglass"
         default: calmPage?.symbol ?? "brain"

@@ -56,11 +56,16 @@ private struct CalmSide: View {
                 CoreRow(t.title, symbol: t.symbol, selected: brain.currentTab == t, action: { pick(t) }) {
                     HStack(spacing: Space.s2) {
                         let n = brain.tabCount(t)
-                        if n > 0 { CountBadge(n, tone: .needsYou, label: t.title) }
-                        if i < 9 { CoreKeycap("⌘\(i + 1)") }
+                        if n > 0 {
+                            CountBadge(n, tone: .needsYou, label: t.title)
+                        } else if let c = count(t) {
+                            Text(c.formatted()).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                                .monospacedDigit().contentTransition(.numericText())
+                        }
                     }
                     .fixedSize()
                 }
+                .help(i < 9 ? "\(t.title) (⌘\(i + 1))" : t.title)
                 .keyboardShortcut(
                     i < 9 ? KeyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command) : nil
                 )
@@ -111,6 +116,13 @@ private struct CalmSide: View {
         .accessibilityIdentifier("brain-search")
     }
 
+    /// The quiet count beside an area or Places, as the Core has it.
+    private func count(_ t: BrainTab) -> Int? {
+        guard brain.calmAvailable else { return nil }
+        if t == .rooms { return PlaceCards.count(brain) }
+        return t.calmPage?.area.flatMap { brain.calm.summary($0)?.count }
+    }
+
     private func pick(_ t: BrainTab) {
         withAnimation(Motion.out(Motion.ui)) {
             if t == .rooms { brain.placeOpen = false }
@@ -134,31 +146,21 @@ private struct BrainSection: View {
             }
         case .me, .rules, .knowledge, .timeline: CalmArea(brain: brain)
         case .rooms: RoomsTab(model: brain)
-        case .inbox: inbox
+        case .inbox: if servesInbox { CheckPage(brain: brain) } else { inbox }
         case .sources:
-            page("Sources", "Where Brain reads from, and what it read") {
-                if let sync = brain.sync {
-                    SyncBannerView(brain: brain, sync: sync)
-                    SourcesTab(brain: brain, sync: sync)
-                }
-                if brain.calmAvailable {
-                    Text("What Brain read").coreFont(size: MacTextSize.headline, weight: .semibold)
-                        .accessibilityAddTraits(.isHeader)
-                    ExploreEvidenceTab(brain: brain)
-                }
-            } actions: {
-                if let sync = brain.sync { SyncNowTile(sync: sync) }
-            }
-        case .activity:
-            // Activity and Checks carry their own title.
-            scroll {
-                RoomBar(model: brain)
-                if brain.isSample || brain.service?.servesChanges == true {
-                    ActivityTab(model: brain)
-                } else {
-                    BrainComingLater(title: "Activity")
+            if brain.calmAvailable {
+                BrainSourcesPage(brain: brain)
+            } else {
+                page("Sources", "Where Brain reads from, and what it read") {
+                    if let sync = brain.sync {
+                        SyncBannerView(brain: brain, sync: sync)
+                        SourcesTab(brain: brain, sync: sync)
+                    }
+                } actions: {
+                    if let sync = brain.sync { SyncNowTile(sync: sync) }
                 }
             }
+        case .activity: BrainActivityPage(brain: brain)
         case .checks:
             scroll {
                 if brain.isSample { ChecksTab(model: brain) } else { BrainComingLater(title: "Checks") }

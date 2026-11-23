@@ -28,7 +28,7 @@ extension CoreBrainService {
 
     static func candidate(_ w: InboxRecordWire, room: RoomViewWire) -> InboxCandidate {
         let date = SyncWords.date(w.distilledAt)
-        return InboxCandidate(
+        var c = InboxCandidate(
             id: w.id, room: room.id, roomName: room.name, kind: CandidateKind(type: w.type, tags: w.tags),
             text: w.body, app: w.tool.map(Self.toolName) ?? "",
             date: date.map { $0.formatted(.dateTime.day().month(.abbreviated)) } ?? "",
@@ -42,6 +42,9 @@ extension CoreBrainService {
                     quote: src.quote)
             },
             tags: w.tags, sortKey: w.distilledAt ?? "")
+        c.reason = w.reason
+        c.otherBody = w.otherBody
+        return c
     }
 
     /// The harness name the Core sends (`claude`, `codex`) as the screens say it.

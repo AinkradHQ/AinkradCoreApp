@@ -1,99 +1,21 @@
 import CoreUI
 import SwiftUI
 
-/// Me, Rules & preferences, Knowledge and Timeline (mockup 15): the Core's current records of the area, best supported first,
-/// grouped the way the page reads. Only the important ones are shown; the search has everything. A record opens its detail
-/// beside the list.
+/// About you, Rules, Knowledge and Timeline: each area its own page.
 struct CalmArea: View {
     let brain: BrainModel
-    @State private var shown = false
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    private var calm: BrainCalmModel { brain.calm }
-
-    private var subtitle: String {
-        switch calm.page {
-        case .me: "Written by Brain from how you work. Changes itself as you do."
-        case .rules: "Brain turns how you work into short rules and starts using them right away."
-        case .knowledge: "The facts and decisions Brain is sure enough about to rely on."
-        case .timeline: "Your work, told as it happened. Only what mattered."
-        default: ""
-        }
-    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(calm.page.title).coreFont(size: MacTextSize.title, weight: .semibold)
-                    Text(subtitle).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
-                }
-                Spacer()
-                if calm.page == .knowledge {
-                    HStack(spacing: Space.s1) {
-                        seg("Facts", "fact")
-                        seg("Decisions", "decision")
-                    }
-                }
-            }
-            if calm.records.isEmpty {
-                Text(calm.loading ? "Reading…" : "Nothing here yet. Brain fills this in as it learns.")
-                    .foregroundStyle(GlassInk.secondary).padding(Space.s4)
-                    .frame(maxWidth: .infinity, alignment: .leading).coreWell()
-            } else {
-                HStack(alignment: .top, spacing: Space.s4) {
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        ScrollView {
-                            VStack(spacing: 2) {
-                                ForEach(Array(calm.records.enumerated()), id: \.element.id) { i, r in
-                                    CoreRow(
-                                        r.body, subtitle: sub(r), symbol: Self.symbol(r.type),
-                                        selected: calm.picked == r.id, action: { calm.picked = r.id }
-                                    ) {
-                                        if r.support > 1 { StateBadge("Sure", tone: .done, symbol: "checkmark") }
-                                    }
-                                    .coreRise(shown, min(i, 8))
-                                }
-                            }
-                            .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.records.map(\.id))
-                        }
-                        if calm.total > calm.records.count {
-                            HStack(spacing: Space.s2) {
-                                Text("Showing the \(calm.records.count) most important of \(calm.total).")
-                                Button("See everything") {
-                                    calm.searchArea = calm.page.area ?? ""
-                                    brain.go(.records)
-                                }
-                                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                            }
-                            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                        }
-                    }
-                    if let r = calm.records.first(where: { $0.id == calm.picked }) {
-                        RecordDetail(brain: brain, record: r, area: calm.page.area ?? "")
-                            .frame(width: Space.s8 * 12)
-                            .transition(.opacity)
-                    }
-                }
-                .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.picked)
-            }
-            if calm.areas?.lockedRooms ?? 0 > 0 {
-                Text("\(BrainWords.plural(calm.areas?.lockedRooms ?? 0, "room", "rooms")) not shown until unlocked.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+        Group {
+            switch brain.calm.page {
+            case .rules: RulesPage(brain: brain)
+            case .knowledge: KnowledgePage(brain: brain)
+            case .timeline: TimelinePage(brain: brain)
+            default: AboutYouPage(brain: brain)
             }
         }
-        .onAppear { shown = true }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("brain-area-page")
-    }
-
-    private func seg(_ title: String, _ type: String) -> some View {
-        Button(title) { Task { await calm.setKnowledge(type) } }
-            .buttonStyle(CoreButtonStyle(calm.knowledgeType == type ? .prominent : .secondary, size: .small))
-    }
-
-    private func sub(_ r: BrainAreaRecordWire) -> String {
-        var s = r.roomName
-        if r.support > 1 { s += " · seen \(r.support) times" }
-        return s
     }
 
     static func symbol(_ type: String) -> String {
@@ -106,5 +28,144 @@ struct CalmArea: View {
         case "project-state": "clock"
         default: "text.alignleft"
         }
+    }
+}
+
+/// About you: empty, how it fills in (three steps) with Import History…; filled, who you are by
+/// what Brain saw most, and what it learned grouped by kind, each with how sure it is.
+struct AboutYouPage: View {
+    let brain: BrainModel
+    @State private var shown = false
+    @Environment(\.coreAccent) private var accent
+    private var calm: BrainCalmModel { brain.calm }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s4) {
+            BrainHead(
+                symbol: "person", title: "About you", count: max(calm.summary("me")?.count ?? 0, calm.records.count),
+                sub: "How you like to work")
+            ScrollView {
+                Group {
+                    if calm.records.isEmpty && !calm.loading { empty } else { filled }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .onAppear { shown = true }
+    }
+
+    private var empty: some View {
+        VStack(spacing: Space.s4) {
+            BrainTile(symbol: "person", lit: true, size: Space.s8 + Space.s6)
+            Text("Brain does not know you yet").coreFont(size: MacTextSize.title, weight: .semibold)
+            Text(
+                "It learns how you like to work from your AI sessions: how you ask, what you correct, what you always repeat. Nothing here comes from your projects; this stays about you."
+            )
+            .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+            .frame(maxWidth: Space.s8 * 15)
+            HStack(alignment: .top, spacing: Space.s3) {
+                step(1, "You work as usual", "Ask AI sessions for things the way you always do.")
+                step(2, "It notices patterns", "“Prefers short answers”, “Reviews before merging”.")
+                step(3, "You stay in charge", "Every line here can be changed or forgotten.")
+            }
+            .frame(maxWidth: Space.s8 * 23)
+            HStack(spacing: Space.s2) {
+                Button {
+                    brain.openImport()
+                } label: {
+                    Label("Import History…", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(CoreButtonStyle(.prominent))
+                .environment(\.coreKeycap, "⌘I")
+                .help("Learn from your past AI sessions (⌘I)")
+            }
+        }
+        .padding(Space.s8)
+        .frame(maxWidth: .infinity)
+        .coreWell()
+        .coreRise(shown, 0)
+        .accessibilityIdentifier("brain-me-empty")
+    }
+
+    private func step(_ n: Int, _ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Text("\(n)").coreFont(size: MacTextSize.meta, weight: .semibold).brainAccentInk()
+                .frame(width: Space.s5, height: Space.s5)
+                .background(GlassInk.accent(accent).opacity(0.2), in: coreShape(Radius.chip))
+                .accessibilityHidden(true)
+            Text(title).coreFont(size: MacTextSize.body, weight: .semibold).padding(.top, Space.s1)
+            Text(text).coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, minHeight: Space.s8 * 3, alignment: .topLeading)
+        .background(GlassInk.well, in: coreShape(Radius.control))
+    }
+
+    /// Filled: who you are (the tags Brain saw most), then the records grouped by kind.
+    private var filled: some View {
+        let tags = Dictionary(calm.records.flatMap(\.tags).map { ($0, 1) }, uniquingKeysWith: +)
+            .sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(5).map(\.key)
+        let groups: [(String, [BrainAreaRecordWire])] = [
+            ("How you like to work", calm.records.filter { $0.type == "preference" || $0.type == "rule" }),
+            ("About you", calm.records.filter { $0.type != "preference" && $0.type != "rule" }),
+        ].filter { !$0.1.isEmpty }
+        return HStack(alignment: .top, spacing: Space.s4) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                BrainTile(symbol: "person", lit: true, size: Space.s8 * 2)
+                Text("You").coreFont(size: MacTextSize.large, weight: .semibold)
+                Text(
+                    "What Brain learned about how you work, from \(BrainWords.plural(calm.records.count, "thing", "things")) it saw."
+                )
+                .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                if !tags.isEmpty {
+                    HStack(spacing: Space.s1) {
+                        ForEach(tags, id: \.self) { t in
+                            Text(t).coreFont(size: MacTextSize.body).padding(.horizontal, Space.s2).padding(
+                                .vertical, 3
+                            )
+                            .background(GlassInk.well, in: coreShape(Radius.chip))
+                        }
+                    }
+                }
+            }
+            .padding(Space.s5)
+            .frame(width: Space.s8 * 9.5, alignment: .leading)
+            .coreWell()
+            VStack(alignment: .leading, spacing: Space.s4) {
+                ForEach(Array(groups.enumerated()), id: \.offset) { i, g in
+                    VStack(alignment: .leading, spacing: Space.s3) {
+                        BrainCardHead(title: g.0) { Text(g.1.count.formatted()).monospacedDigit() }
+                        LazyVGrid(
+                            columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())],
+                            spacing: Space.s2
+                        ) {
+                            ForEach(g.1) { trait($0) }
+                        }
+                    }
+                    .padding(Space.s4).coreWell()
+                    .coreRise(shown, i + 1)
+                }
+            }
+        }
+        .accessibilityIdentifier("brain-me-filled")
+    }
+
+    private func trait(_ r: BrainAreaRecordWire) -> some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Text(r.body).coreFont(size: MacTextSize.body).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                SureBars(support: r.support)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, minHeight: Space.s8 * 2, alignment: .topLeading)
+        .background(GlassInk.well, in: coreShape(Radius.control))
+        .contextMenu {
+            Button("Forget") { brain.forget(r) }
+        }
+        .help("Seen in \(BrainWords.plural(r.support, "session", "sessions")). Right-click to forget it.")
     }
 }

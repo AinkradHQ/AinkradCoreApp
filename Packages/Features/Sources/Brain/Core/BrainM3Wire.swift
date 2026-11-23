@@ -32,8 +32,14 @@ struct InboxRecordWire: Decodable {
     var distilledAt: String?
     var distilledBy: DistilledByWire?
     var tool: String?
+    /// API minor 101: why Brain asks (`conflict`, `single_source`, `duplicate`, `other`), and the record it clashes with.
+    var reason: String?
+    var otherID: String?
+    var otherBody: String?
     enum CodingKeys: String, CodingKey {
-        case id, type, body, tags, sources, tool
+        case id, type, body, tags, sources, tool, reason
+        case otherID = "other_id"
+        case otherBody = "other_body"
         case distilledAt = "distilled_at"
         case distilledBy = "distilled_by"
     }
