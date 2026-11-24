@@ -218,12 +218,61 @@ struct GuidedSignInModelTests {
         let m = await ready(svc)
         let flow = AddAccountFlow()
         await flow.choose(provider("agy-sub", harness: "agy"), m)
-        #expect(flow.needsConsent && flow.runners?.only != nil && m.signIn == nil)
-        await flow.startOnRunner(m)
+        #expect(flow.needsConsent && flow.runners?.none == false && m.signIn == nil)
+        await flow.startOnCore(m)
         #expect(m.signIn == nil && !svc.log.contains { $0.hasPrefix("startLogin") }, "no login.start without consent")
         flow.consent = true
         flow.back(m)
         #expect(!flow.consent, "consent is not kept across tries")
+    }
+
+    /// Accounts on the Core: the wizard never asks for a runner, even when several could run the sign-in.
+    @Test func theWizardHasNoRunnerStepAndNamesNoRunner() async {
+        let svc = FakeService()
+        let m = await ready(svc)
+        svc.runnerList = ["r_1", "r_2"].map {
+            AccountRunner(id: $0, name: $0, online: true, commands: ["login-bound:agy", "login-bound:opencode"])
+        }
+        m.signInTick = 0.002
+        svc.loginItem = LoginItem(
+            id: "lg", provider: "agy-sub", label: "agy", runner: "r_2", state: "failed", url: nil, reason: "stop",
+            accountID: nil)
+        let flow = AddAccountFlow()
+        await flow.choose(provider("agy-sub", harness: "agy"), m)
+        // Only the risk note is asked; then the sign-in starts through the Core with no runner named.
+        flow.consent = true
+        await flow.startOnCore(m)
+        let starts = svc.log.filter { $0.hasPrefix("startLogin") }
+        #expect(starts == ["startLogin agy-sub \(flow.keyFlow.label)"], "\(starts)")
+        #expect(flow.runners == nil)
+        #expect(RunnerBinding.forSignIn("codex-sub").words == "Signed in on the Core · works on every runner")
+        #expect(RunnerBinding.forSignIn("agy-sub").why == RunnerBinding.agyWhy)
+    }
+
+    @Test func whereTheLoginLivesDecidesTheLineAndMoveToCore() async {
+        let svc = FakeService()
+        svc.orderOn = true
+        svc.accountList = [
+            account(1, "codex-old", provider: "codex-sub"), account(2, "codex-new", provider: "codex-sub"),
+            account(3, "agy", provider: "agy-sub"),
+        ]
+        let m = await ready(svc)
+        svc.bound = [1: "r_1", 3: "r_1"]
+        svc.notes = [
+            1: AccountNotes(held: "runner"), 2: AccountNotes(held: "core"), 3: AccountNotes(held: "runner"),
+        ]
+        await m.reload()
+        await m.reloadBindings(svc)
+        let old = m.account(1)!
+        let new = m.account(2)!
+        let agy = m.account(3)!
+        #expect(new.runnerBinding?.words == "Signed in on the Core · works on every runner")
+        #expect(old.runnerBinding?.words == "Runs only on linux-01" && old.runnerBinding?.movable == true)
+        #expect(m.moreActions(old).contains(.moveToCore))
+        #expect(!m.moreActions(new).contains(.moveToCore) && !m.moreActions(agy).contains(.moveToCore))
+        #expect(agy.runnerBinding?.detail.contains("keychain") == true)
+        await m.moveToCore(old)
+        #expect(svc.log.contains("moveToCore 1"))
     }
 
     @Test(.timeLimit(.minutes(1))) func openCodeNeedsNoConsent() async {

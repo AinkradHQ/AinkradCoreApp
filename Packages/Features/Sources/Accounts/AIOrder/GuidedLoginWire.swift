@@ -4,6 +4,9 @@ import Foundation
 // HAND-WRITTEN WIRE for the guided sign-in routes (E7-5). The generated client does not know them yet; the coordinator
 // runs `make clients` at integration and this file then shrinks. Every call is gated by API minor 95.
 
+/// Accounts on the Core: `held`, Move to Core and the sign-in with no runner step (Core API 103).
+let coreMinorAccountsOnCore: Int32 = 103
+
 /// `POST /api/v1/accounts/logins/{id}/input`. The line is a secret: no `Debug`, never stored or logged by the app.
 private struct LoginInputBody: Encodable { let text: String }
 
@@ -15,8 +18,9 @@ private struct BoundProbe: Decodable {
     let wipeNote: String?
     let keyringNotCleared: Bool?
     let modelsEnforced: Bool?
+    let held: String?
     private enum Keys: String, CodingKey {
-        case id, runners, runner
+        case id, runners, runner, held
         case wipeNote = "wipe_note"
         case keyringNotCleared = "keyring_not_cleared"
         case modelsEnforced = "models_enforced"
@@ -30,6 +34,7 @@ private struct BoundProbe: Decodable {
         wipeNote = try? c.decodeIfPresent(String.self, forKey: .wipeNote)
         keyringNotCleared = try? c.decodeIfPresent(Bool.self, forKey: .keyringNotCleared)
         modelsEnforced = try? c.decodeIfPresent(Bool.self, forKey: .modelsEnforced)
+        held = try? c.decodeIfPresent(String.self, forKey: .held)
     }
 }
 
@@ -38,6 +43,8 @@ private struct BoundProbe: Decodable {
 struct AccountNotes: Equatable, Sendable {
     var wipeNote: String?
     var modelsEnforced: Bool?
+    /// Where a plan's login lives: `core` or `runner` (Core API 103); nil from an older Core.
+    var held: String?
 
     static let keyringWords =
         "Your Antigravity login may stay in this runner's keyring. Sign out in Antigravity on that runner."
@@ -65,6 +72,9 @@ extension AccountsService {
     }
     func boundRunners() async -> [Int64: String] { [:] }
     func accountNotes() async -> [Int64: AccountNotes] { [:] }
+    func moveToCore(account: Int64) async throws {
+        throw CoreError.invalidInput("Moving an account to the Core needs a newer Core.")
+    }
 }
 
 extension LiveAccountsService {
@@ -81,6 +91,14 @@ extension LiveAccountsService {
         let body = try JSONEncoder().encode(LoginInputBody(text: line))
         _ = try await connection.signedRequest(
             method: "POST", target: "/api/v1/accounts/logins/\(Self.segment(id))/input", body: body)
+    }
+
+    /// `POST /api/v1/accounts/{id}/move-to-core` (Core API 103): the runner hands the login to the Core's vault. A step-up.
+    func moveToCore(account: Int64) async throws {
+        guard await connection.serverSupports(minor: coreMinorAccountsOnCore) else {
+            throw CoreError.invalidInput("Moving an account to the Core needs a newer Core.")
+        }
+        _ = try await connection.signedRequest(method: "POST", target: "/api/v1/accounts/\(account)/move-to-core")
     }
 
     func boundRunners() async -> [Int64: String] {
@@ -101,8 +119,8 @@ extension LiveAccountsService {
         for r in rows {
             let n = AccountNotes(
                 wipeNote: AccountNotes.wipe(note: r.wipeNote, flag: r.keyringNotCleared),
-                modelsEnforced: r.modelsEnforced)
-            if n.wipeNote != nil || n.modelsEnforced != nil { out[r.id] = n }
+                modelsEnforced: r.modelsEnforced, held: r.held)
+            if n.wipeNote != nil || n.modelsEnforced != nil || n.held != nil { out[r.id] = n }
         }
         return out
     }

@@ -62,6 +62,17 @@ extension AccountsModel {
         }
     }
 
+    /// Moves a runner-bound ChatGPT or OpenCode login into the Core (Touch ID): from then on every runner can use it, and
+    /// the copy on the runner is deleted. Nothing changes when the Core refuses; the toast says why.
+    func moveToCore(_ a: AccountItem) async {
+        let key = "move-\(a.id)"
+        let ok = await write(
+            key, reason: "Move \(title(a)) to your Core, so every runner can use it.",
+            done: "\(title(a)) is on your Core now. It works on every runner."
+        ) { try await $0.moveToCore(account: a.id) }
+        if !ok, let why = writeError[key] { host.shell.showToast(why) }
+    }
+
     /// The runner each bound account is pinned to: what the Core says, else where the app saw the sign-in finish.
     func reloadBindings(_ service: any AccountsService) async {
         let said = await service.boundRunners()
@@ -74,7 +85,8 @@ extension AccountsModel {
             n.modelsEnforced = notes[a.id]?.modelsEnforced
             let bound = SignInStyle.of(a.provider, methods: providerMethods(a.provider)).runnerBound
             let runner = said[a.id] ?? boundSeen[a.id]
-            n.runnerBinding = (bound || runner != nil) ? RunnerBinding(name: runner.flatMap { names[$0] }) : nil
+            n.runnerBinding = RunnerBinding.of(
+                provider: a.provider, held: notes[a.id]?.held, runner: runner.flatMap { names[$0] }, bound: bound)
             return n
         }
     }

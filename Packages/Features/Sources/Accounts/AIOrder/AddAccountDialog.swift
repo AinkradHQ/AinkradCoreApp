@@ -214,10 +214,9 @@ struct AddAccountDialog: View {
                     },
                     back: { flow.back(model) })
             } else {
-                RunnerPickView(
-                    provider: name, choice: c, pick: { flow.runners?.selected = $0 },
-                    consent: flow.needsConsent ? Binding(get: { flow.consent }, set: { flow.consent = $0 }) : nil,
-                    start: { Task { await flow.startOnRunner(model) } }, back: { flow.back(model) })
+                ConsentView(
+                    provider: name, consent: Binding(get: { flow.consent }, set: { flow.consent = $0 }),
+                    start: { Task { await flow.startOnCore(model) } }, back: { flow.back(model) })
             }
         } else {
             signInRunning
@@ -261,9 +260,7 @@ struct AddAccountDialog: View {
             }
             if pastes, case .open? = s?.stage { pasteField(s?.codeError) }
             status(s?.stage, name: name)
-            if let r = flow.runnerName {
-                RunnerBoundNote(binding: RunnerBinding(name: r))
-            }
+            RunnerBoundNote(binding: RunnerBinding.forSignIn(flow.providerID ?? ""))
             if SignInStyle.showsRisk(flow.providerID ?? "") {
                 Label(
                     "Uses your subscription at your own risk. The provider's rules may not allow it.",

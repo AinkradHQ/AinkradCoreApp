@@ -22,10 +22,9 @@ final class AddAccountFlow {
     var modelsFound: Int?
     /// The models were counted: the third line of the check is done.
     var modelsSettled = false
-    /// A runner-bound sign-in waits here for a runner: the ones that can run it, or why none can.
+    /// A CLI sign-in (ChatGPT, OpenCode, Antigravity) waits here until some runner can run it for the Core, or says why
+    /// none can. The person never picks one: the Core runs the sign-in (on its own runner first) and keeps the login.
     var runners: RunnerChoice?
-    /// The runner the sign-in started on, for the line "Runs only on ...".
-    var runnerName: String?
     /// "I understand this may break the provider's rules": asked before a Codex or Antigravity sign-in starts. In memory
     /// only, so every launch (and every new try) asks again.
     var consent = false
@@ -78,14 +77,13 @@ final class AddAccountFlow {
         startedName = m.namesOn ? AccountNames.clean(accountName) : nil
         if ProviderCatalog.kind(p) == .subscription {
             runners = nil
-            runnerName = nil
             if SignInStyle.of(p.id, methods: p.loginMethods).runnerBound,
                 let list = try? await m.service?.runners()
             {
                 let c = RunnerChoice.make(runners: list, harness: p.harness)
                 runners = c
-                // One runner can do it: use it without asking. The sign-in says where it runs.
-                if c.only != nil, !needsConsent { await startOnRunner(m) }
+                // Some runner can run it: start at once, unless the risk note must be agreed to first.
+                if !c.none, !needsConsent { await startOnCore(m) }
             } else {
                 await m.startSignIn(provider: p.id, label: label, displayName: startedName)
             }
@@ -94,13 +92,12 @@ final class AddAccountFlow {
         }
     }
 
-    /// Starts the sign-in on the chosen runner; the account will only run there.
-    func startOnRunner(_ m: AccountsModel) async {
-        guard let id = providerID, let r = runners?.chosen, !needsConsent || consent else { return }
-        runnerName = r.name
+    /// Starts the sign-in through the Core, which picks the runner that runs the CLI. No runner is named.
+    func startOnCore(_ m: AccountsModel) async {
+        guard let id = providerID, runners?.none == false, !needsConsent || consent else { return }
         runners = nil
         startedName = m.namesOn && nameIssue == nil ? AccountNames.clean(accountName) : nil
-        await m.startSignIn(provider: id, label: keyFlow.label, displayName: startedName, runner: r.id)
+        await m.startSignIn(provider: id, label: keyFlow.label, displayName: startedName)
     }
 
     /// No runner can sign in: install the provider's app on `target` (Touch ID), wait until a runner offers the sign-in,
@@ -130,7 +127,7 @@ final class AddAccountFlow {
                 let c = RunnerChoice.make(runners: list, harness: p.harness)
                 if !c.none {
                     runners = c
-                    if c.only != nil, !needsConsent { await startOnRunner(m) }
+                    if !needsConsent { await startOnCore(m) }
                     return
                 }
             }
@@ -145,7 +142,6 @@ final class AddAccountFlow {
     func back(_ m: AccountsModel) {
         consent = false
         runners = nil
-        runnerName = nil
         if stepper.step == .signIn { Task { await m.cancelSignIn() } }
         keyFlow.wipe()
         error = nil
@@ -156,7 +152,6 @@ final class AddAccountFlow {
         m.signIn = nil
         consent = false
         runners = nil
-        runnerName = nil
         keyFlow = KeyEntryFlow()
         providerID = nil
         addedAccount = nil
