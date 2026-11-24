@@ -1,4 +1,4 @@
 # The macOS runner bundled into the app: the AinkradCore release asset ainkrad-runner-<VERSION>-macos-arm64.zip
 # (made by AinkradCore scripts/release/mac-package.sh) and its SHA-256. Empty until a Core release publishes it.
-VERSION=0.10.0
-SHA256_ARM64=a35890fe4bb399766733a3573a6c2ca5c4abcd425d1464c62044b12365f34e3f
+VERSION=0.10.9
+SHA256_ARM64=2fc226a8b7697c6da3013e8eb261de7bf8e8766ac37f37af552727ecdf060ffc
