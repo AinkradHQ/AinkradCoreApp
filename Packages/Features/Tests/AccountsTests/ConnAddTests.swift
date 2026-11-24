@@ -75,6 +75,18 @@ struct ConnAddStateTests {
         #expect(a.chosen(order: order) == ["a", "b", "z/gone"])
     }
 
+    @Test func pastSixtyFourAFullyTickedOwnerIsSavedAsAWildcardAndComesBackTicked() {
+        var a = ConnAddState(kind: "github")
+        let mine = (0..<70).map { ConnPick(id: "me/r\($0)", name: "r\($0)") }
+        let org = [ConnPick(id: "org/x", name: "x"), ConnPick(id: "org/y", name: "y")]
+        a.picked = Set(mine.map(\.id) + ["org/x"])
+        #expect(a.chosen(order: mine + org) == ["me/*", "org/x"])
+        #expect(a.chosen(order: mine + org, complete: false).count == 71)
+        a.picked = ["me/*", "org/x"]
+        a.expandWildcards(mine + org, complete: true)
+        #expect(a.picked == Set(mine.map(\.id) + ["org/x"]))
+    }
+
     @Test func stepsGoForwardAndBackAndDoneHasNoBack() {
         var a = ConnAddState(kind: "github")
         a.signedIn(connection: 1)

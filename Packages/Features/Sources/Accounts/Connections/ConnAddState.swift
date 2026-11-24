@@ -111,9 +111,33 @@ struct ConnAddState: Equatable, Sendable {
     var canFinish: Bool { !picked.isEmpty }
 
     /// The ids to save, in the list's order, then any picked ones the list no longer shows.
-    func chosen(order: [ConnPick]) -> [String] {
+    /// The Core takes at most 64 names, so past that an owner whose every listed repository is ticked is saved as
+    /// `owner/*` (only when the list is complete, so the wildcard never reaches more than the person ticked).
+    func chosen(order: [ConnPick], complete: Bool = true) -> [String] {
         let known = order.map(\.id).filter(picked.contains)
-        return known + picked.subtracting(known).sorted()
+        let ids = known + picked.subtracting(known).sorted()
+        guard ids.count > Self.maxNames, complete else { return ids }
+        let owners = Dictionary(grouping: order.map(\.id).filter { $0.contains("/") }) { Self.owner($0) }
+        let full = Set(owners.filter { $0.value.allSatisfy(picked.contains) }.keys)
+        var out: [String] = []
+        for id in ids {
+            guard id.contains("/"), full.contains(Self.owner(id)) else { out.append(id); continue }
+            let star = Self.owner(id) + "/*"
+            if !out.contains(star) { out.append(star) }
+        }
+        return out
+    }
+
+    static let maxNames = 64
+    static func owner(_ id: String) -> String { String(id.split(separator: "/").first ?? "") }
+
+    /// Turn a saved `owner/*` back into ticks on that owner's rows; it stays as a pick only when the list is cut short.
+    mutating func expandWildcards(_ items: [ConnPick], complete: Bool) {
+        for star in picked where star.hasSuffix("/*") {
+            let owner = String(star.dropLast(2))
+            picked.formUnion(items.map(\.id).filter { $0.contains("/") && Self.owner($0) == owner })
+            if complete { picked.remove(star) }
+        }
     }
 
     var countLine: String { "\(picked.count) picked" }
