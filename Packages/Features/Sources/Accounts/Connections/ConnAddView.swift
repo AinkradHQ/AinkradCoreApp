@@ -12,6 +12,7 @@ struct ConnAddView: View {
     @State var token = false
     @State var site: String?
     @State var copied = false
+    @State var installing = false
     @Environment(\.accessibilityReduceMotion) var reduce
 
     var a: ConnAddState { model.add ?? ConnAddState() }
@@ -161,6 +162,7 @@ struct ConnAddView: View {
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(rows.isEmpty)
             }
             pickList(noun)
+            if a.kind == "github" { missingRepos }
             if let e = model.addError { AccIssue(text: e) }
             if let c = a.connection, model.gated.contains("access-\(c)") {
                 TurnOnConnections(model: model) { await model.finishAdd() }
@@ -168,6 +170,28 @@ struct ConnAddView: View {
             footer(
                 primary: (a.finishTitle(noun: noun, saving: saving), { Task { await model.finishAdd() } }),
                 enabled: a.canFinish && !saving, busy: saving)
+        }
+    }
+
+    /// GitHub only lists repositories where the Ainkrad GitHub App is installed, even ones you can open. Installing it on
+    /// another account or organization brings them in (the list reloads when you come back); a token sees them all.
+    private var missingRepos: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Text("Missing a repository? GitHub only shows accounts and organizations where Ainkrad is installed.")
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            HStack(spacing: Space.s2) {
+                AccLink(title: "Add an organization or account", symbol: "plus") {
+                    installing = true
+                    NSWorkspace.shared.open(URL(string: "https://github.com/apps/ainkradhq/installations/new")!)
+                }
+                AccLink(title: "Use a token instead", symbol: "key") { token = true }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard installing else { return }
+            installing = false
+            Task { await model.loadPicks() }
         }
     }
 
