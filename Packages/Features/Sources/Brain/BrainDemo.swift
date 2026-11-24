@@ -109,13 +109,16 @@ public final class BrainDemo {
         case "worst-overview", "worst-rooms", "worst-inbox": s.worst = true
         default: break
         }
-        if scene == "room-ai-access" || scene == "calm-place" { s.m3 = true }
+        if scene == "room-ai-access" || scene.hasPrefix("calm-place") { s.m3 = true }
         // The redesign's scenes have things to check (BrainCalmDemo.swift).
         if scene.hasPrefix("calm"), !["calm-fresh", "calm-few", "calm-import", "calm-import-drop"].contains(scene) {
             s.m3 = true
         }
-        // The place detail opens on its Overview; the sample place has none written yet (the empty state).
-        if scene == "calm-place" { s.overview = .notWritten }
+        // The place page: its overview written, or being written by the Core.
+        if scene.hasPrefix("calm-place") {
+            s.overview =
+                scene == "calm-place-writing" ? .writing : scene == "calm-place-first" ? .notWritten : .written
+        }
         if scene.hasPrefix("room-overview") {
             s.m3 = true
             s.overview =

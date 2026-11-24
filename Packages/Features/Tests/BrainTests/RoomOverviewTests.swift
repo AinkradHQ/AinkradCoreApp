@@ -39,6 +39,17 @@ struct RoomOverviewTests {
         #expect(try JSONDecoder().decode(OverviewState.self, from: Data(#""needs_account""#.utf8)) == .needsAccount)
     }
 
+    /// API minor 102: a refresh queued while the old overview is shown reads as being written; an older Core sends
+    /// neither field.
+    @Test func cardPendingReadsAsWriting() throws {
+        let queued = try JSONDecoder().decode(
+            RoomOverview.self,
+            from: Data(#"{"state":"written","card_at":"2026-11-23T10:00:00Z","card_pending":true}"#.utf8))
+        #expect(queued.isWriting && queued.cardAt == "2026-11-23T10:00:00Z")
+        let old = try JSONDecoder().decode(RoomOverview.self, from: Data(#"{"state":"written"}"#.utf8))
+        #expect(!old.isWriting && old.cardPending == nil)
+    }
+
     @Test func aRoomOpensOnItsOverviewWhereTheServiceWritesOne() async {
         let model = await make(.written)
         #expect(model.candidates.paneMode == .overview)

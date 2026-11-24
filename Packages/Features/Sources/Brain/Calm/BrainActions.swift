@@ -75,3 +75,11 @@ enum CheckWords {
         }
     }
 }
+
+extension BrainModel {
+    /// A place Overview's "All 92 rules", "All decisions", "Timeline": the area's page, narrowed to that place.
+    func openPlaceList(_ p: BrainCalmModel.Page, room: String, type: String? = nil) {
+        tab = p.tab
+        Task { await calm.openFiltered(p, room: room, type: type) }
+    }
+}

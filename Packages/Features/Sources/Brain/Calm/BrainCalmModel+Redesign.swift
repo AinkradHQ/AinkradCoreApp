@@ -27,7 +27,9 @@ extension BrainCalmModel {
     func matches(_ r: BrainAreaRecordWire) -> Bool {
         if page == .rules, let room = ruleRoom, r.room != room { return false }
         if page == .knowledge, topic == nil, r.type != knowledgeType { return false }
-        if page == .knowledge, let room = topicRoom, r.room != room, r.roomName != room { return false }
+        if page == .knowledge || page == .timeline, let room = topicRoom, r.room != room, r.roomName != room {
+            return false
+        }
         if !filterText.isEmpty, !r.body.localizedCaseInsensitiveContains(filterText) { return false }
         return true
     }

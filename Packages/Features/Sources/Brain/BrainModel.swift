@@ -86,6 +86,8 @@ public final class BrainModel {
         service?.overviewService != nil && (isSample || (apiMinor ?? 0) >= 74)
     }
     /// "Same project as…" and its list in Settings (Core API minor 72). The sample always has it.
+    /// The Core writes place overviews by itself (API minor 102; the sample stands for such a Core).
+    var writesOverviews: Bool { isSample || (apiMinor ?? 0) >= coreMinorAutoOverview }
     public var remembersSameProject: Bool { isSample || (apiMinor ?? 0) >= 72 }
     /// Sync now, sources and rules on the Rooms page; nil until a service attaches.
     public private(set) var sync: SyncModel?

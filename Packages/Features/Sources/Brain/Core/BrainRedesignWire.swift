@@ -5,6 +5,8 @@ import Foundation
 
 /// The API minor that serves the redesign's routes and fields.
 public let coreMinorBrainRedesign = 101
+/// The API minor from which the Core writes and refreshes place overviews by itself (`card_at`, `card_pending`).
+public let coreMinorAutoOverview = 102
 
 /// `GET /places`: one row per place, the private About you place included.
 public struct PlaceWire: Codable, Sendable, Equatable, Identifiable {

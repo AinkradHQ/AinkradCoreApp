@@ -169,6 +169,7 @@ struct ExploreEvidenceTab: View {
         case "cursor": "Cursor"
         case "note": "Notes folder"
         case "chat_export": "Chat exports"
+        case "doc": "Project docs"
         default: kind.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

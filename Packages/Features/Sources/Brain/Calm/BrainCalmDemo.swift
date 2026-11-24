@@ -6,7 +6,9 @@ import Foundation
 extension BrainDemo {
     static let walk = [
         "calm-me", "calm-me-full", "calm-rules", "calm-knowledge", "calm-knowledge-ask", "calm-knowledge-topic",
-        "calm-timeline", "calm-places", "calm-place", "calm-inbox", "calm-sources", "calm-activity", "calm-search",
+        "calm-timeline", "calm-places", "calm-place", "calm-place-first", "calm-place-writing", "calm-place-read",
+        "calm-place-settings",
+        "calm-inbox", "calm-sources", "calm-activity", "calm-search",
     ]
 
     func showWalk(_ scene: String) async {
@@ -19,12 +21,16 @@ extension BrainDemo {
         case "calm-places":
             model.placeOpen = false
             model.go(.rooms)
-        case "calm-place":
+        case let s where s.hasPrefix("calm-place-") || s == "calm-place":
+            calm.demoLatest = Self.read
+            calm.demoTrace = Self.trace
             model.go(.rooms)
             model.view("acme-shop")
             await model.inspect("acme-shop")
             await model.candidates.loadPolicy("acme-shop")
-            model.candidates.paneMode = .overview
+            await model.candidates.loadAccess("acme-shop")
+            model.candidates.paneMode =
+                s == "calm-place-read" ? .items : s == "calm-place-settings" ? .settings : .overview
             await model.roomOverview.open("acme-shop")
         case "calm-inbox": model.go(.inbox)
         case "calm-sources": model.go(.sources)
@@ -322,6 +328,35 @@ extension BrainDemo {
             .init(
                 id: "q8", room: "acme-shop", roomName: "Acme Shop", type: "fact",
                 body: "Every fix needs a passing test before it merges"),
+        ])
+
+    /// What Acme Shop read, newest first (made-up titles).
+    static var read: RoomLatest {
+        func at(_ h: Double) -> String { ISO8601DateFormatter().string(from: Date().addingTimeInterval(-h * 3_600)) }
+        let rows: [(String, String, Double)] = [
+            ("doc", "Memory: the project briefing", 0.4), ("claude_code", "Fix the update step for the runner", 1.8),
+            ("doc", "Notes for later: the release testing walk", 22), ("claude_code", "Redesign the order pages", 25),
+            ("doc", "Design parity check for the editor", 30), ("codex", "Review the release checklist", 46),
+            ("doc", "Test plan for the next release", 52), ("doc", "Security review: the payment flow", 58),
+        ]
+        return RoomLatest(
+            items: rows.enumerated().map { i, r in
+                LatestItem(itemID: "src\(i)", type: "source", sourceKind: r.0, title: r.1, startedAt: at(r.2))
+            }, records: 6_260)
+    }
+
+    static let trace = SourceTraceWire(
+        excerpt: "…the runner beside the Core must update in the same run, after the health check, and roll back alone "
+            + "if it fails",
+        records: [
+            .init(
+                id: "tr1", type: "rule", body: "Update the runner together with the Core", archived: false, history: []),
+            .init(
+                id: "tr2", type: "fact", body: "The update writes its progress to one status file", archived: false,
+                history: []),
+            .init(
+                id: "tr3", type: "project-state", body: "0.10.5 shipped the combined update", archived: false,
+                history: []),
         ])
 
     /// To check's three questions: a disagreement, a rule seen once, and a duplicate.
