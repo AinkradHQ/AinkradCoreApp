@@ -16,6 +16,15 @@ struct WorkspaceTests {
         #expect(shell.spaces.count == 1 && shell.panes.map(\.id) == ["a", "b", "c"])
     }
 
+    @Test func aNewAppJoiningAFocusedWorkspaceKeepsItFocused() {
+        let shell = ShellModel()
+        shell.workspaceWidth = 1500
+        shell.openPane(spec("a"))
+        shell.toggleFocusMode()
+        shell.openPane(spec("b"))
+        #expect(shell.spaces.count == 1 && shell.focusedPane == "b" && shell.activePane == "b")
+    }
+
     @Test func anAppThatDoesNotFitSideBySideOpensANewWorkspaceWhenTheHeightIsUnknown() {
         let shell = ShellModel()
         shell.workspaceWidth = 1000
