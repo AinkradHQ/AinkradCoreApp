@@ -45,4 +45,18 @@ enum ConnAccess {
     static func line(_ p: ConnPick, now: Date = Date()) -> String? {
         p.updatedAt.map { updated($0, now: now) } ?? p.detail
     }
+
+    /// "Just now", "12 min ago", "3 h ago", "Yesterday", "4 days ago": when a connection was last used.
+    static func used(_ then: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let secs = max(0, Int(now.timeIntervalSince(then)))
+        if secs < 60 { return "Just now" }
+        if secs < 3600 { return "\(secs / 60) min ago" }
+        let days =
+            calendar.dateComponents([.day], from: calendar.startOfDay(for: then), to: calendar.startOfDay(for: now))
+            .day ?? 0
+        if days < 1 { return "\(secs / 3600) h ago" }
+        if days == 1 { return "Yesterday" }
+        if days < 60 { return "\(days) days ago" }
+        return "\(days / 30) months ago"
+    }
 }

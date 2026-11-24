@@ -5,6 +5,17 @@ import Foundation
 enum ConnStep: Int, CaseIterable, Sendable {
     case service = 1
     case signIn, allow, choose, done
+
+    /// The word under its bar in the step path.
+    var label: String {
+        switch self {
+        case .service: "Service"
+        case .signIn: "Sign in"
+        case .allow: "Access"
+        case .choose: "Choose"
+        case .done: "Done"
+        }
+    }
 }
 
 /// Read only, or read and change.
@@ -106,6 +117,24 @@ struct ConnAddState: Equatable, Sendable {
     }
 
     var countLine: String { "\(picked.count) picked" }
+
+    /// Tick every row in the list, or untick them; picks the list does not show stay as they are.
+    mutating func selectAll(_ rows: [ConnPick]) { picked.formUnion(rows.map(\.id)) }
+    mutating func clearAll(_ rows: [ConnPick]) { picked.subtract(rows.map(\.id)) }
+    func allPicked(_ rows: [ConnPick]) -> Bool { !rows.isEmpty && rows.allSatisfy { picked.contains($0.id) } }
+
+    /// The main button of the last question: it names the count ("Connect 2 repositories").
+    func finishTitle(noun: String, saving: Bool) -> String {
+        if saving { return "Saving…" }
+        if editing { return "Save" }
+        return picked.isEmpty ? "Connect" : "Connect \(picked.count) \(ConnAccess.noun(noun, count: picked.count))"
+    }
+
+    /// Back is offered when `back()` would move: not on the first or last step, never before where an edit opened.
+    var canGoBack: Bool {
+        guard step != .service, step != .done, let prior = ConnStep(rawValue: step.rawValue - 1) else { return false }
+        return prior.rawValue >= floor.rawValue
+    }
 
     mutating func next() {
         switch step {

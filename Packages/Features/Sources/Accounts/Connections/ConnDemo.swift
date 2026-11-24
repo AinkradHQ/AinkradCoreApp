@@ -9,7 +9,8 @@ import SwiftUI
 extension AccountsDemo {
     public static let connScenes = [
         // The mockup's states (10-connections): the list, the empty page, the five steps, the error.
-        "conn-list", "conn-empty", "conn-add-1", "conn-add-2", "conn-add-2-code", "conn-add-3", "conn-add-3-write",
+        "conn-list", "conn-empty", "conn-add-1", "conn-add-2", "conn-add-2-code", "conn-add-2-jira", "conn-add-3",
+        "conn-add-3-write",
         "conn-add-4", "conn-add-4-error", "conn-add-5", "conn-error", "conn-jira-sites", "conn-off",
         // Around it: a token instead, rename, the app registration, replacing a token, the refusals.
         "conn-token", "conn-rename", "conn-app-notset", "conn-app-set", "conn-app-saving", "conn-app-error",
@@ -52,6 +53,7 @@ extension AccountsDemo {
         switch scene {
         case "conn-add-1": m.beginAdd()
         case "conn-add-2": await open("github")
+        case "conn-add-2-jira": await open("jira")
         case "conn-add-2-code":
             await open("github")
             try? await Task.sleep(for: .milliseconds(400))

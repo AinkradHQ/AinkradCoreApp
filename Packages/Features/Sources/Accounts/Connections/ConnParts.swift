@@ -1,40 +1,78 @@
 import CoreUI
 import SwiftUI
 
-/// A service's logo: its letter on a rounded square in its own tint (the mockup's `c10-logo`).
+/// A service's logo as a template image in one ink: the primary ink, or the accent when `lit` (hover, connected).
+/// A kind without a logo shows its letter.
+struct ConnMark: View {
+    let kind: String
+    let size: CGFloat
+    var lit = false
+    @Environment(\.coreAccent) private var paneAccent
+    var body: some View {
+        let ink = lit ? GlassInk.accentInk(paneAccent) : GlassInk.primary
+        Group {
+            if ConnLook.logos.contains(kind) {
+                Image("conn-\(kind)", bundle: .module).renderingMode(.template).resizable().scaledToFit()
+                    .frame(width: size, height: size)
+            } else {
+                Text(ConnLook.letter(kind)).coreFont(size: size * 0.8, weight: .bold)
+            }
+        }
+        .foregroundStyle(ink)
+        .animation(Motion.out(Motion.hover), value: lit)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The logo tile: the mark on a quiet well. No brand colours.
 struct ConnLogo: View {
     let kind: String
     var size: CGFloat = 44
+    var lit = false
     var body: some View {
-        let hue = ConnLook.hue(kind)
-        coreShape(size > 56 ? Radius.pane : Radius.cardMac)
-            .fill(hue.opacity(0.26))
+        coreShape(size >= 40 ? Radius.cardMac : Radius.control)
+            .fill(GlassInk.well)
+            .frame(width: size, height: size)
+            .overlay { ConnMark(kind: kind, size: (size * 0.5).rounded(), lit: lit) }
+            .accessibilityHidden(true)
+    }
+}
+
+/// The Ainkrad emblem on a tile: the Core end of every wire.
+struct ConnCoreTile: View {
+    var size: CGFloat = 64
+    var body: some View {
+        coreShape(Radius.cardMac)
+            .fill(GlassInk.well)
             .frame(width: size, height: size)
             .overlay {
-                Text(ConnLook.letter(kind))
-                    .coreFont(size: size > 56 ? 30 : MacTextSize.large, weight: .bold)
-                    .foregroundStyle(hue)
+                Image("Emblem", bundle: .main).resizable().scaledToFit().frame(width: size * 0.5)
             }
             .accessibilityHidden(true)
     }
 }
 
-/// The five steps as small rounded bars: done and current in the accent, the rest quiet.
+/// The five steps as a path: a bar and a word each. Done and current bars take the accent; the current word is the bold one.
 struct ConnSteps: View {
     @Environment(\.coreAccent) private var paneAccent
     let at: ConnStep
     @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
-        HStack(spacing: Space.s1) {
+        HStack(spacing: Space.s2) {
             ForEach(ConnStep.allCases, id: \.rawValue) { s in
-                coreShape(2)
-                    .fill(s.rawValue <= at.rawValue ? GlassInk.accent(paneAccent) : GlassInk.track)
-                    .frame(width: s == at ? Space.s5 : Space.s2, height: Space.s1 + 2)
+                VStack(spacing: Space.s2) {
+                    coreShape(2)
+                        .fill(s.rawValue <= at.rawValue ? GlassInk.accent(paneAccent) : GlassInk.track)
+                        .frame(height: 3)
+                    Text(s.label).coreFont(size: MacTextSize.meta, weight: s == at ? .semibold : .regular)
+                        .foregroundStyle(s == at ? GlassInk.primary : GlassInk.secondary)
+                }
+                .frame(maxWidth: .infinity)
             }
         }
-        .animation(reduce ? nil : .smooth(duration: 0.3), value: at)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: at)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Step \(at.rawValue) of 5")
+        .accessibilityLabel("Step \(at.rawValue) of 5: \(at.label)")
     }
 }
 
@@ -45,53 +83,17 @@ struct ConnLink: View {
     var body: some View {
         TimelineView(.animation(paused: reduce)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
-            HStack(spacing: Space.s2 - 2) {
+            HStack(spacing: Space.s2) {
                 ForEach(0..<5, id: \.self) { i in
                     let p = reduce ? 0 : max(0, sin((t * 3.9) - Double(i) * 0.6))
                     let lit = reduce ? i < 3 : p > 0.5
-                    coreShape(3).fill(GlassInk.accent(paneAccent))
-                        .frame(width: 9, height: 9)
+                    coreShape(2).fill(GlassInk.accent(paneAccent))
+                        .frame(width: 6, height: 6)
                         .opacity(lit ? 1 : 0.28)
-                        .offset(y: reduce ? 0 : -3 * p)  // grid: ok motion only, a hop
                 }
             }
         }
         .accessibilityHidden(true)
-    }
-}
-
-/// A service as a button: logo, name, one line. The tiles of the empty page and of step 1.
-struct ConnTileButton: View {
-    let kind: ConnKind
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: Space.s2) {
-                ConnLogo(kind: kind.id)
-                Text(kind.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                Text(kind.say).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .multilineTextAlignment(.center).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, Space.s2).padding(.top, Space.s4).padding(.bottom, Space.s3)
-            .frame(maxWidth: .infinity)
-            .background(GlassInk.well, in: coreShape(Radius.cardMac))
-            .contentShape(coreShape(Radius.cardMac))
-        }
-        .buttonStyle(CoreQuietPressStyle(radius: Radius.cardMac, hoverFill: true))
-        .accessibilityLabel("\(kind.name). \(kind.say)")
-    }
-}
-
-/// The five tiles in one row.
-struct ConnTiles: View {
-    let kinds: [ConnKind]
-    let pick: (String) -> Void
-    var body: some View {
-        HStack(alignment: .top, spacing: Space.s2) {
-            ForEach(Array(kinds.enumerated()), id: \.element.id) { i, k in
-                ConnTileButton(kind: k) { pick(k.id) }.connRise(index: i)
-            }
-        }
     }
 }
 
@@ -108,22 +110,6 @@ enum ConnMotion {
         if reduce { return 0 }
         let x = (t - phase).truncatingRemainder(dividingBy: floatPeriod) / floatPeriod
         return -floatLift * (1 - cos(2 * .pi * x)) / 2
-    }
-}
-
-/// A tile floating up and down. Time-driven, no pointer input; a still tile under Reduce Motion.
-private struct ConnFloat: ViewModifier {
-    let phase: Double
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    func body(content: Content) -> some View {
-        if reduce {
-            content
-        } else {
-            TimelineView(.animation) { ctx in
-                content.offset(
-                    y: ConnMotion.floatOffset(at: ctx.date.timeIntervalSinceReferenceDate, phase: phase, reduce: false))
-            }
-        }
     }
 }
 
@@ -147,6 +133,5 @@ private struct ConnRise: ViewModifier {
 }
 
 extension View {
-    func connFloat(phase: Double = 0) -> some View { modifier(ConnFloat(phase: phase)) }
     func connRise(index: Int) -> some View { modifier(ConnRise(index: index)) }
 }
