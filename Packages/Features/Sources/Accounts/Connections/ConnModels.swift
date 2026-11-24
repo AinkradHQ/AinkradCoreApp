@@ -155,32 +155,51 @@ enum ConnFilter: String, CaseIterable {
 }
 
 enum ConnLook {
-    /// The one letter on a service's logo tile.
-    static func letter(_ kind: String) -> String {
+    /// The services that ship a logo (an asset in `ConnLogos.xcassets`); any other kind falls back to its letter.
+    static let logos: Set<String> = ["github", "jira", "linear", "slack", "teams"]
+
+    /// The one letter a kind without a logo shows.
+    static func letter(_ kind: String) -> String { kind.prefix(1).uppercased() }
+
+    /// What the Core can read from a service, as the chips on its card.
+    static func reads(_ kind: String) -> [String] {
         switch kind {
-        case "teams": "T"
-        default: kind.prefix(1).uppercased()
+        case "github": ["Repositories", "Issues", "Pull requests"]
+        case "jira": ["Issues", "Boards", "Sprints"]
+        case "linear": ["Issues", "Cycles", "Projects"]
+        case "slack", "teams": ["Channels", "Threads"]
+        default: []
         }
     }
-    static func symbol(_ kind: String) -> String {
+
+    /// The website a browser sign-in happens on ("Sign in to Atlassian").
+    static func site(_ kind: String, name: String) -> String {
         switch kind {
-        case "github": "arrow.triangle.branch"
-        case "jira": "square.stack.3d.up"
-        case "linear": "line.diagonal"
-        case "slack": "number"
-        default: "link"
+        case "jira": "Atlassian"
+        case "teams": "Microsoft"
+        default: name
         }
     }
-    static func hue(_ kind: String) -> Color {
+
+    /// What the sign-in asks the person to pick on that website.
+    static func pickWord(_ kind: String) -> String {
         switch kind {
-        case "github": Color(red: 0x9A / 255, green: 0xA3 / 255, blue: 0xB2 / 255)
-        case "jira": Color(red: 0x5B / 255, green: 0x93 / 255, blue: 0xE6 / 255)
-        case "linear": Color(red: 0x8A / 255, green: 0x7F / 255, blue: 0xE0 / 255)
-        case "slack": Color(red: 0xD0 / 255, green: 0x7A / 255, blue: 0xA6 / 255)
-        case "teams": Color(red: 0x77 / 255, green: 0x82 / 255, blue: 0xDD / 255)
-        default: GlassInk.blue
+        case "jira": "site"
+        case "teams": "account"
+        default: "workspace"
         }
     }
+
+    /// The icon of one capability row on the Access step.
+    static func capabilitySymbol(_ c: ConnCapability) -> String {
+        if !c.writes { return c.id.contains("message") || c.id == "read_issues" ? "tray" : "eye" }
+        switch c.id {
+        case "push", "transition": return "arrow.right"
+        case "post_messages": return "paperplane"
+        default: return "pencil"
+        }
+    }
+
     /// The chip on a row: connected, or what to do about it.
     static func chip(_ c: ConnItem) -> (String, Tone, String) {
         if c.status == .needsLook && c.signInNeeded { return ("Sign in again", .warn, "exclamationmark.triangle") }
@@ -192,14 +211,5 @@ enum ConnLook {
         case .needsLook: ("Needs a look", .warn, "exclamationmark.triangle")
         case .disabled: ("Turned off", .queue, "pause.circle")
         }
-    }
-}
-
-/// The tile of a kind: a rounded square in its colour.
-struct ConnTile: View {
-    let kind: String
-    var large = false
-    var body: some View {
-        IconTile(ConnLook.symbol(kind), hue: ConnLook.hue(kind), size: large ? 48 : 36)
     }
 }

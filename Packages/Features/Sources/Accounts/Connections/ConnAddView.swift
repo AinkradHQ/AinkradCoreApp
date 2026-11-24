@@ -2,20 +2,22 @@ import AppKit
 import CoreUI
 import SwiftUI
 
-/// The guided Add (D-21, mockup 10): service tiles, sign in on the service's own website with a live waiting state, what
-/// AI may do, which repositories (or projects, teams, channels), done. The same dialog opens on step 3 or 4 from a row's
-/// More menu. All moves live in `ConnAddState`; this only draws them.
+/// The guided Add (D-21): service cards, sign in on the service's own website with a checklist that follows the real
+/// sign-in, what AI may do, which repositories (or projects, teams, channels), done. The same dialog opens on step 3 or 4
+/// from a row's More menu. All moves live in `ConnAddState`; this only draws them. The dialog is as tall as its step.
 struct ConnAddView: View {
-    @Environment(\.coreAccent) private var paneAccent
+    @Environment(\.coreAccent) var paneAccent
     let model: ConnectionsModel
     let close: () -> Void
-    @State private var token = false
-    @State private var site: String?
-    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State var token = false
+    @State var site: String?
+    @State var copied = false
+    @State var installing = false
+    @Environment(\.accessibilityReduceMotion) var reduce
 
-    private var a: ConnAddState { model.add ?? ConnAddState() }
-    private var kind: ConnKind? { a.kind.flatMap(model.kind) }
-    private var name: String { kind?.name ?? "the service" }
+    var a: ConnAddState { model.add ?? ConnAddState() }
+    var kind: ConnKind? { a.kind.flatMap(model.kind) }
+    var name: String { kind?.name ?? "the service" }
 
     var body: some View {
         Group {
@@ -29,16 +31,16 @@ struct ConnAddView: View {
     }
 
     private var panel: some View {
-        CoreDialogPanel("", width: 780) {
-            VStack(spacing: Space.s2) {
+        CoreDialogPanel("", width: 600) {
+            VStack(spacing: Space.s5) {
                 ConnSteps(at: a.step)
-                stage
-                    .id(a.step)
-                    .transition(.opacity)
-                    .frame(maxWidth: .infinity, minHeight: 332, alignment: .top)
+                ConnStage(step: a.step) { stage }
             }
-            .animation(reduce ? nil : .smooth(duration: 0.34), value: a.step)
         }
+        // The height eases between steps (and as a sign-in moves on); Reduce Motion fades instead.
+        .animation(Motion.calm(Motion.out(Motion.move), reduce), value: a.step)
+        .animation(Motion.calm(Motion.out(Motion.move), reduce), value: model.flow?.step)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: a.mode)
     }
 
     @ViewBuilder private var stage: some View {
@@ -51,8 +53,8 @@ struct ConnAddView: View {
         }
     }
 
-    private func head(_ title: String, _ sub: String) -> some View {
-        VStack(spacing: Space.s1 / 2) {
+    func head(_ title: String, _ sub: String) -> some View {
+        VStack(spacing: Space.s1) {
             Text(title).coreFont(size: MacTextSize.large, weight: .semibold).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(sub).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
@@ -60,141 +62,44 @@ struct ConnAddView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func back() -> CoreAction { CoreAction("Back") { model.addBack() } }
+    /// Cancel on the left, Back beside it when the step has a way back.
+    func footer(
+        back: Bool = true, alternate: (String, () -> Void)? = nil, primary: (String, () -> Void)? = nil,
+        enabled: Bool = true, busy: Bool = false
+    ) -> some View {
+        ConnFooter(
+            cancel: close, back: back && a.canGoBack ? { model.addBack() } : nil, alternate: alternate,
+            primary: primary, enabled: enabled, busy: busy)
+    }
 
     // MARK: 1. pick a service
 
     private var serviceStep: some View {
-        VStack(spacing: Space.s3) {
+        VStack(spacing: Space.s4) {
             head("Connect a service", "Pick one. You sign in on its own website, never here.")
-            ConnTiles(kinds: model.kinds) { model.pick(service: $0) }.padding(.top, Space.s2)
-            Spacer(minLength: Space.s3)
-            CoreDialogFooter(cancel: CoreAction("Cancel", key: .cancel, run: close), primary: nil)
-        }
-    }
-
-    // MARK: 2. sign in
-
-    @ViewBuilder private var signInStep: some View {
-        switch model.flow?.step {
-        case .failed(let title, let fix)?: failedStep(title, fix)
-        case .pickSite(let sites)?: siteStep(sites)
-        default: waitingStep
-        }
-    }
-
-    private var waitingStep: some View {
-        VStack(spacing: Space.s3) {
-            HStack(spacing: Space.s5) {
-                ConnLogo(kind: a.kind ?? "", size: 72).connFloat()
-                ConnLink()
-                IconTile("link", hue: GlassInk.accent(paneAccent), size: 72, bounce: false).connFloat(
-                    phase: ConnMotion.heroPhase)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s2), count: 3), spacing: Space.s2)
+            {
+                ForEach(model.kinds) { k in ConnPickCard(kind: k) { model.pick(service: k.id) } }
             }
-            .padding(.top, Space.s6)
-            head(
-                "Finish signing in on \(name)", "We opened \(name) in your browser. Sign in there, then come back here."
-            )
-            if let code = model.flow?.userCode { codeBox(code) }
-            HStack(spacing: Space.s3) {
-                CoreWorkingBar(width: Space.s8 * 4 + Space.s3)
-                Text("Waiting for \(name)…").foregroundStyle(GlassInk.secondary)
-            }
-            Spacer(minLength: Space.s3)
-            CoreDialogFooter(
-                cancel: back(), primary: nil,
-                alternate: CoreAction("Open \(name) again") { model.openSignIn() })
-        }
-    }
-
-    /// A device-code sign-in (GitHub, Teams) asks for this code on the service's page.
-    private func codeBox(_ code: String) -> some View {
-        VStack(spacing: Space.s1) {
-            Text("Type this code on the page that opened").coreFont(size: MacTextSize.meta)
-                .foregroundStyle(GlassInk.secondary)
-            Text(code).coreFont(size: MacTextSize.large + 8, weight: .semibold, design: .monospaced)
-                .textSelection(.enabled)
-                .accessibilityLabel("Code \(code.map(String.init).joined(separator: " "))")
-            Button("Copy code") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(code, forType: .string)
-            }
-            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-        }
-        .padding(.vertical, Space.s3).padding(.horizontal, Space.s5)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-    }
-
-    private func failedStep(_ title: String, _ fix: String) -> some View {
-        let gated = model.flow?.gated == true
-        let notSet = fix == ConnSay.notConfigured
-        return VStack(spacing: Space.s2) {
-            IconTile("exclamationmark.triangle", hue: GlassInk.red, size: 72, bounce: false).padding(.top, Space.s6)
-            Text("Sign-in didn't finish").coreFont(size: MacTextSize.large, weight: .semibold)
-                .accessibilityAddTraits(.isHeader)
-            Text(
-                title == ConnSay.expiredTitle
-                    ? "We didn't hear back from \(name). Nothing was connected." : "\(title) \(fix)"
-            )
-            .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            if gated { TurnOnConnections(model: model) { model.retrySignIn() } }
-            HStack(spacing: Space.s2) {
-                if notSet, let k = kind {
-                    AccLink(title: "Set up your own app", symbol: "gearshape") { ConnDialogs.openApp(model, k) }
-                }
-                if let k = kind, !k.tokenTitle.isEmpty, !a.again {
-                    AccLink(title: "Use a token instead", symbol: "key") { token = true }
-                }
-            }
-            Spacer(minLength: Space.s3)
-            CoreDialogFooter(cancel: back(), primary: CoreAction("Try again", key: .primary) { model.retrySignIn() })
-        }
-    }
-
-    /// Jira with several sites: not in the mockup, but the Core needs one chosen.
-    private func siteStep(_ sites: [String]) -> some View {
-        let chosen = site ?? sites.first
-        return VStack(spacing: Space.s3) {
-            head("Which \(name) site?", "You have more than one. Connect the other later if you need it.")
-            VStack(spacing: Space.s1) {
-                ForEach(sites, id: \.self) { s in
-                    Button {
-                        site = s
-                    } label: {
-                        HStack {
-                            Text(s)
-                            Spacer()
-                            if s == chosen {
-                                Image(systemName: "checkmark").foregroundStyle(GlassInk.accent(paneAccent))
-                            }
-                        }
-                        .padding(Space.s3).background(GlassInk.well, in: coreShape(Radius.cardMac))
-                        .contentShape(coreShape(Radius.cardMac))
-                    }
-                    .buttonStyle(CoreQuietPressStyle(radius: Radius.cardMac, hoverFill: true))
-                }
-            }
-            Spacer(minLength: Space.s3)
-            CoreDialogFooter(
-                cancel: back(),
-                primary: CoreAction("Use this site", key: .primary) { Task { await model.choose(site: chosen) } })
+            footer(back: false)
         }
     }
 
     // MARK: 3. what may it do
 
     private var allowStep: some View {
-        let mode = Binding(get: { a.mode }, set: { model.add?.set(mode: $0, in: kind) })
-        return VStack(spacing: Space.s3) {
-            head("What may your assistant do on \(name)?", "Start safe. You can change this any time.")
+        let k = kind  // read before mutating model.add: reading it inside the mutation is an exclusivity crash
+        let mode = Binding(get: { a.mode }, set: { model.add?.set(mode: $0, in: k) })
+        return VStack(spacing: Space.s4) {
+            ConnPair(kind: a.kind ?? "", size: 56)
+            head("What may your assistant do on \(name)?", "You can change this any time in Connections.")
             CoreSegmented(
                 "What it may do",
                 segments: [
                     CoreSegment(ConnMode.read, "Read only", symbol: "eye"),
                     CoreSegment(ConnMode.write, "Read and change", symbol: "bolt"),
                 ], selection: mode)
-            VStack(spacing: Space.s1 + 2) {
+            VStack(spacing: Space.s1) {
                 ForEach(kind?.capabilities ?? []) { c in capability(c) }
             }
             if a.mode == .write {
@@ -203,11 +108,11 @@ struct ConnAddView: View {
                     systemImage: "exclamationmark.triangle"
                 )
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+            } else {
+                Text("Recommended to start. It can look, never touch.").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary)
             }
-            Spacer(minLength: Space.s3)
-            CoreDialogFooter(
-                cancel: a.editing ? CoreAction("Cancel", key: .cancel, run: close) : back(),
-                primary: CoreAction("Next", key: .primary) { model.addNext() })
+            footer(primary: ("Continue", { model.addNext() }))
         }
     }
 
@@ -215,20 +120,23 @@ struct ConnAddView: View {
         let on = Binding(get: { a.isOn(c) }, set: { _ in model.add?.toggle(c.id) })
         let dim = c.writes && a.mode == .read
         return HStack(spacing: Space.s3) {
-            IconTile(
-                c.writes ? "bolt" : "eye", hue: c.writes ? GlassInk.amber : GlassInk.green, size: 32,
-                bounce: on.wrappedValue)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(c.title).coreFont(size: MacTextSize.body, weight: .semibold)
-                Text(c.say).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
-            }
+            Image(systemName: ConnLook.capabilitySymbol(c)).coreFont(size: MacTextSize.body, weight: .medium)
+                .foregroundStyle(dim ? GlassInk.secondary : GlassInk.primary)
+                .frame(width: 28, height: 28).background(GlassInk.well, in: coreShape(Radius.control))
+                .accessibilityHidden(true)
+            Text(c.title).coreFont(size: MacTextSize.body, weight: .medium)
+                .foregroundStyle(dim ? GlassInk.secondary : GlassInk.primary)
             Spacer(minLength: Space.s3)
-            CoreSwitch("", isOn: on).disabled(!c.writes || a.mode == .read)
-                .accessibilityLabel(c.title)
+            if c.writes {
+                CoreSwitch("", isOn: on).disabled(a.mode == .read).accessibilityLabel(c.title)
+            } else {
+                StateBadge("Always", tone: .done, symbol: "checkmark.circle")
+            }
         }
-        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
-        .background(GlassInk.well, in: coreShape(Radius.cardMac))
-        .opacity(dim ? 0.55 : 1)
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(c.say)
+        .opacity(dim ? 0.7 : 1)
     }
 
     // MARK: 4. which ones
@@ -237,37 +145,60 @@ struct ConnAddView: View {
         let noun = kind?.resource ?? "places"
         let query = Binding(get: { a.query }, set: { model.add?.query = $0 })
         let saving = model.busy?.hasPrefix("access-") == true
-        return VStack(spacing: Space.s2 + 2) {
-            head("Which \(noun)?", "Your assistant only sees the ones you pick.")
+        var rows: [ConnPick] = []
+        if case .ready(let p) = model.picks { rows = a.visible(p.items) }
+        let all = a.allPicked(rows)
+        return VStack(spacing: Space.s3) {
+            head("Which \(noun)?", "Your assistant only sees what you tick.")
             HStack(spacing: Space.s2) {
-                Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-                TextField("Search \(noun)", text: query).textFieldStyle(.plain)
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                    TextField("Search \(noun)", text: query).textFieldStyle(.plain)
+                }
+                .coreFieldSurface()
+                Button(all ? "Clear All" : "Select All") {
+                    if all { model.add?.clearAll(rows) } else { model.add?.selectAll(rows) }
+                }
+                .buttonStyle(CoreButtonStyle(.secondary)).disabled(rows.isEmpty)
             }
-            .coreFieldSurface()
             pickList(noun)
+            if a.kind == "github" { missingRepos }
             if let e = model.addError { AccIssue(text: e) }
             if let c = a.connection, model.gated.contains("access-\(c)") {
                 TurnOnConnections(model: model) { await model.finishAdd() }
             }
-            Spacer(minLength: Space.s2)
+            footer(
+                primary: (a.finishTitle(noun: noun, saving: saving), { Task { await model.finishAdd() } }),
+                enabled: a.canFinish && !saving, busy: saving)
+        }
+    }
+
+    /// GitHub only lists repositories where the Ainkrad GitHub App is installed, even ones you can open. Installing it on
+    /// another account or organization brings them in (the list reloads when you come back); a token sees them all.
+    private var missingRepos: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Text("Missing a repository? GitHub only shows accounts and organizations where Ainkrad is installed.")
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             HStack(spacing: Space.s2) {
-                Button("Back") { model.addBack() }.buttonStyle(CoreButtonStyle(.secondary))
-                Text(a.countLine).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .padding(.leading, Space.s2)
-                Spacer(minLength: Space.s3)
-                Button(saving ? "Saving…" : (a.editing ? "Save" : "Connect \(name)")) {
-                    Task { await model.finishAdd() }
+                AccLink(title: "Add an organization or account", symbol: "plus") {
+                    installing = true
+                    NSWorkspace.shared.open(URL(string: "https://github.com/apps/ainkradhq/installations/new")!)
                 }
-                .buttonStyle(CoreButtonStyle(.prominent, busy: saving)).coreShortcut(.primary)
-                .disabled(!a.canFinish || saving)
+                AccLink(title: "Use a token instead", symbol: "key") { token = true }
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard installing else { return }
+            installing = false
+            Task { await model.loadPicks() }
         }
     }
 
     @ViewBuilder private func pickList(_ noun: String) -> some View {
         switch model.picks {
         case .idle, .loading:
-            VStack(spacing: Space.s1 + 2) {
+            VStack(spacing: Space.s1) {
                 ForEach(0..<3, id: \.self) { _ in
                     CoreSkeleton(coreShape(Radius.control)).frame(height: Space.s8 + Space.s2)
                 }
@@ -285,43 +216,26 @@ struct ConnAddView: View {
                     .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity).padding(.vertical, Space.s6)
             } else {
                 ScrollView {
-                    VStack(spacing: Space.s1 + 2) {
+                    VStack(spacing: Space.s1) {
                         ForEach(rows) { r in
+                            let on = a.picked.contains(r.id)
                             CoreCheckbox(
                                 r.name, detail: ConnAccess.line(r),
-                                isOn: Binding(
-                                    get: { a.picked.contains(r.id) }, set: { _ in model.add?.toggle(pick: r.id) }),
-                                // the mockup: folder for GitHub, doc for the rest
-                                icon: a.kind == "github" ? "folder" : "doc.text"
+                                isOn: Binding(get: { on }, set: { _ in model.add?.toggle(pick: r.id) })
                             )
                             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(GlassInk.well, in: coreShape(Radius.control))
+                            .background(on ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+                            .animation(Motion.out(Motion.hover), value: on)
                         }
                     }
                 }
-                .scrollIndicators(.never).frame(maxHeight: 196)
+                .scrollIndicators(.never).frame(maxHeight: 232)
                 if p.truncated {
                     Text("There are more. Type in the search to narrow the list.").coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary)
                 }
             }
-        }
-    }
-
-    // MARK: 5. done
-
-    private var doneStep: some View {
-        let title = a.again ? "\(name) is signed in again" : a.editing ? "Saved" : "\(name) is connected"
-        return VStack(spacing: Space.s2) {
-            IconTile("checkmark", hue: GlassInk.green, size: 72, bounce: a.step).connFloat().padding(.top, Space.s6)
-            Text(title).coreFont(size: MacTextSize.large, weight: .semibold).accessibilityAddTraits(.isHeader)
-            Text(a.again ? "Nothing else changed." : a.doneLine(noun: kind?.resource ?? "places"))
-                .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
-            Spacer(minLength: Space.s3)
-            CoreDialogFooter(
-                cancel: a.editing || a.again ? nil : CoreAction("Connect another") { model.addAnother() },
-                primary: CoreAction("Done", key: .primary, run: close))
         }
     }
 }

@@ -101,6 +101,7 @@ extension ConnectionsModel {
             if let a = add, a.editing, a.picked.isEmpty, item(id)?.only == nil {
                 add?.picked = Set(p.items.map(\.id))
             }
+            add?.expandWildcards(p.items, complete: !p.truncated)
         } catch {
             picks = .failed(ConnSay.plain(error))
         }
@@ -114,10 +115,16 @@ extension ConnectionsModel {
             addError = "That connection isn't there any more. Nothing was changed."
             return
         }
-        let order: [ConnPick]
-        if case .ready(let p) = picks { order = p.items } else { order = [] }
+        var order: [ConnPick] = []
+        var complete = false
+        if case .ready(let p) = picks { (order, complete) = (p.items, !p.truncated) }
+        let only = a.chosen(order: order, complete: complete)
+        guard only.count <= ConnAddState.maxNames else {
+            addError = "Your Core takes up to \(ConnAddState.maxNames) here, and \(only.count) are picked. Untick some. Nothing was changed."
+            return
+        }
         addError = nil
-        if await setAccess(c, allowed: a.allowed(k), only: a.chosen(order: order)) {
+        if await setAccess(c, allowed: a.allowed(k), only: only) {
             add?.next()
         } else {
             addError = writeError["access-\(c.id)"]
