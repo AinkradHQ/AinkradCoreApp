@@ -34,7 +34,11 @@ public final class BrainModel {
             updateStatusPolling()
             importer?.review.canSameProject = remembersSameProject
             importer?.review.keepsInCommit = keepsInCommit
-            Task { await restoreImport() }
+            Task {
+                await restoreImport()
+                // The top-bar dropdown's numbers are read ahead, so its first open shows them, not the older counts.
+                await refreshGlance()
+            }
         }
     }
     /// The calm Brain (E9-4): the areas, what it learned and Undo. A real Core with API minor 95 shows them in the sidebar.
@@ -275,6 +279,7 @@ public final class BrainModel {
             rooms = rs
             overview = ov
             load = .ready
+            await refreshGlance()
             if let sync, sync.status == nil {
                 await sync.reload()
                 // Real Cores only: the sample has no Mac collectors to run.
