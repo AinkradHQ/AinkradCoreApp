@@ -12,6 +12,9 @@ struct UnlockCard: View {
     var sheetUp = false
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var breathe = false
+    /// When the last ask ended unanswered: the system Touch ID panel takes focus, so Cancel makes the app active again;
+    /// that comeback must not ask again (no loop). A later, real return to the app does.
+    @State private var askEnded = Date.distantPast
 
     private var checking: Bool { shell.lock == .checking }
 
@@ -29,6 +32,15 @@ struct UnlockCard: View {
             if shell.lock == .locked, NSApplication.shared.isActive { shell.unlock?() }
             guard !reduce else { return }
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { breathe = true }
+        }
+        // The card often appears while Ainkrad is in the background (the Mac woke, the app relaunched, it locked while
+        // another app was in front): ask the moment it comes to the front, so unlocking is one step, the finger
+        // (Ahmed, 2026-11-24). Cancel leaves the card; the next time the app comes to the front it asks again.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if shell.lock == .locked, Date().timeIntervalSince(askEnded) > 2 { shell.unlock?() }
+        }
+        .onChange(of: shell.lock) { was, now in
+            if was == .checking, now == .locked { askEnded = Date() }
         }
         .transition(.opacity)
     }
