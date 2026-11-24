@@ -89,6 +89,8 @@ protocol AccountsService: Sendable {
     func boundRunners() async -> [Int64: String]
     /// What the Core says about leftovers and model enforcement, by account id. Empty when it says nothing.
     func accountNotes() async -> [Int64: AccountNotes]
+    /// Moves a runner-bound ChatGPT or OpenCode login into the Core's vault (Core API 103).
+    func moveToCore(account: Int64) async throws
     // 0.10 usage meters and model switches. Wire in `AIOrder/UsageWire.swift`; the defaults say "not supported".
     // Requirements, not extension-only, so a conformer's own answer is the one `any AccountsService` calls.
     func accountMeters() async -> [Int64: AccountMeterItem]

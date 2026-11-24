@@ -75,14 +75,11 @@ struct GuidedTerminal: View {
     }
 }
 
-/// Which runner the account will live on, when more than one can sign in. Online runners only; the first is picked.
-struct RunnerPickView: View {
-    @Environment(\.coreAccent) private var paneAccent
+/// Codex and Antigravity: the risk note, agreed to before the sign-in starts. No runner is asked for: the sign-in runs
+/// through the Core, which keeps the login.
+struct ConsentView: View {
     let provider: String
-    let choice: RunnerChoice
-    let pick: (String) -> Void
-    /// Set for Codex and Antigravity: the risk note is agreed to here, before the sign-in starts.
-    var consent: Binding<Bool>?
+    let consent: Binding<Bool>
     let start: () -> Void
     let back: () -> Void
 
@@ -90,30 +87,17 @@ struct RunnerPickView: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             VStack(spacing: Space.s2) {
                 ProviderTile(name: provider, size: Space.s8 * 2)
-                Text("Choose a runner").coreFont(size: MacTextSize.large, weight: .bold)
-                Text("\(provider) signs in on one runner. This account only runs there.")
+                Text("Sign in to \(provider)").coreFont(size: MacTextSize.large, weight: .bold)
+                Text("You sign in once, on your Core. Ainkrad then uses this account wherever a session runs.")
                     .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: Space.s2)], spacing: Space.s2) {
-                ForEach(choice.eligible) { r in
-                    AccPick(
-                        title: r.name, sub: "Online", symbol: "server.rack", hue: GlassInk.accent(paneAccent),
-                        on: choice.selected == r.id
-                    ) {
-                        pick(r.id)
-                    }
-                }
-            }
-            if let consent {
-                RiskConsent(agreed: consent)
-            }
+            RiskConsent(agreed: consent)
             AccDialogButtons(
-                confirm: "Continue", cancelTitle: "Back",
-                enabled: choice.chosen != nil && (consent?.wrappedValue ?? true),
-                cancel: back, run: start)
+                confirm: "Continue", cancelTitle: "Back", enabled: consent.wrappedValue, cancel: back, run: start)
         }
-        .accessibilityIdentifier("runner-pick")
+        .accessibilityIdentifier("sign-in-consent")
     }
 }
 
@@ -211,11 +195,12 @@ struct NoRunnerView: View {
     }
 }
 
-/// "Runs only on <runner>": the line for an account pinned to one runner.
+/// Where the account's login lives: "Signed in on the Core · works on every runner", or "Runs only on <runner>".
 struct RunnerBoundNote: View {
     let binding: RunnerBinding
     var body: some View {
-        Label(binding.words, systemImage: "server.rack").coreFont(size: MacTextSize.meta)
+        Label(binding.words, systemImage: binding.core ? "checkmark.shield" : "server.rack")
+            .coreFont(size: MacTextSize.meta)
             .foregroundStyle(GlassInk.secondary).help(binding.detail)
             .accessibilityHint(binding.detail)
     }

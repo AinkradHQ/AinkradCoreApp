@@ -226,7 +226,7 @@ final class FakeService: AccountsService, @unchecked Sendable {
         id: "lg_1", provider: "claude-sub", label: "claude-plan", runner: "r_1", state: "open_url",
         url: "https://claude.ai/oauth/authorize?test", reason: nil, accountID: nil)
     func startLogin(provider: String, label: String, runner: String?) async throws -> LoginItem {
-        try note("startLogin \(provider) \(label)")
+        try note("startLogin \(provider) \(label)\(runner.map { " on \($0)" } ?? "")")
         return loginItem
     }
     func login(_ id: String) async throws -> LoginItem { loginItem }
@@ -253,6 +253,7 @@ final class FakeService: AccountsService, @unchecked Sendable {
     func boundRunners() async -> [Int64: String] { bound }
     var notes: [Int64: AccountNotes] = [:]
     func accountNotes() async -> [Int64: AccountNotes] { notes }
+    func moveToCore(account: Int64) async throws { try note("moveToCore \(account)") }
     var runnerList = [AccountRunner(id: "r_1", name: "linux-01", online: true)]
     var lastKey = ""
     func createAccount(provider: String, label: String, key: String, runners: [String]) async throws -> AccountItem {

@@ -149,15 +149,57 @@ struct RunnerChoice: Equatable, Sendable {
     }
 }
 
-/// The line that says an account stays on one runner.
+/// Where a plan account's login lives (accounts on the Core, Core API 103): on the Core, lent to whichever runner runs a
+/// session, or still on the one runner it signed in on.
 struct RunnerBinding: Equatable, Sendable {
     /// The runner's name, when the app knows it.
     var name: String?
-    var words: String { name.map { "Runs only on \($0)" } ?? "Runs on one runner only" }
-    var detail: String {
-        name.map {
-            "This account signed in on \($0), so it only runs there. If \($0) is offline, Core moves on to the next account."
+    /// The login is kept on the Core and works on every runner.
+    var core = false
+    /// A runner-bound login the Core can take over ("Move to Core"): ChatGPT and OpenCode, never Antigravity.
+    var movable = false
+    /// Why it cannot move, when that is the reason it stays (Antigravity's keychain).
+    var why: String?
+
+    static let onCore = RunnerBinding(core: true)
+    static let agyWhy = "Antigravity keeps its login in that machine's keychain, so it cannot move to the Core."
+
+    /// The ChatGPT and OpenCode plans: their login is files the Core can keep. Mirrors the Core's `LENDABLE`.
+    static func lendable(_ provider: String) -> Bool { ["codex-sub", "opencode-sub"].contains(provider) }
+
+    /// What the sign-in screen says about the account it will make.
+    static func forSignIn(_ provider: String) -> RunnerBinding {
+        provider == "agy-sub" ? RunnerBinding(why: agyWhy) : .onCore
+    }
+
+    /// The account's row from what the Core says (`held`), else (an older Core) where the app saw it sign in.
+    static func of(provider: String, held: String?, runner: String?, bound: Bool) -> RunnerBinding? {
+        switch held {
+        case "core": return .onCore
+        case "runner":
+            return RunnerBinding(
+                name: runner, movable: lendable(provider), why: provider == "agy-sub" ? agyWhy : nil)
+        default: return (bound || runner != nil) ? RunnerBinding(name: runner) : nil
         }
+    }
+
+    var words: String {
+        if core { return "Signed in on the Core · works on every runner" }
+        return name.map { "Runs only on \($0)" } ?? "Runs on one runner only"
+    }
+
+    var detail: String {
+        if core {
+            return "Its login is kept on your Core and lent to the runner that runs each session, "
+                + "for that session only."
+        }
+        let base =
+            name.map {
+                "This account signed in on \($0), so it only runs there. "
+                    + "If \($0) is offline, Core moves on to the next account."
+            }
             ?? "This account signed in on one runner, so it only runs there. If that runner is offline, Core moves on to the next account."
+        if let why { return "\(base) \(why)" }
+        return movable ? "\(base) Move it to the Core so every runner can use it." : base
     }
 }

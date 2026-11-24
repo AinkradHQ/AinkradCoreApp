@@ -3,13 +3,14 @@ import SwiftUI
 
 /// Everything the account page can do, each with its key. One is the page's main action, the rest sit in ⋯ (⌘.).
 enum DetailAction: CaseIterable {
-    case check, order, signIn, turnOn, turnOff, key, budget, up, down, limits, rename, tech, remove
+    case check, order, signIn, moveToCore, turnOn, turnOff, key, budget, up, down, limits, rename, tech, remove
 
     var title: String {
         switch self {
         case .check: "Check"
         case .order: "Open AI order"
         case .signIn: "Sign in again"
+        case .moveToCore: "Move to Core"
         case .turnOn: "Turn on"
         case .turnOff: "Turn off"
         case .key: "Replace key…"
@@ -28,6 +29,7 @@ enum DetailAction: CaseIterable {
         case .check: "arrow.clockwise"
         case .order: "list.number"
         case .signIn: "person.crop.circle.badge.checkmark"
+        case .moveToCore: "checkmark.shield"
         case .turnOn: "play.fill"
         case .turnOff: "pause.fill"
         case .key: "key"
@@ -47,6 +49,7 @@ enum DetailAction: CaseIterable {
         case .check: ("r", .command, "⌘R")
         case .order: ("o", .command, "⌘O")
         case .signIn: ("i", .command, "⌘I")
+        case .moveToCore: ("m", [.command, .shift], "⇧⌘M")
         case .turnOn, .turnOff: ("t", .command, "⌘T")
         case .key: ("k", [.command, .shift], "⇧⌘K")
         case .budget: ("b", .command, "⌘B")
@@ -74,7 +77,9 @@ extension AccountsModel {
     /// What ⋯ holds: everything that applies, but the main action. A plan has no key; a key's check is the main action.
     func moreActions(_ a: AccountItem) -> [DetailAction] {
         let onOff: DetailAction = a.phase == .disabled ? .turnOn : .turnOff
-        let own: [DetailAction] = a.isPlan ? [.check, .signIn, onOff] : [.check, .key, .budget, onOff]
+        // A ChatGPT or OpenCode login still on its runner can move into the Core (accounts on the Core).
+        let move: [DetailAction] = a.runnerBinding?.movable == true ? [.moveToCore] : []
+        let own: [DetailAction] = a.isPlan ? [.check, .signIn] + move + [onOff] : [.check, .key, .budget, onOff]
         let order: [DetailAction] = aiOrderOn ? [.up, .down] : []
         return (own + order + [.limits, .rename, .tech, .remove]).filter { $0 != primaryAction(a) }
     }
@@ -98,6 +103,7 @@ extension AccountsModel {
             cursor = "a-\(a.id)"
             go(.accounts)
         case .signIn, .key: AccountDialogs.openConnect(self, provider: a.provider, replacing: a)
+        case .moveToCore: Task { await moveToCore(a) }
         case .turnOn: Task { await setEnabled(a, true) }
         case .turnOff: Task { await setEnabled(a, false) }
         case .budget: openBudget(a)
