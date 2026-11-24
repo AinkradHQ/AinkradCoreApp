@@ -8,6 +8,8 @@ struct MapSource: Identifiable {
     let title: String
     let line: String
     let live: Bool
+    /// The source is switched on (it feeds Brain); off sources stay dark.
+    var on = true
 }
 
 /// An area on the home map's right: its name, count and what it took in today.
@@ -82,9 +84,11 @@ struct BrainMap: View {
         let left = Self.srcW + Space.s8 + Space.s5 + Space.s8
         let right = sz.width - Self.shelfW - Space.s8 - Space.s2
         for (i, s) in sources.enumerated() {
+            // While Brain learns, every source that is on feeds it (what it collected earlier is what it is tidying), so
+            // their wires run too, not only the one being read this second (2026-11-23: the left side stayed dark).
             draw(
-                &gc, from: CGPoint(x: left, y: y(i, of: sources.count, sz)), to: CGPoint(x: inX, y: c.y), live: s.live,
-                t, i)
+                &gc, from: CGPoint(x: left, y: y(i, of: sources.count, sz)), to: CGPoint(x: inX, y: c.y),
+                live: s.live || (working && s.on), t, i)
         }
         for (i, s) in shelves.enumerated() {
             let live = working && s.today > 0
@@ -107,15 +111,23 @@ struct BrainMap: View {
             p, with: .color(lit ? GlassInk.accent(accent).opacity(0.8 * pulse) : palette.track),
             style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
         guard lit, ticking, !reduce else { return }
-        let u = (t / 1.8 + Double(k) * 0.23).truncatingRemainder(dividingBy: 1)
-        gc.stroke(
-            p.trimmedPath(from: max(0, u - 0.12), to: u), with: .color(GlassInk.accent(accent)),
-            style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
+        // A soft comet, not a hard dash: a bright head and a tail that fades in steps, on the wire's own width.
+        let u = (t / 2.2 + Double(k) * 0.37).truncatingRemainder(dividingBy: 1)
+        let steps = 8
+        for j in 0..<steps {
+            let to = u - 0.022 * Double(j)
+            let from = to - 0.022
+            guard to > 0 else { break }
+            gc.stroke(
+                p.trimmedPath(from: max(0, from), to: min(1, to)),
+                with: .color(GlassInk.accent(accent).opacity(1 - Double(j) / Double(steps))),
+                style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+        }
     }
 
     private func source(_ s: MapSource) -> some View {
         HStack(spacing: Space.s3) {
-            BrainTile(symbol: s.symbol, lit: s.live && working)
+            BrainTile(symbol: s.symbol, lit: working && (s.live || s.on))
             VStack(alignment: .leading, spacing: 1) {
                 Text(s.title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
                 Text(s.line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)

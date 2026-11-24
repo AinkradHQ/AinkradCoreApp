@@ -25,7 +25,6 @@ extension BrainCalmModel {
 
     /// The demo's filters, done here because there is no Core to do them.
     func matches(_ r: BrainAreaRecordWire) -> Bool {
-        if page == .rules, let k = ruleKind, Self.kind(r) != k { return false }
         if page == .rules, let room = ruleRoom, r.room != room { return false }
         if page == .knowledge, topic == nil, r.type != knowledgeType { return false }
         if page == .knowledge, let room = topicRoom, r.room != room, r.roomName != room { return false }

@@ -227,6 +227,18 @@ struct FlakyTransport: ImportTransport {
         #expect(b.flatMap { $0 }.count == 30)
     }
 
+    @Test func oneItemOverTheCapIsCutToFitWithAMatchingHash() throws {
+        var big = items(1)[0]
+        big.text = String(repeating: "\u{1b}[0m", count: 200_000)  // control characters escape to 6 bytes each
+        big.content_hash = ItemFormat.hash(big.text)
+        let b = try Uploader.batches([big] + items(2))
+        for batch in b { #expect(try JSONEncoder().encode(["items": batch]).count < 1_048_576) }
+        let cut = try #require(b.flatMap { $0 }.first { $0.item_id == big.item_id })
+        #expect(cut.text.count < big.text.count)
+        #expect(cut.content_hash == ItemFormat.hash(cut.text))
+        #expect(b.flatMap { $0 }.count == 3)
+    }
+
     @Test func resumesAfterTheCoreDropsAndDoesNotResend() async throws {
         let state = FlakyTransport.State(failUntil: 2)
         let up = Uploader(transport: FlakyTransport(state: state), retries: 3, pause: { _ in })

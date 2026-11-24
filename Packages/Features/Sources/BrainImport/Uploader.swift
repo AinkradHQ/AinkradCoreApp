@@ -48,8 +48,8 @@ public struct Uploader: Sendable {
         var out: [[ImportItem]] = []
         var cur: [ImportItem] = []
         var size = 0
-        for item in items {
-            let n = try enc.encode(item).count + 1
+        for original in items {
+            let (item, n) = try fitting(original, enc)
             if !cur.isEmpty, size + n > maxBatchBytes || cur.count >= maxBatchItems {
                 out.append(cur)
                 cur = []
@@ -60,6 +60,20 @@ public struct Uploader: Sendable {
         }
         if !cur.isEmpty { out.append(cur) }
         return out
+    }
+
+    /// One item whose JSON alone passes the cap (terminal text full of control characters, each escaped to 6 bytes,
+    /// 2026-11-23: the Core refused it with 413 on every retry) is cut until it fits, keeping its start and its end.
+    static func fitting(_ item: ImportItem, _ enc: JSONEncoder) throws -> (ImportItem, Int) {
+        var it = item
+        var n = try enc.encode(it).count + 1
+        while n > maxBatchBytes, it.text.count > 64 {
+            let keep = max(Int(Double(it.text.count) * Double(maxBatchBytes) / Double(n) * 0.9), 32)
+            it.text = String(it.text.prefix(keep / 2)) + "\n[…]\n" + String(it.text.suffix(keep / 2))
+            it.content_hash = ItemFormat.hash(it.text)  // the Core checks the hash against the text
+            n = try enc.encode(it).count + 1
+        }
+        return (it, n)
     }
 
     /// Uploads `items` to run `run`; returns how many were sent in this call.
