@@ -87,6 +87,12 @@ struct ConnAddStateTests {
         #expect(a.picked == Set(mine.map(\.id) + ["org/x"]))
     }
 
+    @Test func aTypedNameIsSentAsACoreName() {
+        #expect(LiveConnectionsService.coreName("Github Token") == "github-token")
+        #expect(LiveConnectionsService.coreName(" Work (main) ") == "work-main")
+        #expect(LiveConnectionsService.coreName("2nd") == nil)
+    }
+
     @Test func stepsGoForwardAndBackAndDoneHasNoBack() {
         var a = ConnAddState(kind: "github")
         a.signedIn(connection: 1)
