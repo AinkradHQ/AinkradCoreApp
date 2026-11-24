@@ -87,7 +87,8 @@ struct ConnAddView: View {
     // MARK: 3. what may it do
 
     private var allowStep: some View {
-        let mode = Binding(get: { a.mode }, set: { model.add?.set(mode: $0, in: kind) })
+        let k = kind  // read before mutating model.add: reading it inside the mutation is an exclusivity crash
+        let mode = Binding(get: { a.mode }, set: { model.add?.set(mode: $0, in: k) })
         return VStack(spacing: Space.s4) {
             ConnPair(kind: a.kind ?? "", size: 56)
             head("What may your assistant do on \(name)?", "You can change this any time in Connections.")
