@@ -139,6 +139,9 @@ struct PlaceRow: View {
                 CoreDropdownItem("Move to Unsorted", symbol: "tray", note: "⌘⌫") {
                     Task { await review.moveToUnsorted(card.id) }
                 },
+                CoreDropdownItem("Ignore This Place", symbol: "eye.slash") {
+                    Task { await review.ignore(card.id) }
+                },
             ],
             isPresented: Binding(
                 get: { review.menuFor == card.id },

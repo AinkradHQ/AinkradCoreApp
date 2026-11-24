@@ -238,11 +238,11 @@ public final class BrainCalmModel {
             let p: BrainAreaPageWire
             if v101 {
                 p = try await routes.area(
-                    area, kind: page == .rules ? ruleKind : nil, topic: page == .knowledge ? topic?.name : nil,
+                    area, kind: nil, topic: page == .knowledge ? topic?.name : nil,
                     room: page == .rules ? ruleRoom : page == .knowledge || page == .timeline ? topicRoom : nil,
                     q: filterText.isEmpty ? nil : filterText,
                     type: page == .knowledge && topic == nil ? knowledgeType : nil,
-                    limit: page == .timeline ? 200 : 60)
+                    limit: page == .timeline ? 200 : page == .rules ? 500 : 60)
             } else {
                 p = try await routes.area(
                     area, type: page == .knowledge ? knowledgeType : nil, limit: page == .timeline ? 200 : 60)

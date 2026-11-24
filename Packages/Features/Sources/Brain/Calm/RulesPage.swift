@@ -97,7 +97,9 @@ struct RulesPage: View {
 
     /// Always, Never, Prefer in that order; rules without a kind (an older Core) in one list.
     private var sections: [Section] {
-        let rs = calm.records.sorted { $0.support > $1.support }
+        // The kind filter runs here on the rules already loaded, so a click never waits for the Core (2026-11-23).
+        let rs = calm.records.filter { calm.ruleKind == nil || $0.kind == calm.ruleKind }
+            .sorted { $0.support > $1.support }
         let kinds = RuleKind.allCases.map(\.rawValue)
         return (kinds.map(Optional.some) + [nil]).compactMap { k -> Section? in
             let rows = rs.filter { k == nil ? !kinds.contains($0.kind ?? "") : $0.kind == k }
@@ -143,8 +145,14 @@ struct RulesPage: View {
     }
 
     private func pick(_ k: String?) {
-        calm.ruleKind = calm.ruleKind == k ? nil : k
-        Task { await calm.refilter() }
+        withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) {
+            calm.ruleKind = calm.ruleKind == k ? nil : k
+            if let id = calm.picked, let r = calm.records.first(where: { $0.id == id }),
+                calm.ruleKind != nil, r.kind != calm.ruleKind
+            {
+                calm.picked = calm.records.first { $0.kind == calm.ruleKind }?.id
+            }
+        }
     }
 }
 
@@ -175,7 +183,9 @@ private struct KindFilter: View {
                     }
                     Spacer(minLength: 0)
                 }
-                if let share { CoreMeter(share, label: "\(title), share of all rules") }
+                // The All tile keeps an empty meter's room, so all four tiles are the same height.
+                CoreMeter(share ?? 0, label: "\(title), share of all rules").opacity(share == nil ? 0 : 1)
+                    .accessibilityHidden(share == nil)
             }
             .padding(Space.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -210,14 +220,16 @@ private struct RulebookRow: View {
                     meta.coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s2)
-                if hover, brain.calm.v101 {
-                    CoreIconButton(symbol: "pencil", label: "Edit rule") { BrainSheets.rule(brain, editing: rule) }
-                        .help("Edit this rule")
-                }
-                if hover {
+                // Always laid out, shown on hover, so the row never shifts.
+                HStack(spacing: Space.s1) {
+                    if brain.calm.v101 {
+                        CoreIconButton(symbol: "pencil", label: "Edit rule") { BrainSheets.rule(brain, editing: rule) }
+                            .help("Edit this rule")
+                    }
                     CoreIconButton(symbol: "trash", label: "Forget rule") { brain.forget(rule) }
                         .help("Forget this rule (⌘⌫ when it is open). Undo brings it back.")
                 }
+                .opacity(hover ? 1 : 0).allowsHitTesting(hover)
                 if rule.everywhere == true {
                     PlaceChip(name: "", everywhere: true)
                 } else {

@@ -68,6 +68,16 @@ extension ReviewModel {
         }
     }
 
+    /// Ignore (2026-11-23): the place stays out of the Brain, none of its items are kept, and once the import is approved
+    /// its folders are skipped in later imports (the Core writes the refuse rule, see Sources > Rules).
+    public func ignore(_ id: String) async {
+        guard let run else { return }
+        await act {
+            _ = try await routes.refuse(run: run, proposal: id)
+            await refresh()
+        }
+    }
+
     /// What the Core already did, in one line ("Merged 7 into 3 places, 12 small ones to Unsorted"); nil when it does not
     /// say. Read from the tidy summary: the local model's, or (Core 0.10.2, no model) the one by names and sizes.
     public var prepared: String? {
