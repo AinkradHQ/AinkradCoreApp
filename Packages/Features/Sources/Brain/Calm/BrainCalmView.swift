@@ -95,7 +95,9 @@ struct CalmHome: View {
             .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: working)
             BrainMap(
                 sources: SourceGroup.make(brain.brainSources).prefix(3).map {
-                    MapSource(id: $0.id, symbol: $0.symbol, title: $0.title, line: $0.mapLine, live: $0.reading)
+                    MapSource(
+                        id: $0.id, symbol: $0.symbol, title: $0.title, line: $0.mapLine, live: $0.reading,
+                        on: $0.enabled)
                 },
                 shelves: Self.order.map { p in
                     let s = calm.summary(p.area ?? "")

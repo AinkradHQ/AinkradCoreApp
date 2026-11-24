@@ -120,12 +120,11 @@ struct AboutYouPage: View {
                 .coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 if !tags.isEmpty {
-                    HStack(spacing: Space.s1) {
+                    ChipFlow(spacing: Space.s1) {
                         ForEach(tags, id: \.self) { t in
-                            Text(t).coreFont(size: MacTextSize.body).padding(.horizontal, Space.s2).padding(
-                                .vertical, 3
-                            )
-                            .background(GlassInk.well, in: coreShape(Radius.chip))
+                            Text(t).coreFont(size: MacTextSize.body).lineLimit(1).fixedSize()
+                                .padding(.horizontal, Space.s2).padding(.vertical, 3)
+                                .background(GlassInk.well, in: coreShape(Radius.chip))
                         }
                     }
                 }
