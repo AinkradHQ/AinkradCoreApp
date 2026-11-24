@@ -135,7 +135,9 @@ struct WorkspaceView: View {
         let away = shell.spaceOffset(of: spec.id)
         let folded = (focus != nil && focus != spec.id) || away != 0
         let tiled = layout.frames[spec.id] ?? CGRect(origin: .zero, size: area)
-        let slot = focus == spec.id ? CGRect(origin: .zero, size: area) : tiled
+        // Focus mode: every pane sits full size (the hidden ones too), so picking another app only cross-fades instead of
+        // growing it out of its tiled frame.
+        let slot = focus != nil ? CGRect(origin: .zero, size: area) : tiled
         let dragging = drag?.id == spec.id
         PaneHost(
             spec: spec, active: shell.activePane == spec.id && (focus != nil || shell.panes.count > 1),

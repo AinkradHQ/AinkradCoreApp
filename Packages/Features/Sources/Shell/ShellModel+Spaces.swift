@@ -53,7 +53,8 @@ extension ShellModel {
             tree.open(spec.id)
         }
         paneSpace[spec.id] = currentSpace
-        focusedPane = nil
+        // A workspace in focus mode stays in it, with the new app in front (a new workspace loads unfocused).
+        if focusedPane != nil { focusedPane = spec.id }
         syncOrder()
     }
 
