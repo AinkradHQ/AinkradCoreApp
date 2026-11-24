@@ -83,7 +83,7 @@ public final class RoomOverviewModel {
             }
             current = o
             phase = .ready
-            writingSince = o.state == .writing ? writingSince ?? Date() : nil
+            writingSince = o.isWriting ? writingSince ?? Date() : nil
         } catch is CancellationError {
             BrainRoutes.log.notice("overview load \(room, privacy: .public) cancelled")
         } catch {
@@ -113,7 +113,7 @@ public final class RoomOverviewModel {
 
     /// Re-reads while the Core writes, until it is done. Cancelled with the view.
     public func watch(_ room: String) async {
-        while !Task.isCancelled, roomID == room, current?.state == .writing {
+        while !Task.isCancelled, roomID == room, current?.isWriting == true {
             try? await Task.sleep(for: pollEvery)
             if Task.isCancelled { return }
             await load(room, quiet: true)

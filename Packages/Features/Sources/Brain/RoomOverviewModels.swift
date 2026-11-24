@@ -166,6 +166,10 @@ public struct RoomOverview: Codable, Sendable, Equatable {
     public var instructionsApprovedAt: String?
     /// Item id to title, for every item a rule cites.
     public var sourceTitles: [String: String]
+    /// API minor 102: when it was written, and whether a write (first or refresh) is queued or running. The Core writes
+    /// overviews by itself from 102 on; an older Core sends neither.
+    public var cardAt: String?
+    public var cardPending: Bool?
 
     public init(
         state: OverviewState, detail: String = "", writtenAt: String? = nil, model: String? = nil,
@@ -201,6 +205,8 @@ public struct RoomOverview: Codable, Sendable, Equatable {
         instructions = try c.decodeIfPresent(String.self, forKey: .instructions)
         instructionsApprovedAt = try c.decodeIfPresent(String.self, forKey: .instructionsApprovedAt)
         sourceTitles = try c.decodeIfPresent([String: String].self, forKey: .sourceTitles) ?? [:]
+        cardAt = try c.decodeIfPresent(String.self, forKey: .cardAt)
+        cardPending = try c.decodeIfPresent(Bool.self, forKey: .cardPending)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -209,9 +215,13 @@ public struct RoomOverview: Codable, Sendable, Equatable {
         case writtenAt = "written_at"
         case instructionsApprovedAt = "instructions_approved_at"
         case sourceTitles = "source_titles"
+        case cardAt = "card_at"
+        case cardPending = "card_pending"
     }
 
     var instructionsApproved: Bool { instructionsApprovedAt != nil }
+    /// Being written now: the state says so, or (API minor 102) a write of it is queued or running.
+    var isWriting: Bool { state == .writing || cardPending == true }
     /// The text AI sessions get: the room's own, else the one first written.
     var instructionsText: String { instructions ?? overview?.instructions ?? "" }
 

@@ -1,44 +1,52 @@
 import CoreUI
 import SwiftUI
 
-/// Room Settings, memory half (B10-02): what the room saves by itself, its daily distil cap, how long it keeps sources, and
+/// Place Settings, memory half (B10-02): what the room saves by itself, its daily distil cap, how long it keeps sources, and
 /// the "Clean up memory…" run. Plain and quick by default: every kind is saved with Undo, nothing to review. Every change
 /// asks for Touch ID (the model asks); until the Core answers, the controls show what the Core has.
 extension RoomSettings {
-    // MARK: Auto-save
+    // MARK: what Brain keeps
 
+    /// Each kind as a tile with its box; then how often a thing must be seen before it is kept.
     func saving(_ p: RoomPolicy) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            head("Auto-save", p.savedTypes.isEmpty ? "Off: everything waits in the Inbox" : "On, with Undo in Activity")
-            ForEach(CandidateKind.saveRows, id: \.self) { k in
-                row(k.plural, Self.saveAbout(k), dim: false, inline: true) {
-                    CoreCheckbox(
-                        "", isOn: Binding(get: { p.saves(k) }, set: { _ in Task { await c.toggleSave(room.id, k) } }),
-                        spoken: k.plural)
+        VStack(alignment: .leading, spacing: Space.s3) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s2), count: 4), spacing: Space.s2)
+            {
+                ForEach(CandidateKind.saveRows, id: \.self) { k in
+                    KeepTile(
+                        symbol: Self.keepSymbol(k), title: k.plural, sub: Self.saveAbout(k),
+                        on: Binding(get: { p.saves(k) }, set: { _ in Task { await c.toggleSave(room.id, k) } }))
                 }
             }
-            row("Only with at least", nil, dim: p.savedTypes.isEmpty, inline: true) {
+            line("Keep something only when it was seen", "More times means fewer, surer things") {
                 CoreSelect(
                     nil,
                     selection: Binding(get: { p.minSources }, set: { n in Task { await c.setMinSources(room.id, n) } }),
-                    options: Self.minChoices(p.minSources).map {
-                        CoreSelectOption($0, BrainWords.plural($0, "source", "sources"))
-                    }
+                    options: Self.minChoices(p.minSources).map { CoreSelectOption($0, Self.seen($0)) }
                 )
-                .frame(width: Space.s8 * 4)
+                .frame(width: Space.s8 * 5)
                 .disabled(p.savedTypes.isEmpty)
             }
-            // Not every Core sends the cap yet: no row rather than a control that cannot save.
-            if let cap = p.dailyDistils {
-                row("Distils a day", "How many times this room may distil by itself", dim: false) {
-                    CoreSelect(
-                        nil,
-                        selection: Binding(get: { cap }, set: { n in Task { await c.setDailyDistils(room.id, n) } }),
-                        options: Self.capChoices(cap).map { CoreSelectOption($0, $0 == 0 ? "None" : "\($0) a day") }
-                    )
-                    .frame(width: Space.s8 * 4)
-                }
-            }
+        }
+    }
+
+    static func seen(_ n: Int) -> String {
+        switch n {
+        case 1: "at least once"
+        case 2: "at least twice"
+        default: "\(n) times or more"
+        }
+    }
+
+    static func keepSymbol(_ k: CandidateKind) -> String {
+        switch k {
+        case .fact: "sparkles"
+        case .decision: "star"
+        case .preference: "person"
+        case .rule: "checkmark"
+        case .task: "tray"
+        case .projectState: "square.grid.2x2"
+        default: "doc"
         }
     }
 
@@ -62,25 +70,19 @@ extension RoomSettings {
     func retention(_ p: RoomPolicy) -> some View {
         let care = model.care
         let ask = care?.roomID == room.id ? care?.retentionAsk : nil
-        return VStack(alignment: .leading, spacing: Space.s1) {
-            head("Retention", "Turning it on asks for Touch ID")
-            row(
-                "Keep sources for", "Older sources already distilled lose their text and keep a citation.", dim: false
-            ) {
+        return VStack(alignment: .leading, spacing: Space.s2) {
+            line("Keep the original text") {
                 CoreSelect(
                     nil,
                     selection: Binding(
                         get: { ask?.days ?? p.retentionDays ?? 0 }, set: { n in pick(n, p) }),
                     options: Self.retentionChoices(p.retentionDays).map {
-                        CoreSelectOption($0, $0 == 0 ? "Keep everything" : "\($0) days")
+                        CoreSelectOption($0, $0 == 0 ? "Forever" : "\($0) days")
                     }
                 )
-                .frame(width: Space.s8 * 4)
+                .frame(width: Space.s8 * 5)
             }
-            if let ask {
-                retentionAsk(ask)
-                    .padding(.horizontal, Space.s3).padding(.vertical, Space.s1)
-            }
+            if let ask { retentionAsk(ask) }
         }
     }
 
@@ -153,14 +155,7 @@ struct RoomCleanupCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            HStack {
-                Text("Clean up memory").coreFont(size: MacTextSize.headline, weight: .semibold)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Space.s3)
-                Text("Undo puts everything back").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-            }
-            .padding(.horizontal, 2)
-            Group { content }.padding(.horizontal, Space.s3)
+            content
             if let note = care.roomID == room.id ? care.note : nil {
                 CoreNotice(symbol: "exclamationmark.triangle", title: note, tone: .warn)
             }
@@ -173,11 +168,13 @@ struct RoomCleanupCard: View {
     @ViewBuilder private var content: some View {
         switch state {
         case .idle:
-            action(
-                "Reads every source again, keeps the facts that still hold and archives the rest.",
-                button: Button("Clean Up Memory…") { care.check(room.id) }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                    .help("Count what a clean-up would keep and archive. Nothing changes yet."))
+            Button {
+                care.check(room.id)
+            } label: {
+                Label("Clean Up Memory…", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            .help("Count what a clean-up would keep and put away. Nothing changes yet.")
         case .checking(let run):
             progress("Checking what would change…", run)
         case .ready(let run):
@@ -189,7 +186,7 @@ struct RoomCleanupCard: View {
         case .nothing:
             CoreNotice(
                 symbol: "tray", title: "Nothing to clean up",
-                text: "This room has no sources to read again yet."
+                text: "This place has nothing to read again yet."
             ) {
                 Button("Dismiss") { care.dismiss() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
@@ -201,15 +198,6 @@ struct RoomCleanupCard: View {
                     Button("Dismiss") { care.dismiss() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
             }
-        }
-    }
-
-    private func action<B: View>(_ text: String, button: B) -> some View {
-        HStack(spacing: Space.s3) {
-            Text(text).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: Space.s3)
-            button
         }
     }
 
@@ -275,5 +263,32 @@ struct RoomCleanupCard: View {
             }
             Button("Dismiss") { care.dismiss() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
+    }
+}
+
+/// One kind Brain may keep: its tile, name, what it means and its box. Off reads dimmer.
+private struct KeepTile: View {
+    let symbol: String
+    let title: String
+    let sub: String
+    @Binding var on: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s1 + 2) {
+            HStack {
+                BrainTile(symbol: symbol, size: Space.s5 + 4)
+                Spacer(minLength: Space.s2)
+                CoreCheckbox("", isOn: $on, spoken: title)
+            }
+            Text(title).coreFont(size: MacTextSize.body, weight: .semibold)
+            Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+        .opacity(on ? 1 : 0.55)
+        .contentShape(coreShape(Radius.control + 2))
+        .onTapGesture { on.toggle() }
+        .accessibilityElement(children: .contain)
     }
 }

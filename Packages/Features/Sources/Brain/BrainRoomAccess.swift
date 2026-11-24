@@ -43,54 +43,74 @@ extension BrainCandidates {
     }
 }
 
-/// The "AI sessions" section of a room's Settings.
+/// "Which AI sessions can use it?": the place's own project, the extra allows with Remove, and Allow Another Project…
+/// which opens the add row. Every change asks for Touch ID.
 struct RoomAISessions: View {
     let c: BrainCandidates
     let room: RoomSummary
     @State private var kind = AccessKind.project
     @State private var name = ""
+    @State private var adding = false
 
     var body: some View {
         if let a = c.access[room.id] {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                HStack {
-                    Text("AI sessions").coreFont(size: MacTextSize.headline, weight: .semibold)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer(minLength: Space.s3)
-                    Text("Changing it asks for Touch ID").coreFont(size: MacTextSize.meta)
-                        .foregroundStyle(GlassInk.secondary)
+            VStack(alignment: .leading, spacing: Space.s2) {
+                entry("folder", "Project “\(room.name)”", "Always, it is this place’s own project", lit: true) {
+                    EmptyView()
                 }
-                .padding(.horizontal, 2)
-                Text("AI sessions see this room only when their project matches it.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .padding(.horizontal, 2).padding(.bottom, Space.s1)
-                CoreRow("Matches project: \(room.name)", subtitle: "Always on", symbol: "folder") { EmptyView() }
-                    .accessibilityIdentifier("room-ai-default")
+                .accessibilityIdentifier("room-ai-default")
                 ForEach(a.entries, id: \.value) { e in
-                    CoreRow(e.value, subtitle: "Also allowed · \(e.kind.title)", symbol: Self.symbol(e.kind)) {
+                    entry(Self.symbol(e.kind), "\(e.kind.title) “\(e.value)”", "Also allowed by you") {
                         Button("Remove") { Task { await c.removeAccess(room.id, e.kind, e.value) } }
                             .buttonStyle(CoreButtonStyle(.plain, size: .small))
-                            .help("Stop letting \(e.kind.title.lowercased()) \(e.value) see this room.")
+                            .help("Stop letting \(e.kind.title.lowercased()) \(e.value) see this place.")
                     }
                     .accessibilityIdentifier("room-ai-allow-\(e.kind.rawValue)-\(e.value)")
                 }
                 .disabled(c.busy)
-                HStack(alignment: .bottom, spacing: Space.s2) {
-                    CoreSelect(
-                        "Also allow", selection: $kind,
-                        options: AccessKind.allCases.map { CoreSelectOption($0, $0.title) }
-                    )
-                    .frame(width: Space.s8 * 4)
-                    CoreTextField("Name", placeholder: placeholder, text: $name) { add() }
-                    Button("Add", action: add).buttonStyle(CoreButtonStyle(.secondary))
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .help("Let this \(kind.title.lowercased()) see this room.")
+                if adding {
+                    HStack(alignment: .bottom, spacing: Space.s2) {
+                        CoreSelect(
+                            "Also allow", selection: $kind,
+                            options: AccessKind.allCases.map { CoreSelectOption($0, $0.title) }
+                        )
+                        .frame(width: Space.s8 * 4)
+                        CoreTextField("Name", placeholder: placeholder, text: $name) { add() }
+                        Button("Add", action: add).buttonStyle(CoreButtonStyle(.secondary))
+                            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .help("Let this \(kind.title.lowercased()) see this place. Asks for Touch ID.")
+                    }
+                    .padding(.top, Space.s1)
+                    .transition(.opacity)
+                } else {
+                    Button {
+                        adding = true
+                    } label: {
+                        Label("Allow Another Project…", systemImage: "plus")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .padding(.top, Space.s1)
                 }
-                .padding(.top, Space.s2)
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("room-ai-sessions")
         }
+    }
+
+    private func entry<T: View>(
+        _ symbol: String, _ title: String, _ sub: String, lit: Bool = false, @ViewBuilder trailing: () -> T
+    ) -> some View {
+        HStack(spacing: Space.s3) {
+            BrainTile(symbol: symbol, lit: lit)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).coreFont(size: MacTextSize.body).lineLimit(1)
+                Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: Space.s2)
+            trailing()
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .background(GlassInk.well, in: coreShape(Radius.control + 2))
     }
 
     private var placeholder: String {
@@ -102,7 +122,12 @@ struct RoomAISessions: View {
     }
 
     private func add() {
-        Task { if await c.addAccess(room.id, kind, name) { name = "" } }
+        Task {
+            if await c.addAccess(room.id, kind, name) {
+                name = ""
+                adding = false
+            }
+        }
     }
 
     private static func symbol(_ k: AccessKind) -> String {

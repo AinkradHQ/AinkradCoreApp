@@ -20,6 +20,18 @@ struct KnowledgePage: View {
                     back: { Task { await calm.openTopic(nil) } }
                 ) { EmptyView() }
                 TopicList(brain: brain, places: t.rooms, topic: t.name).transition(.opacity)
+            } else if let room = calm.topicRoom {
+                // Opened from a place's Overview: that place's facts or decisions.
+                let name = brain.rooms.first { $0.id == room }?.name ?? room
+                BrainHead(
+                    symbol: "sparkles", title: name, crumb: "Knowledge", count: calm.total,
+                    sub: calm.knowledgeType == "decision" ? "Decisions made in \(name)" : "What Brain knows in \(name)",
+                    back: {
+                        calm.topicRoom = nil
+                        Task { await calm.loadRecords() }
+                    }
+                ) { EmptyView() }
+                TopicList(brain: brain, places: [], topic: nil).transition(.opacity)
             } else {
                 BrainHead(
                     symbol: "sparkles", title: "Knowledge", count: s?.count,
@@ -32,6 +44,7 @@ struct KnowledgePage: View {
             }
         }
         .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.topic?.name)
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: calm.topicRoom)
         .onAppear { shown = true }
         .accessibilityIdentifier("brain-knowledge")
     }

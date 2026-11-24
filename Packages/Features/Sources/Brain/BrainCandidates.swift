@@ -8,7 +8,7 @@ public enum RoomPaneMode: String, Sendable, Hashable {
     var title: String {
         switch self {
         case .overview: "Overview"
-        case .items: "Items"
+        case .items: "What It Read"
         case .settings: "Settings"
         }
     }

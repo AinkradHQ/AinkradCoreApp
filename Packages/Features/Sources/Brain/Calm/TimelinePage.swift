@@ -15,9 +15,22 @@ struct TimelinePage: View {
     var body: some View {
         let s = calm.summary("timeline")
         VStack(alignment: .leading, spacing: Space.s4) {
-            BrainHead(
-                symbol: "clock", title: "Timeline", count: s?.count, sub: "What happened, and when",
-                today: s?.today ?? 0)
+            if let room = calm.topicRoom {
+                // Opened from a place's Overview: what happened in that place.
+                let name = brain.rooms.first { $0.id == room }?.name ?? room
+                BrainHead(
+                    symbol: "clock", title: name, crumb: "Timeline", count: calm.total,
+                    sub: "What happened in \(name), and when",
+                    back: {
+                        calm.topicRoom = nil
+                        Task { await calm.loadRecords() }
+                    }
+                ) { EmptyView() }
+            } else {
+                BrainHead(
+                    symbol: "clock", title: "Timeline", count: s?.count, sub: "What happened, and when",
+                    today: s?.today ?? 0)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
                     grid.coreRise(shown, 0)

@@ -147,7 +147,8 @@ public final class BrainCalmModel {
     public internal(set) var v101 = false
     /// API minor 101: every place with its counts by area, whether it learns now.
     public internal(set) var places: [PlaceWire]?
-    /// API minor 101: Knowledge's topics, the one opened, its place filter and words.
+    /// API minor 101: Knowledge's topics, the one opened, its place filter (also Knowledge's and Timeline's list of one
+    /// place, opened from a place's Overview) and words.
     public internal(set) var topics: [TopicWire]?
     public var topic: TopicWire?
     public var topicRoom: String?
@@ -173,6 +174,8 @@ public final class BrainCalmModel {
     var demoTopic: [BrainAreaRecordWire] = []
     var demoAnswer: AskWire?
     var demoSources: [SourceWire]?
+    var demoLatest: RoomLatest?
+    var demoTrace: SourceTraceWire?
     #endif
     @ObservationIgnored var routes: BrainRoutes?
     @ObservationIgnored var service: (any BrainService)?
@@ -211,6 +214,7 @@ public final class BrainCalmModel {
         if page != p {
             picked = nil
             topic = nil
+            topicRoom = nil
             filterText = ""
         }
         page = p
@@ -235,7 +239,7 @@ public final class BrainCalmModel {
             if v101 {
                 p = try await routes.area(
                     area, kind: page == .rules ? ruleKind : nil, topic: page == .knowledge ? topic?.name : nil,
-                    room: page == .rules ? ruleRoom : page == .knowledge ? topicRoom : nil,
+                    room: page == .rules ? ruleRoom : page == .knowledge || page == .timeline ? topicRoom : nil,
                     q: filterText.isEmpty ? nil : filterText,
                     type: page == .knowledge && topic == nil ? knowledgeType : nil,
                     limit: page == .timeline ? 200 : 60)
