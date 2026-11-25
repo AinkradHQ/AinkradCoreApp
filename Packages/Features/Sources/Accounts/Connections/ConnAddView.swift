@@ -22,7 +22,9 @@ struct ConnAddView: View {
     var body: some View {
         Group {
             if token, let k = kind {
-                TokenForm(model: model, kind: k, back: { token = false }, close: close)
+                TokenForm(
+                    model: model, kind: k, joining: a.connection.flatMap(model.item), back: { token = false },
+                    close: close)
             } else {
                 panel
             }
