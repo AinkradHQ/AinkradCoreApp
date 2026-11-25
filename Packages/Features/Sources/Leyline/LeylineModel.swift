@@ -272,14 +272,7 @@ public final class LeylineModel {
         writeError = nil
         defer { busy = false }
         let made: HostItem
-        do {
-            made = try await host.elevated("Add the host \(draft.name).", done: "added", keepsEdit: true) {
-                try await service.createHost(draft)
-            }
-        } catch is AdminDeclined {
-            writeError = "Adding a host needs Touch ID. Try again and confirm it."
-            return nil
-        } catch {
+        do { made = try await service.createHost(draft) } catch {
             if CoreError.unwrapping(error) == .forbiddenScope { readOnly = true }
             writeError = words(error)
             return nil
