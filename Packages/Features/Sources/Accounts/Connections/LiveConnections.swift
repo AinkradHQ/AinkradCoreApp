@@ -180,7 +180,7 @@ struct LiveConnectionsService: ConnectionsService {
 
     func rename(_ id: Int64, to name: String) async throws {
         try await run {
-            _ = try await client.updateConnection(path: .init(id: String(id)), body: .json(.init(name: Self.coreName(name) ?? name))).ok
+            _ = try await client.updateConnection(path: .init(id: String(id)), body: .json(.init(label: name, name: Self.coreName(name)))).ok
         }
     }
 
@@ -307,6 +307,18 @@ struct LiveConnectionsService: ConnectionsService {
 
     static func name(of kind: String, _ title: String?) -> String { title ?? kind.capitalized }
 
+    /// The name the person gave a connection; empty when it only repeats the account or the service ("GitHub").
+    static func shownLabel(_ label: String, identity: String?, service: String) -> String {
+        let l = label.trimmingCharacters(in: .whitespaces)
+        return l == identity || l.caseInsensitiveCompare(service) == .orderedSame ? "" : l
+    }
+
+    /// Whose account it is, readable: Jira's "712020:… at https://team.atlassian.net" is shown as "team.atlassian.net".
+    static func shownIdentity(_ identity: String) -> String {
+        guard let r = identity.range(of: " at https://") else { return identity }
+        return String(identity[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+    }
+
     static func item(
         _ c: Components.Schemas.Connection, service: String?, grants: [Components.Schemas.ConnectionGrant]?
     )
@@ -321,11 +333,11 @@ struct LiveConnectionsService: ConnectionsService {
         let member = grants?.first { $0.granteeKind == "role" && $0.grantee == "member" }
         let chosen = member?.limits.additionalProperties.values.first { !$0.isEmpty }
         return ConnItem(
-            id: c.id, kind: c.kind, name: c.name, identity: c.identity ?? c.label, status: status,
+            id: c.id, kind: c.kind, name: c.name, identity: Self.shownIdentity(c.identity ?? c.label), status: status,
             reason: status == .needsLook ? reason(c.stateReason, service: service) : nil, isDefault: c.isDefault,
             allowed: Set(grants == nil ? (c.myCapabilities ?? []) : (member?.capabilities ?? [])), only: chosen,
             lastUsed: nil, lastChecked: c.lastTestedAt, users: Int(c.grantCount ?? 1), signInNeeded: authLost,
-            authMethod: c.authMethod, label: c.label == c.identity ? "" : c.label)
+            authMethod: c.authMethod, label: Self.shownLabel(c.label, identity: c.identity, service: service))
     }
 
     /// The Core's reasons are short codes; the screen says them in words.
