@@ -13,6 +13,7 @@ extension ConnAddView {
             toolbar(noun)
             pickList(noun)
             if a.kind == "github" { missingRepos }
+            if a.kind == "jira" { otherSites }
             if let e = model.addError { AccIssue(text: e) }
             if let c = a.connection, model.gated.contains("access-\(c)") {
                 TurnOnConnections(model: model) { await model.finishAdd() }
@@ -81,6 +82,35 @@ extension ConnAddView {
             installing = false
             Task { await model.loadPicks() }
         }
+    }
+
+    /// Atlassian ties a sign-in to one site: projects shared with you on another company's site need a connection of
+    /// their own. "Connect another site" saves these choices first, then signs in again (pick the other site there).
+    private var otherSites: some View {
+        HStack(spacing: Space.s3) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Missing a project?").coreFont(size: MacTextSize.meta, weight: .semibold)
+                Text("Projects on another Atlassian site need their own connection.").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: Space.s2) {
+                AccLink(
+                    title: "Connect another site", symbol: "plus",
+                    help: "Saves these projects, then signs in again. Pick the other site on Atlassian’s page."
+                ) {
+                    Task {
+                        await model.finishAdd()
+                        if model.addError == nil { model.pick(service: "jira") }
+                    }
+                }
+                .disabled(!a.canFinish)
+                AccLink(title: "Use a token", symbol: "key") { token = true }
+            }
+            .fixedSize()
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .background(GlassInk.well, in: coreShape(Radius.control))
     }
 
     @ViewBuilder private func pickList(_ noun: String) -> some View {
