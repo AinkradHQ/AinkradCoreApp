@@ -167,13 +167,25 @@ struct AddAccountLogicTests {
 
     @Test func theNewestGooglePageWinsAndTheErrorReadsPlainly() {
         let screen = [
-            "Open https://accounts.google.com/o/oauth2/auth?code_challenge=OLD",
+            "Open https://accounts.google.com/o/oauth2/auth?client_id=a&response_type=code&code_challenge=OLD",
             "Got an error: token exchange failed: oauth2: \"invalid_grant\" \"Bad Request\"",
-            "Open https://accounts.google.com/o/oauth2/auth?code_challenge=NEW",
+            "Open https://accounts.google.com/o/oauth2/auth?client_id=a&response_type=code&code_challenge=NEW",
             "Visit https://evil.example/x",
         ]
         #expect(SignInScreen.newestPage(screen)?.absoluteString.hasSuffix("NEW") == true)
         #expect(SignInScreen.lastError(screen)?.hasPrefix("Google didn’t accept") == true)
         #expect(SignInScreen.lastError(["Welcome"]) == nil)
     }
+
+    @Test func aGooglePageThatRunsOnToTheNextLineIsJoinedAndACutOneIsSkipped() {
+        let screen = [
+            "Visit https://accounts.google.com/o/oauth2/auth?client_id=abc&redirect_uri=https%3A%2F%2Fcodeassist",
+            ".google.com%2Fauthcode&response_type=code&code_challenge=NEW",
+            "Enter the authorization code:",
+        ]
+        let u = SignInScreen.newestPage(screen)?.absoluteString ?? ""
+        #expect(u.hasSuffix("code_challenge=NEW") && u.contains("response_type=code"))
+        #expect(SignInScreen.newestPage(["https://accounts.google.com/o/oauth2/auth?client_id=abc", "Waiting for you"]) == nil)
+    }
 }
+

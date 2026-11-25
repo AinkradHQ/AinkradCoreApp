@@ -205,10 +205,32 @@ enum SignInScreen {
     /// The LAST https sign-in page on the screen: a retry prints a new page with a new one-time secret, and a code from an
     /// older page is refused ("invalid_grant").
     static func newestPage(_ lines: [String]) -> URL? {
-        for line in lines.reversed() {
-            for w in line.split(whereSeparator: \.isWhitespace).reversed() where w.hasPrefix("https://") {
-                if let u = URL(string: String(w)), let h = u.host, hosts.contains(h) { return u }
+        // A long page runs past the end of the terminal's line and goes on in the next: join each URL with the lines that
+        // carry on from it (no space inside), then take the last one that is a whole sign-in page.
+        var pages: [String] = []
+        var i = 0
+        while i < lines.count {
+            let words = lines[i].split(whereSeparator: \.isWhitespace)
+            for (k, w) in words.enumerated() where w.hasPrefix("https://") {
+                var url = String(w)
+                if k == words.count - 1 {  // the URL ends the line: it may go on below
+                    var j = i + 1
+                    while j < lines.count {
+                        let next = lines[j].trimmingCharacters(in: .whitespaces)
+                        guard !next.isEmpty, !next.contains(" "), !next.hasPrefix("https://") else { break }
+                        url += next
+                        j += 1
+                    }
+                }
+                pages.append(url)
             }
+            i += 1
+        }
+        for p in pages.reversed() {
+            guard let u = URL(string: p), let h = u.host, hosts.contains(h) else { continue }
+            // A Google page without these is cut short and only gets Google's "Authorization Error".
+            if h == "accounts.google.com", !(p.contains("response_type=") && p.contains("client_id=")) { continue }
+            return u
         }
         return nil
     }
