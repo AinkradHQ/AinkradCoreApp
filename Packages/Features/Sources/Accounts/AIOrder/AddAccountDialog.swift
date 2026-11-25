@@ -20,6 +20,7 @@ struct AddAccountDialog: View {
     private static let startKind = ProviderKind.apiKey
     #endif
     @State var code = ""
+    @FocusState var codeFocused: Bool
     @State var copied = false
     @State var details = false
     @Environment(\.accessibilityReduceMotion) var reduce

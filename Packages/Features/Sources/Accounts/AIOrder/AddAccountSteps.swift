@@ -129,6 +129,8 @@ extension AddAccountDialog {
             detailsDisclosure(s, step)
             if step == .failed {
                 footer(primary: ("Try Again", { Task { await flow.retrySignIn(model) } }))
+            } else if step == .enterCode || step == .openURL {
+                footer(primary: ("Continue", sendCode), enabled: codeReady, busy: s?.sending == true)
             } else {
                 footer()
             }
@@ -228,6 +230,8 @@ extension AddAccountDialog {
                     Task { await model.sendGuidedInput(o.number) }
                 } label: {
                     HStack(spacing: Space.s2) {
+                        Text(o.number).coreFont(size: MacTextSize.meta, weight: .semibold, design: .monospaced)
+                            .foregroundStyle(GlassInk.secondary).frame(width: Space.s4)
                         Text(o.title).coreFont(size: MacTextSize.body, weight: .medium)
                         Spacer(minLength: Space.s2)
                         if i == 0 {
@@ -240,6 +244,8 @@ extension AddAccountDialog {
                 }
                 .buttonStyle(CoreQuietPressStyle(radius: Radius.control, hoverFill: true))
                 .disabled(sending)
+                // Keyboard: the choice's own number picks it (1, 2, …).
+                .keyboardShortcut(KeyEquivalent(Character(o.number.count == 1 ? o.number : "0")), modifiers: [])
                 .accessibilityIdentifier("sign-in-choice-\(o.number)")
             }
             if let e = model.signIn?.inputError { AccIssue(text: e) }
@@ -257,20 +263,23 @@ extension AddAccountDialog {
     /// The code the provider shows: pasted here, sent once through the Core, then cleared. Never sent for the person.
     private func codeField(_ prompt: String = "Paste the code") -> some View {
         let s = model.signIn
-        let empty = code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return HStack(alignment: .top, spacing: Space.s2) {
-            CoreTextField(
-                "", placeholder: prompt, text: $code, error: s?.codeError ?? s?.inputError, mono: true,
-                autofocus: prompt == "Paste the code", onSubmit: sendCode
-            )
-            .accessibilityLabel("The code")
-            .accessibilityIdentifier("sign-in-code")
-            Button("Continue", action: sendCode)
-                .buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: s?.sending == true))
-                .disabled(empty).padding(.top, Space.s1)
+        let error = s?.codeError ?? s?.inputError
+        // The whole row's width, one line; Return sends it, and so does the dialog's main button (bottom right).
+        return VStack(alignment: .leading, spacing: Space.s1) {
+            TextField("", text: $code, prompt: Text(prompt).foregroundStyle(GlassInk.secondary))
+                .textFieldStyle(.plain).coreFont(size: MacTextSize.body, design: .monospaced)
+                .autocorrectionDisabled().focused($codeFocused).onSubmit(sendCode)
+                .padding(.horizontal, Space.s3).frame(maxWidth: .infinity, minHeight: MacSize.controlLg)
+                .coreFieldSurface(focused: codeFocused, error: error != nil)
+                .onAppear { if prompt == "Paste the code" { codeFocused = true } }
+                .accessibilityLabel("The code").accessibilityIdentifier("sign-in-code")
+            if let error { CoreFieldError(error) }
         }
         .padding(.top, Space.s1)
     }
+
+    /// The code step's main button, bottom right: Continue (⏎) once something is pasted.
+    var codeReady: Bool { !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     private func sendCode() {
         let c = code
