@@ -93,6 +93,13 @@ struct ConnAddStateTests {
         #expect(ConnAccess.scope(nil, only: ["me/*"], seen: 3) == "3 places")
     }
 
+    @Test func rowsShowTheGivenNameAndAReadableAccount() {
+        #expect(LiveConnectionsService.shownLabel("GitHub", identity: "me", service: "GitHub") == "")
+        #expect(LiveConnectionsService.shownLabel("Work Jira", identity: "x", service: "Jira") == "Work Jira")
+        #expect(LiveConnectionsService.shownIdentity("712020:1d1b at https://ainkrad.atlassian.net") == "ainkrad.atlassian.net")
+        #expect(LiveConnectionsService.shownIdentity("AhmedMElhalaby") == "AhmedMElhalaby")
+    }
+
     @Test func aTypedNameIsSentAsACoreName() {
         #expect(LiveConnectionsService.coreName("Github Token") == "github-token")
         #expect(LiveConnectionsService.coreName(" Work (main) ") == "work-main")

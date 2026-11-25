@@ -121,7 +121,7 @@ struct RenameSheet: View {
     let close: () -> Void
     @State private var name = ""
     var body: some View {
-        CoreDialogPanel("Rename \(item.name)") {
+        CoreDialogPanel("Rename \(item.label.isEmpty ? item.name : item.label)") {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField("Name", placeholder: item.name, text: $name, autofocus: true)
                 if let e = model.writeError["rename-\(item.id)"] { AccIssue(text: e) }
@@ -132,7 +132,7 @@ struct RenameSheet: View {
                 }
             }
         }
-        .onAppear { name = item.name }
+        .onAppear { name = item.label.isEmpty ? item.name : item.label }
     }
 }
 
