@@ -656,6 +656,21 @@ public final class TerminalsModel {
         }
     }
 
+    /// A terminal the Core already opened (a Leyline host terminal), drawn inside another screen with no pane of its own. The
+    /// same session is reused while it lives. nil when the Core does not list it.
+    func embed(existing id: String) async -> TerminalSession? {
+        if let s = sessions[id] { return s }
+        if !items.contains(where: { $0.id == id }) { await reload() }
+        guard let t = items.first(where: { $0.id == id }) else { return nil }
+        let s = TerminalSession(item: t, runner: runner(t.runner), service: service, host: host)
+        s.onBell = { [weak self] in self?.bell(t.id) }
+        s.onChange = { [weak self] in self?.paneChanged(t.id) }
+        s.onGone = { [weak self] in self?.forget(t.id) }
+        sessions[t.id] = s
+        await s.attach()
+        return s
+    }
+
     func openNew(runner: String? = nil, form: NewTerminalModel? = nil) {
         let m = form ?? NewTerminalModel(model: self, runner: runner ?? quickRunner)
         newTerminal = m

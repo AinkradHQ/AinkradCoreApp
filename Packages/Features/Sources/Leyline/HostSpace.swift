@@ -4,67 +4,8 @@ import Projects
 import Shell
 import SwiftUI
 
-/// The space of one host: a top bar with how it is reached, a thin rail and the page the rail picks. Overview, Terminal,
-/// Files, Commands, History and Access are live (Y9-02, Y9-03); Tunnels waits for tunnels (deferred out of 0.9).
-struct HostSpaceView: View {
-    let model: LeylineModel
-    let host: HostItem
-    @State private var state: HostPageState
-
-    init(model: LeylineModel, host: HostItem) {
-        self.model = model
-        self.host = host
-        _state = State(initialValue: HostPageState(model: model, hostID: host.id))
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            if model.section == .overview {
-                HostHero(model: model, host: host, state: state)
-                if let lease = state.direct { DirectBanner(state: state, lease: lease) }
-                HostCards(model: model, host: host, state: state)
-            } else {
-                HostSubpageBar(model: model, host: host)
-                if let lease = state.direct { DirectBanner(state: state, lease: lease) }
-                page
-            }
-        }
-        .padding(Space.s4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .foregroundStyle(GlassInk.primary)
-        .coreFont(size: MacTextSize.body)
-        // What the Overview and History pages both show, read once when the space opens.
-        .task {
-            async let c: Void = state.loadCommands()
-            async let h: Void = state.loadHistory()
-            _ = await (c, h)
-        }
-        .onDisappear { state.closePage() }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("host-space")
-    }
-
-    @ViewBuilder private var page: some View {
-        switch model.section {
-        case .overview: HostOverviewPage(state: state)
-        case .terminal: HostTerminalPage(state: state)
-        case .files: HostFilesPage(state: state)
-        case .commands: HostCommandsPage(state: state)
-        case .history: HostHistoryPage(state: state)
-        case .access:
-            AccessPage(model: model, host: host, state: state)
-        case .tunnels:
-            let e = model.section.empty
-            Island(e.title) {
-                Text(e.line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityIdentifier("host-page-\(model.section.title)")
-        }
-    }
-}
-
 /// Shown under the top bar for as long as a Mac-direct lease is open, whatever page the person is on.
-private struct DirectBanner: View {
+struct DirectBanner: View {
     let state: HostPageState
     let lease: DirectLease
 

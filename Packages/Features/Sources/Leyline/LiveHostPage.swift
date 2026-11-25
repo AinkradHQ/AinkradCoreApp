@@ -132,6 +132,14 @@ extension LiveLeylineService {
         ).item
     }
 
+    func hostKeys(host: String) async throws -> [HostKeyItem] {
+        try await call("GET", "/hosts/\(Self.seg(host))/host-keys", as: [HostKeyItem].self)
+    }
+
+    func trustHostKey(host: String, fingerprint: String) async throws {
+        _ = try await raw("POST", "/hosts/\(Self.seg(host))/host-keys/trust", ["fingerprint": fingerprint])
+    }
+
     func checkHost(address: String, port: Int) async throws -> HostCheck {
         guard await connection.serverSupports(minor: coreMinorV010) else { throw LeylineFailure.notYet }
         struct Body: Encodable {

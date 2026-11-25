@@ -150,43 +150,47 @@ enum LeylinePage: String, CaseIterable, Identifiable {
     var title: String { self == .hosts ? "Hosts" : "Keys" }
 }
 
-/// The rail of a host's space.
+/// The tabs of a host's view. Commands has no tab: it opens from More.
 enum HostSection: String, CaseIterable, Identifiable {
-    case overview, terminal, files, tunnels, commands, history, access
+    case terminal, files, history, access, commands
     var id: String { rawValue }
+    static let tabs: [HostSection] = [.terminal, .files, .history, .access]
     var title: String {
         switch self {
-        case .overview: "Overview"
         case .terminal: "Terminal"
         case .files: "Files"
-        case .tunnels: "Tunnels"
-        case .commands: "Commands & runbooks"
-        case .history: "History & recordings"
+        case .commands: "Commands"
+        case .history: "History"
         case .access: "Access"
         }
     }
     var symbol: String {
         switch self {
-        case .overview: "square.grid.2x2"
         case .terminal: "terminal"
         case .files: "folder"
-        case .tunnels: "arrow.left.arrow.right"
         case .commands: "chevron.right.2"
-        case .history: "clock.arrow.circlepath"
+        case .history: "clock"
         case .access: "lock"
         }
     }
-    /// ⌘1 … ⌘7.
-    var key: Character { Character(String((Self.allCases.firstIndex(of: self) ?? 0) + 1)) }
+    /// ⌘1, ⌘2, ⌘3 and ⌘, (Access is where a host's settings are).
+    var key: Character? {
+        switch self {
+        case .terminal: "1"
+        case .files: "2"
+        case .history: "3"
+        case .access: ","
+        case .commands: nil
+        }
+    }
+    var keyWord: String { key.map { "⌘\($0)" } ?? "" }
+    static func forKey(_ c: Character) -> HostSection? { tabs.first { $0.key == c } }
 
-    /// What a page says until its story builds it (the mockup's empty words).
+    /// What a page says while it has nothing to show.
     var empty: (title: String, line: String) {
         switch self {
-        case .overview:
-            ("Overview", "Health, what is live on the host and one-click commands show here once the host is checked.")
-        case .terminal: ("Terminal", "No terminal is open on this host. Connect opens one here.")
+        case .terminal: ("Terminal", "No terminal is open on this host.")
         case .files: ("Files", "Browse the host over SFTP, drag files in to upload and out to download.")
-        case .tunnels: ("Tunnels", "No tunnels yet. A tunnel listens on 127.0.0.1 only.")
         case .commands: ("Pre-set commands", "No commands yet. Add the ones you run often; AI follows the same rules.")
         case .history: ("History", "Nothing has run on this host yet. Everything you and AI do is listed here.")
         case .access: ("Access", "")
@@ -198,8 +202,10 @@ enum HostSection: String, CaseIterable, Identifiable {
 struct HostGroup: Identifiable, Equatable {
     let name: String?
     let hosts: [HostItem]
+    /// The title of the hosts that are in no group.
+    static let shared = "Shared"
     var id: String { name ?? "" }
-    var title: String { name ?? "Shared" }
+    var title: String { name ?? Self.shared }
     var sub: String {
         let n = "\(hosts.count) host\(hosts.count == 1 ? "" : "s")"
         return name == nil ? "not in a group · \(n)" : "group · \(n)"

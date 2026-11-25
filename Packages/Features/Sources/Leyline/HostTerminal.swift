@@ -1,45 +1,72 @@
+import Admin
 import AppKit
 import CoreUI
 import Projects
 import SwiftUI
 
-/// Terminal: the host's shell opens in the app's own terminal pane (the one every terminal uses), relayed through the Core's
-/// runner. Next to it, Mac-direct: this Mac's own `ssh` borrows the key for a few minutes, for this host only.
-struct HostTerminalPage: View {
-    let state: HostPageState
-    @State private var settled = false
+/// Terminal: a real shell on the host, drawn right here by the app's terminal emulator and relayed through the Core (the key
+/// stays in the Core). It opens as soon as the view does (Touch ID first, like every terminal), and coming back to the host
+/// shows the same one. With no terminal app (the Debug demo) a stand-in screen shows instead.
+struct HostTerminalTab: View {
+    let model: LeylineModel
+    let host: HostItem
+    @State private var failure: String?
+    @State private var opening = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s2) {
-            relayed.coreRise(settled, 0)
-            MacDirectIsland(state: state).coreRise(settled, 1)
+        Group {
+            if model.terminalView == nil {
+                StandInTerminal(host: host)
+            } else if let id = model.hostTerminals[host.id], let v = model.terminalView?(id) {
+                v
+            } else if let failure {
+                VStack(alignment: .leading, spacing: Space.s3) {
+                    Text(failure).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("Try Again") { Task { await open() } }.buttonStyle(CoreButtonStyle(.secondary))
+                }
+                .padding(Space.s4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                Text("Opening a terminal on \(host.name)…").foregroundStyle(GlassInk.secondary)
+                    .padding(Space.s4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
         }
-        .onAppear { settled = true }
+        .task(id: host.id) { if model.terminalView != nil, model.hostTerminals[host.id] == nil { await open() } }
         .accessibilityIdentifier("host-page-Terminal")
     }
 
-    private var relayed: some View {
-        Island("Terminal", sub: "relayed through the Core") {
-            VStack(alignment: .leading, spacing: Space.s4) {
-                if let h = state.host {
-                    RouteChips(hops: ["This Mac"] + state.model.route(h) + [h.name])
-                }
-                Text(
-                    "Connect opens a terminal on this host in its own pane. The key stays in the Core. Closing the pane ends the session."
-                )
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                Button {
-                    Task { await state.connect() }
-                } label: {
-                    Label("Connect", systemImage: "terminal")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent, busy: state.opening))
-                .disabled(state.opening || state.model.readOnly)
-                .help("Open a terminal on this host")
-                .accessibilityIdentifier("terminal-connect")
-            }
+    private func open() async {
+        guard !opening else { return }
+        opening = true
+        defer { opening = false }
+        failure = nil
+        do { _ = try await model.terminal(for: host.id) } catch is AdminDeclined {
+            failure = "The terminal needs Touch ID. Try again when you are ready."
+        } catch { failure = model.words(error) }
+    }
+}
+
+/// The Debug demo's terminal: what a real one would show, in the terminal's own colours. Never on a live Core.
+struct StandInTerminal: View {
+    let host: HostItem
+    var body: some View {
+        let p =
+            Text("\(host.login)").foregroundStyle(Color(red: 0.56, green: 0.82, blue: 0.56))
+            + Text(":").foregroundStyle(Color(red: 0.84, green: 0.86, blue: 0.9))
+            + Text("~").foregroundStyle(Color(red: 0.48, green: 0.65, blue: 1)) + Text("$ ")
+        let out = Text(
+            " 10:42:07 up 23 days,  4:11,  1 user,  load average: 0.58, 0.61, 0.66\n")
+        VStack(alignment: .leading, spacing: 0) {
+            p + Text("uptime\n") + out + p + Text("df -h /\n")
+                + Text("Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        80G   49G   31G  61% /\n")
+                + p
+                + Text("▍")
         }
-        .accessibilityIdentifier("terminal-relayed")
+        .font(.system(size: 12.5, design: .monospaced)).lineSpacing(4)
+        .foregroundStyle(Color(red: 0.84, green: 0.86, blue: 0.9))
+        .padding(.horizontal, Space.s4 + 2).padding(.vertical, Space.s4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(red: 0.043, green: 0.051, blue: 0.07))
+        .accessibilityLabel("Terminal on \(host.name)")
     }
 }
 
