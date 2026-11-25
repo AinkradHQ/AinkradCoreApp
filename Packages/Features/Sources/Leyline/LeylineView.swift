@@ -201,7 +201,7 @@ struct LeylineHome: View {
             page(
                 LeylineStateCard(
                     symbol: "exclamationmark.triangle", title: "Hosts did not load",
-                    text: "The Core answered with an error. \(why) Nothing was changed.", tone: .fail
+                    text: "\(why) Nothing was changed.", tone: .fail
                 ) {
                     AppActionTile(
                         title: "Try again", symbol: "arrow.clockwise", key: "", hue: GlassInk.accent(paneAccent)
