@@ -29,6 +29,11 @@ struct ProviderItem: Identifiable, Equatable, Sendable {
     var version: Int64 = 1
     /// A preset (OpenRouter, Groq...): shipped in code and read-only; absent on a Core below 0.10.
     var preset = false
+    /// A preset's page where a key is made, and how its keys usually start (Core API 105); nil from an older Core.
+    var keyURL: String? = nil
+    var keyHint: String? = nil
+    /// The Core keeps it off the Add cards (OpenCode's own login); absent on an older Core.
+    var hidden = false
 }
 
 /// An account as a `read` device sees it: its key's last four characters, never the key.

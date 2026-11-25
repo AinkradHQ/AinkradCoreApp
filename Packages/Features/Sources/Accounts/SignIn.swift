@@ -43,6 +43,17 @@ struct SignInFlow: Equatable {
     /// What went wrong with the last typed line, in words. Never the line.
     var inputError: String?
     var sending = false
+    /// Where the Core says the sign-in stands (`starting|open_url|enter_code|finishing|done|failed`) and its own line for
+    /// it; nil from a Core that does not say, when the app infers the stage (`SignInStep.of`).
+    var coreStage: String?
+    var message: String?
+    /// The CLI menu the person answered in this dialog: it is not offered again unless a different one appears.
+    var pickedMenu: [MenuOption]?
+    /// The screen when the person picked from a menu here: that menu is not offered again until the screen changes (an
+    /// error sends the CLI back to the same menu, and then it is offered again).
+    var pickedScreen: [String]?
+    /// The sign-in page opened last; a newer one the CLI prints (a retry makes a new page) is opened in its place.
+    var openedURL: URL?
 }
 
 extension AccountsModel {
@@ -113,9 +124,13 @@ extension AccountsModel {
             guard let service, let l = try? await service.login(id) else { continue }
             apply(l)
             await pollScreen(id)
-            // A device code is not in the generated client's answer: read it apart, for providers that have one.
-            if signIn?.deviceCode == nil, signIn?.provider != "claude-sub", !signInEnded {
-                signIn?.deviceCode = await service.loginCode(id)
+            // The device code and the plain stage are not in the generated client's answer: read them apart.
+            if !signInEnded {
+                let x = await service.loginExtra(id)
+                guard signIn?.login == id else { continue }
+                if let c = x.code { signIn?.deviceCode = c }
+                signIn?.coreStage = x.stage
+                signIn?.message = x.message
             }
         }
         if case .done = signIn?.stage { await reload() }
