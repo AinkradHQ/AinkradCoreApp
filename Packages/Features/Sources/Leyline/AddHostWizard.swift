@@ -103,9 +103,9 @@ struct AddHostWizard: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             head("Which server?", "Paste a whole ssh user@host -p 22 into any field and the rest fills in.")
             HStack(alignment: .top, spacing: Space.s3) {
-                serverField(.user, "User", "deploy", f.user).frame(maxWidth: .infinity)
-                serverField(.host, "Host or IP", "203.0.113.10", f.host)
-                    .frame(minWidth: Space.s8 * 8, maxWidth: .infinity).layoutPriority(1)
+                // Fixed User and Port, Host takes the rest: a layout priority on Host squeezed User to a sliver.
+                serverField(.user, "User", "deploy", f.user).frame(width: Space.s8 * 5)
+                serverField(.host, "Host or IP", "203.0.113.10", f.host).frame(maxWidth: .infinity)
                     .accessibilityIdentifier("add-host-field")
                 serverField(.port, "Port", "22", f.port).frame(width: Space.s8 * 3)
             }
