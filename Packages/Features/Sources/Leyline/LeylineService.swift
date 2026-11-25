@@ -20,6 +20,8 @@ protocol LeylineService: Sendable {
     func openTerminal(host: String, rows: Int, cols: Int) async throws -> String
     func health(host: String) async throws -> HostHealth
     func commands() async throws -> [PresetCommand]
+    /// Saves a one-step command for every host (`POST /commands`; a read-only one may ask for Touch ID).
+    func createCommand(name: String, step: String, readOnly: Bool, confirm: Bool) async throws -> PresetCommand
     /// Runs a pre-set command on the host through the gate; returns the run's id.
     func runCommand(_ command: String, host: String, confirmed: Bool) async throws -> String
     func run(_ id: String, host: String, name: String) async throws -> CommandRun
@@ -61,6 +63,9 @@ extension LeylineService {
     func openTerminal(host: String, rows: Int, cols: Int) async throws -> String { throw LeylineFailure.notYet }
     func health(host: String) async throws -> HostHealth { throw LeylineFailure.notYet }
     func commands() async throws -> [PresetCommand] { throw LeylineFailure.notYet }
+    func createCommand(name: String, step: String, readOnly: Bool, confirm: Bool) async throws -> PresetCommand {
+        throw LeylineFailure.notYet
+    }
     func runCommand(_ command: String, host: String, confirmed: Bool) async throws -> String {
         throw LeylineFailure.notYet
     }

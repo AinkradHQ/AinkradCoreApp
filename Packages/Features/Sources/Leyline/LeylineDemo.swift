@@ -10,7 +10,8 @@ import SwiftUI
 public final class LeylineDemo {
     public static let scenes = [
         "map", "map-filtered", "peek-offline", "map-many", "map-many-acme", "list", "list-many",
-        "host-terminal", "host-files", "host-history", "host-access", "host-commands", "wiz-server", "wiz-signin",
+        "host-overview", "host-commands-running", "host-command-output", "host-access-panel", "host-terminal",
+        "host-files", "host-runner-too-old", "host-offline", "host-new-command", "wiz-server", "wiz-signin",
         "wiz-signin-file", "wiz-signin-text", "wiz-name", "wiz-check", "wiz-failed", "wiz-done", "hosts-empty",
         "hosts-loading",
         "hosts-offline", "hosts-absent", "hosts-failed", "keys", "keys-empty", "keys-generate", "keys-import",
@@ -41,7 +42,12 @@ public final class LeylineDemo {
         model.closeKeys()
         model.keySelected = nil
         model.keyFresh = nil
-        model.section = .terminal
+        model.section = .overview
+        model.accessOpen = false
+        model.commandForm = nil
+        model.hostProblem = [:]
+        model.debugRuns = [:]
+        model.debugShown = nil
         model.debugRunner = nil
         model.deviceLookup = nil
         model.previewGaps = true
@@ -105,11 +111,29 @@ public final class LeylineDemo {
                 text: KeyText.sample(cipher: "aes256-ctr", publicFields: [Data((0..<32).map { UInt8($0 * 7) })]),
                 taken: model.keyNames)
         case "add-advanced": HostDialogs.openAdd(model, login: "ops@198.51.100.40")
+        case "host-overview":
+            model.debugRuns = Self.runs(running: false)
+            model.openHost(named("lan-web-1")!)
+        case "host-commands-running":
+            model.debugRuns = Self.runs(running: true)
+            model.debugShown = "lc_restart"
+            model.openHost(named("lan-web-1")!)
+        case "host-command-output":
+            model.debugRuns = Self.runs(running: false)
+            model.debugShown = "builtin-disk"
+            model.openHost(named("lan-web-1")!)
+        case "host-new-command":
+            model.openHost(named("lan-web-1")!)
+            model.commandForm = CommandDraft(name: "Restart the queue", command: "sudo systemctl restart app-queue")
+        case "host-access-panel": model.openHost(named("lan-web-1")!, .access)
         case "host-terminal": model.openHost(named("lan-web-1")!, .terminal)
         case "host-files": model.openHost(named("lan-web-1")!, .files)
-        case "host-history": model.openHost(named("lan-web-1")!, .history)
-        case "host-access": model.openHost(named("lan-web-1")!, .access)
-        case "host-commands": model.openHost(named("lan-web-1")!, .commands)
+        case "host-runner-too-old":
+            model.hostProblem[named("lan-web-1")!] = LeylineFailure(
+                sentence: "", code: "runner_cannot_ssh", status: 409)
+            model.openHost(named("lan-web-1")!, .terminal)
+        case "host-offline":
+            model.openHost(named("backup-box")!)
         case "host-access-allowed": model.openHost(named("lan-staging")!, .access)
         case "runner-waiting":
             model.debugRunner = .waiting(until: Date().addingTimeInterval(840))

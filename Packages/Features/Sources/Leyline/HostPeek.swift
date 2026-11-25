@@ -89,15 +89,7 @@ struct HostPeek: View {
     private func tryNow() async {
         trying = true
         defer { trying = false }
-        do {
-            let c = try await model.checkHost(host.address, host.port)
-            model.host.shell.showToast(
-                c.ok
-                    ? "\(host.name) answered in \(c.ms ?? 0) ms"
-                    : "\(host.name) did not answer: \(c.reason ?? "no reply")",
-                kind: c.ok ? .info : .warn)
-        } catch { model.host.shell.showToast(model.words(error), kind: .warn) }
-        await model.reload()
+        await model.tryNow(host)
     }
 
     private func metrics(_ h: HostHealth) -> some View {
@@ -198,15 +190,15 @@ struct HostPeek: View {
     private var actions: some View {
         HStack(spacing: Space.s1 + 2) {
             Button {
-                model.openHost(host.id, .terminal)
+                model.openHost(host.id)
             } label: {
-                Label("Open Terminal", systemImage: "terminal").frame(maxWidth: .infinity)
+                Label("Open Host", systemImage: "gauge.with.dots.needle.33percent").frame(maxWidth: .infinity)
             }
             .buttonStyle(CoreButtonStyle(.secondary))
             .environment(\.coreKeycap, "⏎")
-            .disabled(off)
-            .accessibilityIdentifier("peek-open-terminal")
-            ForEach([HostSection.files, .history, .access]) { s in
+            .help("Health, pre-set commands and history (⏎)")
+            .accessibilityIdentifier("peek-open-host")
+            ForEach([HostSection.terminal, .files, .access]) { s in
                 CoreIconButton(symbol: s.symbol, label: "\(s.title)  \(s.keyWord)") { model.openHost(host.id, s) }
                     .disabled(off && s != .access)
                     .help("\(s.title)  \(s.keyWord)")
@@ -255,7 +247,6 @@ struct RouteChain: View {
 enum HostMore {
     static func items(_ m: LeylineModel, _ h: HostItem, state: HostPageState? = nil) -> [CoreDropdownItem] {
         var out = [
-            CoreDropdownItem("Commands", symbol: "chevron.right.2") { m.openHost(h.id, .commands) },
             CoreDropdownItem("Change Host…", symbol: "slider.horizontal.3", enabled: !m.readOnly) {
                 HostDialogs.openEdit(m, h)
             },

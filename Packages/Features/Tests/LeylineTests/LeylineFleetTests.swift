@@ -164,13 +164,19 @@ struct LeylineFleetTests {
         #expect(m.currentGroup == "Acme")
     }
 
-    @MainActor @Test func anOfflineHostDoesNotOpen() {
+    @MainActor @Test func anOfflineHostOpensOnItsOverviewOnly() {
         let m = LeylineModel(host: FakeHost())
         m.hosts = [host("down", up: false), host("up")]
-        m.openHost("down")
-        #expect(m.openID == nil)
+        m.openHost("down", .terminal)
+        #expect(m.openID == "down" && m.section == .overview)
+        m.go(.files)
+        #expect(m.section == .overview)
         m.openHost("up", .files)
-        #expect(m.openID == "up" && m.section == .files)
+        #expect(m.openID == "up" && m.section == .files && !m.accessOpen)
+        m.openHost("up", .access)
+        #expect(m.section == .overview && m.accessOpen)
+        m.go(.access)
+        #expect(!m.accessOpen)
     }
 }
 

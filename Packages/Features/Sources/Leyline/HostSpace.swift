@@ -46,29 +46,66 @@ struct RouteChips: View {
 
 // MARK: Access
 
-/// Access: how the host is reached and signed in to, its host key, the one AI rule, its group and tags, and the runner it can
-/// become. The rule is the only control that writes in place; Change… opens the host sheet.
-struct AccessPage: View {
+/// Access, the slide-over panel (⌘, toggles it, Esc closes it): how the host is reached and signed in to, its host key, the
+/// one AI rule, the runner it can become, and its group and tags. The rule is the only control that writes in place;
+/// Change… opens the host sheet. Same size and margins as the Keys panel.
+struct AccessPanel: View {
     let model: LeylineModel
     let host: HostItem
     let state: HostPageState
-    @State private var settled = false
 
     var body: some View {
-        VStack(spacing: Space.s2) {
-            HStack(alignment: .top, spacing: Space.s2) {
-                connection.coreRise(settled, 0)
-                aiRule.coreRise(settled, 1)
+        VStack(alignment: .leading, spacing: Space.s3) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                Text("Access").coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
+                Text(host.name).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                Spacer(minLength: Space.s2)
+                Button("esc") { model.accessOpen = false }
+                    .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                    .help("Close Access (esc)")
+                    .accessibilityLabel("Close Access")
             }
-            .frame(height: Space.s8 * 10)
-            HStack(alignment: .top, spacing: Space.s2) {
-                projects.coreRise(settled, 2)
-                runner.coreRise(settled, 3)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s3) {
+                    connection
+                    aiRule
+                    runner
+                    projects
+                }
+                .padding(.bottom, Space.s1)
             }
-            .frame(maxHeight: .infinity)
+            .scrollIndicators(.automatic)
+            Text("⌘, toggle · esc close").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .frame(maxWidth: .infinity).accessibilityHidden(true)
         }
-        .onAppear { settled = true }
+        .frame(width: KeysPanel.width - Space.s4 * 2)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .corePanel(radius: Radius.pane, padding: Space.s4)
+        .contentShape(coreShape(Radius.pane))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Access")
         .accessibilityIdentifier("host-page-Access")
+    }
+
+    /// One part of the panel: a title, a quiet line, what sits at its right, then its content, on a well.
+    private func part<C: View, A: View>(
+        _ title: String, sub: String? = nil, @ViewBuilder accessory: () -> A, @ViewBuilder content: () -> C
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).accessibilityAddTraits(.isHeader)
+                if let sub {
+                    Text(sub).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                accessory()
+            }
+            content()
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coreWell(radius: Radius.cardMac)
+        .accessibilityElement(children: .contain)
     }
 
     private func change(_ help: String) -> some View {
@@ -79,23 +116,18 @@ struct AccessPage: View {
     // MARK: Connection
 
     private var connection: some View {
-        Island("Connection") {
+        part("Connection", accessory: { change("Change the jump hosts, the user, the port or the key") }) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     CoreFieldLabel("Reached through")
-                    HStack(spacing: Space.s2) {
-                        RouteChips(hops: model.route(host) + [host.name])
-                        change("Change the jump hosts and where the connection starts")
-                    }
+                    RouteChips(hops: model.route(host) + [host.name])
                 }
                 VStack(alignment: .leading, spacing: Space.s2) {
                     CoreFieldLabel("Signs in as")
-                    HStack(spacing: Space.s2) {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                         Image(systemName: "key").coreFont(size: MacTextSize.body, weight: .medium)
                             .accessibilityHidden(true)
-                        Text(signsIn).lineLimit(2)
-                        Spacer(minLength: Space.s2)
-                        change("Change the user, the port or the key")
+                        Text(signsIn).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 VStack(alignment: .leading, spacing: Space.s2) {
@@ -146,22 +178,20 @@ struct AccessPage: View {
     // MARK: AI rule
 
     private var aiRule: some View {
-        Island("AI on this host", sub: "one rule for AI sessions, agents and MCP") {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                HStack(spacing: Space.s2) {
-                    ForEach(AIRule.allCases) { r in
-                        RadioRow(
-                            r.title, subtitle: r.line, selected: host.aiRule == r,
-                            action: { Task { await model.setRule(host, r) } }
-                        ) {
-                            if r == .allowed {
-                                Image(systemName: "touchid").foregroundStyle(GlassInk.secondary)
-                                    .accessibilityLabel("Needs Touch ID")
-                            }
+        part("AI on this host", sub: "AI sessions, agents and MCP", accessory: { EmptyView() }) {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                ForEach(AIRule.allCases) { r in
+                    RadioRow(
+                        r.title, subtitle: r.line, selected: host.aiRule == r,
+                        action: { Task { await model.setRule(host, r) } }
+                    ) {
+                        if r == .allowed {
+                            Image(systemName: "touchid").foregroundStyle(GlassInk.secondary)
+                                .accessibilityLabel("Needs Touch ID")
                         }
-                        .disabled(model.readOnly)
-                        .accessibilityIdentifier("ai-rule-\(r.wire)")
                     }
+                    .disabled(model.readOnly)
+                    .accessibilityIdentifier("ai-rule-\(r.wire)")
                 }
                 Text(
                     (host.aiRule == .allowed
@@ -169,7 +199,8 @@ struct AccessPage: View {
                         : "Approvals come to the bell and the host page; approving uses Touch ID. Allowed needs Touch ID to turn on.")
                         + " Keys, host-key trust and Mac-direct are never available to AI."
                 )
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .accessibilityIdentifier("access-ai-rule")
@@ -178,8 +209,8 @@ struct AccessPage: View {
     // MARK: Projects, group and tags
 
     private var projects: some View {
-        Island(
-            title: "Projects", sub: nil,
+        part(
+            "Group and tags",
             accessory: {
                 // TODO(Y9-03): attaching a host to a project, with a role, needs a Core route; today only the group is stored.
                 Soon(prominent: false, help: "Attaching a host to a project arrives with the project link") {
@@ -199,7 +230,7 @@ struct AccessPage: View {
                         .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: Space.s2) {
-                    CoreFieldLabel("Group and tags")
+                    CoreFieldLabel("In the gallery")
                     HStack(spacing: Space.s2) {
                         if let g = host.group { CoreChip(g, minWidth: 0) }
                         ForEach(host.tags, id: \.self) { CoreChip($0, minWidth: 0) }
@@ -217,26 +248,10 @@ struct AccessPage: View {
     // MARK: Make it a runner
 
     private var runner: some View {
-        Island(
-            title: "Make it a runner", sub: "run AI sessions and projects here",
-            accessory: {
-                Button {
-                    confirmRunner()
-                } label: {
-                    Label("Make Runner…", systemImage: "server.rack")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent, busy: state.runnerState == .starting))
-                .disabled(model.readOnly || host.runnerDevice != nil || busyInstalling)
-                .help(
-                    host.runnerDevice != nil
-                        ? "This host is already a runner" : "Install the Ainkrad runner here (Touch ID)"
-                )
-                .accessibilityIdentifier("runner-make")
-            }
-        ) {
+        part("Runner", sub: "run AI sessions and projects here", accessory: { EmptyView() }) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 runnerStatus
-                VStack(alignment: .leading, spacing: Space.s2) {
+                VStack(alignment: .leading, spacing: Space.s1) {
                     ForEach(
                         Array(
                             [
@@ -245,9 +260,22 @@ struct AccessPage: View {
                                 "Pair with the Core",
                             ].enumerated()), id: \.offset
                     ) { i, step in
-                        Text("\(i + 1). \(step)").foregroundStyle(GlassInk.secondary)
+                        Text("\(i + 1). \(step)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                Button {
+                    confirmRunner()
+                } label: {
+                    Label("Make Runner…", systemImage: "server.rack")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, busy: state.runnerState == .starting))
+                .disabled(model.readOnly || host.runnerDevice != nil || busyInstalling)
+                .help(
+                    host.runnerDevice != nil
+                        ? "This host is already a runner" : "Install the Ainkrad runner here (Touch ID)"
+                )
+                .accessibilityIdentifier("runner-make")
             }
         }
         .accessibilityIdentifier("access-runner")

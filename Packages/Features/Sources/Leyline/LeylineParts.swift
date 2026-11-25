@@ -173,9 +173,9 @@ struct LeylineFooter: View {
             Spacer(minLength: 0)
             if model.load == .ready, !model.fleet.isEmpty, model.openID == nil {
                 hint("↑↓←→", "Move")
-                hint("⏎", "Terminal")
+                hint("⏎", "Open")
+                hint("⌘1", "Terminal")
                 hint("⌘2", "Files")
-                hint("⌘3", "History")
                 hint("type", "Find")
             }
         }

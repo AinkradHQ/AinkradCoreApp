@@ -4,44 +4,66 @@ import CoreUI
 import Projects
 import SwiftUI
 
-/// Terminal: a real shell on the host, drawn right here by the app's terminal emulator and relayed through the Core (the key
-/// stays in the Core). It opens as soon as the view does (Touch ID first, like every terminal), and coming back to the host
-/// shows the same one. With no terminal app (the Debug demo) a stand-in screen shows instead.
+/// Terminal: a real shell on the host, drawn over the whole pane by the app's terminal emulator and relayed through the Core
+/// (the key stays in the Core). It opens when the view does (Touch ID first, like every terminal), and coming back to the host
+/// shows the same one. With no terminal app (the Debug demo) a stand-in screen shows instead. A runner too old for ssh, or a
+/// terminal that did not open, is the state card with its fix, never a bare sentence.
 struct HostTerminalTab: View {
     let model: LeylineModel
     let host: HostItem
+    let state: HostPageState
     @State private var failure: String?
     @State private var opening = false
+    @Environment(\.coreAccent) private var paneAccent
 
     var body: some View {
         Group {
-            if model.terminalView == nil {
-                StandInTerminal(host: host)
+            if let p = state.problem {
+                HostProblemCard(problem: p, model: model, hostID: host.id) { await open() }.hostPage()
+            } else if model.terminalView == nil {
+                surface(StandInTerminal(host: host))
             } else if let id = model.hostTerminals[host.id], let v = model.terminalView?(id) {
-                v
+                surface(v)
             } else if let failure {
-                VStack(alignment: .leading, spacing: Space.s3) {
-                    Text(failure).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                    Button("Try Again") { Task { await open() } }.buttonStyle(CoreButtonStyle(.secondary))
+                LeylineStateCard(
+                    symbol: "terminal", title: "The terminal did not open", text: failure, tone: .warn
+                ) {
+                    AppActionTile(
+                        title: "Try Again", symbol: "arrow.clockwise", key: "", hue: GlassInk.accent(paneAccent),
+                        prominent: true
+                    ) { Task { await open() } }
                 }
-                .padding(Space.s4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .hostPage()
             } else {
-                Text("Opening a terminal on \(host.name)…").foregroundStyle(GlassInk.secondary)
-                    .padding(Space.s4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                VStack(spacing: Space.s3) {
+                    CoreBusyBar().frame(maxWidth: Space.s8 * 5)
+                    Text("Opening a terminal on \(host.name)…").foregroundStyle(GlassInk.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityElement(children: .combine)
             }
         }
-        .task(id: host.id) { if model.terminalView != nil, model.hostTerminals[host.id] == nil { await open() } }
+        .task(id: host.id) {
+            if model.terminalView != nil, model.hostTerminals[host.id] == nil, state.problem == nil { await open() }
+        }
         .accessibilityIdentifier("host-page-Terminal")
     }
 
+    private func surface(_ v: some View) -> some View {
+        v.clipShape(coreShape(Radius.cardMac)).padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
+    }
+
     private func open() async {
-        guard !opening else { return }
+        guard !opening, model.terminalView != nil else { return }
         opening = true
         defer { opening = false }
         failure = nil
         do { _ = try await model.terminal(for: host.id) } catch is AdminDeclined {
             failure = "The terminal needs Touch ID. Try again when you are ready."
-        } catch { failure = model.words(error) }
+        } catch {
+            state.note(error)
+            failure = model.words(error)
+        }
     }
 }
 

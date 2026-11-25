@@ -27,6 +27,9 @@ struct HostExtras: Equatable, Sendable {
     var memoryTotal: String?
     /// "31 GB free".
     var diskFree: String?
+    /// "↓ 1.2 MB/s · ↑ 340 KB/s" and its samples (KB/s, oldest first): the Core does not measure the network yet.
+    var network: String?
+    var networkSeries: [Double] = []
     /// An AI request waiting for a person on this host, as the command it wants to run.
     var approval: String?
 }

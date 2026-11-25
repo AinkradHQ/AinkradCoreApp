@@ -4,8 +4,9 @@ import Shell
 import SwiftUI
 
 /// The Leyline pane: the hosts as a map or a list with the selected host's panel and the Keys panel, or an opened host. Every
-/// action has a key: type to find (⌘K focuses the field), arrows move, Return opens the terminal, ⌘2 files, ⌘3 history,
-/// ⌘, access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. The pane's surface follows the
+/// action has a key: type to find (⌘K focuses the field), arrows move, Return opens the host, ⌘1 its terminal, ⌘2 its files,
+/// ⌘, its access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. On a host: Return opens the terminal (or runs the lit
+/// command), ⌥1…⌥9 run the first nine commands, arrows light a command, ⌘N saves a new one. The pane's surface follows the
 /// Look's transparency and blur.
 struct LeylineView: View {
     let model: LeylineModel
@@ -47,7 +48,7 @@ struct LeylineView: View {
         let c = press.characters.lowercased()
         if press.key == .escape {
             if model.openID != nil {
-                model.closeHost()
+                back()
                 paneFocus = true
                 return .handled
             }
@@ -65,11 +66,12 @@ struct LeylineView: View {
             }
             return .ignored
         }
-        if cmd, let ch = c.first, let tab = HostSection.forKey(ch) {
+        if cmd, let ch = c.first, let to = HostSection.forKey(ch) {
             guard let id = model.openID ?? model.selected else { return .ignored }
-            if model.openID != nil { model.section = tab } else { model.openHost(id, tab) }
+            if model.openID != nil { model.go(to) } else { model.openHost(id, to) }
             return .handled
         }
+        if model.openID != nil { return hostKey(press) }
         guard model.openID == nil, model.load == .ready else { return .ignored }
         if model.keysOpen {
             // ↑ ↓ open the next key; ⌘G, ⌘I and ⌘C are the panel's own.
@@ -112,6 +114,37 @@ struct LeylineView: View {
             return .handled
         }
         return .ignored
+    }
+
+    /// Esc on a host: one level back each time.
+    private func back() {
+        if model.accessOpen {
+            model.accessOpen = false
+        } else if model.commandForm != nil {
+            model.commandForm = nil
+        } else if model.section != .overview {
+            model.section = .overview
+        } else if model.page?.lit != nil {
+            model.page?.lit = nil
+        } else {
+            model.closeHost()
+        }
+    }
+
+    /// The overview's keys: ⏎ runs the lit command, else opens the terminal; the arrows move the light. The terminal and the
+    /// files keep their keys (a focused terminal never sends them here).
+    private func hostKey(_ press: KeyPress) -> KeyPress.Result {
+        guard model.section == .overview, model.commandForm == nil, !model.accessOpen,
+            press.modifiers.isEmpty
+        else { return .ignored }
+        switch press.key {
+        case .return:
+            if model.page?.runLit() != true { model.go(.terminal) }
+        case .leftArrow, .upArrow: model.page?.moveLit(-1)
+        case .rightArrow, .downArrow: model.page?.moveLit(1)
+        default: return .ignored
+        }
+        return .handled
     }
 }
 
