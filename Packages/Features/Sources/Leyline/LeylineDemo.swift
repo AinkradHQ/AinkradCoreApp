@@ -37,7 +37,8 @@ public final class LeylineDemo {
         model.selected = nil
         model.openGroup = nil
         model.layout = scene.hasPrefix("list") ? .list : .map
-        model.page = .hosts
+        model.keysOpen = false
+        model.keySelected = nil
         model.section = .terminal
         model.debugRunner = nil
         model.deviceLookup = nil
@@ -88,12 +89,14 @@ public final class LeylineDemo {
         case "hosts-offline": model.setLoad(.notConnected)
         case "hosts-absent": model.setLoad(.absent)
         case "hosts-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
-        case "keys", "keys-empty": model.page = .keys
+        case "keys", "keys-empty":
+            model.keysOpen = true
+            model.keySelected = model.keys.first?.id
         case "key-generate":
-            model.page = .keys
+            model.keysOpen = true
             KeyDialogs.openGenerate(model)
         case "key-import":
-            model.page = .keys
+            model.keysOpen = true
             KeyDialogs.openImport(model)
         case "add-advanced": HostDialogs.openAdd(model, login: "ops@198.51.100.40")
         case "host-terminal": model.openHost(named("lan-web-1")!, .terminal)

@@ -143,13 +143,6 @@ enum LeylineLoad: Equatable {
     case absent
 }
 
-/// The two pages of the gallery's top bar. TODO(Y9-04): Fleet.
-enum LeylinePage: String, CaseIterable, Identifiable {
-    case hosts, keys
-    var id: String { rawValue }
-    var title: String { self == .hosts ? "Hosts" : "Keys" }
-}
-
 /// The tabs of a host's view. Commands has no tab: it opens from More.
 enum HostSection: String, CaseIterable, Identifiable {
     case terminal, files, history, access, commands

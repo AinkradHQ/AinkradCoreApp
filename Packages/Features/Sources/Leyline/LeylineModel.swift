@@ -6,7 +6,7 @@ import Observation
 import Shell
 import SwiftUI
 
-/// The Leyline app: the hosts gallery, the Keys page and the host space the gallery opens. It owns the lists, the Core service
+/// The Leyline app: the hosts gallery, the Keys panel and the host space the gallery opens. It owns the lists, the Core service
 /// and the writes (the ones that need it behind Touch ID, through the host), and registers the pane and the launcher entries.
 @MainActor @Observable
 public final class LeylineModel {
@@ -31,8 +31,10 @@ public final class LeylineModel {
     var keys: [KeyItem] = []
     var knownHosts: [KnownHostItem] = []
     var load: LeylineLoad = .notConnected
-    /// The page: the hosts (map or list), or Keys.
-    var page = LeylinePage.hosts
+    /// The Keys panel, slid in over the right of the map or the list.
+    var keysOpen = false
+    /// The key lit in the Keys panel (↑ ↓ move it).
+    var keySelected: String?
     /// "Type to find a host": typing anywhere on the page fills it.
     var filter = ""
     /// Map or List.
@@ -279,7 +281,7 @@ public final class LeylineModel {
         }
         LeylineOptions.markMine(made.id)
         await reload()
-        page = .hosts
+        keysOpen = false
         selected = made.id
         openGroup = made.group ?? HostGroup.shared
         return made
@@ -412,7 +414,7 @@ public final class LeylineModel {
     func newHost() {
         guard !readOnly else { return }
         show()
-        page = .hosts
+        keysOpen = false
         writeError = nil
         checkNeedsStepUp = false
         AddHostWizard.open(self)
@@ -472,7 +474,7 @@ public final class LeylineModel {
             ["ssh", "server", "create", "host", "jump"], action: true
         ) {
             $0.show()
-            $0.page = .hosts
+            $0.keysOpen = false
             HostDialogs.openAdd($0, login: "")
         }
         entry(
@@ -480,7 +482,7 @@ public final class LeylineModel {
             ["ssh", "keypair", "create"], action: true
         ) {
             $0.show()
-            $0.page = .keys
+            $0.keysOpen = true
             KeyDialogs.openGenerate($0)
         }
     }
