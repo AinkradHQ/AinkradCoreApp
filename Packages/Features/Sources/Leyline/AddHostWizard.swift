@@ -320,7 +320,10 @@ extension LeylineModel {
         wizard?.reach = .running
         if f.jump == nil, let port = f.portNumber {
             do {
-                let c = try await service.checkHost(address: f.host, port: port)
+                // Through the Touch ID helper like every other Leyline action: the Core asks for proof here.
+                let c = try await host.elevated("Check and add \(f.host).", done: "checked", keepsEdit: true) {
+                    try await service.checkHost(address: f.host, port: port)
+                }
                 guard c.ok else {
                     let why = c.reason ?? "it did not answer"
                     wizard?.reach = .failed(why.prefix(1).uppercased() + why.dropFirst())
@@ -330,6 +333,10 @@ extension LeylineModel {
                 wizard?.reach = .done(c.ms.map { "\($0) ms" })
             } catch let e as LeylineFailure where e.isMissing {
                 wizard?.reach = .done(nil)  // an older Core cannot check before saving
+            } catch is AdminDeclined {
+                wizard?.reach = .failed("Adding a server needs Touch ID. Try again and confirm it.")
+                wizard?.failure = .reach
+                return
             } catch {
                 wizard?.reach = .failed(words(error))
                 wizard?.failure = .reach
@@ -353,6 +360,8 @@ extension LeylineModel {
                     )
                 }
                 keyID = k.id
+                // The key is in the Core's list now, for this and later hosts: a retry uses it, never imports it twice.
+                wizard?.key = .saved(k.id)
             } catch is AdminDeclined {
                 wizard?.signIn = .failed("The key needs Touch ID to be sealed in the Core.")
                 wizard?.failure = .key
