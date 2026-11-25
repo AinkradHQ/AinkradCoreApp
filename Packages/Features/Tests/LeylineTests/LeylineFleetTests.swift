@@ -173,3 +173,76 @@ struct LeylineFleetTests {
         #expect(m.openID == "up" && m.section == .files)
     }
 }
+
+@Suite("Add Host wizard")
+struct AddHostWizardTests {
+    @Test func aWholeSSHLinePastedIntoAnyServerFieldFillsAllThree() {
+        for field in [AddHostFlow.Field.user, .host, .port] {
+            var f = AddHostFlow()
+            f.setServer(field, "ssh ops@db.example.com -p 2200")
+            #expect(f.user == "ops" && f.host == "db.example.com" && f.port == "2200", "\(field)")
+        }
+        var f = AddHostFlow()
+        f.setServer(.user, "deploy")
+        f.setServer(.port, "22a2")
+        #expect(f.user == "deploy" && f.port == "222" && f.host.isEmpty)
+    }
+
+    @Test func problemsSpeakOnlyAboutWhatWasTyped() {
+        var f = AddHostFlow()
+        f.user = ""
+        f.port = ""
+        #expect(f.problems.isEmpty)
+        f.user = "a b"
+        f.host = "bad host"
+        f.port = "70000"
+        #expect(Set(f.problems.keys) == [.user, .host, .port])
+        f.name = ""
+        f.nameTouched = true
+        #expect(f.problems[.name] != nil)
+        f.key = .importing
+        f.keyText = "ssh-ed25519 AAAA public"
+        #expect(f.problems[.keys] != nil)
+    }
+
+    @Test func arrowsMoveThroughTheKeysAndStopAtTheEnds() {
+        var f = AddHostFlow()
+        let ids = ["k1", "k2"]
+        f.moveKey(-1, keyIDs: ids)
+        #expect(f.key == .none)
+        f.moveKey(1, keyIDs: ids)
+        #expect(f.key == .saved("k1"))
+        f.moveKey(1, keyIDs: ids)
+        f.moveKey(1, keyIDs: ids)
+        f.moveKey(1, keyIDs: ids)
+        #expect(f.key == .importing)
+        f.moveKey(-1, keyIDs: ids)
+        #expect(f.key == .saved("k2"))
+    }
+
+    @Test func theStartingKeyIsTheLastOneElseTheMostUsed() {
+        #expect(AddHostFlow.defaultKey(keyIDs: ["a", "b"], usage: ["a": 1, "b": 3], last: "a") == .saved("a"))
+        #expect(AddHostFlow.defaultKey(keyIDs: ["a", "b"], usage: ["a": 1, "b": 3], last: "gone") == .saved("b"))
+        #expect(AddHostFlow.defaultKey(keyIDs: ["a"], usage: [:], last: nil) == .none)
+        #expect(AddHostFlow.defaultKey(keyIDs: [], usage: [:], last: nil) == .none)
+    }
+
+    @Test func aFailureSendsYouToTheFieldThatFixesItAndKeepsWhatYouTyped() {
+        #expect(AddHostFlow.fix(for: .reach).step == .server && AddHostFlow.fix(for: .reach).field == .host)
+        #expect(AddHostFlow.fix(for: .key).step == .signIn)
+        #expect(AddHostFlow.fix(for: .save("That name is already taken. Pick another.")).field == .name)
+        #expect(AddHostFlow.fix(for: .save("The address is not allowed.")).step == .server)
+        var f = AddHostFlow()
+        f.setHost("deploy@192.0.2.40:2222")
+        f.step = .check
+        f.reach = .failed("refused")
+        f.failure = .reach
+        f.applyFix()
+        #expect(f.step == .server && f.focus == .host && f.reach == .waiting && f.failure == nil)
+        #expect(f.host == "192.0.2.40" && f.port == "2222" && f.user == "deploy")
+        f.next()
+        #expect(f.step == .signIn && f.focus == .keys)
+        f.back()
+        #expect(f.step == .server && f.focus == .user && f.host == "192.0.2.40")
+    }
+}

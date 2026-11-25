@@ -11,7 +11,8 @@ public final class LeylineDemo {
     public static let scenes = [
         "map", "map-filtered", "peek-offline", "map-many", "map-many-acme", "list", "list-many",
         "host-terminal", "host-files", "host-history", "host-access", "host-commands", "wiz-server", "wiz-signin",
-        "wiz-signin-file", "wiz-signin-text", "wiz-name", "wiz-check", "wiz-done", "hosts-empty", "hosts-loading",
+        "wiz-signin-file", "wiz-signin-text", "wiz-name", "wiz-check", "wiz-failed", "wiz-done", "hosts-empty",
+        "hosts-loading",
         "hosts-offline", "hosts-absent", "hosts-failed", "keys", "keys-empty", "key-generate", "key-import",
         "add-advanced", "host-access-allowed", "runner-waiting", "runner-paired",
     ]
@@ -119,7 +120,9 @@ public final class LeylineDemo {
         f.key = .saved(Self.kid(1))
         f.project = "Lanterna"
         switch scene {
-        case "wiz-signin": f.step = .signIn
+        case "wiz-signin":
+            f.step = .signIn
+            f.focus = .keys
         case "wiz-signin-file":
             f.step = .signIn
             f.key = .importing
@@ -134,6 +137,10 @@ public final class LeylineDemo {
             f.reach = .done("31 ms")
             f.signIn = .done("Signed in")
             f.hostKey = .asks(Self.newHostKey)
+        case "wiz-failed":
+            f.step = .check
+            f.reach = .failed("Connection refused on port 22. Is ssh running there, or on another port?")
+            f.failure = .reach
         case "wiz-done":
             f.step = .check
             f.reach = .done("31 ms")

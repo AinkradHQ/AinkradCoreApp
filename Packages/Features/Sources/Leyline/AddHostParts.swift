@@ -31,6 +31,7 @@ struct KeyOption: View {
     let title: String
     let line: String
     let on: Bool
+    var keycap: String?
     let pick: () -> Void
     @State private var hover = false
     @Environment(\.corePalette) private var palette
@@ -44,6 +45,7 @@ struct KeyOption: View {
                     Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: Space.s2)
+                if let keycap { CoreKeycap(keycap) }
                 if on { Image(systemName: "checkmark").foregroundStyle(palette.primary).accessibilityHidden(true) }
             }
             .padding(.horizontal, Space.s3 + 2).padding(.vertical, Space.s2 + 2)
@@ -51,6 +53,7 @@ struct KeyOption: View {
             .contentShape(coreShape(Radius.cardMac))
         }
         .buttonStyle(.plain)
+        .focusable(false)  // the list is one tab stop; ↑ ↓ move through it
         .onHover { hover = $0 }
         .animation(Motion.out(Motion.hover), value: hover)
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -73,7 +76,7 @@ struct DropZone: View {
                 HStack(spacing: Space.s1) {
                     Text("or")
                     Button(file == nil ? "choose one" : "choose another", action: choose).buttonStyle(.link)
-                    Text("· id_ed25519, *.pem")
+                    Text("· ⌘V pastes one · id_ed25519, *.pem")
                 }
                 .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
             }
