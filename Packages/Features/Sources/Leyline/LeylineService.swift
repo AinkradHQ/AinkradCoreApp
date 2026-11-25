@@ -264,7 +264,16 @@ struct LiveLeylineService: LeylineService {
             LeylineFailure(sentence: "Give this host an ssh key first (Access).", code: code, status: status)
         case 409 where code.hasPrefix("host_key"):
             LeylineFailure(sentence: "The host key is not trusted yet. Check it on Access.", code: code, status: status)
-        case 409: LeylineFailure(sentence: "That name is already taken. Pick another.", code: code, status: status)
+        case 409 where code == "real_secret_refused":
+            LeylineFailure(
+                sentence: "Your Core takes test keys only. To keep a real key, set Keys and secrets to Real in Settings → "
+                    + "Feature switches.", code: code, status: status)
+        case 409 where code == "secrets_disabled":
+            LeylineFailure(
+                sentence: "Keys and secrets is Off. Turn it on in Settings → Feature switches.", code: code, status: status)
+        // Only the Core's own name clash is a taken name; any other refusal keeps its own words.
+        case 409 where code == "conflict":
+            LeylineFailure(sentence: "That name is already taken. Pick another.", code: code, status: status)
         default:
             LeylineFailure(sentence: message.isEmpty ? "The Core refused that." : message, code: code, status: status)
         }
