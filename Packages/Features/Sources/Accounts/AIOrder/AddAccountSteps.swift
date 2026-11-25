@@ -230,7 +230,8 @@ extension AddAccountDialog {
             ForEach(Array(options.enumerated()), id: \.offset) { i, o in
                 Button {
                     model.signIn?.pickedMenu = options
-                    model.signIn?.pickedScreen = model.signIn?.screen
+                    let shown = model.signIn?.screen  // read first: reading signIn inside its own write is an exclusivity crash
+                    model.signIn?.pickedScreen = shown
                     Task { await model.sendGuidedInput(o.number) }
                 } label: {
                     HStack(spacing: Space.s2) {
