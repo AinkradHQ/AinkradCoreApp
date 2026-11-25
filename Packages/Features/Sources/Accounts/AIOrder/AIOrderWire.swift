@@ -59,8 +59,24 @@ struct ModelListProbe: Decodable, Sendable {
     }
 }
 
-/// `GET /api/v1/accounts/logins/{id}` read for the optional device `code` (E7-4).
-struct LoginCodeProbe: Decodable, Sendable { let code: String? }
+/// `GET /api/v1/accounts/logins/{id}` read for what the generated client does not know yet: the optional device `code`
+/// (E7-4), and where the sign-in stands in plain terms, `stage` (`starting|open_url|enter_code|finishing|done|failed`)
+/// with an optional `message`. Every field is optional: an older Core says none of them.
+struct LoginExtra: Decodable, Equatable, Sendable {
+    var code: String?
+    var stage: String?
+    var message: String?
+    init(code: String? = nil, stage: String? = nil, message: String? = nil) {
+        (self.code, self.stage, self.message) = (code, stage, message)
+    }
+    private enum Keys: String, CodingKey { case code, stage, message }
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        code = try? c.decodeIfPresent(String.self, forKey: .code)
+        stage = try? c.decodeIfPresent(String.self, forKey: .stage)
+        message = try? c.decodeIfPresent(String.self, forKey: .message)
+    }
+}
 
 extension AccountsService {
     func aiOrderSupported() async -> Bool { false }
@@ -72,7 +88,7 @@ extension AccountsService {
         throw CoreError.invalidInput("The AI order needs a newer Core.")
     }
     func modelCount(account: Int64) async -> Int? { nil }
-    func loginCode(_ id: String) async -> String? { nil }
+    func loginExtra(_ id: String) async -> LoginExtra { LoginExtra() }
 }
 
 extension LiveAccountsService {
@@ -103,12 +119,12 @@ extension LiveAccountsService {
         return (try? JSONDecoder().decode(ModelListProbe.self, from: data))?.count
     }
 
-    func loginCode(_ id: String) async -> String? {
+    func loginExtra(_ id: String) async -> LoginExtra {
         guard await aiOrderSupported(),
             let data = try? await connection.signedRequest(
                 method: "GET", target: "/api/v1/accounts/logins/\(Self.segment(id))")
-        else { return nil }
-        return (try? JSONDecoder().decode(LoginCodeProbe.self, from: data))?.code
+        else { return LoginExtra() }
+        return (try? JSONDecoder().decode(LoginExtra.self, from: data)) ?? LoginExtra()
     }
 
     /// One path segment, percent-encoded (an agent id may hold `:`).

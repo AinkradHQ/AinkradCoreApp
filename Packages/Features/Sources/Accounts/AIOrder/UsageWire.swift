@@ -127,6 +127,23 @@ struct BudgetMessagesProbe: Decodable, Sendable {
 struct ProviderPresetProbe: Decodable, Sendable {
     let id: String
     let preset: Bool?
+    let keyURL: String?
+    let keyHint: String?
+    let hidden: Bool?
+    private enum Keys: String, CodingKey {
+        case id, preset, hidden
+        case keyURL = "key_url"
+        case keyHint = "key_hint"
+    }
+    // Lenient: a field of another shape is read as absent.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        id = try c.decode(String.self, forKey: .id)
+        preset = try? c.decodeIfPresent(Bool.self, forKey: .preset)
+        keyURL = try? c.decodeIfPresent(String.self, forKey: .keyURL)
+        keyHint = try? c.decodeIfPresent(String.self, forKey: .keyHint)
+        hidden = try? c.decodeIfPresent(Bool.self, forKey: .hidden)
+    }
 }
 
 /// `PUT /api/v1/budgets` with a message cap or a 5-hour period, which the generated body cannot say yet.
@@ -197,7 +214,7 @@ extension LiveAccountsService {
         }
     }
 
-    /// The generated providers plus whether each is a preset.
+    /// The generated providers plus whether each is a preset, its key page and hint, and whether the Core hides it.
     func withPresets(_ list: [ProviderItem]) async -> [ProviderItem] {
         guard await aiOrderSupported(),
             let data = try? await connection.signedRequest(method: "GET", target: "/api/v1/accounts/providers"),
@@ -205,7 +222,9 @@ extension LiveAccountsService {
         else { return list }
         return list.map { p in
             var p = p
-            p.preset = rows.first { $0.id == p.id }?.preset ?? false
+            let r = rows.first { $0.id == p.id }
+            p.preset = r?.preset ?? false
+            (p.keyURL, p.keyHint, p.hidden) = (r?.keyURL, r?.keyHint, r?.hidden ?? false)
             return p
         }
     }
