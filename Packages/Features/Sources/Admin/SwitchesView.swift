@@ -122,7 +122,7 @@ private struct SecretsModeCard: View {
     private static let lines = [
         "Your Core keeps no keys or secrets. Nothing can be added until you choose Test keys.",
         "Your Core keeps test keys only. Anything shaped like a real key is refused, to keep you safe while testing.",
-        "Your Core keeps real keys.",
+        "Your Core keeps real keys and secrets, sealed with its master key. They never leave it.",
     ]
 
     var body: some View {
@@ -138,21 +138,22 @@ private struct SecretsModeCard: View {
                     "Keys and secrets",
                     segments: [
                         CoreSegment(0, "Off", symbol: "lock.fill"), CoreSegment(1, "Test keys", symbol: "testtube.2"),
+                        CoreSegment(2, "Real keys", symbol: "key.fill"),
                     ],
-                    selection: Binding(get: { min(mode, 1) }, set: { pick($0) })
+                    selection: Binding(get: { min(mode, 2) }, set: { pick($0) })
                 )
                 .fixedSize()
                 .disabled(model.busy == setting.key)
             }
         } content: {
             StatePanel(
-                symbol: mode == 0 ? "lock.fill" : "testtube.2", hue: hue,
-                title: mode == 0 ? "Off" : "Test keys",
+                symbol: mode == 0 ? "lock.fill" : mode == 1 ? "testtube.2" : "key.fill", hue: hue,
+                title: mode == 0 ? "Off" : mode == 1 ? "Test keys" : "Real keys",
                 line: Self.lines.indices.contains(mode) ? Self.lines[mode] : "A setting this app doesn't know yet.",
                 trigger: mode
             ) {
-                StepTrack(["Off", "Test keys", "Real keys"], at: min(mode, 2), hue: hue, locked: [2])
-                    .help("Real keys open after the external security review (G-SEC).")
+                // Owner chose (2026-11-25) to open Real keys before the external review (G-SEC); Touch ID confirms it.
+                StepTrack(["Off", "Test keys", "Real keys"], at: min(mode, 2), hue: hue)
             }
             if let e = model.writeError[setting.key] { IssueLine(code: nil, text: e) }
         }
@@ -166,7 +167,10 @@ private struct SecretsModeCard: View {
             await model.set(
                 setting, to: Int64(m),
                 reason:
-                    "Set secrets.mode to \(m). \(m == 0 ? "This refuses every store and lease." : "Throwaway values only.")"
+                    "Set secrets.mode to \(m). "
+                    + (m == 0
+                        ? "This refuses every store and lease."
+                        : m == 1 ? "Throwaway values only." : "Your Core will keep real keys and secrets, sealed.")
             )
         }
     }
