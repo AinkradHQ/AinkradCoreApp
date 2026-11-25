@@ -222,3 +222,14 @@ struct AIOrderModelTests {
         #expect(!svc.log.contains("clearAIOrder birch"), "an agent with no order of its own is not cleared")
     }
 }
+
+struct ModelsTabSearchTests {
+    @Test func theSearchKeepsModelsWhoseNameHoldsTheWords() {
+        let rows = ["openai/gpt-5", "anthropic/claude-sonnet-5", "x-ai/grok-4"].map {
+            ModelRowItem(model: $0, allowed: true)
+        }
+        #expect(ModelsTab.filter(rows, " Claude ").map(\.model) == ["anthropic/claude-sonnet-5"])
+        #expect(ModelsTab.filter(rows, "").count == 3)
+        #expect(ModelsTab.filter(rows, "llama").isEmpty)
+    }
+}

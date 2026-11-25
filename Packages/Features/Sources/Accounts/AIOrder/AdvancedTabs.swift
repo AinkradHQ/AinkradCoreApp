@@ -5,6 +5,7 @@ import SwiftUI
 /// one only when the plan differs. Return saves it (a new version of the price, from now on).
 struct ModelsTab: View {
     @Bindable var model: AccountsModel
+    @State private var query = ""
 
     private var chosenID: Int64? { model.limitsAccount ?? model.orderIDs.first }
 
@@ -31,9 +32,22 @@ struct ModelsTab: View {
                         }
                         Color.clear.frame(width: ModelAllowRow.switchWidth, height: 1)
                     }
-                    ForEach(listed) { r in
-                        ModelAllowRow(model: model, account: a, row: r, price: rows.first { $0.model == r.model })
-                            .id("\(a.id)-\(r.model)-\(r.inputMicro ?? -1)-\(r.outputMicro ?? -1)")
+                    // OpenRouter lists 400+ models: one lookup table, a search, and a scroll area that only draws the
+                    // rows on screen (every row has two fields; drawing them all froze the app).
+                    let price = Dictionary(rows.map { ($0.model, $0) }, uniquingKeysWith: { a, _ in a })
+                    let shown = Self.filter(listed, query)
+                    if listed.count > Self.searchFrom { search(listed.count) }
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: Space.s3) {
+                            ForEach(shown) { r in
+                                ModelAllowRow(model: model, account: a, row: r, price: price[r.model])
+                                    .id("\(a.id)-\(r.model)-\(r.inputMicro ?? -1)-\(r.outputMicro ?? -1)")
+                            }
+                        }
+                    }
+                    .scrollIndicators(.automatic).frame(maxHeight: Space.s8 * 14)
+                    if shown.isEmpty {
+                        Text("No model matches.").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                     }
                 } else if rows.isEmpty {
                     Text(
@@ -68,6 +82,26 @@ struct ModelsTab: View {
             await model.reloadPrices()
             if let id = chosenID, let a = model.account(id) { await model.reloadModels(a) }
         }
+    }
+
+    nonisolated static let searchFrom = 12
+
+    /// Models whose name holds the typed words, in the Core's order.
+    nonisolated static func filter(_ rows: [ModelRowItem], _ query: String) -> [ModelRowItem] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return q.isEmpty ? rows : rows.filter { $0.model.lowercased().contains(q) }
+    }
+
+    private func search(_ total: Int) -> some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.body, weight: .medium)
+                .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            TextField("", text: $query, prompt: Text("Search \(total) models").foregroundStyle(GlassInk.secondary))
+                .textFieldStyle(.plain).autocorrectionDisabled().accessibilityLabel("Search models")
+            if !query.isEmpty { CoreIconButton(symbol: "xmark", label: "Clear the search") { query = "" } }
+        }
+        .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd)
+        .coreFieldSurface()
     }
 
     private func head(_ s: String) -> some View {
