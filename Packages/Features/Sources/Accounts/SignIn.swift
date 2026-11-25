@@ -49,6 +49,11 @@ struct SignInFlow: Equatable {
     var message: String?
     /// The CLI menu the person answered in this dialog: it is not offered again unless a different one appears.
     var pickedMenu: [MenuOption]?
+    /// The screen when the person picked from a menu here: that menu is not offered again until the screen changes (an
+    /// error sends the CLI back to the same menu, and then it is offered again).
+    var pickedScreen: [String]?
+    /// The sign-in page opened last; a newer one the CLI prints (a retry makes a new page) is opened in its place.
+    var openedURL: URL?
 }
 
 extension AccountsModel {

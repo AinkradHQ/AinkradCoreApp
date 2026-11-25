@@ -127,8 +127,9 @@ enum SignInStep: Equatable, Sendable {
             if asksForCode(flow.screen) { return .enterCode }
             // An older Core leaves the CLI's own menu up (Antigravity's login method): the person picks, never the app. A
             // menu already answered here is not asked again; a new one is.
+            _ = u
             let menu = GuidedMenu.options(flow.screen)
-            if u == nil, flow.deviceCode == nil, !menu.isEmpty, menu != flow.pickedMenu { return .chooseMethod }
+            if flow.deviceCode == nil, !menu.isEmpty, flow.screen != flow.pickedScreen { return .chooseMethod }
             return .openURL
         case .done, .failed: return .starting  // handled above
         }
@@ -193,3 +194,33 @@ enum GuidedMenu {
         return l.isEmpty || ["↑", "↓", "navigate", "select", "esc to"].contains { l.contains($0) }
     }
 }
+
+/// What the sign-in CLI printed that the dialog acts on itself: its newest sign-in page and its last error.
+enum SignInScreen {
+    /// Sign-in pages the app may open on its own, read from the screen (the Core checks the page it reports itself).
+    static let hosts: Set<String> = [
+        "accounts.google.com", "auth.openai.com", "claude.ai", "console.anthropic.com", "platform.claude.com",
+    ]
+
+    /// The LAST https sign-in page on the screen: a retry prints a new page with a new one-time secret, and a code from an
+    /// older page is refused ("invalid_grant").
+    static func newestPage(_ lines: [String]) -> URL? {
+        for line in lines.reversed() {
+            for w in line.split(whereSeparator: \.isWhitespace).reversed() where w.hasPrefix("https://") {
+                if let u = URL(string: String(w)), let h = u.host, hosts.contains(h) { return u }
+            }
+        }
+        return nil
+    }
+
+    /// The CLI's last error line, in plain words; nil when the screen shows none.
+    static func lastError(_ lines: [String]) -> String? {
+        guard let l = lines.last(where: { $0.localizedCaseInsensitiveContains("error") }) else { return nil }
+        if l.contains("invalid_grant") {
+            return "Google didn’t accept that code. It has to come from the newest Google page. Pick Google OAuth again; "
+                + "a new page opens."
+        }
+        return l.trimmingCharacters(in: .whitespaces)
+    }
+}
+

@@ -124,6 +124,8 @@ struct AddAccountLogicTests {
         #expect(SignInStep.of(f, style: .guided) == .chooseMethod)
         #expect(GuidedInput.check("1", provider: "agy-sub") == .send("1"), "the Core takes the choice's number")
         f.stage = .guided(URL(string: "https://example.invalid"))
+        #expect(SignInStep.of(f, style: .guided) == .chooseMethod, "back on its menu after an error: asked again")
+        f.screen = agy + ["Please visit https://accounts.google.com/o/oauth2/auth?x=1", "Waiting…"]
         #expect(SignInStep.of(f, style: .guided) == .openURL, "a page once it prints one")
     }
 
@@ -157,9 +159,21 @@ struct AddAccountLogicTests {
         var f = SignInFlow(stage: .guided(nil), label: "x")
         f.screen = Self.agyMenu + [""]
         #expect(SignInStep.of(f, style: .guided) == .chooseMethod)
-        f.pickedMenu = GuidedMenu.options(f.screen)
+        f.pickedScreen = f.screen
         #expect(SignInStep.of(f, style: .guided) == .openURL, "picked: not asked again, the code field waits")
         f.screen = ["Pick a project:", "> 1. alpha", "  2. beta", "↑/↓ Navigate"]
         #expect(SignInStep.of(f, style: .guided) == .chooseMethod, "a new menu is asked")
+    }
+
+    @Test func theNewestGooglePageWinsAndTheErrorReadsPlainly() {
+        let screen = [
+            "Open https://accounts.google.com/o/oauth2/auth?code_challenge=OLD",
+            "Got an error: token exchange failed: oauth2: \"invalid_grant\" \"Bad Request\"",
+            "Open https://accounts.google.com/o/oauth2/auth?code_challenge=NEW",
+            "Visit https://evil.example/x",
+        ]
+        #expect(SignInScreen.newestPage(screen)?.absoluteString.hasSuffix("NEW") == true)
+        #expect(SignInScreen.lastError(screen)?.hasPrefix("Google didn’t accept") == true)
+        #expect(SignInScreen.lastError(["Welcome"]) == nil)
     }
 }

@@ -118,6 +118,9 @@ extension AddAccountDialog {
             }
             if step == .finishing { CoreWorkingBar(width: Self.width - 2 * Space.s6) }
             if case .failed(let why)? = s?.stage { AccIssue(text: why).frame(maxWidth: .infinity, alignment: .leading) }
+            if step == .chooseMethod || step == .openURL, let e = SignInScreen.lastError(s?.screen ?? []) {
+                AccIssue(text: e).frame(maxWidth: .infinity, alignment: .leading)
+            }
             if AddCards.risky(flow.providerID ?? "") {
                 Label(
                     "Uses your plan at your own risk. \(chosen.map(AddCards.who) ?? name)’s rules may not allow it.",
@@ -227,6 +230,7 @@ extension AddAccountDialog {
             ForEach(Array(options.enumerated()), id: \.offset) { i, o in
                 Button {
                     model.signIn?.pickedMenu = options
+                    model.signIn?.pickedScreen = model.signIn?.screen
                     Task { await model.sendGuidedInput(o.number) }
                 } label: {
                     HStack(spacing: Space.s2) {

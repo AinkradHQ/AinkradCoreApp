@@ -27,8 +27,10 @@ extension AccountsModel {
             let changed = s.lines != signIn?.screen
             signIn?.screen = s.lines
             if let c = s.code { signIn?.deviceCode = c }
-            if signIn?.opened == false, let u = s.url.flatMap(URL.init(string:)) {
+            // The newest page on the screen wins over the one the Core first reported: a retry makes a new page.
+            if let u = SignInScreen.newestPage(s.lines) ?? s.url.flatMap(URL.init(string:)), u != signIn?.openedURL {
                 signIn?.opened = true
+                signIn?.openedURL = u
                 signIn?.stage = .guided(u)
                 opener(u)
             }
