@@ -48,6 +48,8 @@ struct HostTerminalTab: View {
 /// The Debug demo's terminal: what a real one would show, in the terminal's own colours. Never on a live Core.
 struct StandInTerminal: View {
     let host: HostItem
+    @Environment(\.coreLook) private var look
+    @Environment(\.corePalette) private var palette
     var body: some View {
         let p =
             Text("\(host.login)").foregroundStyle(Color(red: 0.56, green: 0.82, blue: 0.56))
@@ -65,7 +67,15 @@ struct StandInTerminal: View {
         .foregroundStyle(Color(red: 0.84, green: 0.86, blue: 0.9))
         .padding(.horizontal, Space.s4 + 2).padding(.vertical, Space.s4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(red: 0.043, green: 0.051, blue: 0.07))
+        // The surface every terminal pane draws (TerminalPaneView): the Look's night surface at its transparency and blur,
+        // at least 0.85 by day so the light glass under it does not wash it grey.
+        .background {
+            AppSurfaceFill(
+                style: look.mode.style, opacity: palette.isDay ? max(0.85, look.opacity) : look.opacity,
+                blur: look.mode.blur, radius: 0, blurAmount: look.blur
+            )
+            .environment(\.corePalette, .night)
+        }
         .accessibilityLabel("Terminal on \(host.name)")
     }
 }

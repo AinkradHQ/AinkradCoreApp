@@ -5,8 +5,8 @@ import SwiftUI
 
 /// The Leyline pane: the hosts as a map or a list with the selected host's panel, the Keys page, or an opened host. Every
 /// action has a key: type to find (⌘K focuses the field), arrows move, Return opens the terminal, ⌘2 files, ⌘3 history,
-/// ⌘, access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. The pane draws no background (the cards sit on the
-/// wallpaper).
+/// ⌘, access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. The pane's surface follows the
+/// Look's transparency and blur.
 struct LeylineView: View {
     let model: LeylineModel
     @FocusState private var paneFocus: Bool
@@ -20,7 +20,10 @@ struct LeylineView: View {
                 LeylineHome(model: model, findFocus: $findFocus).transition(.opacity)
             }
         }
-        .appLook(AppLookPrefs.shared("leyline"))
+        // The pane's surface follows the Look (Settings, Appearance, or Leyline's own): transparency and blur, like
+        // Connections and Accounts.
+        .paneLook(AppLookPrefs.shared("leyline").look)
+        .appLookTheme(AppLookPrefs.shared("leyline"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)
