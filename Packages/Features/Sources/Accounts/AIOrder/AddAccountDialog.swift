@@ -21,6 +21,7 @@ struct AddAccountDialog: View {
     #endif
     @State var code = ""
     @FocusState var codeFocused: Bool
+    @State var startedAt: Date?
     @State var copied = false
     @State var details = false
     @Environment(\.accessibilityReduceMotion) var reduce

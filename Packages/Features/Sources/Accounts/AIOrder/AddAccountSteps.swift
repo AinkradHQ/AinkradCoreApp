@@ -117,6 +117,7 @@ extension AddAccountDialog {
                 }
             }
             if step == .finishing { CoreWorkingBar(width: Self.width - 2 * Space.s6) }
+            if step == .starting { slowStart }
             if case .failed(let why)? = s?.stage { AccIssue(text: why).frame(maxWidth: .infinity, alignment: .leading) }
             if step == .chooseMethod || step == .openURL, let e = SignInScreen.lastError(s?.screen ?? []) {
                 AccIssue(text: e).frame(maxWidth: .infinity, alignment: .leading)
@@ -369,3 +370,29 @@ extension AddAccountDialog {
         .accessibilityIdentifier("account-add-done")
     }
 }
+
+extension AddAccountDialog {
+    /// No page after 30 seconds: the runner is gone (an app that quit takes its runner with it) or busy. Say so and offer
+    /// a fresh start, which closes the stuck sign-in on the Core first.
+    var slowStart: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { t in
+            if let since = startedAt, t.date.timeIntervalSince(since) > 30 {
+                HStack(spacing: Space.s3) {
+                    Text("The runner isn’t answering. Stop this sign-in and start again.")
+                        .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.amberInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Start Again") {
+                        Task {
+                            await model.cancelSignIn()
+                            if let p = chosen { choose(p) }
+                        }
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                }
+            }
+        }
+        .onAppear { if startedAt == nil { startedAt = .now } }
+        .onDisappear { startedAt = nil }
+    }
+}
+
