@@ -166,12 +166,8 @@ struct AccessPanel: View {
                 }
             }
         } else {
-            // TODO(Y2-02): the Core pins the key on the first connect; until then there is nothing to show.
-            VStack(alignment: .leading, spacing: Space.s1) {
-                Text("Not pinned yet").coreFont(size: MacTextSize.body, weight: .medium)
-                Text("Leyline keeps the host’s key the first time it connects. \(rule)")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            }
+            // The host offered a key that nobody trusted yet: show it, and Trust pins it (terminals refuse until then).
+            SeenHostKey(model: model, host: host, rule: rule)
         }
     }
 
