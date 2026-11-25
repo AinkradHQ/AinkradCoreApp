@@ -42,7 +42,8 @@ struct AddAccountLogicTests {
 
     @Test func theKeyPageComesFromTheCoreFirst() {
         #expect(AddCards.keyPage(p("openrouter"))?.absoluteString == "https://openrouter.ai/keys")
-        #expect(AddCards.keyPage(p("openrouter", url: "https://example.com/k"))?.absoluteString == "https://example.com/k")
+        #expect(
+            AddCards.keyPage(p("openrouter", url: "https://example.com/k"))?.absoluteString == "https://example.com/k")
         #expect(AddCards.keyPage(p("together")) == nil)
         #expect(AddCards.keyPage(p("together", url: "http://plain.example")) == nil, "https only")
     }
@@ -98,5 +99,31 @@ struct AddAccountLogicTests {
         #expect(SignInStep.page(f) == nil)
         f.stage = .guided(URL(string: "https://example.invalid/a"))
         #expect(SignInStep.page(f)?.path == "/a")
+    }
+
+    /// Antigravity on an older Core (no auto-answer): its CLI waits on the login-method menu and prints no URL.
+    @Test func antigravitysMenuBecomesChoices() {
+        let agy = [
+            "Select login method:", "> 1. Google OAuth", "  2. Use a Google Cloud project", "",
+            "↑/↓ Navigate · enter Select",
+        ]
+        let want = [
+            MenuOption(number: "1", title: "Google OAuth"),
+            MenuOption(number: "2", title: "Use a Google Cloud project"),
+        ]
+        #expect(GuidedMenu.options(agy) == want)
+        // The same screen squashed onto one line.
+        #expect(
+            GuidedMenu.options(
+                ["Select login method: > 1. Google OAuth  2. Use a Google Cloud project  ↑/↓ Navigate · enter Select"])
+                == want)
+        #expect(GuidedMenu.options(["Opening https://example.invalid/v2.1. now", "Paste the code:"]).isEmpty)
+        #expect(GuidedMenu.options(["1. Only one"]).isEmpty)
+        var f = SignInFlow(stage: .guided(nil), label: "x")
+        f.screen = agy
+        #expect(SignInStep.of(f, style: .guided) == .chooseMethod)
+        #expect(GuidedInput.check("1", provider: "agy-sub") == .send("1"), "the Core takes the choice's number")
+        f.stage = .guided(URL(string: "https://example.invalid"))
+        #expect(SignInStep.of(f, style: .guided) == .openURL, "a page once it prints one")
     }
 }

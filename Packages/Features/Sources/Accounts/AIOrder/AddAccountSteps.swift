@@ -138,7 +138,7 @@ extension AddAccountDialog {
     /// Where each line stands: 0 sign in, 1 the code, 2 finishing, 3 all done.
     private func at(_ step: SignInStep) -> Int {
         switch step {
-        case .starting, .openURL, .failed: 0
+        case .starting, .chooseMethod, .openURL, .failed: 0
         case .enterCode: 1
         case .finishing: 2
         case .done: 3
@@ -154,13 +154,20 @@ extension AddAccountDialog {
     @ViewBuilder private func codeRows(_ step: SignInStep) -> some View {
         let who = chosen.map(AddCards.who) ?? name
         let page = SignInStep.page(model.signIn)
-        ConnCheckRow(
-            index: 1,
-            item: ConnSignInItem(
-                role: .open, title: "Sign in to \(who)",
-                detail: step == .starting ? "Getting the page ready…" : "We opened it in your browser",
-                state: check(0, step)),
-            trailing: openAgain(page, show: at(step) <= 1))
+        if step == .chooseMethod {
+            ConnCheckRow(
+                index: 1,
+                item: ConnSignInItem(role: .pick, title: "Choose how to sign in", detail: nil, state: .current),
+                detail: AnyView(methodChoices), trailing: EmptyView())
+        } else {
+            ConnCheckRow(
+                index: 1,
+                item: ConnSignInItem(
+                    role: .open, title: "Sign in to \(who)",
+                    detail: step == .starting ? "Getting the page ready…" : "We opened it in your browser",
+                    state: check(0, step)),
+                trailing: openAgain(page, show: at(step) <= 1))
+        }
         ConnCheckRow(
             index: 2,
             item: ConnSignInItem(
@@ -205,6 +212,35 @@ extension AddAccountDialog {
                     ? (model.signIn?.message ?? "Saving your sign-in on the Core…") : "A few seconds",
                 state: check(2, step)),
             trailing: EmptyView())
+    }
+
+    /// The CLI's own menu as buttons, the first one marked Recommended. A click sends that choice's number once.
+    private var methodChoices: some View {
+        let options = GuidedMenu.options(model.signIn?.screen ?? [])
+        let sending = model.signIn?.sending == true
+        return VStack(spacing: Space.s1) {
+            ForEach(Array(options.enumerated()), id: \.offset) { i, o in
+                Button {
+                    Task { await model.sendGuidedInput(o.number) }
+                } label: {
+                    HStack(spacing: Space.s2) {
+                        Text(o.title).coreFont(size: MacTextSize.body, weight: .medium)
+                        Spacer(minLength: Space.s2)
+                        if i == 0 {
+                            Text("Recommended").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                        }
+                    }
+                    .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+                    .background(GlassInk.well, in: coreShape(Radius.control))
+                    .contentShape(coreShape(Radius.control))
+                }
+                .buttonStyle(CoreQuietPressStyle(radius: Radius.control, hoverFill: true))
+                .disabled(sending)
+                .accessibilityIdentifier("sign-in-choice-\(o.number)")
+            }
+            if let e = model.signIn?.inputError { AccIssue(text: e) }
+        }
+        .padding(.top, Space.s1)
     }
 
     @ViewBuilder private func openAgain(_ page: URL?, show: Bool) -> some View {
@@ -281,7 +317,9 @@ extension AddAccountDialog {
     }
 
     private func fallbackLines(_ step: SignInStep) -> [String] {
-        let all = ["Starting the sign-in on your Core…", "Opening the sign-in page…", "Waiting for the code…", "Saving…"]
+        let all = [
+            "Starting the sign-in on your Core…", "Opening the sign-in page…", "Waiting for the code…", "Saving…",
+        ]
         return Array(all.prefix(min(at(step) + 2, all.count)))
     }
 

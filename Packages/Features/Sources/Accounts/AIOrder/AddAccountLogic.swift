@@ -12,17 +12,21 @@ enum AddCards {
     private static let faces: [String: (name: String, line: String)] = [
         "claude-sub": ("Claude", "Pro or Max plan"), "codex-sub": ("ChatGPT", "Plus or Pro plan"),
         "agy-sub": ("Google", "Google AI plan"),
-        "openrouter": ("OpenRouter", "Hundreds of models, one key"), "anthropic": ("Anthropic", "Claude models by API key"),
+        "openrouter": ("OpenRouter", "Hundreds of models, one key"),
+        "anthropic": ("Anthropic", "Claude models by API key"),
         "openai": ("OpenAI", "GPT models by API key"), "google": ("Google Gemini", "Gemini models by API key"),
-        "gemini": ("Google Gemini", "Gemini models by API key"), "deepseek": ("DeepSeek", "Fast, low-cost coding models"),
+        "gemini": ("Google Gemini", "Gemini models by API key"),
+        "deepseek": ("DeepSeek", "Fast, low-cost coding models"),
         "mistral": ("Mistral", "Codestral and Mistral models"), "xai": ("xAI", "Grok models"),
         "groq": ("Groq", "Very fast open models"), "vercel": ("Vercel AI Gateway", "Many providers behind one key"),
     ]
     /// Who a plan signs in with, as the checklist says it ("Sign in to OpenAI").
     private static let who = ["claude-sub": "Claude", "codex-sub": "OpenAI", "agy-sub": "Google"]
     private static let logos = [
-        "claude-sub": "claude", "codex-sub": "openai", "agy-sub": "gemini", "anthropic": "anthropic", "openai": "openai",
-        "google": "gemini", "gemini": "gemini", "openrouter": "openrouter", "deepseek": "deepseek", "mistral": "mistral",
+        "claude-sub": "claude", "codex-sub": "openai", "agy-sub": "gemini", "anthropic": "anthropic",
+        "openai": "openai",
+        "google": "gemini", "gemini": "gemini", "openrouter": "openrouter", "deepseek": "deepseek",
+        "mistral": "mistral",
         "xai": "x", "groq": "groq", "vercel": "vercel",
     ]
     /// Where each built-in's keys are made, for a Core that does not give `key_url`.
@@ -97,7 +101,7 @@ enum KeyHint: Equatable {
 /// Where a subscription sign-in stands, as the checklist shows it. The Core's `stage` wins; an older Core's is inferred:
 /// a page to open, then a code once the provider's CLI asks for one.
 enum SignInStep: Equatable, Sendable {
-    case starting, openURL, enterCode, finishing, done, failed
+    case starting, chooseMethod, openURL, enterCode, finishing, done, failed
 
     static func of(_ flow: SignInFlow?, style: SignInStyle) -> SignInStep {
         guard let flow else { return .starting }
@@ -119,7 +123,10 @@ enum SignInStep: Equatable, Sendable {
         case .working: return .finishing
         // Claude's CLI asks for the code as soon as its page is open.
         case .open: return style == .paste ? .enterCode : .openURL
-        case .guided: return asksForCode(flow.screen) ? .enterCode : .openURL
+        case .guided(let u):
+            // An older Core leaves the CLI's own menu up (Antigravity's login method): the person picks, never the app.
+            if u == nil, flow.deviceCode == nil, !GuidedMenu.options(flow.screen).isEmpty { return .chooseMethod }
+            return asksForCode(flow.screen) ? .enterCode : .openURL
         case .done, .failed: return .starting  // handled above
         }
     }
@@ -137,5 +144,41 @@ enum SignInStep: Equatable, Sendable {
         case .guided(let u)?: u
         default: nil
         }
+    }
+}
+
+/// One choice of a sign-in CLI's numbered menu, and the line that picks it (its number, as the person would type it).
+struct MenuOption: Equatable, Sendable {
+    let number: String
+    let title: String
+}
+
+/// The numbered menu a sign-in CLI is waiting on, read from its screen: the last run numbered 1, 2, … with at least two
+/// choices. Items may sit on their own lines (`> 1. Google OAuth`) or on one squashed line.
+enum GuidedMenu {
+    static func options(_ lines: [String]) -> [MenuOption] {
+        var found: [MenuOption] = []
+        for line in lines {
+            let marks = line.matches(of: #/(\d{1,2})[.)]\s+/#)
+            for (i, m) in marks.enumerated() {
+                // The number starts the line or follows a space or a cursor mark, never another digit or a dot.
+                if m.range.lowerBound != line.startIndex,
+                    !" >❯›*".contains(line[line.index(before: m.range.lowerBound)])
+                {
+                    continue
+                }
+                let end = i + 1 < marks.count ? marks[i + 1].range.lowerBound : line.endIndex
+                var title = Substring(line[m.range.upperBound..<end])
+                for stop in ["  ", "↑", "↓"] {
+                    if let r = title.range(of: stop) { title = title[..<r.lowerBound] }
+                }
+                let t = title.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: ">❯›")))
+                if !t.isEmpty { found.append(MenuOption(number: String(m.output.1), title: t)) }
+            }
+        }
+        guard let start = found.lastIndex(where: { $0.number == "1" }) else { return [] }
+        var run: [MenuOption] = []
+        for o in found[start...] where o.number == "\(run.count + 1)" { run.append(o) }
+        return run.count >= 2 ? run : []
     }
 }
