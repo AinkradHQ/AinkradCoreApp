@@ -59,6 +59,19 @@ struct ConnectionsTests {
         m.stopFlow()
     }
 
+    @Test func onlyALoopbackRedirectIsCaughtOnThisMac() {
+        func flow(_ redirect: String?) -> ConnFlow {
+            var c = URLComponents(string: "https://auth.atlassian.com/authorize")!
+            c.queryItems = [URLQueryItem(name: "state", value: "s")] + (redirect.map { [URLQueryItem(name: "redirect_uri", value: $0)] } ?? [])
+            return ConnFlow(id: "f", kind: "jira", userCode: nil, url: c.url!, step: .waiting, callbackState: "s")
+        }
+        #expect(flow("http://127.0.0.1:47613/callback").catchesHere)
+        #expect(flow("http://[::1]:47613/callback").catchesHere)
+        #expect(flow(nil).catchesHere)  // says nothing: as before
+        #expect(!flow("https://signin.ainkrad.io/callback").catchesHere)
+        #expect(!flow("https://core.example.com/callback").catchesHere)
+    }
+
     @Test func aFailedSignInSaysWhatToDoNotACode() async {
         let (m, s, _) = await make()
         s.failNext = true

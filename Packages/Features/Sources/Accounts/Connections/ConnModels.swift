@@ -89,6 +89,14 @@ struct ConnFlow: Equatable, Sendable {
         if case .connected = step { return true }
         return false
     }
+    /// The browser comes back to this Mac: the authorize address's `redirect_uri` is a loopback one (an older Core), or
+    /// it names none. A Core that uses Ainkrad's hosted callback (`https://signin.ainkrad.io/callback`) collects the
+    /// code itself, so the app starts no catcher and only waits for the flow's step.
+    var catchesHere: Bool {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard let r = items.first(where: { $0.name == "redirect_uri" })?.value else { return true }
+        return ["127.0.0.1", "::1", "[::1]", "localhost"].contains(URL(string: r)?.host ?? "")
+    }
 }
 
 /// One repository, project, team or channel a connection can reach, as the picker lists it.
