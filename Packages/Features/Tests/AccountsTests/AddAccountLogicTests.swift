@@ -187,5 +187,9 @@ struct AddAccountLogicTests {
         #expect(u.hasSuffix("code_challenge=NEW") && u.contains("response_type=code"))
         #expect(SignInScreen.newestPage(["https://accounts.google.com/o/oauth2/auth?client_id=abc", "Waiting for you"]) == nil)
     }
+
+    @Test func aThemePreviewIsNotAnError() {
+        #expect(SignInScreen.lastError(["tokyo night | ✕ error: compilation failed || ⚠ warning: deprecation"]) == nil)
+    }
 }
 

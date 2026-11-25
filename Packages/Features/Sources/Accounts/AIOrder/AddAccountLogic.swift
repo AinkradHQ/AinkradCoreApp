@@ -237,7 +237,11 @@ enum SignInScreen {
 
     /// The CLI's last error line, in plain words; nil when the screen shows none.
     static func lastError(_ lines: [String]) -> String? {
-        guard let l = lines.last(where: { $0.localizedCaseInsensitiveContains("error") }) else { return nil }
+        // Only the CLI's own error line ("Got an error: …"), never a word "error" inside a preview it draws (agy's theme
+        // picker shows sample code with "error: compilation failed").
+        guard let l = lines.last(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("Got an error") }) else {
+            return nil
+        }
         if l.contains("invalid_grant") {
             return "Google didn’t accept that code. It has to come from the newest Google page. Pick Google OAuth again; "
                 + "a new page opens."
