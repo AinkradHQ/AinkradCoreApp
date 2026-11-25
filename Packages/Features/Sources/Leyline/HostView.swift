@@ -16,15 +16,17 @@ struct HostView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
+        VStack(alignment: .leading, spacing: 0) {
             bar
-            if let lease = state.direct { DirectBanner(state: state, lease: lease).padding(.horizontal, Space.s5) }
+            if let lease = state.direct {
+                DirectBanner(state: state, lease: lease).padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
+            }
             HStack(spacing: 0) {
                 page.frame(maxWidth: .infinity, maxHeight: .infinity)
                 if model.section == .terminal { side }
             }
             .clipShape(coreShape(Radius.cardMac))
-            .padding(.horizontal, Space.s5).padding(.bottom, Space.s5)
+            .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
         }
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
@@ -38,8 +40,10 @@ struct HostView: View {
         .accessibilityIdentifier("host-space")
     }
 
+    /// The app header: the way back, the host and its route at the left; its tabs and More at the right, the same tiles
+    /// as every app's pages.
     private var bar: some View {
-        HStack(spacing: Space.s3) {
+        AppHeader {
             Button {
                 model.closeHost()
             } label: {
@@ -52,30 +56,29 @@ struct HostView: View {
             if let w = host.latencyWord {
                 StateBadge(w, tone: host.light == .slow ? .warn : host.light == .off ? .queue : .run, symbol: "circle")
             }
-            HStack(spacing: Space.s1 + 2) {
+            HStack(spacing: Space.s1) {
                 ForEach(Array(route.enumerated()), id: \.offset) { i, r in
                     if i > 0 {
-                        Image(systemName: "arrow.right").coreFont(size: MacTextSize.meta - 1)
+                        Image(systemName: "arrow.right").coreFont(size: MacTextSize.meta)
                             .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
                     }
-                    Text(r).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
+                    Text(r).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
             .accessibilityElement(children: .combine)
-            Spacer(minLength: Space.s3)
-            KeyTabs(
-                label: "Host tabs",
-                tabs: HostSection.tabs.map { .init(id: $0, title: $0.title, symbol: nil, key: $0.keyWord) },
-                selection: Binding(get: { model.section }, set: { model.section = $0 }))
-            CoreDropdown(items: HostMore.items(model, host, state: state)) {
-                Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .medium)
-                    .frame(width: MacSize.controlMd, height: MacSize.controlMd)
-                    .background(GlassInk.well, in: coreShape(Radius.control))
+        } actions: {
+            HStack(spacing: Space.s2) {
+                ForEach(HostSection.tabs) { t in
+                    AppFilterTile(title: t.title, count: -1, on: model.section == t, key: t.keyWord) {
+                        model.section = t
+                    }
+                    .accessibilityIdentifier("tab-\(t.title)")
+                }
             }
-            .help("More")
-            .accessibilityLabel("More")
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Host tabs")
+            MoreButton(items: HostMore.items(model, host, state: state))
         }
-        .padding(.horizontal, Space.s5).padding(.top, Space.s3)
     }
 
     private var route: [String] {

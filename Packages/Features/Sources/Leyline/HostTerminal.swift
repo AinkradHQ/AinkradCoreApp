@@ -63,7 +63,7 @@ struct StandInTerminal: View {
                 + p
                 + Text("▍")
         }
-        .font(.system(size: 12.5, design: .monospaced)).lineSpacing(4)
+        .font(.core(size: 12.5, design: .monospaced, scale: TextSizePrefs.shared.scale)).lineSpacing(Space.s1)
         .foregroundStyle(Color(red: 0.84, green: 0.86, blue: 0.9))
         .padding(.horizontal, Space.s4 + 2).padding(.vertical, Space.s4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

@@ -3,35 +3,70 @@ import SwiftUI
 
 // Small pieces the Leyline page, the host panel and the host view share. Built from CoreUI parts only.
 
-/// A row of tabs where each shows the key that picks it ("Terminal ⌘1", "Map ⌘M"): the picked one sits on a well, the others
-/// are plain. Hover lifts each like any Core button.
-struct KeyTabs<ID: Hashable>: View {
-    struct Tab: Identifiable {
-        let id: ID
-        let title: String
-        let symbol: String?
-        let key: String
-    }
-    let label: String
-    let tabs: [Tab]
-    @Binding var selection: ID
-
+/// A page that is not there: nothing yet, loading failed, not connected. The Accounts and Connections state card: an icon
+/// tile in its tone that bounces in, a title, the words and what to do about it as header-style action tiles.
+struct LeylineStateCard<Actions: View>: View {
+    @Environment(\.coreAccent) private var paneAccent
+    let symbol: String
+    let title: String
+    let text: String
+    var tone: Tone = .queue
+    @ViewBuilder let actions: Actions
+    @State private var shown = false
     var body: some View {
-        HStack(spacing: Space.s1) {
-            ForEach(tabs) { t in
-                Button {
-                    selection = t.id
-                } label: {
-                    if let s = t.symbol { Label(t.title, systemImage: s) } else { Text(t.title) }
-                }
-                .buttonStyle(CoreButtonStyle(t.id == selection ? .secondary : .plain, size: .medium))
-                .environment(\.coreKeycap, t.key)
-                .accessibilityAddTraits(t.id == selection ? .isSelected : [])
-                .accessibilityIdentifier("tab-\(t.title)")
+        let hue = tone == .fail ? GlassInk.red : tone == .warn ? GlassInk.amber : GlassInk.accent(paneAccent)
+        VStack(spacing: Space.s3) {
+            IconTile(symbol, hue: hue, size: Space.s8 * 2, bounce: shown)
+                .coreScaleEffect(shown ? 1 : 0.6)
+            Text(title).coreFont(size: MacTextSize.large, weight: .bold).accessibilityAddTraits(.isHeader)
+            Text(text).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 16)
+            HStack(spacing: Space.s2) { actions }.padding(.top, Space.s2)
+        }
+        .padding(Space.s6)
+        .frame(maxWidth: .infinity)
+        .coreWell()
+        .overlay { if tone == .fail { coreShape(Radius.cardMac).strokeBorder(GlassInk.red, lineWidth: 1) } }
+        .animation(.smooth(duration: 0.45), value: shown)
+        .onAppear { shown = true }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+extension LeylineStateCard where Actions == EmptyView {
+    init(symbol: String, title: String, text: String, tone: Tone = .queue) {
+        self.init(symbol: symbol, title: title, text: text, tone: tone) { EmptyView() }
+    }
+}
+
+/// The loading state of Accounts and Connections: a bar, a word, and quiet cards where the hosts will be.
+struct LeylineSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            CoreBusyBar().frame(maxWidth: Space.s8 * 5)
+            Text("Loading…").foregroundStyle(GlassInk.secondary)
+            ForEach(0..<4, id: \.self) { _ in
+                Color.clear.frame(height: Space.s8 + Space.s6).coreWell()
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(label)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading")
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
+/// The More menu's button on a well: a header tile's size by default, a medium control's beside medium buttons.
+struct MoreButton: View {
+    let items: [CoreDropdownItem]
+    var side = MacSize.controlLg
+    var body: some View {
+        CoreDropdown(items: items) {
+            Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .semibold)
+                .frame(width: side, height: side)
+                .background(GlassInk.well, in: coreShape(Radius.control))
+        }
+        .help("More")
+        .accessibilityLabel("More")
     }
 }
 
@@ -56,10 +91,7 @@ struct HostTile: View {
     let symbol: String
     var size: CGFloat = 34
     var body: some View {
-        Image(systemName: symbol).coreFont(size: size * 0.46, weight: .medium)
-            .frame(width: size, height: size)
-            .background(GlassInk.well, in: coreShape(size > 40 ? Radius.cardMac : Radius.control))
-            .accessibilityHidden(true)
+        IconTile(symbol, hue: GlassInk.primary, size: size)
     }
 }
 
@@ -124,21 +156,39 @@ struct FindField: View {
     }
 }
 
-/// The keys of the page, quietly along the bottom.
-struct KeyHints: View {
-    let hints: [(String, String)]
+/// The foot of the page, as in Accounts and Terminals: status chips at the left, the keys at the right.
+struct LeylineFooter: View {
+    let model: LeylineModel
     var body: some View {
         HStack(spacing: Space.s4) {
-            ForEach(hints, id: \.0) { k, word in
-                HStack(spacing: Space.s1 + 2) {
-                    CoreKeycap(k)
-                    Text(word).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            if model.load == .ready, !model.fleet.isEmpty {
+                HStack(spacing: Space.s2) {
+                    AppStatChip("server.rack", Words.count(model.fleet.count, "host"), GlassInk.accent(paneAccent))
+                    AppStatChip("checkmark.circle.fill", "\(model.onlineCount) online", GlassInk.green)
+                    if model.fleet.count > model.onlineCount {
+                        AppStatChip("moon.zzz.fill", "\(model.fleet.count - model.onlineCount) offline", GlassInk.slate)
+                    }
                 }
             }
+            Spacer(minLength: 0)
+            if model.load == .ready, !model.fleet.isEmpty, model.openID == nil {
+                hint("↑↓←→", "Move")
+                hint("⏎", "Terminal")
+                hint("⌘2", "Files")
+                hint("⌘3", "History")
+                hint("type", "Find")
+            }
         }
-        .frame(maxWidth: .infinity).frame(height: Space.s8 + Space.s3)
+        .padding(.horizontal, Space.s4).padding(.vertical, Space.s3)
+    }
+    @Environment(\.coreAccent) private var paneAccent
+
+    private func hint(_ keys: String, _ what: String) -> some View {
+        HStack(spacing: Space.s2) {
+            CoreKeycap(keys)
+            Text(what).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Keys: " + hints.map { "\($0.0) \($0.1)" }.joined(separator: ", "))
     }
 }
 

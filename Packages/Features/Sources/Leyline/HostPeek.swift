@@ -156,7 +156,9 @@ struct HostPeek: View {
     private func approval(_ command: String) -> some View {
         HStack(spacing: Space.s2 + 2) {
             CountBadge(1, label: "AI waits for you")
-            (Text("AI wants to run ") + Text(command).font(.system(size: MacTextSize.meta + 1, design: .monospaced)))
+            (Text("AI wants to run ")
+                + Text(command).font(
+                    .core(size: MacTextSize.meta + 1, design: .monospaced, scale: TextSizePrefs.shared.scale)))
                 .coreFont(size: MacTextSize.meta + 1).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Space.s1)
             Button("Review") { model.host.shell.bellOpen = true }
@@ -209,13 +211,7 @@ struct HostPeek: View {
                     .disabled(off && s != .access)
                     .help("\(s.title)  \(s.keyWord)")
             }
-            CoreDropdown(items: HostMore.items(model, host)) {
-                Image(systemName: "ellipsis").coreFont(size: MacTextSize.body, weight: .medium)
-                    .frame(width: MacSize.controlMd, height: MacSize.controlMd)
-                    .background(GlassInk.well, in: coreShape(Radius.control))
-            }
-            .help("More")
-            .accessibilityLabel("More")
+            MoreButton(items: HostMore.items(model, host), side: MacSize.controlMd)
         }
     }
 }
