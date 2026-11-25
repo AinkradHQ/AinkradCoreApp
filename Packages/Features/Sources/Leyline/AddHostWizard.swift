@@ -351,12 +351,14 @@ extension LeylineModel {
         case .saved(let id): keyID = id
         case .importing:
             wizard?.signIn = .running
+            // A name another key already has gets a free one ("deploy-2"): the Core refuses a taken name.
+            let name = AddHostFlow.freeName(f.importName, taken: Set(keys.map(\.name)))
             do {
                 let k = try await host.elevated(
-                    "Import the key \(f.importName) into the Core.", done: "imported", keepsEdit: true
+                    "Import the key \(name) into the Core.", done: "imported", keepsEdit: true
                 ) {
                     try await service.importKey(
-                        name: f.importName, privateKey: f.keyText, passphrase: f.passphrase.isEmpty ? nil : f.passphrase
+                        name: name, privateKey: f.keyText, passphrase: f.passphrase.isEmpty ? nil : f.passphrase
                     )
                 }
                 keyID = k.id
