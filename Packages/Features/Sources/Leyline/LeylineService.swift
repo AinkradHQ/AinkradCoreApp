@@ -38,6 +38,16 @@ protocol LeylineService: Sendable {
     func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall
     /// Whether an address answers like an SSH server from the Core, and how fast (`POST /hosts/check`, API minor 95).
     func checkHost(address: String, port: Int) async throws -> HostCheck
+    /// The host keys the Core knows for a host: `trusted`, `seen` (offered, waiting for a person) or `replaced`.
+    func hostKeys(host: String) async throws -> [HostKeyItem]
+    /// A person trusts a key the host offered (`POST /hosts/{h}/host-keys/trust`).
+    func trustHostKey(host: String, fingerprint: String) async throws
+}
+
+/// One host key the Core knows for a host.
+struct HostKeyItem: Equatable, Sendable, Decodable {
+    let fingerprint: String
+    let state: String
 }
 
 /// The Core's answer to "does this address answer SSH?".
@@ -66,6 +76,8 @@ extension LeylineService {
     func pauseRecording(session: String) async throws { throw LeylineFailure.notYet }
     func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall { throw LeylineFailure.notYet }
     func checkHost(address: String, port: Int) async throws -> HostCheck { throw LeylineFailure.notYet }
+    func hostKeys(host: String) async throws -> [HostKeyItem] { throw LeylineFailure.notYet }
+    func trustHostKey(host: String, fingerprint: String) async throws { throw LeylineFailure.notYet }
 }
 
 /// A new host, as the Add Host sheets fill it. Nothing optional is sent as null: the Core takes its defaults.

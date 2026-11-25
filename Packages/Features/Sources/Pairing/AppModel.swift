@@ -302,6 +302,10 @@ public final class AppModel {
             projects.attach(connection: live.connection)
             leyline.attach(connection: live.connection)
             leyline.openTerminal = { [weak model] id in await model?.openRemote(id) }
+            // The host view draws its terminal in place; Add Host lists the Core's projects.
+            leyline.terminalView = { [weak model] id in model.map { AnyView(AttachedTerminal(model: $0, terminal: id)) }
+            }
+            leyline.projectNames = { [weak self] in self?.projects.refs.map(\.name) ?? [] }
             // The Core records host terminals when a host asks: the pane shows it and can pause it.
             leyline.markRecording = { [weak model] terminal, paused in
                 model?.recording[terminal] = paused.map { PaneRecording(paused: $0) }

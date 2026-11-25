@@ -31,20 +31,37 @@ public final class LeylineModel {
     var keys: [KeyItem] = []
     var knownHosts: [KnownHostItem] = []
     var load: LeylineLoad = .notConnected
-    /// The page of the top bar (the gallery, or Keys).
+    /// The page: the hosts (map or list), or Keys.
     var page = LeylinePage.hosts
-    /// The gallery's Filter field.
+    /// "Type to find a host": typing anywhere on the page fills it.
     var filter = ""
-    /// The host whose space is open (nil: the gallery or Keys).
+    /// Map or List.
+    var layout = LeylineLayout.map
+    /// The selected host: the lit route on the map, the row in the list, the host panel.
+    var selected: String?
+    /// The group whose hosts are spread out on a big map.
+    var openGroup: String?
+    /// The host whose view is open (nil: the map or the list).
     var openID: String?
-    var section = HostSection.overview
-    /// The gallery cards ticked for a fleet run.
-    var selection: Set<String> = []
-    /// The gallery card the arrow keys are on.
-    var cursor: String?
-    /// ⌘N and Add Host: the quick pop-over under the button.
-    var quickOpen = false
-    var quickText = ""
+    var section = HostSection.terminal
+    /// Each host's health, read from the Core's stored samples (at most once a minute).
+    var healthByHost: [String: HostHealth] = [:]
+    var healthReadAt: Date?
+    /// The last things that happened on a host, read when it is selected.
+    var activity: [String: [HostEvent]] = [:]
+    /// What the Core does not send yet (see `HostExtras`): empty on a live Core.
+    var extras: [String: HostExtras] = [:]
+    /// The Add Host wizard while it is open.
+    var wizard: AddHostFlow?
+    /// Debug demo only: Add Host also draws what the Core cannot do yet (a stored password, a sign-in test before saving), so
+    /// its screenshots show the whole design. Always false on a live Core.
+    var previewGaps = false
+    /// The terminal each host's view embeds, so coming back shows the same one.
+    var hostTerminals: [String: String] = [:]
+    /// Draws a Core terminal inside the host view. The app sets it; nil (the Debug demo) shows a stand-in.
+    public var terminalView: (@MainActor (String) -> AnyView?)?
+    /// The Core's project names, for Add Host's Project picker. The app sets it.
+    public var projectNames: (@MainActor () -> [String])?
     /// A refusal from the Core (or the sheet's own check) for the write in flight, in words.
     private(set) var writeError: String?
     private(set) var busy = false
@@ -53,8 +70,6 @@ public final class LeylineModel {
     /// The Core's name, for "Reached through" (the Core this Mac is paired with).
     var coreName: String { host.shell.home.coreName.isEmpty ? "Home Core" : host.shell.home.coreName }
     #if DEBUG
-    /// Snapshots only: draws this card in its hover state.
-    var debugHover: String?
     /// Snapshots only: the Make Runner state a host page opens in.
     var debugRunner: HostPageState.RunnerInstallState?
     #endif
@@ -78,9 +93,12 @@ public final class LeylineModel {
         knownHosts = []
         load = .notConnected
         openID = nil
-        cursor = nil
-        selection = []
-        quickOpen = false
+        selected = nil
+        wizard = nil
+        healthByHost = [:]
+        healthReadAt = nil
+        activity = [:]
+        hostTerminals = [:]
         readOnly = false
     }
 
@@ -139,8 +157,8 @@ public final class LeylineModel {
             hosts = try await h
             keys = try await k
             knownHosts = try await n
-            selection = selection.intersection(hosts.map(\.id))
             load = .ready
+            if selected.map({ id in !hosts.contains { $0.id == id } }) ?? true { selected = fleet.first?.id }
         } catch let e as LeylineFailure where e.status == 404 || e.status == 501 {
             load = .absent
         } catch {
@@ -170,18 +188,19 @@ public final class LeylineModel {
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
     var open: HostItem? { hostItem(openID) }
 
-    /// The gallery's cards after the Filter field.
-    var shown: [HostItem] {
-        let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        let hosts = LeylineOptions.filter(
+    /// The hosts Settings, Leyline, Options lets the page show (before the find field).
+    var fleet: [HostItem] {
+        LeylineOptions.filter(
             hosts, show: LeylineOptions.current, opened: LeylineOptions.opened(), mine: LeylineOptions.mine())
-        return q.isEmpty
-            ? hosts
-            : hosts.filter {
-                $0.name.lowercased().contains(q) || $0.address.lowercased().contains(q)
-                    || ($0.group ?? "").lowercased().contains(q) || $0.tags.contains { $0.contains(q) }
-            }
     }
+    /// Whether a host matches "Type to find a host": its name, address, group or a tag.
+    func matches(_ h: HostItem) -> Bool {
+        let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
+        return q.isEmpty || h.name.lowercased().contains(q) || h.address.lowercased().contains(q)
+            || (h.group ?? "").lowercased().contains(q) || h.tags.contains { $0.contains(q) }
+    }
+    /// The hosts after the find field: the list shows only these; the map dims the rest.
+    var shown: [HostItem] { fleet.filter(matches) }
     var groups: [HostGroup] { HostGroup.grouping(shown) }
 
     /// The hosts a key logs in to, for the "used by" chips.
@@ -232,14 +251,22 @@ public final class LeylineModel {
         return nil
     }
 
-    /// Adds a host (a name and an address is enough: it asks first by default). The new host opens. Returns false when
-    /// nothing was added; the sheet or pop-over stays open with its error.
+    /// Adds a host (a name and an address is enough: it asks first by default) from the advanced sheet, and closes it. Returns
+    /// false when nothing was added; the sheet stays open with its error.
     @discardableResult
     func addHost(_ draft: HostDraft) async -> Bool {
-        guard let service, !busy, mayWrite() else { return false }
+        guard let made = await createHost(draft) else { return false }
+        host.shell.closeDialog()
+        host.shell.showToast("\(made.name) added")
+        return true
+    }
+
+    /// Creates a host and selects it; nil (with `writeError`) when the Core or the check refused.
+    func createHost(_ draft: HostDraft) async -> HostItem? {
+        guard let service, !busy, mayWrite() else { return nil }
         if let p = Self.problem(draft) {
             writeError = p
-            return false
+            return nil
         }
         busy = true
         writeError = nil
@@ -248,16 +275,14 @@ public final class LeylineModel {
         do { made = try await service.createHost(draft) } catch {
             if CoreError.unwrapping(error) == .forbiddenScope { readOnly = true }
             writeError = words(error)
-            return false
+            return nil
         }
         LeylineOptions.markMine(made.id)
-        quickOpen = false
-        quickText = ""
         await reload()
         page = .hosts
-        host.shell.closeDialog()
-        host.shell.showToast("\(made.name) added")
-        return true
+        selected = made.id
+        openGroup = made.group ?? HostGroup.shared
+        return made
     }
 
     /// Saves the edit sheet: every field it owns goes in one change.
@@ -366,16 +391,16 @@ public final class LeylineModel {
         return true
     }
 
-    // MARK: selection
-
-    func toggle(_ id: String) {
-        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
-    }
-
     // MARK: navigation
 
-    func openHost(_ id: String) {
-        section = .overview
+    /// Opens a host's view on a tab: the terminal at once by default. An offline host stays on the page.
+    func openHost(_ id: String, _ tab: HostSection = .terminal) {
+        guard hostItem(id)?.light != .off else {
+            host.shell.showToast("It is not answering. Leyline tries again every minute.", kind: .warn)
+            return
+        }
+        selected = id
+        section = tab
         LeylineOptions.markOpened(id)
         if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = id } } else { openID = id }
     }
@@ -388,13 +413,12 @@ public final class LeylineModel {
         guard !readOnly else { return }
         show()
         page = .hosts
-        quickText = ""
         writeError = nil
         checkNeedsStepUp = false
-        quickOpen = true
+        AddHostWizard.open(self)
     }
 
-    /// ⌘N while the gallery is up: the same as Add Host.
+    /// ⌘N while the page is up: the same as Add Host.
     func newItem() { if openID == nil { newHost() } }
 
     func show() {
@@ -439,7 +463,7 @@ public final class LeylineModel {
             "point.3.connected.trianglepath.dotted", ["ssh", "host", "server", "key", "terminal"]
         ) { $0.show() }
         entry(
-            "add-host", "Add Host", "user@address and Return · asks first by default", "plus",
+            "add-host", "Add Host", "Server, sign in, name, check · asks first by default", "plus",
             ["ssh", "server", "create", "host"], action: true
         ) { $0.newHost() }
         entry(

@@ -47,3 +47,33 @@ public struct EmbeddedTerminal: View {
         if terminal == nil { failure = model.embedError ?? "The terminal did not open." }
     }
 }
+
+/// A terminal the Core already opened, inside another screen (Leyline's host view): attached when the view first appears.
+public struct AttachedTerminal: View {
+    let model: TerminalsModel
+    let terminal: String
+    @State private var session: TerminalSession?
+    @State private var missing = false
+    @Environment(\.corePalette) private var palette
+
+    public init(model: TerminalsModel, terminal: String) {
+        self.model = model
+        self.terminal = terminal
+    }
+
+    public var body: some View {
+        Group {
+            if let session {
+                TerminalPaneView(model: model, session: session)
+            } else {
+                Text(missing ? "That terminal has ended." : "Connecting…").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(palette.text2).padding(Space.s3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .task(id: terminal) {
+            session = await model.embed(existing: terminal)
+            missing = session == nil
+        }
+    }
+}
