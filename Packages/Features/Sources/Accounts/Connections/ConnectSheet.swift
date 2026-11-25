@@ -84,11 +84,10 @@ struct TokenForm: View {
     private var key: String { joining.map { "replace-\($0.id)" } ?? "token" }
 
     private var intro: String {
-        guard let j = joining else {
+        guard joining != nil else {
             return "Only if signing in doesn't work for you. Core keeps the token sealed and never shows it again."
         }
-        let who = j.label.isEmpty ? j.identity : j.label
-        return "The token replaces the sign-in of \(who). Its name, access and \(kind.resource) stay. "
+        return "The token replaces this connection's sign-in. Its name, access and \(kind.resource) stay. "
             + "It must be for the same \(kind.name) account. Core keeps it sealed and never shows it again."
     }
 
