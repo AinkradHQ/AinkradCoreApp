@@ -232,7 +232,7 @@ public final class ConnectionsModel {
                 try await service.start(kind: kind, again: again)
             }
             flow = f
-            if f.callbackState != nil || (self.kind(kind)?.signIn == .browser && f.userCode == nil) {
+            if f.catchesHere, f.callbackState != nil || (self.kind(kind)?.signIn == .browser && f.userCode == nil) {
                 startCatcher(for: f)
             }
         } catch is AdminDeclined {
