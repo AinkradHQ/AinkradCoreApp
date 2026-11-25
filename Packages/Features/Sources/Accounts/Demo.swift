@@ -512,7 +512,8 @@ public final class AccountsDemo {
         "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices", "ai-order-rename",
         // Add an AI account (approved mockup 2026-11-25), step by step.
         "ai-add-pick-key", "ai-add-pick-sub", "ai-add-key-empty", "ai-add-key-pasted", "ai-add-key-checking",
-        "ai-add-sub-open", "ai-add-sub-code", "ai-add-sub-device", "ai-add-sub-finishing", "ai-add-sub-failed",
+        "ai-add-sub-open", "ai-add-sub-menu", "ai-add-sub-code", "ai-add-sub-device", "ai-add-sub-finishing",
+        "ai-add-sub-failed",
         "ai-add-done",
     ]
     /// The account page's six states (`AccountDetailDemo`), walked after the scenes above.
@@ -751,12 +752,14 @@ public final class AccountsDemo {
             switch scene {
             case "ai-add-pick-key", "ai-add-pick-sub": nil
             case "ai-add-sub-open", "ai-add-sub-finishing", "ai-add-sub-failed": "claude-sub"
-            case "ai-add-sub-code": "agy-sub"
+            case "ai-add-sub-code", "ai-add-sub-menu": "agy-sub"
             case "ai-add-sub-device": "codex-sub"
             default: "openrouter"
             }
         AddAccountDebug.subscription = scene == "ai-add-pick-sub"
-        if ["ai-add-key-pasted", "ai-add-key-checking"].contains(scene) { AddAccountDebug.key = "sk-or-v1-demo0000000000000000" }
+        if ["ai-add-key-pasted", "ai-add-key-checking"].contains(scene) {
+            AddAccountDebug.key = "sk-or-v1-demo0000000000000000"
+        }
         AddAccountDebug.opened = scene == "ai-add-key-pasted"
         AddAccountDebug.checking = scene == "ai-add-key-checking"
         if scene == "ai-add-done" { AddAccountDebug.doneModels = 312 }
@@ -771,6 +774,12 @@ public final class AccountsDemo {
         case "ai-add-sub-code":
             f.stage = .guided(page)
             f.screen = ["Opening the sign-in page…", page.absoluteString, "", "Paste the authorization code here:"]
+        case "ai-add-sub-menu":
+            f.stage = .guided(nil)
+            f.screen = [
+                "Select login method:", "> 1. Google OAuth", "  2. Use a Google Cloud project", "",
+                "↑/↓ Navigate · enter Select",
+            ]
         case "ai-add-sub-device": f.deviceCode = "K7QM-4XZP"
         case "ai-add-sub-finishing": f.stage = .working
         case "ai-add-sub-failed":

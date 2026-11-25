@@ -126,4 +126,40 @@ struct AddAccountLogicTests {
         f.stage = .guided(URL(string: "https://example.invalid"))
         #expect(SignInStep.of(f, style: .guided) == .openURL, "a page once it prints one")
     }
+
+    static let agyMenu = [
+        "Select login method:", "> 1. Google OAuth", "  2. Use a Google Cloud project", "",
+        "↑/↓ Navigate · enter Select",
+    ]
+
+    /// The owner's run: Google OAuth picked, the CLI opened the browser itself (no page reached the Core) and asks for
+    /// the code under the old menu.
+    @Test func aCodePromptUnderTheMenuAsksForTheCode() {
+        var f = SignInFlow(stage: .guided(nil), label: "x")
+        f.screen =
+            Self.agyMenu + [
+                "Please visit the following URL to authorize the application:",
+                "https://accounts.example.invalid/o/oauth2",
+                "", "Enter the authorization code:",
+            ]
+        #expect(SignInStep.of(f, style: .guided) == .enterCode)
+    }
+
+    @Test func aMenuWithOtherTextAfterItIsGone() {
+        let screen = Self.agyMenu + ["Waiting for the browser sign-in…"]
+        #expect(GuidedMenu.options(screen).isEmpty)
+        var f = SignInFlow(stage: .guided(nil), label: "x")
+        f.screen = screen
+        #expect(SignInStep.of(f, style: .guided) == .openURL)
+    }
+
+    @Test func aMenuAtTheTailIsCurrentUntilAnsweredHere() {
+        var f = SignInFlow(stage: .guided(nil), label: "x")
+        f.screen = Self.agyMenu + [""]
+        #expect(SignInStep.of(f, style: .guided) == .chooseMethod)
+        f.pickedMenu = GuidedMenu.options(f.screen)
+        #expect(SignInStep.of(f, style: .guided) == .openURL, "picked: not asked again, the code field waits")
+        f.screen = ["Pick a project:", "> 1. alpha", "  2. beta", "↑/↓ Navigate"]
+        #expect(SignInStep.of(f, style: .guided) == .chooseMethod, "a new menu is asked")
+    }
 }

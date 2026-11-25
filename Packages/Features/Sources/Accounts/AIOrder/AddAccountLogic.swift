@@ -124,9 +124,12 @@ enum SignInStep: Equatable, Sendable {
         // Claude's CLI asks for the code as soon as its page is open.
         case .open: return style == .paste ? .enterCode : .openURL
         case .guided(let u):
-            // An older Core leaves the CLI's own menu up (Antigravity's login method): the person picks, never the app.
-            if u == nil, flow.deviceCode == nil, !GuidedMenu.options(flow.screen).isEmpty { return .chooseMethod }
-            return asksForCode(flow.screen) ? .enterCode : .openURL
+            if asksForCode(flow.screen) { return .enterCode }
+            // An older Core leaves the CLI's own menu up (Antigravity's login method): the person picks, never the app. A
+            // menu already answered here is not asked again; a new one is.
+            let menu = GuidedMenu.options(flow.screen)
+            if u == nil, flow.deviceCode == nil, !menu.isEmpty, menu != flow.pickedMenu { return .chooseMethod }
+            return .openURL
         case .done, .failed: return .starting  // handled above
         }
     }
@@ -154,11 +157,12 @@ struct MenuOption: Equatable, Sendable {
 }
 
 /// The numbered menu a sign-in CLI is waiting on, read from its screen: the last run numbered 1, 2, … with at least two
-/// choices. Items may sit on their own lines (`> 1. Google OAuth`) or on one squashed line.
+/// choices. Items may sit on their own lines (`> 1. Google OAuth`) or on one squashed line. The menu must be the screen's
+/// tail: after its last choice only blank lines and navigation hints may follow, or the CLI has moved on.
 enum GuidedMenu {
     static func options(_ lines: [String]) -> [MenuOption] {
-        var found: [MenuOption] = []
-        for line in lines {
+        var found: [(option: MenuOption, line: Int)] = []
+        for (n, line) in lines.enumerated() {
             let marks = line.matches(of: #/(\d{1,2})[.)]\s+/#)
             for (i, m) in marks.enumerated() {
                 // The number starts the line or follows a space or a cursor mark, never another digit or a dot.
@@ -173,12 +177,19 @@ enum GuidedMenu {
                     if let r = title.range(of: stop) { title = title[..<r.lowerBound] }
                 }
                 let t = title.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: ">❯›")))
-                if !t.isEmpty { found.append(MenuOption(number: String(m.output.1), title: t)) }
+                if !t.isEmpty { found.append((MenuOption(number: String(m.output.1), title: t), n)) }
             }
         }
-        guard let start = found.lastIndex(where: { $0.number == "1" }) else { return [] }
-        var run: [MenuOption] = []
-        for o in found[start...] where o.number == "\(run.count + 1)" { run.append(o) }
-        return run.count >= 2 ? run : []
+        guard let start = found.lastIndex(where: { $0.option.number == "1" }) else { return [] }
+        var run: [(option: MenuOption, line: Int)] = []
+        for o in found[start...] where o.option.number == "\(run.count + 1)" { run.append(o) }
+        guard run.count >= 2, let last = run.last?.line, lines[(last + 1)...].allSatisfy(hintOrBlank) else { return [] }
+        return run.map(\.option)
+    }
+
+    /// A line a menu may leave under itself: blank, or how to move through it ("↑/↓ Navigate · enter Select").
+    static func hintOrBlank(_ line: String) -> Bool {
+        let l = line.trimmingCharacters(in: .whitespaces).lowercased()
+        return l.isEmpty || ["↑", "↓", "navigate", "select", "esc to"].contains { l.contains($0) }
     }
 }

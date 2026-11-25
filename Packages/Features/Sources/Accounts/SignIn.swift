@@ -47,6 +47,8 @@ struct SignInFlow: Equatable {
     /// it; nil from a Core that does not say, when the app infers the stage (`SignInStep.of`).
     var coreStage: String?
     var message: String?
+    /// The CLI menu the person answered in this dialog: it is not offered again unless a different one appears.
+    var pickedMenu: [MenuOption]?
 }
 
 extension AccountsModel {

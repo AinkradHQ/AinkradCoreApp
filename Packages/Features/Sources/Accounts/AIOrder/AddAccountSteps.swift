@@ -172,7 +172,10 @@ extension AddAccountDialog {
             index: 2,
             item: ConnSignInItem(
                 role: .copy, title: "Paste the code \(who) shows", detail: "After you sign in", state: check(1, step)),
-            detail: step == .enterCode ? AnyView(codeField) : nil, trailing: EmptyView())
+            // Waiting on the page, a code may still come (a missed prompt): a small field, so nobody is stranded.
+            detail: step == .enterCode
+                ? AnyView(codeField()) : step == .openURL ? AnyView(codeField("Got a code? Paste it")) : nil,
+            trailing: EmptyView())
         finishingRow(step)
     }
 
@@ -221,6 +224,7 @@ extension AddAccountDialog {
         return VStack(spacing: Space.s1) {
             ForEach(Array(options.enumerated()), id: \.offset) { i, o in
                 Button {
+                    model.signIn?.pickedMenu = options
                     Task { await model.sendGuidedInput(o.number) }
                 } label: {
                     HStack(spacing: Space.s2) {
@@ -251,13 +255,13 @@ extension AddAccountDialog {
     }
 
     /// The code the provider shows: pasted here, sent once through the Core, then cleared. Never sent for the person.
-    private var codeField: some View {
+    private func codeField(_ prompt: String = "Paste the code") -> some View {
         let s = model.signIn
         let empty = code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return HStack(alignment: .top, spacing: Space.s2) {
             CoreTextField(
-                "", placeholder: "Paste the code", text: $code, error: s?.codeError ?? s?.inputError, mono: true,
-                autofocus: true, onSubmit: sendCode
+                "", placeholder: prompt, text: $code, error: s?.codeError ?? s?.inputError, mono: true,
+                autofocus: prompt == "Paste the code", onSubmit: sendCode
             )
             .accessibilityLabel("The code")
             .accessibilityIdentifier("sign-in-code")
