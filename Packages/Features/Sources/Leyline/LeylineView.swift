@@ -51,8 +51,12 @@ struct LeylineView: View {
                 paneFocus = true
                 return .handled
             }
+            if model.keyForm != nil {
+                model.closeKeyForm()
+                return .handled
+            }
             if model.keysOpen {
-                model.keysOpen = false
+                model.closeKeys()
                 return .handled
             }
             if !model.filter.isEmpty {
@@ -68,12 +72,9 @@ struct LeylineView: View {
         }
         guard model.openID == nil, model.load == .ready else { return .ignored }
         if model.keysOpen {
-            // ↑ ↓ move through the keys; ⌘G and ⌘I are the panel's own buttons.
-            guard press.key == .upArrow || press.key == .downArrow, !model.keys.isEmpty else { return .ignored }
-            let ids = model.keys.map(\.id)
-            let at = model.keySelected.flatMap { ids.firstIndex(of: $0) }
-            let next = press.key == .upArrow ? max((at ?? ids.count) - 1, 0) : min((at ?? -1) + 1, ids.count - 1)
-            model.keySelected = ids[next]
+            // ↑ ↓ open the next key; ⌘G, ⌘I and ⌘C are the panel's own.
+            guard press.key == .upArrow || press.key == .downArrow, model.keyForm == nil else { return .ignored }
+            model.moveKey(down: press.key == .downArrow)
             return .handled
         }
         if cmd {
@@ -176,9 +177,11 @@ struct LeylineHome: View {
                 ],
                 selection: Binding(
                     get: { model.layout }, set: { l in withAnimation(Motion.out(Motion.ui)) { model.layout = l } }))
-            CoreIconButton(symbol: "key", label: "Keys", selected: model.keysOpen) { model.keysOpen.toggle() }
-                .help("Keys")
-                .accessibilityIdentifier("leyline-keys-button")
+            CoreIconButton(symbol: "key", label: "Keys", selected: model.keysOpen) {
+                if model.keysOpen { model.closeKeys() } else { model.keysOpen = true }
+            }
+            .help("Keys")
+            .accessibilityIdentifier("leyline-keys-button")
             Button {
                 model.newHost()
             } label: {

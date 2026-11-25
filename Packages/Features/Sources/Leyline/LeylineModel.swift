@@ -33,8 +33,13 @@ public final class LeylineModel {
     var load: LeylineLoad = .notConnected
     /// The Keys panel, slid in over the right of the map or the list.
     var keysOpen = false
-    /// The key lit in the Keys panel (↑ ↓ move it).
+    /// The key lit in the Keys panel (↑ ↓ move it); its row is the one open.
     var keySelected: String?
+    /// The Keys panel's open form (Generate or Import), and what Import holds.
+    var keyForm: KeyForm?
+    var keyDraft = KeyDraft()
+    /// The key just made or imported: lit for a moment at the top of the list.
+    var keyFresh: String?
     /// "Type to find a host": typing anywhere on the page fills it.
     var filter = ""
     /// Map or List.
@@ -342,9 +347,10 @@ public final class LeylineModel {
         busy = true
         writeError = nil
         defer { busy = false }
+        let made: KeyItem
         do {
-            try await host.elevated("Make the key \(name) in the Core.", done: "created", keepsEdit: true) {
-                _ = try await service.generateKey(name: name)
+            made = try await host.elevated("Make the key \(name) in the Core.", done: "created", keepsEdit: true) {
+                try await service.generateKey(name: name)
             }
         } catch is AdminDeclined {
             return false
@@ -354,7 +360,7 @@ public final class LeylineModel {
             return false
         }
         await reload()
-        host.shell.closeDialog()
+        keyMade(made.id)
         host.shell.showToast("\(name) made. Its private half stays in the Core.")
         return true
     }
@@ -375,9 +381,10 @@ public final class LeylineModel {
         busy = true
         writeError = nil
         defer { busy = false }
+        let made: KeyItem
         do {
-            try await host.elevated("Import the key \(name) into the Core.", done: "imported", keepsEdit: true) {
-                _ = try await service.importKey(
+            made = try await host.elevated("Import the key \(name) into the Core.", done: "imported", keepsEdit: true) {
+                try await service.importKey(
                     name: name, privateKey: privateKey, passphrase: passphrase.isEmpty ? nil : passphrase)
             }
         } catch is AdminDeclined {
@@ -388,7 +395,7 @@ public final class LeylineModel {
             return false
         }
         await reload()
-        host.shell.closeDialog()
+        keyMade(made.id)
         host.shell.showToast("\(name) imported")
         return true
     }
@@ -482,8 +489,7 @@ public final class LeylineModel {
             ["ssh", "keypair", "create"], action: true
         ) {
             $0.show()
-            $0.keysOpen = true
-            KeyDialogs.openGenerate($0)
+            $0.openKeyForm(.generate)
         }
     }
 }
