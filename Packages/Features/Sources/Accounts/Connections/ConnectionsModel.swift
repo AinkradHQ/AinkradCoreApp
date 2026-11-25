@@ -191,8 +191,27 @@ public final class ConnectionsModel {
                 }
             }
             load = .ready
+            await countWildcards(service)
         } catch {
             load = .failed(code: "error", message: ConnSay.plain(error))
+        }
+    }
+
+    /// A saved `owner/*` is one entry but many repositories: read those connections' lists and count what they reach.
+    private func countWildcards(_ service: any ConnectionsService) async {
+        let wild = items.filter { $0.only?.contains { $0.hasSuffix("/*") } == true }
+        let counts = await withTaskGroup(of: (Int64, Int?).self) { g in
+            for c in wild {
+                g.addTask { (c.id, (try? await service.picks(c.id)).map { ConnAccess.reach(c.only ?? [], in: $0.items) }) }
+            }
+            var out: [Int64: Int] = [:]
+            for await (id, n) in g { if let n { out[id] = n } }
+            return out
+        }
+        items = items.map {
+            var c = $0
+            c.seen = counts[c.id]
+            return c
         }
     }
 

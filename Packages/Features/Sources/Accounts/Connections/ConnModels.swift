@@ -60,6 +60,10 @@ struct ConnItem: Identifiable, Equatable, Sendable {
     var signInNeeded = false
     /// `oauth` (signed in on the service's website), `token` or `app_install`: only the first can be signed in again.
     var authMethod = "oauth"
+    /// The name the person gave it ("Github Token"); empty when they gave none.
+    var label = ""
+    /// How many the connection really reaches when `only` holds `owner/*` entries, counted from the service's list.
+    var seen: Int?
 }
 
 /// Where a sign-in stands, read from the Core while the sheet is open.

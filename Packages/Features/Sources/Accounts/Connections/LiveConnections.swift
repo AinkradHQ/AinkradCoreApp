@@ -325,7 +325,7 @@ struct LiveConnectionsService: ConnectionsService {
             reason: status == .needsLook ? reason(c.stateReason, service: service) : nil, isDefault: c.isDefault,
             allowed: Set(grants == nil ? (c.myCapabilities ?? []) : (member?.capabilities ?? [])), only: chosen,
             lastUsed: nil, lastChecked: c.lastTestedAt, users: Int(c.grantCount ?? 1), signInNeeded: authLost,
-            authMethod: c.authMethod)
+            authMethod: c.authMethod, label: c.label == c.identity ? "" : c.label)
     }
 
     /// The Core's reasons are short codes; the screen says them in words.
