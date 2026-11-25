@@ -4,8 +4,14 @@ import SwiftUI
 /// A step arriving: it slides in from the trailing side going forward and from the leading side going back, and the old one
 /// is replaced at once. Reduce Motion fades without moving.
 struct ConnStage<Content: View>: View {
-    let step: ConnStep
+    let step: Int
     @ViewBuilder let content: Content
+    init(step: ConnStep, @ViewBuilder content: () -> Content) { self.init(index: step.rawValue, content: content) }
+    /// Any numbered way of steps (Add an AI account's Pick · Add · Done).
+    init(index: Int, @ViewBuilder content: () -> Content) {
+        step = index
+        self.content = content()
+    }
     @State private var arrived = 1.0
     @State private var from: CGFloat = 1
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -17,7 +23,7 @@ struct ConnStage<Content: View>: View {
             .offset(x: reduce ? 0 : (1 - arrived) * from * 32)  // grid: ok motion only, the slide of a step
             .opacity(arrived)
             .onChange(of: step) { old, new in
-                from = new.rawValue >= old.rawValue ? 1 : -1
+                from = new >= old ? 1 : -1
                 arrived = 0
                 withAnimation(Motion.calm(Motion.out(Motion.move), reduce)) { arrived = 1 }
             }
@@ -94,6 +100,7 @@ struct ConnCheckRow<Trailing: View>: View {
                     Text(d).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
             }
+            .layoutPriority(detail == nil ? 0 : 1)  // a field in the line takes the width before the spacer
             Spacer(minLength: Space.s3)
             trailing
         }

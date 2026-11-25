@@ -25,22 +25,14 @@ final class AddAccountFlow {
     /// A CLI sign-in (ChatGPT, OpenCode, Antigravity) waits here until some runner can run it for the Core, or says why
     /// none can. The person never picks one: the Core runs the sign-in (on its own runner first) and keeps the login.
     var runners: RunnerChoice?
-    /// "I understand this may break the provider's rules": asked before a Codex or Antigravity sign-in starts. In memory
-    /// only, so every launch (and every new try) asks again.
-    var consent = false
-    private var runnerMethods: [String] = []
+    /// The person opened the provider's key page: the checklist's first line ticks.
+    var keyOpened = false
     /// Installing the provider's app on a runner so it can sign in: the runner, and whether the app now waits for that
     /// runner to restart with it (it reconnects once idle and then offers the sign-in).
     var installing: AccountRunner?
     var waitingRestart = false
     /// Why the runner still cannot sign in after the install, when the app knows.
     var installNote: String?
-
-    /// Codex and Antigravity have rules of their own: no sign-in starts before the person agrees. OpenCode needs none.
-    var needsConsent: Bool {
-        guard let id = providerID else { return false }
-        return SignInStyle.of(id, methods: runnerMethods).runnerBound && SignInStyle.showsRisk(id)
-    }
 
     var key: String {
         get { keyFlow.key }
@@ -66,8 +58,7 @@ final class AddAccountFlow {
 
     func choose(_ p: ProviderItem, _ m: AccountsModel) async {
         providerID = p.id
-        runnerMethods = p.loginMethods
-        consent = false
+        keyOpened = false
         error = nil
         let label = ProviderCatalog.label(
             for: ProviderCatalog.name(p.id, fallback: p.name), taken: Set(m.accounts.map(\.label)))
@@ -82,8 +73,8 @@ final class AddAccountFlow {
             {
                 let c = RunnerChoice.make(runners: list, harness: p.harness)
                 runners = c
-                // Some runner can run it: start at once, unless the risk note must be agreed to first.
-                if !c.none, !needsConsent { await startOnCore(m) }
+                // Some runner can run it: start at once. The risk line sits under the checklist (approved mockup).
+                if !c.none { await startOnCore(m) }
             } else {
                 await m.startSignIn(provider: p.id, label: label, displayName: startedName)
             }
@@ -94,7 +85,7 @@ final class AddAccountFlow {
 
     /// Starts the sign-in through the Core, which picks the runner that runs the CLI. No runner is named.
     func startOnCore(_ m: AccountsModel) async {
-        guard let id = providerID, runners?.none == false, !needsConsent || consent else { return }
+        guard let id = providerID, runners?.none == false else { return }
         runners = nil
         startedName = m.namesOn && nameIssue == nil ? AccountNames.clean(accountName) : nil
         await m.startSignIn(provider: id, label: keyFlow.label, displayName: startedName)
@@ -127,7 +118,7 @@ final class AddAccountFlow {
                 let c = RunnerChoice.make(runners: list, harness: p.harness)
                 if !c.none {
                     runners = c
-                    if !needsConsent { await startOnCore(m) }
+                    await startOnCore(m)
                     return
                 }
             }
@@ -140,7 +131,6 @@ final class AddAccountFlow {
     }
 
     func back(_ m: AccountsModel) {
-        consent = false
         runners = nil
         if stepper.step == .signIn { Task { await m.cancelSignIn() } }
         keyFlow.wipe()
@@ -150,8 +140,8 @@ final class AddAccountFlow {
 
     func again(_ m: AccountsModel) {
         m.signIn = nil
-        consent = false
         runners = nil
+        keyOpened = false
         keyFlow = KeyEntryFlow()
         providerID = nil
         addedAccount = nil

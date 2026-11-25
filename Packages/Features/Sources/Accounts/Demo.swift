@@ -510,6 +510,10 @@ public final class AccountsDemo {
         "usage-limits-error", "usage-limits-no-admin", "usage-limits-read-only",
         "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
         "ai-order-advanced", "ai-order-add-install", "ai-order-add-installing", "ai-order-prices", "ai-order-rename",
+        // Add an AI account (approved mockup 2026-11-25), step by step.
+        "ai-add-pick-key", "ai-add-pick-sub", "ai-add-key-empty", "ai-add-key-pasted", "ai-add-key-checking",
+        "ai-add-sub-open", "ai-add-sub-code", "ai-add-sub-device", "ai-add-sub-finishing", "ai-add-sub-failed",
+        "ai-add-done",
     ]
     /// The account page's six states (`AccountDetailDemo`), walked after the scenes above.
     public static let detailScenes = AccountDetailDemo.scenes
@@ -556,6 +560,7 @@ public final class AccountsDemo {
         model.testing = nil
         model.detailTech = false
         model.detailMore = false
+        AddAccountDebug.reset()
         switch scene {
         case "key-gate": svc.gateState = GateState(mode: 0, providerAccounts: 0)
         case "ai-order", "ai-order-limit-hit", "ai-order-add-pick", "ai-order-add-key", "ai-order-add-signin",
@@ -563,6 +568,7 @@ public final class AccountsDemo {
             "ai-order-rename":
             svc.useAIOrderSample(limitHit: scene == "ai-order-limit-hit")
             svc.noLogin = scene.hasPrefix("ai-order-add-install")
+        case _ where scene.hasPrefix("ai-add-"): svc.useAIOrderSample(limitHit: false)
         case "connect-installing": svc.noLogin = true
         case _ where AccountDetailDemo.scenes.contains(scene): svc.useDetailSample(scene)
         case "overview-gate-off": svc.gateState = GateState(mode: 0, providerAccounts: 0)
@@ -630,6 +636,7 @@ public final class AccountsDemo {
         case "detail-checked":
             await model.checkNow(model.account(1)!)
             try? await Task.sleep(for: .milliseconds(400))
+        case _ where scene.hasPrefix("ai-add-"): await showAdd(scene)
         case "ai-order-add-pick": AccountDialogs.openConnect(model, provider: nil)
         case "ai-order-add-key": AccountDialogs.openConnect(model, provider: "anthropic")
         case "ai-order-add-signin": AccountDialogs.openConnect(model, provider: "codex-sub")
@@ -735,6 +742,42 @@ public final class AccountsDemo {
         case "settings-gate": model.openSwitches()
         default: break
         }
+    }
+
+    /// Add an AI account's steps on the stand-in data. A sign-in's state is set by hand once the stand-in one has started,
+    /// under another id, so its follow loop stops and the scene holds still.
+    private func showAdd(_ scene: String) async {
+        let provider: String? =
+            switch scene {
+            case "ai-add-pick-key", "ai-add-pick-sub": nil
+            case "ai-add-sub-open", "ai-add-sub-finishing", "ai-add-sub-failed": "claude-sub"
+            case "ai-add-sub-code": "agy-sub"
+            case "ai-add-sub-device": "codex-sub"
+            default: "openrouter"
+            }
+        AddAccountDebug.subscription = scene == "ai-add-pick-sub"
+        if ["ai-add-key-pasted", "ai-add-key-checking"].contains(scene) { AddAccountDebug.key = "sk-or-v1-demo0000000000000000" }
+        AddAccountDebug.opened = scene == "ai-add-key-pasted"
+        AddAccountDebug.checking = scene == "ai-add-key-checking"
+        if scene == "ai-add-done" { AddAccountDebug.doneModels = 312 }
+        AccountDialogs.openConnect(model, provider: provider)
+        guard scene.hasPrefix("ai-add-sub-"), let id = provider else { return }
+        try? await Task.sleep(for: .milliseconds(1500))
+        let page = URL(string: "https://example.invalid/sign-in")!
+        var f = SignInFlow(stage: .open(page), login: "lg_scene", runner: "linux-01", label: "plan", opened: true)
+        f.provider = id
+        switch scene {
+        case "ai-add-sub-open": f.coreStage = "open_url"
+        case "ai-add-sub-code":
+            f.stage = .guided(page)
+            f.screen = ["Opening the sign-in page…", page.absoluteString, "", "Paste the authorization code here:"]
+        case "ai-add-sub-device": f.deviceCode = "K7QM-4XZP"
+        case "ai-add-sub-finishing": f.stage = .working
+        case "ai-add-sub-failed":
+            f.stage = .failed("Nothing happened for 10 minutes, so the sign-in stopped. Start again when you're ready.")
+        default: break
+        }
+        model.signIn = f
     }
 }
 #endif

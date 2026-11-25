@@ -194,7 +194,7 @@ struct GuidedSignInModelTests {
     }
 }
 
-/// The review fixes (E7): consent before the start, the secret toggle's rule, the notes.
+/// The review fixes (E7): the start of a sign-in, the secret toggle's rule, the notes.
 @MainActor struct GuidedReviewFixTests {
     func provider(_ id: String, harness: String) -> ProviderItem {
         ProviderItem(
@@ -213,17 +213,19 @@ struct GuidedSignInModelTests {
         return m
     }
 
-    @Test func noSignInStartsBeforeConsentForAntigravityAndCodex() async {
+    /// The approved Add an AI account mockup (2026-11-25): no consent step, the sign-in starts at once and the risk line
+    /// sits under the checklist.
+    @Test(.timeLimit(.minutes(1))) func antigravityStartsAtOnceWithTheRiskLine() async {
         let svc = FakeService()
         let m = await ready(svc)
+        m.signInTick = 0.002
+        svc.loginItem = LoginItem(
+            id: "lg", provider: "agy-sub", label: "agy", runner: "r_1", state: "failed", url: nil, reason: "stop",
+            accountID: nil)
         let flow = AddAccountFlow()
         await flow.choose(provider("agy-sub", harness: "agy"), m)
-        #expect(flow.needsConsent && flow.runners?.none == false && m.signIn == nil)
-        await flow.startOnCore(m)
-        #expect(m.signIn == nil && !svc.log.contains { $0.hasPrefix("startLogin") }, "no login.start without consent")
-        flow.consent = true
-        flow.back(m)
-        #expect(!flow.consent, "consent is not kept across tries")
+        #expect(svc.log.contains { $0.hasPrefix("startLogin agy-sub") }, "it started without asking")
+        #expect(AddCards.risky("agy-sub") && !AddCards.risky("codex-sub") && !AddCards.risky("claude-sub"))
     }
 
     /// Accounts on the Core: the wizard never asks for a runner, even when several could run the sign-in.
@@ -239,9 +241,7 @@ struct GuidedSignInModelTests {
             accountID: nil)
         let flow = AddAccountFlow()
         await flow.choose(provider("agy-sub", harness: "agy"), m)
-        // Only the risk note is asked; then the sign-in starts through the Core with no runner named.
-        flow.consent = true
-        await flow.startOnCore(m)
+        // The sign-in starts through the Core with no runner named.
         let starts = svc.log.filter { $0.hasPrefix("startLogin") }
         #expect(starts == ["startLogin agy-sub \(flow.keyFlow.label)"], "\(starts)")
         #expect(flow.runners == nil)
@@ -285,7 +285,6 @@ struct GuidedSignInModelTests {
         for _ in 0..<400 where !svc.log.contains(where: { $0.hasPrefix("startLogin opencode-sub") }) {
             try? await Task.sleep(for: .milliseconds(5))
         }
-        #expect(!flow.needsConsent)
         #expect(svc.log.contains { $0.hasPrefix("startLogin opencode-sub") }, "it started without asking")
         // Wait for the page to reach the host before closing, or a slow parallel run cancels first.
         for _ in 0..<400 where (m.host as? FakeHost)?.opened.isEmpty != false {

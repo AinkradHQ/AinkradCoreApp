@@ -18,6 +18,12 @@ enum AIOrderDemo {
                 models: [ModelPriceItem(id: "\(id)-model", inputMicro: 3_000_000, outputMicro: 15_000_000)],
                 pricedAt: "2026-11-19", builtin: id == "anthropic")
         }
+        // A Core 105 preset: its key page and hint come from the Core.
+        func preset(_ id: String, _ name: String) -> ProviderItem {
+            var p = key(id, name, "opencode")
+            (p.preset, p.keyURL, p.keyHint) = (true, "https://vercel.com/ai-gateway", "vck_")
+            return p
+        }
         return [
             sub("claude-sub", "Claude subscription", "claude"),
             sub("codex-sub", "Codex subscription", "codex", "device_code"),
@@ -26,7 +32,7 @@ enum AIOrderDemo {
             key("anthropic", "Anthropic API"), key("openai", "OpenAI API", "codex"), key("google", "Gemini API", "agy"),
             key("openrouter", "OpenRouter"), key("aimlapi", "AIMLAPI"), key("groq", "Groq"),
             key("deepseek", "DeepSeek"),
-            key("mistral", "Mistral"), key("xai", "xAI"), key("apinex", "APInex"),
+            key("mistral", "Mistral"), key("xai", "xAI"), key("apinex", "APInex"), preset("vercel", "Vercel AI Gateway"),
         ]
     }
 
@@ -134,7 +140,9 @@ extension AccountsDemo.Service {
     func setModelAllowed(account: Int64, model: String, allowed: Bool) async throws {
         if allowed { deniedModels[account]?.remove(model) } else { deniedModels[account, default: []].insert(model) }
     }
-    func loginCode(_ id: String) async -> String? { loginProvider == "codex-sub" ? "K7QM-4XZP" : nil }
+    func loginExtra(_ id: String) async -> LoginExtra {
+        LoginExtra(code: loginProvider == "codex-sub" ? "K7QM-4XZP" : nil)
+    }
 
     func namesSupported() async -> Bool { order010 }
     func setAccountName(account: Int64, name: String?) async throws -> AccountItem {

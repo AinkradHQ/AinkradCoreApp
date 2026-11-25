@@ -1,0 +1,102 @@
+import Foundation
+import Testing
+
+@testable import Accounts
+
+/// Add an AI account (approved mockup 2026-11-25): which cards show, the key's hint, where a sign-in stands.
+struct AddAccountLogicTests {
+    func p(
+        _ id: String, harness: String = "claude", login: [String] = ["paste"], prefix: String? = nil,
+        hint: String? = nil, url: String? = nil, hidden: Bool = false
+    ) -> ProviderItem {
+        var x = ProviderItem(
+            id: id, name: id.capitalized, harness: harness, authVar: "K", baseURL: "", delivery: [],
+            loginMethods: login, models: [], pricedAt: nil, builtin: true, keyPrefix: prefix)
+        (x.keyHint, x.keyURL, x.hidden) = (hint, url, hidden)
+        return x
+    }
+
+    @Test func openCodeIsNeverACardOnAnyCore() {
+        let list = [
+            p("opencode-sub", harness: "opencode", login: ["runner_login"]),
+            p("claude-sub", login: ["browser_code"]), p("codex-sub", harness: "codex", login: ["device_code"]),
+            p("agy-sub", harness: "agy", login: ["runner_login"]),
+            // A Core-added preset runs on OpenCode but is an API key: it stays.
+            p("together", harness: "opencode"), p("openrouter"), p("anthropic"),
+        ]
+        #expect(AddCards.cards(list, .subscription).map(\.id) == ["claude-sub", "codex-sub", "agy-sub"])
+        #expect(AddCards.cards(list, .apiKey).map(\.id) == ["openrouter", "anthropic", "together"])
+        // A newer Core flags it hidden: whatever its id or harness.
+        var flagged = p("someday-sub", harness: "claude", login: ["browser_code"])
+        flagged.hidden = true
+        #expect(AddCards.cards([flagged], .subscription).isEmpty)
+    }
+
+    @Test func cardFacesAndLogosFollowTheMockup() {
+        #expect(AddCards.name(p("codex-sub")) == "ChatGPT" && AddCards.who(p("codex-sub")) == "OpenAI")
+        #expect(AddCards.name(p("agy-sub")) == "Google" && AddCards.who(p("agy-sub")) == "Google")
+        #expect(AddCards.logo("xai") == "ai-x" && AddCards.logo("groq") == "ai-groq")
+        #expect(AddCards.logo("together") == "together", "no mark: the id, so the tile shows its letter")
+        #expect(ConnLook.logos.contains(AddCards.logo("openrouter")))
+    }
+
+    @Test func theKeyPageComesFromTheCoreFirst() {
+        #expect(AddCards.keyPage(p("openrouter"))?.absoluteString == "https://openrouter.ai/keys")
+        #expect(AddCards.keyPage(p("openrouter", url: "https://example.com/k"))?.absoluteString == "https://example.com/k")
+        #expect(AddCards.keyPage(p("together")) == nil)
+        #expect(AddCards.keyPage(p("together", url: "http://plain.example")) == nil, "https only")
+    }
+
+    @Test func onlyADefinitionsPrefixBlocksAdd() {
+        #expect(AddCards.keyStart(p("x", prefix: "abc-", hint: "zzz")) == ("abc-", true))
+        #expect(AddCards.keyStart(p("openrouter", hint: "sk-or-v1-")) == ("sk-or-v1-", false))
+        #expect(AddCards.keyStart(p("groq")) == ("gsk_", false))
+        #expect(AddCards.keyStart(p("together")) == (nil, false))
+    }
+
+    @Test func theKeyHintReadsAsYouType() {
+        #expect(KeyHint.of("", prefix: "sk-or-", name: "OpenRouter").words == "Starts with sk-or-")
+        #expect(KeyHint.of("", prefix: nil, name: "Mistral").words == "Paste the whole key")
+        #expect(KeyHint.of("sk-or-v1-0123456789", prefix: "sk-or-", name: "OpenRouter") == .looksRight)
+        #expect(
+            KeyHint.of("sk-ant-0123456789", prefix: "sk-or-", name: "OpenRouter").words
+                == "OpenRouter keys start with sk-or-")
+        #expect(KeyHint.of("0123456789abc", prefix: nil, name: "Mistral") == .looksRight)
+    }
+
+    @Test func theCoresStageWins() {
+        var f = SignInFlow(stage: .open(URL(string: "https://example.invalid")!), label: "x")
+        f.coreStage = "enter_code"
+        #expect(SignInStep.of(f, style: .deviceCode) == .enterCode)
+        f.coreStage = "finishing"
+        #expect(SignInStep.of(f, style: .paste) == .finishing)
+        f.coreStage = "something_new"
+        #expect(SignInStep.of(f, style: .deviceCode) == .openURL, "an unknown word falls back to inference")
+        f.stage = .done(account: 1)
+        #expect(SignInStep.of(f, style: .paste) == .done)
+        f.stage = .failed("no")
+        #expect(SignInStep.of(f, style: .paste) == .failed)
+    }
+
+    @Test func anOlderCoresStageIsInferred() {
+        #expect(SignInStep.of(nil, style: .paste) == .starting)
+        var f = SignInFlow(stage: .starting, label: "x")
+        #expect(SignInStep.of(f, style: .paste) == .starting)
+        f.stage = .open(URL(string: "https://example.invalid")!)
+        #expect(SignInStep.of(f, style: .paste) == .enterCode, "Claude's CLI asks for the code at once")
+        #expect(SignInStep.of(f, style: .deviceCode) == .openURL)
+        f.stage = .guided(URL(string: "https://example.invalid"))
+        f.screen = ["Open this page to sign in:", "https://example.invalid", ""]
+        #expect(SignInStep.of(f, style: .guided) == .openURL)
+        f.screen += ["Paste the authorization code here:", ""]
+        #expect(SignInStep.of(f, style: .guided) == .enterCode)
+        f.sending = true
+        #expect(SignInStep.of(f, style: .guided) == .finishing)
+        f.sending = false
+        f.stage = .working
+        #expect(SignInStep.of(f, style: .paste) == .finishing)
+        #expect(SignInStep.page(f) == nil)
+        f.stage = .guided(URL(string: "https://example.invalid/a"))
+        #expect(SignInStep.page(f)?.path == "/a")
+    }
+}

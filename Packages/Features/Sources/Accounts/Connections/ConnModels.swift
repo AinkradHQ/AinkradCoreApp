@@ -168,7 +168,12 @@ enum ConnFilter: String, CaseIterable {
 
 enum ConnLook {
     /// The services that ship a logo (an asset in `ConnLogos.xcassets`); any other kind falls back to its letter.
-    static let logos: Set<String> = ["github", "jira", "linear", "slack", "teams"]
+    static let logos: Set<String> = [
+        "github", "jira", "linear", "slack", "teams",
+        // AI providers on the Add an AI account cards (`AddCards.logo`).
+        "ai-anthropic", "ai-claude", "ai-deepseek", "ai-gemini", "ai-groq", "ai-mistral", "ai-openai", "ai-openrouter",
+        "ai-vercel", "ai-x",
+    ]
 
     /// The one letter a kind without a logo shows.
     static func letter(_ kind: String) -> String { kind.prefix(1).uppercased() }
