@@ -87,6 +87,18 @@ struct ConnAddStateTests {
         #expect(a.picked == Set(mine.map(\.id) + ["org/x"]))
     }
 
+    @Test func aWildcardCountsEveryListedRepositoryOfItsOwner() {
+        let list = ["me/a", "me/b", "me/c", "org/x", "org/y"].map { ConnPick(id: $0, name: $0) }
+        #expect(ConnAccess.reach(["me/*", "org/x", "gone/z"], in: list) == 5)
+        #expect(ConnAccess.scope(nil, only: ["me/*"], seen: 3) == "3 places")
+    }
+
+    @Test func aTypedNameIsSentAsACoreName() {
+        #expect(LiveConnectionsService.coreName("Github Token") == "github-token")
+        #expect(LiveConnectionsService.coreName(" Work (main) ") == "work-main")
+        #expect(LiveConnectionsService.coreName("2nd") == nil)
+    }
+
     @Test func stepsGoForwardAndBackAndDoneHasNoBack() {
         var a = ConnAddState(kind: "github")
         a.signedIn(connection: 1)

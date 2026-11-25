@@ -13,10 +13,20 @@ enum ConnAccess {
     }
 
     /// "3 repositories", "1 project", "All channels", "No teams". `only` nil is every one of them.
-    static func scope(_ kind: ConnKind?, only: [String]?) -> String {
+    static func scope(_ kind: ConnKind?, only: [String]?, seen: Int? = nil) -> String {
         let word = kind?.resource ?? "places"
         guard let only else { return "All \(word)" }
-        return only.isEmpty ? "No \(word)" : "\(only.count) \(noun(word, count: only.count))"
+        let n = seen ?? only.count
+        return n == 0 ? "No \(word)" : "\(n) \(noun(word, count: n))"
+    }
+
+    /// How many of `list` the saved `only` reaches, `owner/*` counting every listed repository of that owner, plus any
+    /// saved names the list doesn't show.
+    static func reach(_ only: [String], in list: [ConnPick]) -> Int {
+        let owners = Set(only.filter { $0.hasSuffix("/*") }.map { String($0.dropLast(2)) })
+        let exact = Set(only.filter { !$0.hasSuffix("/*") })
+        let hit = list.filter { exact.contains($0.id) || owners.contains(String($0.id.split(separator: "/").first ?? "")) }
+        return hit.count + exact.subtracting(hit.map(\.id)).count
     }
 
     /// "repositories" for 3, "repository" for 1.

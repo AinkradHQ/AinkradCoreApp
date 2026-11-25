@@ -41,6 +41,9 @@ enum ConnDialogs {
 struct TokenForm: View {
     let model: ConnectionsModel
     let kind: ConnKind
+    /// Set when the token is for a connection that already exists (its "Use a token" link): the token replaces its
+    /// sign-in, and its name, access and choices stay. One account stays one connection.
+    var joining: ConnItem?
     let back: () -> Void
     let close: () -> Void
     @State private var name = ""
@@ -50,9 +53,10 @@ struct TokenForm: View {
     var body: some View {
         CoreDialogPanel(kind.tokenTitle) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("Only if signing in doesn't work for you. Core keeps the token sealed and never shows it again.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                CoreTextField("Name", placeholder: "\(kind.name) (token)", text: $name, autofocus: true)
+                Text(intro).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                if joining == nil {
+                    CoreTextField("Name", placeholder: "\(kind.name) (token)", text: $name, autofocus: true)
+                }
                 ForEach(kind.tokenFields, id: \.self) { f in
                     CoreTextField(
                         f, placeholder: f == "Site" ? "yourteam.atlassian.net" : "you@company.com", text: binding(f))
@@ -65,10 +69,10 @@ struct TokenForm: View {
                 }
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
                 .background(GlassInk.well, in: coreShape(Radius.cardMac))
-                if let e = model.writeError["token"] { AccIssue(text: e) }
-                if model.gated.contains("token") { TurnOnConnections(model: model) { await connect() } }
+                if let e = model.writeError[key] { AccIssue(text: say(e)) }
+                if model.gated.contains(key) { TurnOnConnections(model: model) { await connect() } }
                 AccDialogButtons(
-                    confirm: "Connect", cancelTitle: "Back", busy: model.busy == "token",
+                    confirm: joining == nil ? "Connect" : "Use this token", cancelTitle: "Back", busy: model.busy == key,
                     enabled: !token.isEmpty && kind.tokenFields.allSatisfy { !(fields[$0] ?? "").isEmpty }, cancel: back
                 ) {
                     Task { await connect() }
@@ -77,7 +81,31 @@ struct TokenForm: View {
         }
     }
 
+    private var key: String { joining.map { "replace-\($0.id)" } ?? "token" }
+
+    private var intro: String {
+        guard joining != nil else {
+            return "Only if signing in doesn't work for you. Core keeps the token sealed and never shows it again."
+        }
+        return "The token replaces this connection's sign-in. Its name, access and \(kind.resource) stay. "
+            + "It must be for the same \(kind.name) account. Core keeps it sealed and never shows it again."
+    }
+
+    /// A Core older than one-connection-per-account refuses a token on a signed-in connection with this sentence.
+    private func say(_ e: String) -> String {
+        e.contains("sign in again instead")
+            ? "Your Core can't switch a signed-in connection to a token yet. Update the Core, then try again." : e
+    }
+
     private func connect() async {
+        if let j = joining {
+            if await model.replaceToken(j, token: token, fields: fields) {
+                await model.reload()
+                await model.loadPicks()
+                back()
+            }
+            return
+        }
         let n = name.isEmpty ? "\(kind.name) (token)" : name
         if await model.addToken(kind: kind.id, name: n, fields: fields, token: token) { close() }
     }

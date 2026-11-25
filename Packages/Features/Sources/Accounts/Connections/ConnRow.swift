@@ -58,12 +58,15 @@ struct ConnRow: View {
         HStack(spacing: Space.s4) {
             ConnLogo(kind: item.kind, size: 40, lit: item.status == .connected)
             VStack(alignment: .leading, spacing: 0) {
-                Text(kind?.name ?? item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                Text(item.identity).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                let service = kind?.name ?? item.name
+                Text(item.label.isEmpty ? service : item.label).coreFont(size: MacTextSize.body, weight: .semibold)
+                    .lineLimit(1)
+                Text(item.label.isEmpty ? item.identity : "\(service) · \(item.identity)").coreFont(size: MacTextSize.meta)
+                    .foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             column("Access", ConnAccess.lead(kind, allowed: item.allowed), width: 140)
-            column("Can see", ConnAccess.scope(kind, only: item.only), width: 132)
+            column("Can see", ConnAccess.scope(kind, only: item.only, seen: item.seen), width: 132)
             if showUsed {
                 column("Last used", item.lastUsed.map { ConnAccess.used($0) } ?? "", width: 96)
             }

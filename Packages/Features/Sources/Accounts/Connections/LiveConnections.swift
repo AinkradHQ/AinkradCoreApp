@@ -136,10 +136,19 @@ struct LiveConnectionsService: ConnectionsService {
     /// A flow as the dialog shows it.
     private func flow(_ f: Components.Schemas.ConnectionFlow) async throws -> ConnFlow { Self.flow(f) }
 
+    /// The Core takes a name as `[a-z][a-z0-9._-]{0,63}`: "Github Token" is sent as `github-token`; what was typed goes
+    /// along as the label. Nothing usable (no letter first) sends no name, and the Core picks one.
+    static func coreName(_ typed: String) -> String? {
+        let ok = Set("abcdefghijklmnopqrstuvwxyz0123456789._-")
+        let dashed = typed.lowercased().split(whereSeparator: { !ok.contains($0) }).joined(separator: "-")
+        let s = String(dashed.prefix(64))
+        return s.first.map { "a"..."z" ~= $0 } == true ? s : nil
+    }
+
     func addToken(kind: String, name: String, fields: [String: String], token: String) async throws -> ConnItem {
         try await run {
             let body = Components.Schemas.NewConnection(
-                authMethod: "token", email: fields[Self.emailField], kind: kind, name: name,
+                authMethod: "token", email: fields[Self.emailField], kind: kind, label: name, name: Self.coreName(name),
                 site: fields[Self.siteField],
                 token: token)
             return Self.item(
@@ -171,7 +180,7 @@ struct LiveConnectionsService: ConnectionsService {
 
     func rename(_ id: Int64, to name: String) async throws {
         try await run {
-            _ = try await client.updateConnection(path: .init(id: String(id)), body: .json(.init(name: name))).ok
+            _ = try await client.updateConnection(path: .init(id: String(id)), body: .json(.init(name: Self.coreName(name) ?? name))).ok
         }
     }
 
@@ -316,7 +325,7 @@ struct LiveConnectionsService: ConnectionsService {
             reason: status == .needsLook ? reason(c.stateReason, service: service) : nil, isDefault: c.isDefault,
             allowed: Set(grants == nil ? (c.myCapabilities ?? []) : (member?.capabilities ?? [])), only: chosen,
             lastUsed: nil, lastChecked: c.lastTestedAt, users: Int(c.grantCount ?? 1), signInNeeded: authLost,
-            authMethod: c.authMethod)
+            authMethod: c.authMethod, label: c.label == c.identity ? "" : c.label)
     }
 
     /// The Core's reasons are short codes; the screen says them in words.
