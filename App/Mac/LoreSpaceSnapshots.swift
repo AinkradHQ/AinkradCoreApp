@@ -22,12 +22,16 @@ enum LoreSpaceSnapshots {
             look.opacity = 0.25
             look.blur = 1
         }
-        if clear { restore = { (look.mode, look.opacity, look.blur) = kept } }
         let only = Set((env["CORE_LORE_SCENES"] ?? "").split(separator: ",").map(String.init))
         NSApp.appearance = NSAppearance(named: theme == "day" ? .aqua : .darkAqua)
         try? await Task.sleep(for: .seconds(3))
         guard let window = await SnapshotCapture.mainWindow() else { return finish("no main window") }
         let demo = app.debugLoreDemo()
+        // The person's Look and sidebars are put back when the walk ends.
+        restore = {
+            if clear { (look.mode, look.opacity, look.blur) = kept }
+            demo.restoreSidebars()
+        }
         var n = 0
         func shot(_ name: String) async {
             n += 1
@@ -88,7 +92,8 @@ enum LoreSpaceSnapshots {
         // Check 2: the link drops mid-typing, the text is kept on this Mac, then sent when the link is back.
         demo.setOffline(true)
         await type("Offline line. ", window)
-        try? await Task.sleep(for: .seconds(2))
+        // Under 3 s after the last key, so the shot also shows the header and key line stepped back while typing.
+        try? await Task.sleep(for: .seconds(1.2))
         log("DRAFT while offline: \(demo.syncWords) draft=\(demo.hasDraft)")
         await shot("kept-typing")
         demo.setOffline(false)

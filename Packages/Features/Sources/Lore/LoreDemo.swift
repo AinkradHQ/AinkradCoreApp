@@ -194,21 +194,29 @@ public final class LoreDemo {
 
     public static let scenes = [
         "today-blank", "today", "past-day", "project-note", "conflict", "kept", "not-connected", "open-sheet",
-        "backlinks", "versions", "restored",
+        "backlinks", "versions", "restored", "long-note", "new-note", "focus",
     ]
 
     private let model: LoreModel
     private let service: Service
+    /// The person's sidebars, put back when the walk ends (the walk opens both, and focus mode hides both).
+    private let sidebars: (Bool, Bool)
 
     public init(model: LoreModel) {
         self.model = model
+        sidebars = (model.showLeft, model.showRight)
         model.drafts = LoreDrafts(
             dir: FileManager.default.temporaryDirectory.appendingPathComponent("lore-demo-drafts"))
         let today = LoreModel.key(Date())
         let yesterday = LoreModel.key(Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date())
+        let earlier = LoreModel.key(Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? Date())
         service = Service([
             LoreNote(id: "ln_demotodayaaa", kind: "daily", day: today, title: "", rev: 3, text: Self.todayText),
             LoreNote(id: "ln_demopastaaaa", kind: "daily", day: yesterday, title: "", rev: 5, text: Self.pastText),
+            LoreNote(
+                id: "ln_demoearlieraa", kind: "daily", day: earlier, title: "", rev: 2,
+                text: "# Seed swap\n\nTraded beans for two kinds of kale."),
+            LoreNote(id: "ln_demolongnote", project: "7", title: "Planting plan", rev: 6, text: Self.longText),
             LoreNote(
                 id: "ln_demoprojecta", project: "7", title: "Launch checklist", rev: 2, text: Self.projectText),
             LoreNote(
@@ -229,6 +237,8 @@ public final class LoreDemo {
             try? await Task.sleep(for: .milliseconds(300))
         }
         model.show()
+        model.showLeft = true
+        model.showRight = true
         try? await Task.sleep(for: .milliseconds(400))
         switch scene {
         case "today-blank":
@@ -252,6 +262,13 @@ public final class LoreDemo {
             await model.openNote("ln_demoprojecta")
             service.seedVersions("ln_demoprojecta")
             if scene == "versions" { model.showVersions() } else { await model.restore("lv_2") }
+        case "long-note": await model.openNote("ln_demolongnote")
+        case "new-note":
+            await model.openDay(model.todayKey)
+            await model.newNote()
+        case "focus":
+            await model.openNote("ln_demolongnote")
+            model.toggleFocus()
         case "open-sheet":
             await model.openDay(model.todayKey)
             LoreOpenSheet.open(model)
@@ -269,6 +286,12 @@ public final class LoreDemo {
         c.error =
             scene == "error" ? "Unable to save: The Core did not answer. Your text is still here." : nil
         c.open()
+    }
+
+    /// Puts the person's sidebars back as they were before the walk.
+    public func restoreSidebars() {
+        model.showLeft = sidebars.0
+        model.showRight = sidebars.1
     }
 
     // MARK: checks for the walk
@@ -329,7 +352,29 @@ public final class LoreDemo {
         - [ ] Test the sign-up form on a phone
 
         Notes from the last meeting are in [[Meeting notes]].
+
+        #launch #club
         """
+
+    static let longText: String = {
+        let beds = [
+            ("Bed one: tomatoes", "Six plants along the fence, staked early. Basil between them keeps the flies off."),
+            ("Bed two: beans", "Climbing beans on the arch, sown in two rounds three weeks apart."),
+            ("Bed three: greens", "Kale, chard and a row of lettuce that gets sown again every fortnight."),
+            ("Bed four: roots", "Carrots and beetroot in the deep soil by the shed, thinned in June."),
+            ("Bed five: flowers", "Marigolds, cosmos and a patch of sunflowers for the club's open day."),
+        ]
+        var t = "# Planting plan\n\nWhat goes where this year, and when. The plot map is in [[Launch checklist]].\n"
+        for (name, line) in beds {
+            t += "\n## \(name)\n\n\(line)\n\n"
+            t += "- Sow under cover in March\n- Plant out after the last frost\n- Feed every two weeks from July\n"
+            t += "\n### Notes\n\nWater at the roots in the morning. Mulch once the soil is warm. "
+            t += "Keep a note of what did well, so next year starts from it.\n"
+        }
+        t += "\n## Timeline\n\n- [x] Order seeds\n- [x] Clear the beds\n- [ ] Build the bean arch\n"
+        t += "- [ ] Open day in August\n"
+        return t
+    }()
 }
 
 #endif

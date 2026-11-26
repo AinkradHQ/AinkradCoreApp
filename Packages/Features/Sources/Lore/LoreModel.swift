@@ -23,6 +23,12 @@ import SwiftUI
     func focus()
     /// The person is mid-composition (an input method's marked text): a fold waits.
     var composing: Bool { get }
+    /// Puts the caret after the last character.
+    func caretToEnd()
+}
+
+extension LorePageText {
+    func caretToEnd() {}
 }
 
 enum LoreLoad: Equatable {
@@ -73,6 +79,11 @@ public final class LoreModel {
     var wordCount = 0
     var hasTable = false
     var noteTags: [String] = []
+    /// The page has no text: it shows the blank prompt (`LoreBlank`).
+    var pageBlank = false
+    /// Typed in the last few seconds: the header and the key line step back (`LoreView`).
+    var typing = false
+    @ObservationIgnored var typingTask: Task<Void, Never>?
     /// The caret is inside a table (the row and column tools are live).
     var caretInTable = false
     var tablesAsText = false
@@ -331,6 +342,7 @@ public final class LoreModel {
         guard load == .ready else { return }
         schedule(debounce)
         refreshOutline(after: .milliseconds(400))
+        typed()
     }
 
     private func schedule(_ wait: Duration) {
@@ -601,6 +613,10 @@ public final class LoreModel {
     func markdown() -> String { editor.markdown() }
     func focus() { editor.focus() }
     var composing: Bool { view?.hasMarkedText() ?? false }
+    func caretToEnd() {
+        guard let tv = view else { return }
+        tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
+    }
 
     func show(_ markdown: String, fold: Bool) {
         guard fold, let tv = view else { return editor.load(markdown: markdown) }

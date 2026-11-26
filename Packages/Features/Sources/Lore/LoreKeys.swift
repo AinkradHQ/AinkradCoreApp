@@ -47,9 +47,8 @@ enum LoreKeys {
 
     /// The key line along the bottom of the space.
     static let hints: [(String, String)] = [
-        (open.label, "Open"), (find.label, "Find"), ("↑↓ ↵", "Pick"), ("esc", "Back to the note"),
-        (today.label, "Today"), ("⌘[ ⌘]", "Days"), ("⌘1 ⌘2", "Sidebars"), (outline.label, "Outline"),
-        (versions.label, "Versions"), (focus.label, "Focus"),
+        (open.label, "Open"), (find.label, "Find"), (today.label, "Today"), ("⌘[ ⌘]", "Days"),
+        (outline.label, "Outline"), (versions.label, "Versions"), (focus.label, "Focus"),
     ]
 
     /// The row after (`step` 1) or before (-1) `cursor` in `ids`; the first or last when there is no cursor yet.
