@@ -53,7 +53,8 @@ public final class DesignDemo {
         "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "needs-you",
         "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
-        "project-island", "project-island-empty", "new-advanced", "rename", "delete",
+        "project-island", "project-island-empty", "new-advanced", "rename", "delete", "directions",
+        "open-design-insert", "compose-prompt",
     ]
 
     private let model: DesignModel
@@ -248,7 +249,7 @@ public final class DesignDemo {
         case "offline": model.load = .notConnected
         case "absent": model.load = .absent
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
-        case "open-design", "open-design-menu": model.openID = "doc:\(Self.did(1))"
+        case "open-design", "open-design-menu", "open-design-insert": model.openID = "doc:\(Self.did(1))"
         case "open-system": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
         case "open-logo": model.openID = "asset:\(Self.sha("Lanterna mark"))"
@@ -258,7 +259,45 @@ public final class DesignDemo {
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
+        if scene == "open-design-insert" {
+            // Probe: the real canvas (CORE_DESIGN_SCENE) takes an insert and selects it.
+            try? await Task.sleep(for: .seconds(2))
+            if let e = model.editors[Self.did(1)] {
+                let before = e.layers.layers.count
+                let ok = e.insert(.rect)
+                let line =
+                    "PROBE attached=\(e.attached) before=\(before) insert=\(ok) after=\(e.layers.layers.count) "
+                    + "sel=\(e.selection) notice=\(e.notice ?? "-")\n"
+                FileHandle.standardError.write(Data(line.utf8))
+            } else {
+                FileHandle.standardError.write(Data("PROBE no editor\n".utf8))
+            }
+        }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
+        if scene == "compose-prompt" {
+            let c = DesignComposer(model: model, doc: Self.did(1), prompt: "A portfolio landing page")
+            model.host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
+        }
+        if scene == "directions" {
+            let c = DesignComposer(model: model, doc: Self.did(1), prompt: "A portfolio landing page")
+            c.debugShow(
+                ComposeState(
+                    id: "dc_1", phase: .done, reason: "", session: nil,
+                    directions: [
+                        .init(
+                            name: "Calm", summary: "A light, airy layout with soft cards and one blue accent.",
+                            frame: nil),
+                        .init(
+                            name: "Bold",
+                            summary:
+                                "A dark, poster-style layout with huge type and a lime accent, for a loud first impression.",
+                            frame: nil),
+                        .init(
+                            name: "Editorial", summary: "A warm, paper-like layout with a serif name and thin rules.",
+                            frame: nil),
+                    ]))
+            model.host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
+        }
         if scene == "delete" { model.askDelete(.doc(Self.docs()[0])) }
         if scene == "open-design-menu" {
             try? await Task.sleep(for: .milliseconds(300))

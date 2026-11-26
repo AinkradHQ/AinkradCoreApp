@@ -13,7 +13,7 @@ struct EditorStage: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
-            LayersIsland(editor: editor).frame(width: Space.s8 * 8)
+            LayersIsland(editor: editor).frame(width: Space.s8 * 9)
             ZStack(alignment: .bottom) {
                 canvas
                     .clipShape(coreShape(Radius.pane))

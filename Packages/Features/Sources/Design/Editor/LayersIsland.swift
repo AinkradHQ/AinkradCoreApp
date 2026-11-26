@@ -25,7 +25,7 @@ struct LayersIsland: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: Space.s1) {
-                        ForEach(rows) { LayerRowView(editor: editor, row: $0) }
+                        ForEach(rows) { LayerRowView(editor: editor, row: $0).lineLimit(1) }
                     }
                 }
                 .scrollIndicators(.automatic)

@@ -14,6 +14,9 @@ final class DesignComposer {
 
     let doc: String
     var prompt: String
+    /// One design: the Core still draws its three, and the best match is kept at once (the others are removed, Undo
+    /// brings them back). TODO(core): a `count` on `designCompose` so only one is drawn.
+    var single = false
     private(set) var phase = Phase.prompt
     private(set) var state: ComposeState?
     private(set) var busy = false
@@ -50,6 +53,7 @@ final class DesignComposer {
                     state = s
                 }
                 phase = s.phase == .done ? .directions : .failed(Self.sentence(s.reason))
+                if single, s.phase == .done, let best = s.directions.first { use(best) }
             } catch is CancellationError {
                 return
             } catch {
@@ -57,6 +61,14 @@ final class DesignComposer {
             }
         }
     }
+
+    #if DEBUG
+    /// Snapshots only: shows a finished drawing.
+    func debugShow(_ s: ComposeState) {
+        state = s
+        phase = .directions
+    }
+    #endif
 
     /// Stop watching, and stop the AI session too.
     func stop() {
@@ -88,10 +100,19 @@ final class DesignComposer {
             close()
             return
         }
-        let drop = all.filter { $0.frame != d.frame }.compactMap(\.frame)
-        if !drop.isEmpty { editor.apply(drop.map(EditOps.delete)) }
-        if let f = d.frame { editor.select(f) }
         close()
+        Task {
+            // The Core writes the frames; the canvas gets them over the sync a moment after "done". Wait for them (up to
+            // 8 s) before removing the others and showing the kept one.
+            let frames = all.compactMap(\.frame)
+            for _ in 0..<40 where !frames.allSatisfy({ editor.layers[$0] != nil }) {
+                try? await Task.sleep(for: .milliseconds(200))
+                editor.reload()
+            }
+            let drop = frames.filter { $0 != d.frame && editor.layers[$0] != nil }
+            if !drop.isEmpty { editor.apply(drop.map(EditOps.delete)) }
+            if let f = d.frame, editor.select(f, quiet: true) { editor.fitSelection() }
+        }
     }
 
     /// The picture of a direction's frame, when the canvas has it.
@@ -129,27 +150,38 @@ struct ComposerView: View {
     private var title: String {
         switch composer.phase {
         case .prompt, .failed: "Draw with AI"
-        case .drawing: "AI is drawing 3 directions"
+        case .drawing: composer.single ? "AI is drawing" : "AI is drawing 3 directions"
         case .directions: "Pick a direction"
         }
     }
 
     private var promptStep: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            Text("Describe what you want. AI draws three different ideas on this canvas to pick from.")
-                .foregroundStyle(GlassInk.secondary)
+            Text(
+                composer.single
+                    ? "Describe what you want. AI draws it on this canvas."
+                    : "Describe what you want. AI draws three different ideas on this canvas to pick from."
+            )
+            .foregroundStyle(GlassInk.secondary)
+            CoreSegmented(
+                "How many",
+                segments: [
+                    CoreSegment(false, "Three ideas", symbol: "square.grid.3x1.below.line.grid.1x2"),
+                    CoreSegment(true, "One design", symbol: "rectangle"),
+                ],
+                selection: $composer.single)
             CoreTextField(
                 "What should it show?", placeholder: "A calm welcome screen for a notes app",
                 text: $composer.prompt, autofocus: true
             ) { composer.draw() }
             HStack(spacing: Space.s2) {
-                Text("3 different ideas").foregroundStyle(GlassInk.secondary)
+                Text(composer.single ? "The best one is kept" : "3 different ideas").foregroundStyle(GlassInk.secondary)
                 Spacer(minLength: Space.s2)
                 Button("Cancel") { composer.close() }.buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
                 Button {
                     composer.draw()
                 } label: {
-                    Label("Draw 3 directions", systemImage: "sparkles")
+                    Label(composer.single ? "Draw it" : "Draw 3 directions", systemImage: "sparkles")
                 }
                 .buttonStyle(CoreButtonStyle(.prominent, busy: composer.busy)).coreShortcut(.primary)
                 .disabled(!composer.canDraw).opacity(composer.canDraw || composer.busy ? 1 : 0.45)
@@ -161,10 +193,11 @@ struct ComposerView: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             Text("“\(composer.trimmed)”").foregroundStyle(GlassInk.secondary).lineLimit(2)
             HStack(alignment: .top, spacing: Space.s3) {
-                ForEach(0..<3, id: \.self) { i in
+                ForEach(0..<(composer.single ? 1 : 3), id: \.self) { i in
                     VStack(alignment: .leading, spacing: Space.s2) {
                         coreShape(Radius.cardMac).fill(GlassInk.well).frame(height: Space.s8 * 5)
-                        Text("Direction \(["A", "B", "C"][i])").coreFont(size: MacTextSize.body, weight: .semibold)
+                        Text(composer.single ? "Your design" : "Direction \(["A", "B", "C"][i])").coreFont(
+                            size: MacTextSize.body, weight: .semibold)
                         CoreBusyBar()
                         Text("Sketching the first shapes").foregroundStyle(GlassInk.secondary)
                             .coreFont(size: MacTextSize.meta)
@@ -195,17 +228,19 @@ struct ComposerView: View {
                             if i == 0 { StateBadge("Best match", tone: .run, symbol: "star") }
                         }
                         Text(d.summary).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: Space.s2)
+                            .frame(maxHeight: .infinity, alignment: .top)
                         HStack(spacing: Space.s2) {
                             Button("Refine") { composer.refine(d) }.buttonStyle(CoreButtonStyle(.secondary))
                             Button("Use this") { composer.use(d) }
                                 .buttonStyle(CoreButtonStyle(i == 0 ? .prominent : .secondary))
                         }
                     }
-                    .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 4, alignment: .leading)
+                    .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .coreWell(radius: Radius.pane)
                 }
             }
+            // The cards as tall as the longest one, no taller: the dialog hugs them.
+            .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button {
                     composer.again()
@@ -224,12 +259,13 @@ struct ComposerView: View {
     @ViewBuilder private func thumb(_ d: ComposeState.Direction) -> some View {
         Group {
             if let sk = composer.sketch(d) {
-                FrameSketchView(sketch: sk)
+                FrameSketchView(sketch: sk).transition(.opacity)
             } else {
-                coreShape(Radius.cardMac).fill(GlassInk.well)
+                coreShape(Radius.cardMac).fill(GlassInk.well).overlay { ProgressView().controlSize(.small) }
             }
         }
-        .frame(height: Space.s8 * 5)
+        .animation(Motion.out(Motion.ui), value: composer.sketch(d) != nil)
+        .frame(height: Space.s8 * 8)
         .frame(maxWidth: .infinity)
     }
 

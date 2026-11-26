@@ -50,7 +50,11 @@ import SwiftUI
             [
                 "op": .string("add"), "id": .string(frame), "type": .string("frame"), "parent": .string(page),
                 "order": .string("a"), "name": .string(canvas.title),
-                "props": .object(["w": .number(s.w), "h": .number(s.h)]),
+                "props": .object([
+                    "w": .number(s.w), "h": .number(s.h),
+                    // A white board: without a fill the frame is invisible on the night canvas.
+                    "fill": .array([.object(["type": .string("solid"), "color": .string("#FFFFFF")])]),
+                ]),
             ],
         ]
     }
