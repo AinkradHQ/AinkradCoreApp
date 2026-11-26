@@ -169,36 +169,92 @@ enum SystemStarter {
     ]
 }
 
+/// A brand-kit colour as the Core takes it: `#rrggbb`. `#rgb` is expanded, an alpha channel dropped, anything else is out.
+enum BrandColor {
+    static func normalize(_ raw: String) -> String? {
+        var h = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        if h.hasPrefix("#") { h.removeFirst() }
+        guard h.allSatisfy(\.isHexDigit), h.unicodeScalars.allSatisfy(\.isASCII) else { return nil }
+        switch h.count {
+        case 3, 4: return "#" + h.prefix(3).map { "\($0)\($0)" }.joined()
+        case 6, 8: return "#" + h.prefix(6)
+        default: return nil
+        }
+    }
+}
+
 /// The AI run that writes a whole system (`compose` with `mode: "system"`): start, then poll until the Core is done.
+/// It can be stopped (the Core session too), and after a failed poll "Try again" asks the Core about the same run first.
 @MainActor @Observable
 final class SystemAI {
     var prompt = ""
     var kit = ""
     private(set) var busy = false
     private(set) var error: String?
+    /// What the Core says it is doing, and how far (optional fields of the state).
+    private(set) var progress: String?
+    private(set) var canRetry = false
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var last: ComposeState?
+    @ObservationIgnored private var runID = 0
 
-    func generate(model: DesignModel, doc: String, kit: BrandKit?) async {
-        guard let service = model.service, !busy else { return }
+    var promptLength: Int { prompt.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count }
+    var overLimit: Bool { promptLength > DesignComposer.promptLimit }
+
+    func start(model: DesignModel, doc: String, kit: BrandKit?, resuming: Bool = false) {
+        guard !busy, let service = model.service else { return }
         busy = true
         error = nil
-        defer { busy = false }
-        do {
-            var s = try await service.composeSystem(
-                doc: doc, prompt: prompt.trimmingCharacters(in: .whitespaces), brandName: kit?.name,
-                colors: kit?.colors ?? [])
-            let started = Date()
-            while s.phase == .drawing || s.phase == .applying {
-                guard Date().timeIntervalSince(started) < 240 else {
-                    if let id = s.session { try? await service.cancelCompose(session: id) }
-                    error = "The AI took too long. Try again."
-                    return
-                }
-                try await Task.sleep(for: .milliseconds(1200))
-                s = try await service.composeState(doc: doc, id: s.id)
+        progress = nil
+        canRetry = false
+        runID += 1
+        let run = runID
+        let text = String(prompt.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.prefix(1000))
+        let colors = Array(Set((kit?.colors ?? []).compactMap(BrandColor.normalize))).sorted()
+        let name = kit?.name
+        let resume = resuming ? last : nil
+        last = nil
+        task = Task { [weak self] in
+            do {
+                let s = try await ComposePoll.run(
+                    service: service, doc: doc, resume: resume,
+                    start: { try await service.composeSystem(doc: doc, prompt: text, brandName: name, colors: colors) },
+                    onState: { s in
+                        guard let self, self.runID == run else { return }
+                        self.last = s
+                        self.progress = Self.words(s)
+                    })
+                guard let self, self.runID == run else { return }
+                self.busy = false
+                self.last = nil
+                if s.phase != .done { self.error = s.reason.isEmpty ? "The AI could not write this system." : s.reason }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self, self.runID == run else { return }
+                self.busy = false
+                self.canRetry = !(error is ComposeTimedOut) && self.last != nil
+                self.error = error is ComposeTimedOut ? "The AI took too long. Try again." : model.words(error)
             }
-            if s.phase != .done { error = s.reason.isEmpty ? "The AI could not write this system." : s.reason }
-        } catch {
-            self.error = model.words(error)
         }
+    }
+
+    /// Stops the run and the Core's session.
+    func stop(model: DesignModel) {
+        runID += 1
+        task?.cancel()
+        if let id = last?.session, let service = model.service {
+            Task { try? await service.cancelCompose(session: id) }
+        }
+        last = nil
+        busy = false
+        progress = nil
+    }
+
+    private static func words(_ s: ComposeState) -> String? {
+        var parts: [String] = []
+        if let stage = s.stage, !stage.isEmpty { parts.append(stage) }
+        if let d = s.elementsDone, let t = s.elementsTotal, t > 0 { parts.append("\(d) of \(t)") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

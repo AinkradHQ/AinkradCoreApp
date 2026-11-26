@@ -55,6 +55,8 @@ public final class DesignModel {
     private(set) var composeSupported = false
     /// The Core can write a whole design system with AI (API 108).
     private(set) var systemAISupported = false
+    /// The Core's edit mode reads a frame itself (API 109).
+    private(set) var editSupported = false
     /// The open item's Projects menu.
     var projectsMenuOpen = false
     /// The editor chrome of each design whose canvas was built (V3-04), by doc id.
@@ -65,6 +67,8 @@ public final class DesignModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: opens the style guide's Generate popover on its replace confirmation.
+    var debugSystemAsk = false
     /// Snapshots only: the app's on-canvas probe (pointer and keys on the real canvas view), set by the app.
     @ObservationIgnored public var debugCanvasProbe: (@MainActor (@escaping @MainActor (String) -> Void) async -> Void)?
     #endif
@@ -107,6 +111,7 @@ public final class DesignModel {
         editors = [:]
         readOnly = false
         composeSupported = false
+        editSupported = false
     }
 
     public var isConnected: Bool { service != nil }
@@ -129,6 +134,7 @@ public final class DesignModel {
             if let connection {
                 composeSupported = await connection.serverSupports(minor: coreMinorV010)
                 systemAISupported = await connection.serverSupports(minor: 108)
+                editSupported = await connection.serverSupports(minor: 109)
             }
         } catch let e as DesignFailure where e.status == 404 || e.status == 501 {
             load = .absent
@@ -279,9 +285,9 @@ public final class DesignModel {
     }
 
     /// New design, quick: made at once with the defaults (named for the category being looked at) and opened.
-    func quickNew() async {
+    func quickNew(starter: Bool = true) async {
         let kind: DesignDoc.Kind = category == .systems ? .system : category == .mockups ? .mockup : .design
-        await create(kind: kind, name: Self.defaultName(kind), project: project)
+        await create(kind: kind, name: Self.defaultName(kind), project: project, starter: starter)
     }
 
     static func defaultName(_ kind: DesignDoc.Kind) -> String {
@@ -295,7 +301,9 @@ public final class DesignModel {
     /// Makes the design and opens it. Returns the Core's refusal in words (the advanced sheet shows it inline), nil on
     /// success; the quick path toasts it.
     @discardableResult
-    func create(kind: DesignDoc.Kind, name: String, project: String?, toast: Bool = true) async -> String? {
+    func create(kind: DesignDoc.Kind, name: String, project: String?, toast: Bool = true, starter: Bool = true) async
+        -> String?
+    {
         guard let service else { return "Not connected to a Core." }
         if readOnly || host.pausedReason != nil {
             let why = host.pausedReason ?? "This device can look at designs but not change them."
@@ -306,7 +314,7 @@ public final class DesignModel {
             let d = try await service.create(
                 kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project)
             docs.append(d)
-            if kind == .design { editor(for: d.id).starter = DesignOptions.starterOps(DesignOptions.canvas) }
+            if kind == .design, starter { editor(for: d.id).starter = DesignOptions.starterOps(DesignOptions.canvas) }
             host.shell.closeDialog()
             category = .all
             filter = ""
@@ -325,10 +333,14 @@ public final class DesignModel {
     /// Opens the AI panel on the open design (from the home: on a new blank design). With a frame selected it edits that
     /// frame; with `prompt` (the Ask… field) it starts at once.
     func drawWithAI(prompt: String = "") async {
-        if openID == nil { await quickNew() }
+        // From the home the new design has no starter frame of its own to keep: the AI's frame replaces it.
+        let fromHome = openID == nil
+        if fromHome { await quickNew() }
         guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else { return }
         let target = editors[d.id]?.targetFrame().map { DesignComposer.Target(id: $0.id, name: $0.title) }
         let c = DesignComposer(model: self, doc: d.id, prompt: prompt, target: target)
+        if fromHome { c.starterFrame = editors[d.id]?.starter?.last?["id"]?.string }
+        composer?.shutdown()  // one run at a time
         withAnimation(Motion.out(Motion.ui)) { composer = c }
         if !prompt.isEmpty { c.draw() }
     }
@@ -341,12 +353,17 @@ public final class DesignModel {
     // MARK: navigation
 
     func openItem(_ id: String) {
+        if let c = composer, "doc:\(c.doc)" != id {  // another design: its run ends with its panel
+            c.shutdown()
+            composer = nil
+        }
         withAnimation(Motion.out(Motion.move)) { openID = id }
     }
 
     func closeItem() {
         editors = [:]
         aboutOpen = false
+        composer?.shutdown()
         composer = nil
         presenter = nil
         withAnimation(Motion.out(Motion.move)) { openID = nil }
