@@ -233,6 +233,7 @@ public final class DesignDemo {
         }
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
+        model.presenter = nil  // scenes share one run: Present from the scene before must not stay open
         switch scene {
         case "home-hover": model.debugHover = DesignItem.doc(Self.docs()[0]).id
         case "screens": model.category = .screens
