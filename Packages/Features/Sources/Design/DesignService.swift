@@ -23,7 +23,8 @@ protocol DesignService: Sendable {
     /// Makes an empty design (`POST /docs`), related to `project` when there is one.
     func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc
     /// Starts an AI session drawing three directions on the design (E11-4, API minor 95).
-    func compose(doc: String, prompt: String) async throws -> ComposeState
+    /// `count` 1 or 3. A Core from before `count` ignores it and draws three (the composer then keeps the best).
+    func compose(doc: String, prompt: String, count: Int) async throws -> ComposeState
     /// Where that drawing is; the first read after the AI is done writes the three frames.
     func composeState(doc: String, id: String) async throws -> ComposeState
     /// Stops the AI session behind a drawing.
@@ -66,7 +67,7 @@ extension DesignService {
     func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc {
         throw DesignFailure(sentence: "This Core cannot make designs.", code: "not_found", status: 404)
     }
-    func compose(doc: String, prompt: String) async throws -> ComposeState { throw Self.noCompose }
+    func compose(doc: String, prompt: String, count: Int) async throws -> ComposeState { throw Self.noCompose }
     func composeState(doc: String, id: String) async throws -> ComposeState { throw Self.noCompose }
     func cancelCompose(session: String) async throws {}
     func rename(_ item: DesignItem, to name: String) async throws {
@@ -158,8 +159,12 @@ struct LiveDesignService: DesignService {
         return try await call("POST", "/docs", body: body, as: DocWire.self).doc
     }
 
-    func compose(doc: String, prompt: String) async throws -> ComposeState {
-        let body = try JSONEncoder().encode(["prompt": prompt])
+    func compose(doc: String, prompt: String, count: Int) async throws -> ComposeState {
+        struct Body: Encodable {
+            let prompt: String
+            let count: Int
+        }
+        let body = try JSONEncoder().encode(Body(prompt: prompt, count: count))
         return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
     }
     func composeState(doc: String, id: String) async throws -> ComposeState {

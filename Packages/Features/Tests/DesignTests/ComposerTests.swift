@@ -12,7 +12,7 @@ private final class ComposeService: DesignService, @unchecked Sendable {
     func kits() async throws -> [BrandKit] { [] }
     func data(_ sha: String) async throws -> Data { Data() }
     func link(_ item: DesignItem, project: String, _ on: Bool) async throws {}
-    func compose(doc: String, prompt: String) async throws -> ComposeState {
+    func compose(doc: String, prompt: String, count: Int) async throws -> ComposeState {
         started.append(prompt)
         return ComposeState(id: "dc_1", phase: .drawing, reason: "", session: "s_1", directions: [])
     }

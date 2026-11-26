@@ -14,8 +14,8 @@ final class DesignComposer {
 
     let doc: String
     var prompt: String
-    /// One design: the Core still draws its three, and the best match is kept at once (the others are removed, Undo
-    /// brings them back). TODO(core): a `count` on `designCompose` so only one is drawn.
+    /// One design: asks the Core for one (`count: 1`). A Core from before that draws three, and the best match is kept at
+    /// once (the others are removed; Undo brings them back).
     var single = false
     private(set) var phase = Phase.prompt
     private(set) var state: ComposeState?
@@ -42,7 +42,7 @@ final class DesignComposer {
             guard let self else { return }
             defer { busy = false }
             do {
-                var s = try await service.compose(doc: doc, prompt: text)
+                var s = try await service.compose(doc: doc, prompt: text, count: single ? 1 : 3)
                 state = s
                 phase = .drawing
                 busy = false
