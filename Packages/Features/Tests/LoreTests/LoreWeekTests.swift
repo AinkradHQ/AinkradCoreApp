@@ -1,5 +1,6 @@
+import AppKit
 import CoreKit
-import Foundation
+import LoreEditor
 import Testing
 
 @testable import Lore
@@ -37,7 +38,9 @@ import Testing
     @Test func templatesAreDistinctAndEndReadyToType() {
         let ids = LoreTemplates.all.map(\.id)
         #expect(Set(ids).count == ids.count)
-        for t in LoreTemplates.all { #expect(t.markdown.hasSuffix("- [ ] ") || t.markdown.hasSuffix("\n\n")) }
+        for t in LoreTemplates.all {
+            #expect(NSImage(systemSymbolName: t.symbol, accessibilityDescription: nil) != nil)
+        }
     }
 
     @Test func aDaysNoteIsNamedByItsDate() {

@@ -88,15 +88,27 @@ extension LoreDemo {
         if let t = LoreTemplates.all.first(where: { $0.id == id }) { model.start(t) }
     }
 
-    /// The prompt as last drawn, and the line the caret is on.
+    /// More… on the blank page.
+    public func moreTemplates() { model.moreTemplates() }
+
+    /// Keys typed into the page (and so into an open list).
+    public func typeOnPage(_ s: String) {
+        for ch in s { textView?.insertText(String(ch), replacementRange: textView?.selectedRange() ?? NSRange()) }
+    }
+
+    /// The prompt as last drawn, the caret's block and the line above it.
     public var pageState: String {
         guard let tv = textView, let e = model.editor else { return "no page" }
         let ns = tv.string as NSString
-        let loc = tv.selectedRange().location
-        let line = ns.paragraphRange(for: NSRange(location: min(loc, ns.length), length: 0))
-        let last = NSMaxRange(line) >= ns.length
+        let loc = min(tv.selectedRange().location, ns.length)
+        let line = ns.paragraphRange(for: NSRange(location: loc, length: 0))
+        let above =
+            line.location > 0
+            ? ns.substring(with: ns.paragraphRange(for: NSRange(location: line.location - 1, length: 0)))
+                .trimmingCharacters(in: .newlines) : ""
         let block = tv.typingAttributes[NSAttributedString.Key("loreBlock")] as? String ?? "?"
-        return "prompt=\(e.placeholderShown ? "DRAWN" : "hidden") caretBlock=\(block) lastLine=\(last)"
+        let here = ns.substring(with: line).trimmingCharacters(in: .newlines)
+        return "prompt=\(e.placeholderShown ? "DRAWN" : "hidden") caret=\(block) '\(here)' under '\(above)'"
     }
 
     public func sides(_ left: Bool, _ right: Bool) {

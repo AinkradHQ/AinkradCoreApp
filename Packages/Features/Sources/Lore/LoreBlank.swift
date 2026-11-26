@@ -1,38 +1,24 @@
-// LoreBlank — what an empty page shows: a light "Start writing…" where the text will go and three quick starts. It
-// lies over the first line of the text column; typing hides it at once.
+// LoreBlank — what an empty page shows: a light "Start writing…" where the text will go, three quick starts and
+// More… for the rest. Typing hides it at once.
 import CoreUI
 import LoreEditor
 import SwiftUI
 
-struct LoreTemplate: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let symbol: String
-    let markdown: String
-}
-
-enum LoreTemplates {
-    static let all = [
-        LoreTemplate(
-            id: "journal", title: "Journal", symbol: "sun.max",
-            markdown: "## How I feel\n\n\n\n## What happened\n\n\n\n## Tomorrow\n\n- [ ] "),
-        LoreTemplate(
-            id: "meeting", title: "Meeting", symbol: "person.2",
-            markdown: "# Meeting\n\nWith: \n\n## Notes\n\n- \n\n## Actions\n\n- [ ] "),
-        LoreTemplate(id: "checklist", title: "Checklist", symbol: "checklist", markdown: "# Checklist\n\n- [ ] "),
-    ]
-}
-
 extension LoreModel {
-    /// Fills the blank page with a template and leaves the cursor at its end, ready to type.
+    /// Fills the blank page with a template (`LoreTemplates`): a line to write under each empty section, the caret at
+    /// the first place to write. The editor's change saves it.
     func start(_ t: LoreTemplate) {
         guard load == .ready, pageBlank else { return }
+        pageBlank = false
+        if let editor { return editor.insertTemplate(t) }
         page.show(t.markdown, fold: false)
         page.caretToEnd()
         page.focus()
-        pageBlank = false
         changed()
     }
+
+    /// More…: every template in a list at the caret (↑ ↓, Return, typing filters, Esc).
+    func moreTemplates() { editor?.openTemplates() }
 }
 
 /// The quick starts under the first line of the empty page. "Start writing…" itself is drawn by the editor where the
@@ -66,8 +52,8 @@ struct LoreBlankPrompt: View {
         .accessibilityIdentifier("lore-blank")
     }
 
-    private var buttons: some View {
-        ForEach(LoreTemplates.all) { t in
+    @ViewBuilder private var buttons: some View {
+        ForEach(LoreTemplates.quick) { t in
             Button {
                 model.start(t)
             } label: {
@@ -77,5 +63,10 @@ struct LoreBlankPrompt: View {
             .fixedSize()
             .help("Start this note from the \(t.title.lowercased()) template")
         }
+        Button("More…") { model.moreTemplates() }
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            .fixedSize()
+            .help("Every template: daily plan, weekly review, project brief, bug report and more")
+            .accessibilityIdentifier("lore-templates-more")
     }
 }

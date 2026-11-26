@@ -7,7 +7,7 @@ import SwiftUI
 
 /// One thing the menu can add or turn a paragraph into.
 public enum LoreInsertItem: String, CaseIterable, Identifiable, Sendable {
-    case text, h1, h2, h3, quote, bullet, numbered, checklist, table, code, divider, image, noteLink, date
+    case text, h1, h2, h3, quote, bullet, numbered, checklist, table, code, divider, image, noteLink, date, template
 
     public var id: String { rawValue }
 
@@ -27,6 +27,7 @@ public enum LoreInsertItem: String, CaseIterable, Identifiable, Sendable {
         case .image: "Image"
         case .noteLink: "Link to note"
         case .date: "Date and time"
+        case .template: "Template"
         }
     }
 
@@ -46,6 +47,7 @@ public enum LoreInsertItem: String, CaseIterable, Identifiable, Sendable {
         case .image: "photo"
         case .noteLink: "link"
         case .date: "calendar"
+        case .template: "doc.on.doc"
         }
     }
 
@@ -66,6 +68,7 @@ public enum LoreInsertItem: String, CaseIterable, Identifiable, Sendable {
         case .image: "Web address"
         case .noteLink: "[["
         case .date: "Now"
+        case .template: "Journal, Meeting…"
         }
     }
 
@@ -86,6 +89,7 @@ public enum LoreInsertItem: String, CaseIterable, Identifiable, Sendable {
         case .image: ["picture", "photo"]
         case .noteLink: ["wiki", "note", "page"]
         case .date: ["time", "today", "stamp"]
+        case .template: ["templates", "start"]
         }
     }
 
@@ -138,8 +142,52 @@ public enum LoreInsertItem: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// A row of the menu: something to add, or a template (the `/` menu's Template, and the blank page's More…).
+enum LoreMenuEntry: Hashable, Identifiable {
+    case item(LoreInsertItem)
+    case template(LoreTemplate)
+
+    var id: String {
+        switch self {
+        case .item(let i): i.rawValue
+        case .template(let t): "template." + t.id
+        }
+    }
+    var title: String {
+        switch self {
+        case .item(let i): i.title
+        case .template(let t): t.title
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .item(let i): i.symbol
+        case .template(let t): t.symbol
+        }
+    }
+    var hint: String {
+        switch self {
+        case .item(let i): i.hint
+        case .template: "Template"
+        }
+    }
+    var heading: String? {
+        guard case .item(let i) = self, [.h1, .h2, .h3].contains(i) else { return nil }
+        return i.rawValue.uppercased()
+    }
+
+    /// The `/` menu: matching items, then matching templates (most rows the panel holds).
+    static func filter(_ query: String, templatesOnly: Bool) -> [LoreMenuEntry] {
+        let templates = LoreTemplates.filter(query).map(LoreMenuEntry.template)
+        if templatesOnly { return templates }
+        let items = LoreInsertItem.filter(query).map(LoreMenuEntry.item)
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return Array((items + (q.isEmpty ? [] : templates)).prefix(LoreInsertItem.inserts.count))
+    }
+}
+
 struct LoreInsertMenuView: View {
-    var items: [LoreInsertItem] = []
+    var items: [LoreMenuEntry] = []
     var selected = 0
     /// The paragraph's block, checked (block menu only).
     var current: LoreInsertItem?
@@ -147,15 +195,17 @@ struct LoreInsertMenuView: View {
     var fromTop = true
     /// Opened by the mouse (the + or the bar's button) rises in; opened by `/` it is just there (typed many times a day).
     var animated = false
-    var onChoose: (LoreInsertItem) -> Void = { _ in }
+    var templatesOnly = false
+    var onChoose: (LoreMenuEntry) -> Void = { _ in }
     @State private var shown = false
-    @State private var hovered: LoreInsertItem?
+    @State private var hovered: LoreMenuEntry?
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             if items.isEmpty {
-                Text("No matching block").coreFont(size: MacTextSize.body).foregroundStyle(GlassInk.secondary)
+                Text(templatesOnly ? "No matching template" : "No matching block").coreFont(size: MacTextSize.body)
+                    .foregroundStyle(GlassInk.secondary)
                     .padding(.horizontal, Space.s3)
                     .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + Space.s1, alignment: .leading)
             }
@@ -179,14 +229,15 @@ struct LoreInsertMenuView: View {
     }
 
     /// Headings show H1, H2, H3 (no symbol says it as plainly); the rest their symbol.
-    @ViewBuilder private func glyph(_ item: LoreInsertItem) -> some View {
-        switch item {
-        case .h1, .h2, .h3: Text(item.rawValue.uppercased()).coreFont(size: MacTextSize.meta, weight: .bold)
-        default: Image(systemName: item.symbol).coreFont(size: MacTextSize.body, weight: .medium)
+    @ViewBuilder private func glyph(_ item: LoreMenuEntry) -> some View {
+        if let h = item.heading {
+            Text(h).coreFont(size: MacTextSize.meta, weight: .bold)
+        } else {
+            Image(systemName: item.symbol).coreFont(size: MacTextSize.body, weight: .medium)
         }
     }
 
-    private func row(_ item: LoreInsertItem, on: Bool) -> some View {
+    private func row(_ item: LoreMenuEntry, on: Bool) -> some View {
         Button {
             onChoose(item)
         } label: {
@@ -194,7 +245,7 @@ struct LoreInsertMenuView: View {
                 glyph(item).foregroundStyle(GlassInk.secondary).frame(width: Space.s5).accessibilityHidden(true)
                 Text(item.title).coreFont(size: MacTextSize.body).lineLimit(1)
                 Spacer(minLength: Space.s3)
-                if current == item {
+                if current.map(LoreMenuEntry.item) == item {
                     Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold)
                         .accessibilityHidden(true)
                 } else if !item.hint.isEmpty {
@@ -210,14 +261,14 @@ struct LoreInsertMenuView: View {
         .buttonStyle(.plain)
         .onHover { inside in hovered = inside ? item : (hovered == item ? nil : hovered) }
         .help(item.hint.isEmpty ? item.title : "\(item.title)  \(item.hint)")
-        .accessibilityAddTraits(on || current == item ? .isSelected : [])
+        .accessibilityAddTraits(on || current.map(LoreMenuEntry.item) == item ? .isSelected : [])
     }
 }
 
 /// The menu's panel: a non-activating child panel under (or over) its anchor. One fixed size, the list hugging the
 /// anchor's side, so it never resizes while the filter changes.
 @MainActor final class LoreInsertMenu {
-    enum Mode { case insert, blocks }
+    enum Mode { case insert, blocks, templates }
     nonisolated static let width = Space.s8 * 8
     nonisolated static let shadowRoom = Space.s6
     /// Room for every insert item.
@@ -230,7 +281,6 @@ struct LoreInsertMenuView: View {
     let anchor: Int
     /// The `/` was typed by the person: Esc leaves it. Opened by a key or the +, Esc takes it away again.
     let typed: Bool
-    private let all: [LoreInsertItem]
     private(set) var query = ""
     private var model: LoreInsertMenuView {
         didSet { float.root = model }
@@ -240,17 +290,21 @@ struct LoreInsertMenuView: View {
     /// `hang` is the screen rect to open against: under it when there is room, else over it.
     init(
         mode: Mode, anchor: Int, typed: Bool, hang: NSRect, window: NSWindow?, current: Block? = nil, animated: Bool,
-        onChoose: @escaping (LoreInsertItem) -> Void
+        onChoose: @escaping (LoreMenuEntry) -> Void
     ) {
         self.mode = mode
         self.anchor = anchor
         self.typed = typed
-        all = mode == .insert ? LoreInsertItem.inserts : LoreInsertItem.blocks
+        let all: [LoreMenuEntry] =
+            mode == .blocks
+            ? LoreInsertItem.blocks.map(LoreMenuEntry.item)
+            : LoreMenuEntry.filter("", templatesOnly: mode == .templates)
         let room = hang.minY - (window?.screen?.visibleFrame.minY ?? 0)
         let below = room > Self.height - Self.shadowRoom
         var m = LoreInsertMenuView(
-            items: all, current: current.map(LoreInsertItem.of), fromTop: below, animated: animated, onChoose: onChoose)
-        if let current, mode == .blocks { m.selected = all.firstIndex(of: LoreInsertItem.of(current)) ?? 0 }
+            items: all, current: current.map(LoreInsertItem.of), fromTop: below, animated: animated,
+            templatesOnly: mode == .templates, onChoose: onChoose)
+        if let current, mode == .blocks { m.selected = all.firstIndex(of: .item(LoreInsertItem.of(current))) ?? 0 }
         model = m
         float = LoreFloat(m, parent: window)
         let size = CGSize(width: Self.width + Self.shadowRoom * 2, height: Self.height)
@@ -259,13 +313,16 @@ struct LoreInsertMenuView: View {
         float.place(NSRect(origin: CGPoint(x: x, y: y), size: size))
     }
 
-    var current: LoreInsertItem? { model.items.indices.contains(model.selected) ? model.items[model.selected] : nil }
+    var current: LoreMenuEntry? { model.items.indices.contains(model.selected) ? model.items[model.selected] : nil }
     var isEmpty: Bool { model.items.isEmpty }
 
     func update(query q: String) {
         query = q
         var m = model
-        m.items = LoreInsertItem.filter(q, in: all)
+        m.items =
+            mode == .blocks
+            ? LoreInsertItem.filter(q, in: LoreInsertItem.blocks).map(LoreMenuEntry.item)
+            : LoreMenuEntry.filter(q, templatesOnly: mode == .templates)
         m.selected = 0
         model = m
     }

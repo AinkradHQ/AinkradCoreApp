@@ -178,4 +178,13 @@ import Testing
         #expect(c.markdown().contains("the quick brown fox"))
         #expect(p95 < 16)
     }
+
+    @Test func theSlashMenuListsTemplatesAndTemplateOpensThem() {
+        #expect(LoreMenuEntry.filter("jour", templatesOnly: false).contains(.template(LoreTemplates.all[0])))
+        #expect(LoreMenuEntry.filter("", templatesOnly: false).contains(.item(.template)))
+        #expect(LoreMenuEntry.filter("", templatesOnly: true).count == LoreTemplates.all.count)
+        #expect(
+            LoreMenuEntry.filter("re", templatesOnly: true).map(\.title)
+                == ["Weekly review", "Bug report", "Reading notes"])
+    }
 }

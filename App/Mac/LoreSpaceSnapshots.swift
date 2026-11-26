@@ -74,8 +74,17 @@ enum LoreSpaceSnapshots {
                 demo.startTemplate(id)
                 try? await Task.sleep(for: .seconds(0.8))
                 log("CHECK template \(id): \(demo.pageState)")
-                await shot("template-\(id)")
+                if ["journal", "daily", "bug"].contains(id) { await shot("template-\(id)") }
             }
+            // More… on the blank page: every template in a list at the caret; typing filters it, Esc closes it.
+            await demo.show("today-blank")
+            try? await Task.sleep(for: .seconds(0.5))
+            demo.moreTemplates()
+            await shot("templates-more")
+            demo.typeOnPage("re")
+            await shot("templates-more-filtered")
+            await key("\u{1B}", [], window, code: 53)
+            log("CHECK more closed by Esc: \(demo.pageState)")
         }
         if only.contains("latency") || only.isEmpty { await latency(demo, window) }
         if only.contains("sizes") { await sizes(demo, only.contains("sizes-type")) }

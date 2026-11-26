@@ -43,7 +43,7 @@ import SwiftUI
         guard !stillSelecting else { return hideBar() }
         if menu?.mode == .blocks, tv.selectedRange().location != menu?.anchor { closeMenu(cancel: true) }
         let sel = tv.selectedRange()
-        let calm = sel.length > 0 && tv.picker == nil && menu?.mode != .insert && !prompting
+        let calm = sel.length > 0 && tv.picker == nil && (menu == nil || menu?.mode == .blocks) && !prompting
         if calm, tv.window?.firstResponder === tv { showBar() } else { hideBar() }
     }
 
@@ -105,28 +105,29 @@ import SwiftUI
         open(anchor: c.location, typed: true, animated: false)
     }
 
-    /// ⌥⌘/ or the +: puts the `/` in itself, so Esc takes it away again.
-    func openInsert(typed: Bool, animated: Bool) {
+    /// ⌥⌘/ or the + (or More… for `templates`): puts the `/` in itself, so Esc takes it away again.
+    func openInsert(typed: Bool, animated: Bool, templates: Bool = false) {
         tv.closePicker()
         let sel = tv.selectedRange()
         tv.setSelectedRange(NSRange(location: NSMaxRange(sel), length: 0))
         tv.insertPlain("/")
-        open(anchor: tv.cursor - 1, typed: typed, animated: animated)
+        open(anchor: tv.cursor - 1, typed: typed, animated: animated, templates: templates)
     }
 
-    private func open(anchor: Int, typed: Bool, animated: Bool) {
+    private func open(anchor: Int, typed: Bool, animated: Bool, templates: Bool = false) {
         closeMenu(cancel: true)
         hideBar()
         let caret = tv.firstRect(forCharacterRange: NSRange(location: anchor, length: 0), actualRange: nil)
         menu = LoreInsertMenu(
-            mode: .insert, anchor: anchor, typed: typed, hang: caret, window: tv.window, animated: animated
+            mode: templates ? .templates : .insert, anchor: anchor, typed: typed, hang: caret, window: tv.window,
+            animated: animated
         ) { [weak self] in self?.choose($0) }
         updateGutter()
     }
 
     /// After a key in insert mode: the text after the `/` filters; leaving it closes the menu (the text stays).
     func updateMenu() {
-        guard let m = menu, m.mode == .insert else { return closeMenu(cancel: true) }
+        guard let m = menu, m.mode != .blocks else { return closeMenu(cancel: true) }
         let start = m.anchor + 1
         guard tv.cursor >= start, m.anchor < tv.ns.length, tv.ns.character(at: m.anchor) == 47 else {
             return closeMenu(cancel: false)
@@ -150,7 +151,7 @@ import SwiftUI
         guard let m = menu else { return }
         menu = nil
         m.close()
-        if cancel, m.mode == .insert, !m.typed, m.anchor < tv.ns.length, tv.ns.character(at: m.anchor) == 47 {
+        if cancel, m.mode != .blocks, !m.typed, m.anchor < tv.ns.length, tv.ns.character(at: m.anchor) == 47 {
             let end = min(max(tv.cursor, m.anchor + 1), tv.ns.length)
             tv.edit { tv.replace(NSRange(location: m.anchor, length: end - m.anchor), with: "") }
             tv.setSelectedRange(NSRange(location: m.anchor, length: 0))
@@ -171,15 +172,25 @@ import SwiftUI
         hideBar()
     }
 
-    private func choose(_ item: LoreInsertItem) {
+    private func choose(_ entry: LoreMenuEntry) {
         guard let m = menu else { return }
         closeMenu(cancel: false)
-        if m.mode == .insert {
+        if m.mode != .blocks {
+            // Template: the same `/` now lists the templates (what was typed after it goes; it filters them anew).
+            if entry == .item(.template) {
+                let q = NSRange(location: m.anchor + 1, length: max(0, min(tv.cursor, tv.ns.length) - m.anchor - 1))
+                if q.length > 0 { tv.edit { tv.replace(q, with: "") } }
+                tv.setSelectedRange(NSRange(location: m.anchor + 1, length: 0))
+                return open(anchor: m.anchor, typed: m.typed, animated: false, templates: true)
+            }
             let r = NSRange(location: m.anchor, length: max(0, min(tv.cursor, tv.ns.length) - m.anchor))
             tv.edit { tv.replace(r, with: "") }
             tv.setSelectedRange(NSRange(location: m.anchor, length: 0))
         }
-        apply(item)
+        switch entry {
+        case .item(let item): apply(item)
+        case .template(let t): tv.insertTemplate(t)
+        }
     }
 
     func apply(_ item: LoreInsertItem) {
@@ -192,6 +203,7 @@ import SwiftUI
             tv.insertPlain("[[")
             tv.linkTrigger()
         case .image: imagePrompt()
+        case .template: openInsert(typed: false, animated: false, templates: true)
         default: break
         }
     }

@@ -127,7 +127,7 @@ import Testing
         tv.insertText("/", replacementRange: tv.selectedRange())
         #expect(tv.tools.menu != nil)
         tv.insertText("ta", replacementRange: tv.selectedRange())
-        #expect(tv.tools.menu?.current == .table)
+        #expect(tv.tools.menu?.current == .item(.table))
         tv.insertNewline(nil)
         #expect(tv.tools.menu == nil)
         #expect(c.markdown() == "Intro\n\n" + LoreFormat.table)
