@@ -115,6 +115,8 @@ public final class DesignModel {
             assets = try await a
             kits = try await k
             load = .ready
+            // The handshake that proves the Core's minors happens on the first request, so ask after a load.
+            if let connection { composeSupported = await connection.serverSupports(minor: coreMinorV010) }
         } catch let e as DesignFailure where e.status == 404 || e.status == 501 {
             load = .absent
         } catch {
@@ -312,6 +314,8 @@ public final class DesignModel {
         guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else { return }
         let c = DesignComposer(model: self, doc: d.id, prompt: prompt)
         host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
+        // From the Ask… field the words are already there: start drawing at once.
+        if !prompt.isEmpty { c.draw() }
     }
 
     /// New design (advanced): the sheet with name, kind and project.

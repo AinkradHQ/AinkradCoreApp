@@ -53,7 +53,7 @@ public final class DesignDemo {
         "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "needs-you",
         "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
-        "project-island", "project-island-empty",
+        "project-island", "project-island-empty", "new-advanced", "rename", "delete",
     ]
 
     private let model: DesignModel
@@ -257,6 +257,9 @@ public final class DesignDemo {
         case "open-font": model.openID = "asset:\(Self.sha("Lanterna Serif Bold"))"
         default: break
         }
+        if scene == "new-advanced" { model.openNew() }
+        if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
+        if scene == "delete" { model.askDelete(.doc(Self.docs()[0])) }
         if scene == "open-design-menu" {
             try? await Task.sleep(for: .milliseconds(300))
             model.projectsMenuOpen = true

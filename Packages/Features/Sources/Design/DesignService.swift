@@ -28,6 +28,10 @@ protocol DesignService: Sendable {
     func composeState(doc: String, id: String) async throws -> ComposeState
     /// Stops the AI session behind a drawing.
     func cancelCompose(session: String) async throws
+    /// A new name for a design, a library file or a brand kit (`PATCH`).
+    func rename(_ item: DesignItem, to name: String) async throws
+    /// Takes it out of the library: a design is archived (every row kept), a file or a kit deleted. A step-up route.
+    func remove(_ item: DesignItem) async throws
 }
 
 /// One "draw 3 directions" run, as the Core reports it.
@@ -65,6 +69,12 @@ extension DesignService {
     func compose(doc: String, prompt: String) async throws -> ComposeState { throw Self.noCompose }
     func composeState(doc: String, id: String) async throws -> ComposeState { throw Self.noCompose }
     func cancelCompose(session: String) async throws {}
+    func rename(_ item: DesignItem, to name: String) async throws {
+        throw DesignFailure(sentence: "This Core cannot rename designs.", code: "not_found", status: 404)
+    }
+    func remove(_ item: DesignItem) async throws {
+        throw DesignFailure(sentence: "This Core cannot delete designs.", code: "not_found", status: 404)
+    }
     static var noCompose: DesignFailure {
         DesignFailure(sentence: "This Core cannot draw with AI yet.", code: "not_found", status: 404)
     }
@@ -96,6 +106,23 @@ struct LiveDesignService: DesignService {
     }
     func data(_ sha: String) async throws -> Data {
         try await raw("GET", "/assets/\(Self.seg(sha))/data")
+    }
+    static func path(_ item: DesignItem) -> String {
+        switch item {
+        case .doc(let d): "/docs/\(seg(d.id))"
+        case .asset(let a): "/assets/\(seg(a.sha))"
+        case .kit(let k): "/collections/\(seg(k.id))"
+        }
+    }
+    func rename(_ item: DesignItem, to name: String) async throws {
+        _ = try await raw("PATCH", Self.path(item), body: try JSONEncoder().encode(["name": name]))
+    }
+    func remove(_ item: DesignItem) async throws {
+        if case .doc = item {
+            _ = try await raw("POST", Self.path(item) + "/archive")
+        } else {
+            _ = try await raw("DELETE", Self.path(item))
+        }
     }
     func link(_ item: DesignItem, project: String, _ on: Bool) async throws {
         let path: String =

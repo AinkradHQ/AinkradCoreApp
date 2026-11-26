@@ -36,7 +36,9 @@ final class DesignEditor {
     /// Answers the Ask… field (V7-02). Nil: no AI is wired yet, and the field says so.
     @ObservationIgnored var ask: (@MainActor (AskRequest) async -> Bool)?
     @ObservationIgnored private let service: (any DesignService)?
-    @ObservationIgnored private weak var backend: (any DesignEditBackend)?
+    /// Held strongly: the canvas hands over a fresh object and keeps none, so a weak hold dropped it at once and the
+    /// chrome never saw the canvas (no layers, no selection). The object holds the canvas view weakly, so no cycle.
+    private var backend: (any DesignEditBackend)?
     @ObservationIgnored private var pending = false
     /// What a brand-new design starts with (its page and a frame of the default canvas); written once, when the canvas is up
     /// and the design is still empty.

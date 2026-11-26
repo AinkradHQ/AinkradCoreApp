@@ -429,3 +429,36 @@ final class FakeBackend: DesignEditBackend {
         #expect(VersionWire(id: "v1", kind: "weird", name: "", createdBy: "", createdAt: "").version.kind == .auto)
     }
 }
+
+@MainActor
+@Suite struct EditorAttachAndInsertTests {
+    @Test func theEditorKeepsTheCanvasItIsHanded() {
+        // The app hands over a fresh backend and keeps no other reference (CanvasEditing.connect).
+        let e = DesignEditor(doc: "dd_1")
+        e.attach(FakeBackend())
+        #expect(e.attached)
+    }
+
+    @Test func insertAddsIntoTheSelectedFrameAndSelectsIt() throws {
+        let b = FakeBackend()
+        b.treeJSON = """
+            [{"id":"p","type":"page","parent":null,"order":"i","name":"Page"},
+             {"id":"f","type":"frame","parent":"p","order":"i","name":"Card"}]
+            """
+        let e = DesignEditor(doc: "dd_1")
+        e.attach(b)
+        e.select("f")
+        #expect(e.insert(.rect))
+        let op = try #require(b.edits.last)
+        #expect(op.contains(#""op":"add""#) && op.contains(#""parent":"f""#) && op.contains(#""type":"rect""#))
+        #expect(b.sel.count == 1 && b.sel != ["f"])
+    }
+
+    @Test func insertOnAnEmptyDesignWritesThePageFirst() {
+        let b = FakeBackend()
+        let e = DesignEditor(doc: "dd_1")
+        e.attach(b)
+        e.insert(.text)
+        #expect(b.edits.first?.contains(#""type":"page""#) == true)
+    }
+}

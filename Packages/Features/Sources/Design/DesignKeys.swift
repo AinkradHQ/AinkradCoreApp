@@ -51,7 +51,7 @@ extension DesignModel {
             return .handled
         }
         guard load == .ready else { return .ignored }
-        if cmd {
+        if cmd, press.key != .delete {
             if c == "f" {
                 find.wrappedValue = true
                 return .handled
@@ -63,6 +63,12 @@ extension DesignModel {
             return .ignored
         }
         if find.wrappedValue { return press.key == .return ? openSelectedOrFirst() : .ignored }
+        if press.key == .delete, press.modifiers.contains(.command) || press.modifiers.isEmpty,
+            let item = item(selected)
+        {
+            askDelete(item)
+            return .handled
+        }
         switch press.key {
         case .return: return openSelectedOrFirst()
         case .leftArrow: return move(-1) ? .handled : .ignored

@@ -22,6 +22,7 @@ struct EditorStage: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("design-canvas")
                 VStack(spacing: Space.s2) {
+                    InsertBar(editor: editor)
                     if editor.syncStuck {
                         CoreNotice(symbol: "exclamationmark.triangle", title: DesignEditor.stuckSentence, tone: .warn)
                             .frame(maxWidth: Space.s8 * 14)

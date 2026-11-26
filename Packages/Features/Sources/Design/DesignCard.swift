@@ -150,6 +150,9 @@ struct DesignMenu: View {
             }
         }
         .disabled(model.allProjects.isEmpty || model.readOnly)
+        Divider()
+        Button("Rename…") { model.askRename(item) }.disabled(model.readOnly)
+        Button("Delete…", role: .destructive) { model.askDelete(item) }.disabled(model.readOnly)
     }
 }
 
