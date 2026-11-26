@@ -28,6 +28,11 @@ public final class DesignCanvasNSView: NSView {
     /// Presenting (a mockup or a prototype): clicks report the node under them instead of editing, scroll and pinch are
     /// off. Nil while editing.
     public var presentTap: ((String?) -> Void)?
+    /// The editor chrome's first look at a key (editor commands: copy, group, zoom…). True: it took the key. Never asked
+    /// while a text is being edited.
+    public var keyHandler: (@MainActor (NSEvent) -> Bool)?
+    /// The tool to give back when Space is let go (Space held = the hand, whatever the tool).
+    var spaceRestore: Int32?
     private var fitted = false
     var lastEditTooLarge = false
     var reduceMotion = false {
@@ -275,6 +280,15 @@ public final class DesignCanvasNSView: NSView {
             return
         }
         let f = e.modifierFlags.intersection([.command, .control, .option])
+        if e.keyCode == 49, f.isEmpty {
+            // Space held: the hand tool until it is let go, with any tool (a repeat changes nothing).
+            if !e.isARepeat, spaceRestore == nil, presentTap == nil {
+                spaceRestore = engine.tool
+                editorSetTool(Int(DE_TOOL_HAND))
+            }
+            return
+        }
+        if keyHandler?(e) == true { return }
         if f.isEmpty, let c = e.charactersIgnoringModifiers?.lowercased(), let t = Self.toolKey(c) {
             editorSetTool(Int(t))
             return
@@ -294,7 +308,24 @@ public final class DesignCanvasNSView: NSView {
         send(key: key, mods: Self.mods(e.modifierFlags))
     }
 
-    /// ⌘D duplicate, ⌘Z / ⇧⌘Z undo and redo, ⌘0 fit the page, ⌘1 fit the selection: only while the canvas has focus.
+    public override func keyUp(with e: NSEvent) {
+        if e.keyCode == 49 { endSpacePan() } else { super.keyUp(with: e) }
+    }
+
+    public override func resignFirstResponder() -> Bool {
+        endSpacePan()
+        return super.resignFirstResponder()
+    }
+
+    func endSpacePan() {
+        guard let t = spaceRestore else { return }
+        spaceRestore = nil
+        editorSetTool(Int(t))
+        onChange?()
+    }
+
+    /// ⌘D duplicate, ⌘Z / ⇧⌘Z undo and redo, ⌘0 fit the page, ⌘1 fit the selection: only while the canvas has focus. The
+    /// editor chrome's `keyHandler` sees the key first (copy, paste, group, zoom, arrange…).
     public override func performKeyEquivalent(with e: NSEvent) -> Bool {
         guard window?.firstResponder === self else { return super.performKeyEquivalent(with: e) }
         let f = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -303,6 +334,7 @@ public final class DesignCanvasNSView: NSView {
             textChanged()
             return true
         }
+        if !engine.textActive, keyHandler?(e) == true { return true }
         switch (e.charactersIgnoringModifiers?.lowercased(), f) {
         case ("d", .command): send(key: DE_KEY_DUPLICATE, mods: 0)
         case ("z", .command): undo(redo: false)
