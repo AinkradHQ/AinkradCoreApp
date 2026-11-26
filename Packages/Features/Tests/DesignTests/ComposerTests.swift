@@ -6,7 +6,10 @@ import Testing
 
 private final class ComposeService: DesignService, @unchecked Sendable {
     var reads = 0
+    var stuck = false
+    var cancelled: [String] = []
     var started: [String] = []
+    func cancelCompose(session: String) async throws { cancelled.append(session) }
     func docs() async throws -> [DesignDoc] { [] }
     func assets() async throws -> [DesignAsset] { [] }
     func kits() async throws -> [BrandKit] { [] }
@@ -18,6 +21,7 @@ private final class ComposeService: DesignService, @unchecked Sendable {
     }
     func composeState(doc: String, id: String) async throws -> ComposeState {
         reads += 1
+        if stuck { return ComposeState(id: id, phase: .drawing, reason: "", session: "s_1", directions: []) }
         let done = reads >= 2
         return ComposeState(
             id: id, phase: done ? .done : .drawing, reason: "", session: "s_1",
@@ -26,7 +30,7 @@ private final class ComposeService: DesignService, @unchecked Sendable {
     }
 }
 
-@Suite("Design composer") @MainActor
+@Suite("Design composer", .serialized) @MainActor
 struct ComposerTests {
     @Test func drawsThenShowsThreeDirections() async {
         let model = DesignModel(host: FakeHost(), projects: ProjectsModel(host: FakeHost()))
@@ -39,6 +43,21 @@ struct ComposerTests {
         #expect(await until { c.phase == .directions })
         #expect(service.started == ["a welcome screen"])
         #expect(c.state?.directions.map(\.name) == ["Calm", "Bold", "Playful"])
+    }
+
+    @Test func aDrawingThatNeverFinishesFailsAndStopsTheSession() async {
+        let (poll, limit) = (DesignComposer.pollInterval, DesignComposer.drawLimit)
+        defer { (DesignComposer.pollInterval, DesignComposer.drawLimit) = (poll, limit) }
+        DesignComposer.pollInterval = .milliseconds(10)
+        DesignComposer.drawLimit = .milliseconds(100)
+        let model = DesignModel(host: FakeHost(), projects: ProjectsModel(host: FakeHost()))
+        let service = ComposeService()
+        service.stuck = true
+        model.service = service
+        let c = DesignComposer(model: model, doc: "dd_0000000000000001", prompt: "x")
+        c.draw()
+        #expect(await until { c.phase == .failed("The AI took too long. Try again, or change the words.") })
+        #expect(await until { service.cancelled == ["s_1"] })
     }
 
     @Test func emptyPromptCannotDraw() {

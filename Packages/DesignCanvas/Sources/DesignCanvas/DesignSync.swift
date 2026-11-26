@@ -29,7 +29,13 @@ public final class DesignSync {
     /// Called after a remote update is applied (the canvas draws a frame).
     var onRemote: () -> Void = {}
     private var task: Task<Void, Never>?
-    private(set) public var connected = false
+    private(set) public var connected = false {
+        didSet { if connected != oldValue { onConnection() } }
+    }
+    /// True once the Core's state (or a reset of it) has been applied: the design is no longer waiting for its first snapshot.
+    private(set) public var received = false
+    /// Called when `connected` flips.
+    var onConnection: () -> Void = {}
     /// An unsent edit is over what the Core takes (`DE_ERR_TOO_LARGE`): it can never be sent, so nothing more is. The
     /// design must be reopened and the unsent edits are lost; this never retries.
     private(set) public var stuck = false
@@ -81,7 +87,9 @@ public final class DesignSync {
                     if target == .doc, let d = engine.diff(sv) { try await channel.send(.update(d), doc: doc) }
                 case .update(let u):
                     switch engine.apply(u, to: target) {
-                    case .applied: onRemote()
+                    case .applied:
+                        received = true
+                        onRemote()
                     case .refused: break
                     case .busy:
                         // nothing changed: ask for it again a moment later (the state vector brings back what is missing)
@@ -92,6 +100,7 @@ public final class DesignSync {
                         if let sv = engine.stateVector() { try await channel.send(.stateVector(sv), doc: doc) }
                     case .reset:
                         // The engine reset the doc: ask for everything again (unsent local edits are kept).
+                        received = true
                         onRemote()
                         if let sv = engine.stateVector() { try await channel.send(.stateVector(sv), doc: doc) }
                     case .halted:

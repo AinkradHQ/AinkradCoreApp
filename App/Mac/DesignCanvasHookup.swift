@@ -23,6 +23,8 @@ final class CanvasEditing: DesignEditBackend {
     func setPresence(_ json: String) { view?.editorSetPresence(json) }
     func tokens() -> Data? { view?.editorTokens() }
     var syncStuck: Bool { view?.editorSyncStuck ?? false }
+    var loaded: Bool { view?.editorLoaded ?? false }
+    var syncConnected: Bool { view?.editorSyncConnected ?? false }
     var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
     var tool: Int { view?.editorTool ?? 0 }
     func setTool(_ tool: Int) { view?.editorSetTool(tool) }

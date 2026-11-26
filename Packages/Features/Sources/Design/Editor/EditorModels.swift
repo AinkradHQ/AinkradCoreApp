@@ -192,6 +192,10 @@ public protocol DesignEditBackend: AnyObject {
     func tokens() -> Data?
     /// An unsent edit can never go to the Core (it is over what one update takes): the design must be reopened.
     var syncStuck: Bool { get }
+    /// The first snapshot from the Core has reached the canvas.
+    var loaded: Bool { get }
+    /// The sync socket to the Core is open.
+    var syncConnected: Bool { get }
     /// The last `edit` was refused because the change is too large for one update.
     var lastEditTooLarge: Bool { get }
     /// The canvas tool (`CanvasTool`); it returns to select by itself after a shape is drawn.
@@ -214,6 +218,8 @@ public struct CanvasCamera: Sendable, Equatable {
 
 extension DesignEditBackend {
     public var syncStuck: Bool { false }
+    public var loaded: Bool { true }
+    public var syncConnected: Bool { true }
     public var lastEditTooLarge: Bool { false }
     public var tool: Int { 0 }
     public func setTool(_ tool: Int) {}

@@ -36,6 +36,10 @@ final class DesignComposer {
     private(set) var startedAt: Date?
     /// While drawing: the document rects the canvas overlay animates (the frame being redrawn, or where new ones land).
     private(set) var busyRects: [CGRect] = []
+    /// The poll interval, the longest a drawing may take, and how long the frames get to reach the canvas (tests shorten them).
+    nonisolated(unsafe) static var pollInterval = Duration.milliseconds(1200)
+    nonisolated(unsafe) static var drawLimit = Duration.seconds(240)
+    nonisolated(unsafe) static var arriveLimit = Duration.seconds(25)
     @ObservationIgnored private weak var model: DesignModel?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var originalText = ""
@@ -90,8 +94,16 @@ final class DesignComposer {
                 state = s
                 busy = false
                 // ponytail: a 1.2 s poll; the Core finishes the drawing on the read that finds the AI done.
+                let deadline = ContinuousClock.now.advanced(by: Self.drawLimit)
                 while s.phase == .drawing || s.phase == .applying {
-                    try await Task.sleep(for: .milliseconds(1200))
+                    if ContinuousClock.now >= deadline {
+                        cancelSession()
+                        withAnimation(Motion.out(Motion.ui)) {
+                            phase = .failed("The AI took too long. Try again, or change the words.")
+                        }
+                        return
+                    }
+                    try await Task.sleep(for: Self.pollInterval)
                     s = try await service.composeState(doc: doc, id: s.id)
                     state = s
                 }
@@ -131,10 +143,16 @@ final class DesignComposer {
     /// Stop watching, and stop the AI session too.
     func stop() {
         task?.cancel()
-        let session = state?.session
+        cancelSession()
         state = nil
         withAnimation(Motion.out(Motion.ui)) { phase = .prompt }
-        if let session, let service = model?.service { Task { try? await service.cancelCompose(session: session) } }
+    }
+
+    /// Stops the Core's AI session for the current drawing, if it has one.
+    private func cancelSession() {
+        if let session = state?.session, let service = model?.service {
+            Task { try? await service.cancelCompose(session: session) }
+        }
     }
 
     func again() {
@@ -155,12 +173,18 @@ final class DesignComposer {
         withAnimation(Motion.out(Motion.ui)) { phase = .prompt }
     }
 
-    /// Waits (up to 8 s) for the Core's frames to reach the canvas over the sync.
-    private func arrived(_ frames: [String], in editor: DesignEditor) async {
-        for _ in 0..<40 where !frames.allSatisfy({ editor.layers[$0] != nil }) {
+    static let notArrived = "The new screen did not reach the canvas. Check the connection and try again."
+
+    /// Waits (up to `arriveLimit`) for the Core's frames to reach the canvas over the sync; the phase stays `.drawing`.
+    /// False when they never came.
+    private func arrived(_ frames: [String], in editor: DesignEditor) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: Self.arriveLimit)
+        while !frames.allSatisfy({ editor.layers[$0] != nil }) {
+            if ContinuousClock.now >= deadline || Task.isCancelled { return false }
             try? await Task.sleep(for: .milliseconds(200))
             editor.reload()
         }
+        return true
     }
 
     /// Keeps `d`'s frame, removes the other directions' frames (one undo step), selects and shows it.
@@ -172,7 +196,10 @@ final class DesignComposer {
     private func keep(_ d: ComposeState.Direction, all: [ComposeState.Direction]) async {
         guard let editor = model?.editors[doc] else { return close() }
         let frames = all.compactMap(\.frame)
-        await arrived(frames, in: editor)
+        guard await arrived(frames, in: editor) else {
+            if !Task.isCancelled { withAnimation(Motion.out(Motion.ui)) { phase = .failed(Self.notArrived) } }
+            return
+        }
         let drop = frames.filter { $0 != d.frame && editor.layers[$0] != nil }
         if !drop.isEmpty { editor.apply(drop.map(EditOps.delete)) }
         if let f = d.frame, editor.select(f, quiet: true) { editor.fitSelection() }
@@ -184,12 +211,15 @@ final class DesignComposer {
     private func replace(_ old: Target, with d: ComposeState.Direction, all: [ComposeState.Direction]) async {
         guard let editor = model?.editors[doc], let new = d.frame else { return close() }
         let frames = all.compactMap(\.frame)
-        await arrived(frames, in: editor)
+        guard await arrived(frames, in: editor) else {
+            if !Task.isCancelled { withAnimation(Motion.out(Motion.ui)) { phase = .failed(Self.notArrived) } }
+            return
+        }
         guard editor.layers[new] != nil, let was = editor.layers[old.id], let parent = was.parent,
             let oldNode = editor.node(of: old.id)
         else {
             withAnimation(Motion.out(Motion.ui)) {
-                phase = .failed("The new screen did not reach the canvas. Try again.")
+                phase = .failed(Self.notArrived)
             }
             return
         }
@@ -227,6 +257,7 @@ final class DesignComposer {
 
     func close() {
         task?.cancel()
+        if phase == .drawing { cancelSession() }
         withAnimation(Motion.out(Motion.ui)) { model?.composer = nil }
     }
 

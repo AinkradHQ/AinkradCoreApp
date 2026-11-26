@@ -23,6 +23,9 @@ final class DesignEditor {
     var notice: String?
     /// The canvas cannot send an unsent edit to the Core: shown until the design is reopened (never a retry).
     private(set) var syncStuck = false
+    /// The design has its first content (the Core's first snapshot arrived, or layers are listed): until then the canvas is blank.
+    private(set) var loaded = false
+    private(set) var syncConnected = true
     static let stuckSentence = "This design stopped syncing — reopen it (unsent edits are lost)"
     var expanded: Set<String> = []
     var renaming: String?
@@ -109,9 +112,12 @@ final class DesignEditor {
 
     func reload() {
         syncStuck = backend?.syncStuck ?? false
+        let conn = backend?.syncConnected ?? true
+        if conn != syncConnected { syncConnected = conn }
         if let t = backend?.tool, t != tool { tool = t }
         guard let b = backend else {
             layers = LayerTree([])
+            loaded = false
             selection = []
             node = nil
             peers = []
@@ -127,6 +133,8 @@ final class DesignEditor {
             }
         }
         if next != layers { layers = next }
+        let isLoaded = b.loaded || !next.layers.isEmpty
+        if isLoaded != loaded { loaded = isLoaded }
         let sel = b.selection()
         if sel != selection {
             selection = sel

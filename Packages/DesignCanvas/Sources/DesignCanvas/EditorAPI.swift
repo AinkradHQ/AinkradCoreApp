@@ -32,6 +32,10 @@ extension DesignCanvasNSView {
     public var editorLastEditTooLarge: Bool { lastEditTooLarge }
     /// An unsent edit can never go out: "This design stopped syncing — reopen it (unsent edits are lost)".
     public var editorSyncStuck: Bool { sync?.stuck ?? false }
+    /// The first snapshot from the Core has been applied.
+    public var editorLoaded: Bool { sync?.received ?? false }
+    /// The sync socket is open.
+    public var editorSyncConnected: Bool { sync?.connected ?? false }
     public func editorUndo() { undo(redo: false) }
     public func editorRedo() { undo(redo: true) }
     public func editorFitSelection() {

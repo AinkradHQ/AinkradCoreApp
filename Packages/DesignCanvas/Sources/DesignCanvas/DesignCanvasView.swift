@@ -378,6 +378,7 @@ public struct DesignCanvas: NSViewRepresentable {
         let s = DesignSync(engine: engine, doc: doc, channel: channel)
         s.onRemote = { [weak v] in v?.contentArrived() }
         s.onStuck = { [weak v] in v?.onChange?() }
+        s.onConnection = { [weak v] in v?.onChange?() }
         v.sync = s
         if let system {
             let y = DesignSync(engine: engine, doc: system, target: .system, channel: channel)

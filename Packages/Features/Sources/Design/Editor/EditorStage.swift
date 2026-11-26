@@ -22,6 +22,10 @@ struct EditorStage: View {
                                 .transition(.opacity)
                         }
                     }
+                    .overlay {
+                        if !editor.loaded { CanvasLoading(editor: editor).transition(.opacity) }
+                    }
+                    .animation(Motion.out(Motion.ui), value: editor.loaded)
                     .clipShape(coreShape(Radius.pane))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contextMenu { DesignMenu(model: model, item: item) }
