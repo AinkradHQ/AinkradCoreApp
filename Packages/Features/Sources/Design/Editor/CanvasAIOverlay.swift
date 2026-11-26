@@ -11,6 +11,8 @@ struct CanvasAIOverlay: View {
     /// Document rects: the frame being redrawn (edit) or where new frames will land.
     let rects: [CGRect]
     let editing: Bool
+    /// Drawing now; false fades it out and stops the timeline.
+    var active = true
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.coreAccent) private var paneAccent
     @State private var shown = false
@@ -20,7 +22,7 @@ struct CanvasAIOverlay: View {
     private var ink: Color { GlassInk.accent(paneAccent) }
 
     var body: some View {
-        TimelineView(.animation(paused: reduce)) { ctx in
+        TimelineView(.animation(paused: reduce || !active)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             // A cheap engine call, read every frame so the overlay follows pan, zoom and fits exactly.
             if let cam = camera(tick) {
@@ -40,6 +42,8 @@ struct CanvasAIOverlay: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .opacity(active ? 1 : 0)
+        .animation(Motion.out(Motion.ui), value: active)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear { shown = true }

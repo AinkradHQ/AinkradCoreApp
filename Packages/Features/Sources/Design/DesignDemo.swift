@@ -331,7 +331,11 @@ public final class DesignDemo {
                 c?.target = nil
                 c?.single = false
                 c?.debugShow(three, phase: .directions)
-            case "ai-done": c?.debugShow(nil, phase: .done("Desktop is updated."))
+            case "ai-done":
+                // As it really goes: drawing (the shimmer), then done; the shimmer must be gone.
+                c?.debugShow(nil, phase: .drawing)
+                try? await Task.sleep(for: .seconds(1.5))
+                c?.debugShow(nil, phase: .done("Desktop is updated."))
             default: break
             }
 
