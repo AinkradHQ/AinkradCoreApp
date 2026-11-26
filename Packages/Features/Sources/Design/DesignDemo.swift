@@ -54,7 +54,7 @@ public final class DesignDemo {
         "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
         "project-island", "project-island-empty", "new-advanced", "rename", "delete", "directions",
-        "open-design-insert", "compose-prompt",
+        "open-design-insert", "open-design-text", "compose-prompt",
     ]
 
     private let model: DesignModel
@@ -249,7 +249,8 @@ public final class DesignDemo {
         case "offline": model.load = .notConnected
         case "absent": model.load = .absent
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
-        case "open-design", "open-design-menu", "open-design-insert": model.openID = "doc:\(Self.did(1))"
+        case "open-design", "open-design-menu", "open-design-insert", "open-design-text":
+            model.openID = "doc:\(Self.did(1))"
         case "open-system": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
         case "open-logo": model.openID = "asset:\(Self.sha("Lanterna mark"))"
@@ -259,12 +260,15 @@ public final class DesignDemo {
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
-        if scene == "open-design-insert" {
+        if scene == "open-design-insert" || scene == "open-design-text" {
             // Probe: the real canvas (CORE_DESIGN_SCENE) takes an insert and selects it.
             try? await Task.sleep(for: .seconds(2))
             if let e = model.editors[Self.did(1)] {
                 let before = e.layers.layers.count
-                let ok = e.insert(.rect)
+                // Every kind once, then the rectangle last so the inspector shows it.
+                for p in InsertPreset.shapes.dropFirst() + InsertPreset.texts.prefix(1) { e.insert(p) }
+                e.select("", quiet: true)
+                let ok = e.insert(scene == "open-design-text" ? InsertPreset.texts[0] : InsertPreset.shapes[0])
                 let line =
                     "PROBE attached=\(e.attached) before=\(before) insert=\(ok) after=\(e.layers.layers.count) "
                     + "sel=\(e.selection) notice=\(e.notice ?? "-")\n"

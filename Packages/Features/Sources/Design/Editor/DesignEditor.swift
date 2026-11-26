@@ -64,6 +64,9 @@ final class DesignEditor {
 
     var attached: Bool { backend != nil }
 
+    /// One node as the engine has it now (not observed).
+    func node(of id: String) -> EditorNode? { backend?.node(id).flatMap { EditorNode(json: $0) } }
+
     /// A picture of one frame (the composer's direction cards); nil until the engine lists it.
     func sketch(frame id: String) -> FrameSketch? {
         guard let b = backend else { return nil }

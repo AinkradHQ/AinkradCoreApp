@@ -448,7 +448,7 @@ final class FakeBackend: DesignEditBackend {
         let e = DesignEditor(doc: "dd_1")
         e.attach(b)
         e.select("f")
-        #expect(e.insert(.rect))
+        #expect(e.insert(InsertPreset.shapes[0]))
         let op = try #require(b.edits.last)
         #expect(op.contains(#""op":"add""#) && op.contains(#""parent":"f""#) && op.contains(#""type":"rect""#))
         #expect(b.sel.count == 1 && b.sel != ["f"])
@@ -458,7 +458,7 @@ final class FakeBackend: DesignEditBackend {
         let b = FakeBackend()
         let e = DesignEditor(doc: "dd_1")
         e.attach(b)
-        e.insert(.text)
+        e.insert(InsertPreset.texts[0])
         #expect(b.edits.first?.contains(#""type":"page""#) == true)
     }
 }

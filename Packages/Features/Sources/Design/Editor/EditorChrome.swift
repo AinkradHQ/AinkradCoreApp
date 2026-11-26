@@ -65,9 +65,9 @@ struct PresenceStrip: View {
     }
 }
 
-/// The Ask… field (V3-04; V7-02 answers it): a line to the AI about this design, sent with the ids of what is selected.
-/// A floating control over the canvas, so it takes the clear glass.
-struct AskBar: View {
+/// The Ask… field (V3-04): a line to the AI about this design, sent with the ids of what is selected; it draws on this
+/// canvas. It sits at the right end of the canvas toolbar.
+struct AskField: View {
     @Bindable var editor: DesignEditor
     @FocusState private var focused: Bool
 
@@ -92,8 +92,8 @@ struct AskBar: View {
                 .disabled(!editor.canAsk || editor.askText.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(.horizontal, Space.s3)
-        .frame(width: Space.s8 * 14, height: MacSize.controlLg + Space.s2)
-        .coreGlass(radius: Radius.cardMac, interactive: false)
+        .frame(width: Space.s8 * 11, height: MacSize.controlLg + Space.s1)
+        .background(GlassInk.well, in: coreShape(Radius.control))
         .help(
             editor.canAsk
                 ? "Ask the AI to change or explain this design"

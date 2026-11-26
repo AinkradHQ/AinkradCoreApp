@@ -16,8 +16,9 @@ import Testing
         #expect(ops.count == 2)
         #expect(ops[0]["type"] == .string("page") && ops[0]["parent"] == .null)
         #expect(ops[1]["parent"] == .string("n_aaaaaaaaaaaa"))
-        #expect(ops[1]["props"]?["w"] == .number(390) && ops[1]["props"]?["h"] == .number(844)
-            && ops[1]["props"]?["fill"]?.array?.first?["color"] == .string("#FFFFFF"))
+        #expect(
+            ops[1]["props"]?["w"] == .number(390) && ops[1]["props"]?["h"] == .number(844)
+                && ops[1]["props"]?["fill"]?.array?.first?["color"] == .string("#FFFFFF"))
         #expect(EditOps.json(ops) != nil)
     }
 

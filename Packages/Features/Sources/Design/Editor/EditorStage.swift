@@ -22,7 +22,6 @@ struct EditorStage: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("design-canvas")
                 VStack(spacing: Space.s2) {
-                    InsertBar(editor: editor)
                     if editor.syncStuck {
                         CoreNotice(symbol: "exclamationmark.triangle", title: DesignEditor.stuckSentence, tone: .warn)
                             .frame(maxWidth: Space.s8 * 14)
@@ -33,7 +32,7 @@ struct EditorStage: View {
                         .frame(maxWidth: Space.s8 * 14)
                     }
                     Spacer(minLength: 0)
-                    AskBar(editor: editor)
+                    CanvasToolbar(model: model, editor: editor)
                 }
                 .padding(Space.s4)
             }
