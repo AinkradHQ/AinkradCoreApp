@@ -51,6 +51,8 @@ public final class DesignModel {
     private(set) var readOnly = false
     /// The Core can draw three directions from a prompt (API minor 95, E11-4).
     private(set) var composeSupported = false
+    /// The Core can write a whole design system with AI (API 108).
+    private(set) var systemAISupported = false
     /// The open item's Projects menu.
     var projectsMenuOpen = false
     /// The editor chrome of each design whose canvas was built (V3-04), by doc id.
@@ -122,7 +124,10 @@ public final class DesignModel {
             kits = try await k
             load = .ready
             // The handshake that proves the Core's minors happens on the first request, so ask after a load.
-            if let connection { composeSupported = await connection.serverSupports(minor: coreMinorV010) }
+            if let connection {
+                composeSupported = await connection.serverSupports(minor: coreMinorV010)
+                systemAISupported = await connection.serverSupports(minor: 108)
+            }
         } catch let e as DesignFailure where e.status == 404 || e.status == 501 {
             load = .absent
         } catch {

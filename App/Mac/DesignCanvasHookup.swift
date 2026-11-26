@@ -25,6 +25,7 @@ final class CanvasEditing: DesignEditBackend {
     var syncStuck: Bool { view?.editorSyncStuck ?? false }
     var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
     var tool: Int { view?.editorTool ?? 0 }
+    func docTokens() -> Data? { view?.editorDocTokens() }
     func setTool(_ tool: Int) { view?.editorSetTool(tool) }
     func camera() -> CanvasCamera? {
         view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }

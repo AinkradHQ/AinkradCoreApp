@@ -37,7 +37,8 @@ public struct DesignEditorHandle: Sendable {
 extension DesignModel {
     /// The canvas for a design doc, or nil when the app has none (tests) or the doc cannot sync yet.
     func canvasView(_ d: DesignDoc) -> AnyView? {
-        guard d.kind == .design, let canvas, let service else { return nil }
+        // A design draws on it; a design system opens on it too (the style guide reads and writes its tokens).
+        guard d.kind == .design || d.kind == .system, let canvas, let service else { return nil }
         let socketOpener: (@Sendable (String, UInt64?) async throws -> CoreSocket)? = connection.map { connection in
             { @Sendable (doc: String, lastSeq: UInt64?) async throws -> CoreSocket in
                 let headers: [String: String] = lastSeq.map { ["Last-Update-Seq": String($0)] } ?? [:]

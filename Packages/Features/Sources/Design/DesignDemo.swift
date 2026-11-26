@@ -55,7 +55,7 @@ public final class DesignDemo {
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
-        "ai-directions", "ai-done", "ai-drawing-new",
+        "ai-directions", "ai-done", "ai-drawing-new", "system-empty", "system-guide", "system-guide-night",
     ]
 
     private let model: DesignModel
@@ -254,7 +254,7 @@ public final class DesignDemo {
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new",
             "tools-probe":
             model.openID = "doc:\(Self.did(1))"
-        case "open-system": model.openID = "doc:\(Self.did(8))"
+        case "open-system", "system-empty", "system-guide", "system-guide-night": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
         case "open-logo": model.openID = "asset:\(Self.sha("Lanterna mark"))"
         case "open-icon-composer": model.openID = "asset:\(Self.sha("Lanterna app icon"))"
@@ -293,6 +293,12 @@ public final class DesignDemo {
             }
         }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
+        if scene == "system-guide" || scene == "system-guide-night" {
+            // The style guide on the real engine (CORE_DESIGN_SCENE): the default set written as token ops.
+            try? await Task.sleep(for: .seconds(2))
+            model.editors[Self.did(8)]?.setTokens(SystemStarter.tokens)
+            try? await Task.sleep(for: .seconds(1))
+        }
         if scene.hasPrefix("ai-") {
             // The AI panel on the real canvas (CORE_DESIGN_SCENE): new, edit, drawing, directions, done.
             try? await Task.sleep(for: .seconds(2))

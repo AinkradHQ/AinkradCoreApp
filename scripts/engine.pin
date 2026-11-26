@@ -1,7 +1,7 @@
 # DesignEngine.xcframework pin (V3-02, plan T6). Built by `scripts/design-engine.sh build` (make engine) in AinkradCore at
-# CORE_COMMIT below (feat/design-camera, AinkradCore #523: de_camera and de_fit_rect for the AI overlay). The rest is its SHA256SUMS.
-CORE_COMMIT=2af5ad98555002076b85b70f23cc23c02ad0445e
+# CORE_COMMIT below (feat/design-systems, AinkradCore #526: token ops, de_doc_tokens, de_export_png). The rest is its SHA256SUMS.
+CORE_COMMIT=b2e4bda0984c80c9e701f963e0fc1ff551ebc2a6
 1b96ae3314c14ce5662cacd4f4ce2fa35237e41fe022cf8e7f471556be0115b2  DesignEngine.xcframework/Info.plist
-0040ff44d709105f442d28455daa0cc74b14daa1c3c1001a316d891a2ebe0ab3  DesignEngine.xcframework/macos-arm64_x86_64/Headers/DesignEngine.h
+2f59a8f313316ca8e6834f0631379174bda1bbc608776af3c123d64208eda900  DesignEngine.xcframework/macos-arm64_x86_64/Headers/DesignEngine.h
 0586d0369f947adc4016922175451fa9f3fd10bb49bf47a3c6aa0a3dc2a38b0d  DesignEngine.xcframework/macos-arm64_x86_64/Headers/module.modulemap
-078d3fd1582bf94c96d6588d32a127d8776a380bccb471e20b78af3c5aff80a5  DesignEngine.xcframework/macos-arm64_x86_64/libDesignEngine.a
+87977c4f9d65be962b4b50905a8bf9e3678c078cc90d33eb4c0eb1b381f61502  DesignEngine.xcframework/macos-arm64_x86_64/libDesignEngine.a

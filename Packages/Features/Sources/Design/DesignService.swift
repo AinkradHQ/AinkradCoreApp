@@ -30,6 +30,8 @@ protocol DesignService: Sendable {
     func composeState(doc: String, id: String) async throws -> ComposeState
     /// Stops the AI session behind a drawing.
     func cancelCompose(session: String) async throws
+    /// AI writes a whole design system (tokens) into a system doc: `mode: "system"`, optional brand kit. Needs API 108.
+    func composeSystem(doc: String, prompt: String, brandName: String?, colors: [String]) async throws -> ComposeState
     /// A new name for a design, a library file or a brand kit (`PATCH`).
     func rename(_ item: DesignItem, to name: String) async throws
     /// Takes it out of the library: a design is archived (every row kept), a file or a kit deleted. A step-up route.
@@ -73,6 +75,9 @@ extension DesignService {
     }
     func composeState(doc: String, id: String) async throws -> ComposeState { throw Self.noCompose }
     func cancelCompose(session: String) async throws {}
+    func composeSystem(doc: String, prompt: String, brandName: String?, colors: [String]) async throws -> ComposeState {
+        throw Self.noCompose
+    }
     func rename(_ item: DesignItem, to name: String) async throws {
         throw DesignFailure(sentence: "This Core cannot rename designs.", code: "not_found", status: 404)
     }
@@ -175,6 +180,20 @@ struct LiveDesignService: DesignService {
         let s = Size(
             w: min(4000, max(200, Int(size.width.rounded()))), h: min(4000, max(200, Int(size.height.rounded()))))
         let body = try JSONEncoder().encode(Body(prompt: prompt, count: count, size: s))
+        return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
+    }
+    func composeSystem(doc: String, prompt: String, brandName: String?, colors: [String]) async throws -> ComposeState {
+        struct Brand: Encodable {
+            let colors: [String]
+            let name: String?
+        }
+        struct Body: Encodable {
+            let prompt: String
+            let mode: String
+            let brand: Brand?
+        }
+        let brand = colors.isEmpty && brandName == nil ? nil : Brand(colors: Array(colors.prefix(12)), name: brandName)
+        let body = try JSONEncoder().encode(Body(prompt: prompt, mode: "system", brand: brand))
         return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
     }
     func composeState(doc: String, id: String) async throws -> ComposeState {
