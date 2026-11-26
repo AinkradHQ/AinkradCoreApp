@@ -43,6 +43,8 @@ public final class DesignModel {
     @ObservationIgnored var columns = 1
     /// The open item's About panel.
     var aboutOpen = false
+    /// The AI panel over the open design's canvas, or nil.
+    var composer: DesignComposer?
     /// The pictures of loaded assets, by sha256.
     private(set) var images: [String: NSImage] = [:]
     @ObservationIgnored private var fetching: Set<String> = []
@@ -313,12 +315,14 @@ public final class DesignModel {
     }
 
     /// Draw with AI: the composer on the open design; from the home, on a new blank design.
+    /// Opens the AI panel on the open design (from the home: on a new blank design). With a frame selected it edits that
+    /// frame; with `prompt` (the Ask… field) it starts at once.
     func drawWithAI(prompt: String = "") async {
         if openID == nil { await quickNew() }
         guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else { return }
-        let c = DesignComposer(model: self, doc: d.id, prompt: prompt)
-        host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
-        // From the Ask… field the words are already there: start drawing at once.
+        let target = editors[d.id]?.targetFrame().map { DesignComposer.Target(id: $0.id, name: $0.title) }
+        let c = DesignComposer(model: self, doc: d.id, prompt: prompt, target: target)
+        withAnimation(Motion.out(Motion.ui)) { composer = c }
         if !prompt.isEmpty { c.draw() }
     }
 
@@ -336,6 +340,7 @@ public final class DesignModel {
     func closeItem() {
         editors = [:]
         aboutOpen = false
+        composer = nil
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 

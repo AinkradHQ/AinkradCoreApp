@@ -2,49 +2,75 @@ import CoreUI
 import Observation
 import SwiftUI
 
-/// The Design composer (E11-4, D-29): describe a design, an AI session draws three directions as frames on the canvas, you
-/// pick one. The Core does the drawing (`POST /docs/{doc}/compose`); this polls it and, on "Use this", deletes the other two
-/// frames as one undoable canvas edit. "Draw 3 more" and "Refine" are new drawings (a refine names the direction).
+/// The Design AI (E11-4, D-29), shown as the AI panel over the canvas (`DesignAIPanel`). Two modes:
+/// - New: describe a screen; an AI session draws one design or three directions as frames on the canvas, you pick one.
+/// - Edit: with a frame selected (or anything inside one), describe a change; the AI redraws that screen with the change and
+///   the redrawn frame takes the old one's place, name and position, as one undoable canvas edit.
+/// The Core does the drawing (`POST /docs/{doc}/compose`); this polls it. The Core has no edit mode yet, so an edit sends the
+/// screen's contents in words with the change (`EditPrompt`).
 @MainActor @Observable
 final class DesignComposer {
     enum Phase: Equatable {
         case prompt, drawing, directions
+        /// An edit landed (or the one design was kept): the panel says so, with Undo.
+        case done(String)
         case failed(String)
+    }
+
+    /// The frame an edit redraws.
+    struct Target: Equatable {
+        let id: String
+        let name: String
     }
 
     let doc: String
     var prompt: String
-    /// One design: asks the Core for one (`count: 1`). A Core from before that draws three, and the best match is kept at
-    /// once (the others are removed; Undo brings them back).
-    var single = false
+    /// One design: asks the Core for one (`count: 1`). A Core from before that draws three, and the best match is kept.
+    var single = true
+    /// Edit this frame, or nil for a new screen.
+    var target: Target?
     private(set) var phase = Phase.prompt
     private(set) var state: ComposeState?
     private(set) var busy = false
+    /// When the current drawing started, for the panel's stages and timer.
+    private(set) var startedAt: Date?
     @ObservationIgnored private weak var model: DesignModel?
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var originalText = ""
 
-    init(model: DesignModel, doc: String, prompt: String = "") {
+    init(model: DesignModel, doc: String, prompt: String = "", target: Target? = nil) {
         self.model = model
         self.doc = doc
         self.prompt = prompt
+        self.target = target
     }
 
     var trimmed: String { prompt.trimmingCharacters(in: .whitespacesAndNewlines) }
-    var canDraw: Bool { !trimmed.isEmpty && trimmed.count <= 1000 && !busy }
+    var editing: Bool { target != nil }
+    /// What the Core is asked: the words, or for an edit the screen in words with the change.
+    var request: String {
+        guard let target, let editor = model?.editors[doc] else { return trimmed }
+        return EditPrompt.make(
+            change: trimmed, screen: target.name, elements: EditPrompt.elements(of: target.id, in: editor))
+    }
+    var canDraw: Bool { !trimmed.isEmpty && trimmed.count <= 600 && !busy }
+    /// How many frames the panel waits for.
+    var expected: Int { editing || single ? 1 : 3 }
 
     func draw() {
         guard canDraw, let service = model?.service else { return }
         busy = true
-        let text = trimmed
-        if originalText.isEmpty { originalText = text }
+        let text = request
+        if originalText.isEmpty { originalText = trimmed }
         task?.cancel()
+        startedAt = Date()
+        withAnimation(Motion.out(Motion.ui)) { phase = .drawing }
         task = Task { [weak self] in
             guard let self else { return }
             defer { busy = false }
             do {
-                var s = try await service.compose(doc: doc, prompt: text, count: single ? 1 : 3)
+                var s = try await service.compose(doc: doc, prompt: String(text.prefix(1000)), count: expected)
                 state = s
-                phase = .drawing
                 busy = false
                 // ponytail: a 1.2 s poll; the Core finishes the drawing on the read that finds the AI done.
                 while s.phase == .drawing || s.phase == .applying {
@@ -52,21 +78,31 @@ final class DesignComposer {
                     s = try await service.composeState(doc: doc, id: s.id)
                     state = s
                 }
-                phase = s.phase == .done ? .directions : .failed(Self.sentence(s.reason))
-                if single, s.phase == .done, let best = s.directions.first { use(best) }
+                guard s.phase == .done, let best = s.directions.first else {
+                    withAnimation(Motion.out(Motion.ui)) { phase = .failed(Self.sentence(s.reason)) }
+                    return
+                }
+                if let target {
+                    await replace(target, with: best, all: s.directions)
+                } else if single {
+                    await keep(best, all: s.directions)
+                } else {
+                    withAnimation(Motion.out(Motion.ui)) { phase = .directions }
+                }
             } catch is CancellationError {
                 return
             } catch {
-                phase = .failed(model?.words(error) ?? "That did not work.")
+                withAnimation(Motion.out(Motion.ui)) { phase = .failed(model?.words(error) ?? "That did not work.") }
             }
         }
     }
 
     #if DEBUG
-    /// Snapshots only: shows a finished drawing.
-    func debugShow(_ s: ComposeState) {
+    /// Snapshots only: shows a phase without a Core.
+    func debugShow(_ s: ComposeState?, phase p: Phase) {
         state = s
-        phase = .directions
+        startedAt = Date().addingTimeInterval(-7)
+        phase = p
     }
     #endif
 
@@ -75,7 +111,7 @@ final class DesignComposer {
         task?.cancel()
         let session = state?.session
         state = nil
-        phase = .prompt
+        withAnimation(Motion.out(Motion.ui)) { phase = .prompt }
         if let session, let service = model?.service { Task { try? await service.cancelCompose(session: session) } }
     }
 
@@ -84,35 +120,76 @@ final class DesignComposer {
         draw()
     }
 
+    /// Back to the prompt with a refine of one direction written for the person to adjust.
     func refine(_ d: ComposeState.Direction) {
-        prompt =
-            "Refine the \(d.name) direction (\(d.summary)). Keep what works and improve it. Original request: "
-            + original
-        phase = .prompt
+        prompt = "Like \(d.name) (\(d.summary)), but "
+        withAnimation(Motion.out(Motion.ui)) { phase = .prompt }
     }
 
-    @ObservationIgnored private var originalText = ""
-    private var original: String { originalText.isEmpty ? trimmed : originalText }
+    /// Back to the prompt to ask for another change or another screen.
+    func another() {
+        prompt = ""
+        state = nil
+        withAnimation(Motion.out(Motion.ui)) { phase = .prompt }
+    }
 
-    /// Keeps `d`'s frame, removes the other directions' frames from the canvas (undo brings them back).
+    /// Waits (up to 8 s) for the Core's frames to reach the canvas over the sync.
+    private func arrived(_ frames: [String], in editor: DesignEditor) async {
+        for _ in 0..<40 where !frames.allSatisfy({ editor.layers[$0] != nil }) {
+            try? await Task.sleep(for: .milliseconds(200))
+            editor.reload()
+        }
+    }
+
+    /// Keeps `d`'s frame, removes the other directions' frames (one undo step), selects and shows it.
     func use(_ d: ComposeState.Direction) {
-        guard let editor = model?.editors[doc], let all = state?.directions else {
-            close()
+        guard let all = state?.directions else { return }
+        Task { await keep(d, all: all) }
+    }
+
+    private func keep(_ d: ComposeState.Direction, all: [ComposeState.Direction]) async {
+        guard let editor = model?.editors[doc] else { return close() }
+        let frames = all.compactMap(\.frame)
+        await arrived(frames, in: editor)
+        let drop = frames.filter { $0 != d.frame && editor.layers[$0] != nil }
+        if !drop.isEmpty { editor.apply(drop.map(EditOps.delete)) }
+        if let f = d.frame, editor.select(f, quiet: true) { editor.fitSelection() }
+        withAnimation(Motion.out(Motion.ui)) { phase = .done("\(d.name) is on the canvas.") }
+    }
+
+    /// The edit: the redrawn frame takes the old one's place (parent, order, position) and name, the old one and any other
+    /// direction go, all in one canvas edit, so one Undo brings the old screen back.
+    private func replace(_ old: Target, with d: ComposeState.Direction, all: [ComposeState.Direction]) async {
+        guard let editor = model?.editors[doc], let new = d.frame else { return close() }
+        let frames = all.compactMap(\.frame)
+        await arrived(frames, in: editor)
+        guard editor.layers[new] != nil, let was = editor.layers[old.id], let parent = was.parent,
+            let oldNode = editor.node(of: old.id)
+        else {
+            withAnimation(Motion.out(Motion.ui)) {
+                phase = .failed("The new screen did not reach the canvas. Try again.")
+            }
             return
         }
-        close()
-        Task {
-            // The Core writes the frames; the canvas gets them over the sync a moment after "done". Wait for them (up to
-            // 8 s) before removing the others and showing the kept one.
-            let frames = all.compactMap(\.frame)
-            for _ in 0..<40 where !frames.allSatisfy({ editor.layers[$0] != nil }) {
-                try? await Task.sleep(for: .milliseconds(200))
-                editor.reload()
-            }
-            let drop = frames.filter { $0 != d.frame && editor.layers[$0] != nil }
-            if !drop.isEmpty { editor.apply(drop.map(EditOps.delete)) }
-            if let f = d.frame, editor.select(f, quiet: true) { editor.fitSelection() }
+        var ops: [[String: DJSON]] = [
+            EditOps.move(new, parent: parent, order: was.order),
+            EditOps.name(new, old.name),
+        ]
+        for k in ["x", "y"] { if let v = oldNode.props[k] { ops.append(EditOps.set(new, k, v)) } }
+        ops.append(EditOps.delete(old.id))
+        ops += frames.filter { $0 != new && editor.layers[$0] != nil }.map(EditOps.delete)
+        guard editor.apply(ops) else {
+            withAnimation(Motion.out(Motion.ui)) { phase = .failed("The canvas would not take the new screen.") }
+            return
         }
+        if editor.select(new, quiet: true) { editor.fitSelection() }
+        target = Target(id: new, name: old.name)
+        withAnimation(Motion.out(Motion.ui)) { phase = .done("\(old.name) is updated.") }
+    }
+
+    func undo() {
+        model?.editors[doc]?.undo()
+        close()
     }
 
     /// The picture of a direction's frame, when the canvas has it.
@@ -120,9 +197,15 @@ final class DesignComposer {
         d.frame.flatMap { model?.editors[doc]?.sketch(frame: $0) }
     }
 
+    /// Shows one direction on the canvas without keeping it yet.
+    func preview(_ d: ComposeState.Direction) {
+        guard let f = d.frame, let editor = model?.editors[doc], editor.select(f, quiet: true) else { return }
+        editor.fitSelection()
+    }
+
     func close() {
         task?.cancel()
-        model?.host.shell.closeDialog()
+        withAnimation(Motion.out(Motion.ui)) { model?.composer = nil }
     }
 
     static func sentence(_ reason: String) -> String {
@@ -130,153 +213,45 @@ final class DesignComposer {
     }
 }
 
-struct ComposerView: View {
-    @Bindable var composer: DesignComposer
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        CoreDialogPanel(title, width: Space.s8 * 22) {
-            switch composer.phase {
-            case .prompt: promptStep
-            case .drawing: drawing
-            case .directions: directions
-            case .failed(let why): failed(why)
-            }
-        }
-        .foregroundStyle(GlassInk.primary)
-        .accessibilityIdentifier("design-composer")
+/// An edit request in words: the change, then the screen as it is, top to bottom, within the Core's 1000 characters.
+enum EditPrompt {
+    struct Element: Equatable {
+        let kind: String
+        let text: String?
+        let color: String?
+        let size: Double?
+        let y: Double
     }
 
-    private var title: String {
-        switch composer.phase {
-        case .prompt, .failed: "Draw with AI"
-        case .drawing: composer.single ? "AI is drawing" : "AI is drawing 3 directions"
-        case .directions: "Pick a direction"
+    static func make(change: String, screen: String, elements: [Element]) -> String {
+        let head =
+            "Redraw the existing screen \"\(screen)\" with this change: \(change). Keep everything else as it is now "
+            + "(same texts, colours and layout) unless the change says otherwise. The screen now, top to bottom: "
+        var body: [String] = []
+        var used = head.count
+        for e in elements.sorted(by: { $0.y < $1.y }) {
+            let part: String
+            switch e.kind {
+            case "text":
+                part =
+                    "text \"\((e.text ?? "").prefix(60))\"" + (e.size.map { " \(Int($0))pt" } ?? "")
+                    + (e.color.map { " \($0)" } ?? "")
+            default:
+                part = "\(e.kind)" + (e.color.map { " \($0)" } ?? "")
+            }
+            guard used + part.count + 2 < 990 else { break }
+            body.append(part)
+            used += part.count + 2
         }
+        return head + (body.isEmpty ? "an empty screen" : body.joined(separator: "; ")) + "."
     }
 
-    private var promptStep: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text(
-                composer.single
-                    ? "Describe what you want. AI draws it on this canvas."
-                    : "Describe what you want. AI draws three different ideas on this canvas to pick from."
-            )
-            .foregroundStyle(GlassInk.secondary)
-            CoreSegmented(
-                "How many",
-                segments: [
-                    CoreSegment(false, "Three ideas", symbol: "square.grid.3x1.below.line.grid.1x2"),
-                    CoreSegment(true, "One design", symbol: "rectangle"),
-                ],
-                selection: $composer.single)
-            CoreTextField(
-                "What should it show?", placeholder: "A calm welcome screen for a notes app",
-                text: $composer.prompt, autofocus: true
-            ) { composer.draw() }
-            HStack(spacing: Space.s2) {
-                Text(composer.single ? "The best one is kept" : "3 different ideas").foregroundStyle(GlassInk.secondary)
-                Spacer(minLength: Space.s2)
-                Button("Cancel") { composer.close() }.buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-                Button {
-                    composer.draw()
-                } label: {
-                    Label(composer.single ? "Draw it" : "Draw 3 directions", systemImage: "sparkles")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent, busy: composer.busy)).coreShortcut(.primary)
-                .disabled(!composer.canDraw).opacity(composer.canDraw || composer.busy ? 1 : 0.45)
-            }
-        }
-    }
-
-    private var drawing: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text("“\(composer.trimmed)”").foregroundStyle(GlassInk.secondary).lineLimit(2)
-            HStack(alignment: .top, spacing: Space.s3) {
-                ForEach(0..<(composer.single ? 1 : 3), id: \.self) { i in
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        coreShape(Radius.cardMac).fill(GlassInk.well).frame(height: Space.s8 * 5)
-                        Text(composer.single ? "Your design" : "Direction \(["A", "B", "C"][i])").coreFont(
-                            size: MacTextSize.body, weight: .semibold)
-                        CoreBusyBar()
-                        Text("Sketching the first shapes").foregroundStyle(GlassInk.secondary)
-                            .coreFont(size: MacTextSize.meta)
-                    }
-                    .padding(Space.s2).frame(maxWidth: .infinity, alignment: .leading)
-                    .coreWell(radius: Radius.pane)
-                }
-            }
-            HStack {
-                Spacer(minLength: Space.s2)
-                Button("Stop") { composer.stop() }.buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("The AI is drawing three directions")
-    }
-
-    private var directions: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            Text("They are on the canvas now. Keep one, and the other two go away (Undo brings them back).")
-                .foregroundStyle(GlassInk.secondary)
-            HStack(alignment: .top, spacing: Space.s3) {
-                ForEach(Array((composer.state?.directions ?? []).enumerated()), id: \.offset) { i, d in
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        thumb(d)
-                        HStack(spacing: Space.s2) {
-                            Text(d.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                            if i == 0 { StateBadge("Best match", tone: .run, symbol: "star") }
-                        }
-                        Text(d.summary).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                        HStack(spacing: Space.s2) {
-                            Button("Refine") { composer.refine(d) }.buttonStyle(CoreButtonStyle(.secondary))
-                            Button("Use this") { composer.use(d) }
-                                .buttonStyle(CoreButtonStyle(i == 0 ? .prominent : .secondary))
-                        }
-                    }
-                    .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .coreWell(radius: Radius.pane)
-                }
-            }
-            // The cards as tall as the longest one, no taller: the dialog hugs them.
-            .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button {
-                    composer.again()
-                } label: {
-                    Label("Draw 3 more", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary))
-                Spacer(minLength: Space.s2)
-                Button("Keep all three") { composer.close() }.buttonStyle(CoreButtonStyle(.secondary))
-                    .coreShortcut(.cancel)
-            }
-        }
-    }
-
-    /// The direction's frame as drawn on the canvas, or a quiet well while the canvas has not listed it.
-    @ViewBuilder private func thumb(_ d: ComposeState.Direction) -> some View {
-        Group {
-            if let sk = composer.sketch(d) {
-                FrameSketchView(sketch: sk).transition(.opacity)
-            } else {
-                coreShape(Radius.cardMac).fill(GlassInk.well).overlay { ProgressView().controlSize(.small) }
-            }
-        }
-        .animation(Motion.out(Motion.ui), value: composer.sketch(d) != nil)
-        .frame(height: Space.s8 * 8)
-        .frame(maxWidth: .infinity)
-    }
-
-    private func failed(_ why: String) -> some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            CoreNotice(symbol: "exclamationmark.triangle", title: why, tone: .warn)
-            HStack(spacing: Space.s2) {
-                Spacer(minLength: Space.s2)
-                Button("Close") { composer.close() }.buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
-                Button("Try again") { composer.again() }.buttonStyle(CoreButtonStyle(.prominent))
-            }
+    @MainActor static func elements(of frame: String, in editor: DesignEditor) -> [Element] {
+        editor.layers.children(of: frame).compactMap { l in
+            guard let n = editor.node(of: l.id) else { return nil }
+            return Element(
+                kind: n.type, text: n.text, color: FrameSketch.hex(n), size: n.props["type"]?["size"]?.double,
+                y: n.props["y"]?.double ?? 0)
         }
     }
 }

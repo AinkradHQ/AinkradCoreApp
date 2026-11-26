@@ -33,9 +33,15 @@ struct EditorStage: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     Spacer(minLength: 0)
+                    if let c = model.composer, case .doc(let d) = item, c.doc == d.id {
+                        DesignAIPanel(composer: c)
+                            .transition(
+                                .opacity.combined(with: .move(edge: .bottom)).combined(with: .scale(scale: 0.97)))
+                    }
                     CanvasToolbar(model: model, editor: editor)
                 }
                 .animation(Motion.out(Motion.ui), value: editor.notice)
+                .animation(Motion.out(Motion.ui), value: model.composer == nil)
                 .padding(Space.s4)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

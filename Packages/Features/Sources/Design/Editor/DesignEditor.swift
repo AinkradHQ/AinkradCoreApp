@@ -71,6 +71,16 @@ final class DesignEditor {
         tool = backend?.tool ?? 0
     }
 
+    /// The screen an AI edit works on: the top-level frame (a frame or component right under a page) the selection is in.
+    func targetFrame() -> DesignLayer? {
+        var id = selection.first
+        while let i = id, let l = layers[i] {
+            if ["frame", "component"].contains(l.type), let p = l.parent, layers[p]?.type == "page" { return l }
+            id = l.parent
+        }
+        return nil
+    }
+
     /// One node as the engine has it now (not observed).
     func node(of id: String) -> EditorNode? { backend?.node(id).flatMap { EditorNode(json: $0) } }
 
