@@ -64,7 +64,7 @@ final class DesignComposer {
     /// The screen to draw: the edited frame's size, else the default canvas (Settings, Design, Options).
     var screen: CGSize {
         if let target, let editor = model?.editors[doc], let r = Self.rect(of: target.id, in: editor) { return r.size }
-        let s = DesignOptions.canvas.size
+        let s = (DesignOptions.Canvas.named(in: trimmed) ?? DesignOptions.canvas).size
         return CGSize(width: s.w, height: s.h)
     }
     /// How many frames the panel waits for.
@@ -196,7 +196,8 @@ final class DesignComposer {
     private func keep(_ d: ComposeState.Direction, all: [ComposeState.Direction]) async {
         guard let editor = model?.editors[doc] else { return close() }
         let frames = all.compactMap(\.frame)
-        guard await arrived(frames, in: editor) else {
+        // Only the kept frame must arrive: an older Core can draw more frames than asked (it ignores `count`).
+        guard await arrived(d.frame.map { [$0] } ?? frames, in: editor) else {
             if !Task.isCancelled { withAnimation(Motion.out(Motion.ui)) { phase = .failed(Self.notArrived) } }
             return
         }
@@ -211,7 +212,7 @@ final class DesignComposer {
     private func replace(_ old: Target, with d: ComposeState.Direction, all: [ComposeState.Direction]) async {
         guard let editor = model?.editors[doc], let new = d.frame else { return close() }
         let frames = all.compactMap(\.frame)
-        guard await arrived(frames, in: editor) else {
+        guard await arrived([new], in: editor) else {
             if !Task.isCancelled { withAnimation(Motion.out(Motion.ui)) { phase = .failed(Self.notArrived) } }
             return
         }

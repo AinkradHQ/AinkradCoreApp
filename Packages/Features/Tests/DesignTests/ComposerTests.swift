@@ -60,6 +60,16 @@ struct ComposerTests {
         #expect(await until { service.cancelled == ["s_1"] })
     }
 
+    @Test func theWordsPickTheScreenSize() {
+        typealias C = DesignOptions.Canvas
+        #expect(C.named(in: "create a web comming soon page (desktop size)") == .desktop)
+        #expect(C.named(in: "A landing page for a bakery") == .desktop)
+        #expect(C.named(in: "an iPad reading app") == .tablet)
+        #expect(C.named(in: "create a login mobile screen") == .phone)
+        #expect(C.named(in: "a calm checkout") == nil)
+        #expect(C.named(in: "webhooks settings") == nil)
+    }
+
     @Test func emptyPromptCannotDraw() {
         let model = DesignModel(host: FakeHost(), projects: ProjectsModel(host: FakeHost()))
         #expect(!DesignComposer(model: model, doc: "dd_0000000000000001", prompt: "   ").canDraw)

@@ -14,6 +14,21 @@ import SwiftUI
     enum Canvas: String, CaseIterable {
         case phone, tablet, desktop
         var title: String { rawValue.capitalized }
+        /// The size the words ask for ("a desktop landing page", "tablet", "mobile app"), nil when they name none.
+        static func named(in words: String) -> Canvas? {
+            let w = words.lowercased()
+            func has(_ list: [String]) -> Bool {
+                list.contains { w.range(of: "\\b\($0)\\b", options: .regularExpression) != nil }
+            }
+            if has([
+                "desktop", "web", "website", "webpage", "web page", "landing page", "laptop", "browser", "dashboard",
+            ]) {
+                return .desktop
+            }
+            if has(["tablet", "ipad"]) { return .tablet }
+            if has(["mobile", "phone", "iphone", "android", "ios"]) { return .phone }
+            return nil
+        }
         /// The frame's width and height in points.
         var size: (w: Double, h: Double) {
             switch self {
