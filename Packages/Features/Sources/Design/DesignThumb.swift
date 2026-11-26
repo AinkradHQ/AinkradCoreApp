@@ -22,71 +22,111 @@ struct DesignThumb: View {
     }
 }
 
-/// A sketch in the shape of the kind: three screens for a design, two pages for a mockup, swatches and "Aa" for a system.
+/// A picture in the shape of the kind, drawn in the pane's accent until rendered previews exist (TODO(V6-02)): a fan of
+/// three screens (day, night) for a design, a browser window for a mockup, colour steps and type for a system.
 struct DocSketch: View {
     let kind: DesignDoc.Kind
     var large = false
+    @Environment(\.coreAccent) private var paneAccent
+
+    private var ink: Color { GlassInk.accent(paneAccent) }
 
     var body: some View {
-        let s: CGFloat = large ? 3 : 1
-        switch kind {
-        case .design:
-            HStack(spacing: Space.s2 * s) {
-                ForEach(0..<3, id: \.self) { i in screen(s, dark: i == 2) }
+        let s: CGFloat = large ? 2.6 : 0.85
+        Group {
+            switch kind {
+            case .design:
+                ZStack {
+                    screen(s, night: false).rotationEffect(.degrees(-8)).offset(x: -44 * s, y: 4 * s)
+                    screen(s, night: true).rotationEffect(.degrees(8)).offset(x: 44 * s, y: 4 * s)
+                    screen(s, night: false).scaleEffect(1.06)
+                }
+            case .mockup: browser(s)
+            case .system: system(s)
             }
-            .accessibilityHidden(true)
-        case .mockup:
-            HStack(spacing: Space.s3 * s) {
-                ForEach(0..<2, id: \.self) { _ in page(s) }
-            }
-            .accessibilityHidden(true)
-        case .system:
-            HStack(spacing: Space.s3 * s) {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.fixed(Space.s6 * s), spacing: Space.s2 * s), count: 4),
-                    spacing: Space.s2 * s
-                ) {
-                    ForEach(0..<8, id: \.self) { _ in
-                        CoreSkeleton(coreShape(Radius.control)).frame(width: Space.s6 * s, height: Space.s6 * s)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func bar(_ w: CGFloat?, _ h: CGFloat, _ c: Color) -> some View {
+        coreShape(h / 2).fill(c).frame(width: w, height: h)
+    }
+
+    /// A phone: an accent header, a few rows, the main button.
+    private func screen(_ s: CGFloat, night: Bool) -> some View {
+        let line = night ? Color.white.opacity(0.22) : Color.black.opacity(0.14)
+        return VStack(alignment: .leading, spacing: 5 * s) {
+            coreShape(4 * s).fill(ink.opacity(night ? 0.7 : 0.9)).frame(height: 22 * s)
+            ForEach(0..<3, id: \.self) { i in
+                HStack(spacing: 4 * s) {
+                    coreShape(3 * s).fill(line).frame(width: 10 * s, height: 10 * s)
+                    VStack(alignment: .leading, spacing: 3 * s) {
+                        bar(nil, 3 * s, line)
+                        bar(CGFloat(18 + i * 6) * s, 3 * s, line.opacity(0.7))
                     }
                 }
-                .fixedSize()
-                Text("Aa").coreFont(size: MacTextSize.large * s, weight: .semibold).foregroundStyle(GlassInk.secondary)
             }
-            .accessibilityHidden(true)
+            Spacer(minLength: 0)
+            coreShape(4 * s).fill(ink).frame(height: 12 * s)
         }
+        .padding(6 * s)
+        .frame(width: 66 * s, height: 120 * s)
+        .background(night ? Color(white: 0.11) : Color(white: 0.97), in: coreShape(10 * s))
+        .shadow(color: .black.opacity(0.18), radius: 6 * s, y: 3 * s)
     }
 
-    /// A phone-shaped well with bars where the header, rows and the main button go.
-    private func screen(_ s: CGFloat, dark: Bool) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1 * s) {
-            CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s8 * s, height: Space.s2 * s)
-            ForEach(0..<3, id: \.self) { _ in
-                HStack(spacing: Space.s1 * s) {
-                    CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s2 * s, height: Space.s2 * s)
-                    CoreSkeleton(coreShape(Radius.chip)).frame(height: Space.s1 * s)
+    /// A browser window: the bar with its lights, a hero, three cards.
+    private func browser(_ s: CGFloat) -> some View {
+        let line = Color.black.opacity(0.14)
+        return VStack(alignment: .leading, spacing: 6 * s) {
+            HStack(spacing: 3 * s) {
+                ForEach(0..<3, id: \.self) { _ in Circle().fill(line).frame(width: 5 * s, height: 5 * s) }
+                bar(nil, 6 * s, line.opacity(0.6)).padding(.leading, 6 * s)
+            }
+            coreShape(5 * s)
+                .fill(
+                    LinearGradient(
+                        colors: [ink, ink.opacity(0.45)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .frame(height: 40 * s)
+                .overlay(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 3 * s) {
+                        bar(48 * s, 5 * s, .white.opacity(0.9))
+                        bar(32 * s, 3 * s, .white.opacity(0.6))
+                    }
+                    .padding(.leading, 8 * s)
+                }
+            HStack(spacing: 5 * s) {
+                ForEach(0..<3, id: \.self) { _ in coreShape(4 * s).fill(line).frame(height: 22 * s) }
+            }
+        }
+        .padding(7 * s)
+        .frame(width: 150 * s, height: 104 * s)
+        .background(Color(white: 0.97), in: coreShape(8 * s))
+        .shadow(color: .black.opacity(0.18), radius: 6 * s, y: 3 * s)
+    }
+
+    /// Colour steps of the accent and the greys, beside "Aa" and a button.
+    private func system(_ s: CGFloat) -> some View {
+        HStack(alignment: .center, spacing: 14 * s) {
+            VStack(spacing: 4 * s) {
+                HStack(spacing: 4 * s) {
+                    ForEach([1, 0.75, 0.5, 0.28], id: \.self) { o in
+                        coreShape(4 * s).fill(ink.opacity(o)).frame(width: 18 * s, height: 18 * s)
+                    }
+                }
+                HStack(spacing: 4 * s) {
+                    ForEach([0.9, 0.6, 0.35, 0.15], id: \.self) { w in
+                        coreShape(4 * s).fill(Color(white: w)).frame(width: 18 * s, height: 18 * s)
+                    }
                 }
             }
-            Spacer(minLength: 0)
-            CoreSkeleton(coreShape(Radius.chip)).frame(height: Space.s3 * s)
-        }
-        .padding(Space.s2 * s)
-        .frame(width: Space.s8 * 2 * s + Space.s2 * s, height: Space.s8 * 4 * s)
-        .coreCard(dark ? GlassInk.wellHover : GlassInk.card, radius: Radius.control)
-    }
-
-    private func page(_ s: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2 * s) {
-            CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s8 * s, height: Space.s2 * s)
-            CoreSkeleton(coreShape(Radius.chip)).frame(height: Space.s4 * s)
-            HStack(spacing: Space.s1 * s) {
-                ForEach(0..<3, id: \.self) { _ in CoreSkeleton(coreShape(Radius.chip)).frame(height: Space.s5 * s) }
+            VStack(alignment: .leading, spacing: 5 * s) {
+                Text("Aa").font(.system(size: 30 * s, weight: .semibold, design: .serif)).foregroundStyle(
+                    GlassInk.primary)
+                coreShape(4 * s).fill(ink).frame(width: 40 * s, height: 12 * s)
             }
-            Spacer(minLength: 0)
         }
-        .padding(Space.s2 * s)
-        .frame(width: Space.s8 * 3 * s, height: Space.s8 * 4 * s)
-        .coreCard(GlassInk.card, radius: Radius.control)
     }
 }
 
@@ -124,8 +164,9 @@ struct FontFace: View {
     var large = false
     var body: some View {
         VStack(spacing: Space.s2) {
-            Image(systemName: "textformat").coreFont(size: large ? MacTextSize.large * 2 : MacTextSize.large)
-                .foregroundStyle(GlassInk.secondary)
+            // The app never loads the font itself, so the sample is set in the system serif.
+            Text("Aa").font(.system(size: large ? 96 : 44, weight: .regular, design: .serif))
+                .foregroundStyle(asset.check == .refused ? GlassInk.secondary : GlassInk.primary)
             if large {
                 Text(asset.name).coreFont(size: MacTextSize.large, weight: .semibold).lineLimit(1)
                 Text(state).foregroundStyle(GlassInk.secondary)

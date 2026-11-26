@@ -1,14 +1,16 @@
 import CoreUI
 import SwiftUI
 
-/// A card of the wall: the thumbnail with its state badge, then the name and "project · what it is". Same bones as a project
-/// card (well, hover lift, rise on arrival); a tap opens the item, a library file drags out as a real file.
+/// A card of the wall: the picture is the card (no frame around it), then the name with its kind's symbol and "project ·
+/// when". Hover lifts it; the keyboard's card sits on a soft accent fill. A tap opens the item, a library file drags out as a
+/// real file.
 struct DesignCard: View {
     let model: DesignModel
     let item: DesignItem
     let index: Int
     let settled: Bool
     @State private var hovering = false
+    @Environment(\.corePalette) private var palette
 
     private var lit: Bool {
         #if DEBUG
@@ -17,44 +19,70 @@ struct DesignCard: View {
         hovering
         #endif
     }
+    private var selected: Bool { model.selected == item.id }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            ZStack(alignment: .topLeading) {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Group {
                 DesignThumb(model: model, item: item)
-                    .frame(height: Space.s8 * 5 + Space.s2)
-                    .frame(maxWidth: .infinity)
-                    .coreCard(GlassInk.well, radius: Radius.cardMac)
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .frame(height: DesignCard.pictureHeight)
+                    .background(lit ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.cardMac))
                     .clipShape(coreShape(Radius.cardMac))
-                if let b = ItemBadge.of(item) {
-                    StateBadge(b.label, tone: b.tone, symbol: b.symbol)
-                        .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
-                        .coreCard(GlassInk.card, radius: Radius.control)
-                        .padding(Space.s2)
+            }
+            .coreScaleEffect(lit ? 1.015 : 1)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: Space.s1) {
+                    Image(systemName: item.symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
+                        .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                    Text(item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                }
+                HStack(spacing: Space.s2) {
+                    Text(DesignCard.short(model, item)).coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    if let b = ItemBadge.of(item) { StateBadge(b.label, tone: b.tone, symbol: b.symbol) }
                 }
             }
-            VStack(alignment: .leading, spacing: 0) {
-                Text(item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
-                Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            }
-            .padding(.horizontal, Space.s2).padding(.bottom, Space.s2)
+            .padding(.horizontal, Space.s1)
             .help(item.name)
         }
         .padding(Space.s2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .coreWell(radius: Radius.pane, active: lit)
+        .background(selected ? palette.btnPrimary.opacity(0.2) : .clear, in: coreShape(Radius.pane))
         .contentShape(coreShape(Radius.pane))
-        .onTapGesture { model.openItem(item.id) }
-        .coreScaleEffect(lit ? 1.01 : 1)
+        .onTapGesture {
+            model.selected = item.id
+            model.openItem(item.id)
+        }
         .coreRise(settled, index)
         .animation(Motion.out(Motion.hover), value: lit)
+        .animation(Motion.out(Motion.hover), value: selected)
         .onHover { hovering = $0 }
         .modifier(DragOut(model: model, item: item))
         .contextMenu { DesignMenu(model: model, item: item) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(item.name), \(item.kindWord)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .coreActivates { model.openItem(item.id) }
         .accessibilityIdentifier("design-card-\(item.id)")
+    }
+
+    static let pictureHeight = Space.s8 * 5
+
+    /// The card's second line: "Lanterna · 1 hr. ago", "No project · 24 KB", "Harbor · used by 2 designs".
+    static func short(_ model: DesignModel, _ item: DesignItem) -> String {
+        var parts = [item.projects.isEmpty ? "No project" : model.projectName(item.projects[0])]
+        switch item {
+        case .asset(let a): parts.append(Words.bytes(a.size))
+        case .kit(let k): parts.append(Words.count(k.colors.count, "colour"))
+        case .doc(let d):
+            if d.kind == .system {
+                parts.append("used by \(Words.count(model.usedBy(d).count, "design"))")
+            } else if let at = d.updatedAt {
+                parts.append(Ago.words(at))
+            }
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// "Lanterna · design system · updated 2 h ago", "No project · logo · 24 KB".
@@ -122,55 +150,24 @@ struct DesignMenu: View {
             }
         }
         .disabled(model.allProjects.isEmpty || model.readOnly)
+        Divider()
+        Button("Rename…") { model.askRename(item) }.disabled(model.readOnly)
+        Button("Delete…", role: .destructive) { model.askDelete(item) }.disabled(model.readOnly)
     }
 }
 
-/// A card on its way: soft wells in the card's shape.
+/// A card on its way: a soft well in the picture's shape and two lines.
 struct DesignCardSkeleton: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            CoreSkeleton(coreShape(Radius.cardMac)).frame(height: Space.s8 * 5 + Space.s2)
+        VStack(alignment: .leading, spacing: Space.s2) {
+            CoreSkeleton(coreShape(Radius.cardMac)).frame(height: DesignCard.pictureHeight)
             VStack(alignment: .leading, spacing: Space.s1) {
-                CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s8 * 4, height: Space.s4)
-                CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s8 * 6, height: Space.s3)
+                CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s8 * 4, height: Space.s3)
+                CoreSkeleton(coreShape(Radius.chip)).frame(width: Space.s8 * 3, height: Space.s2)
             }
-            .padding(.horizontal, Space.s2).padding(.bottom, Space.s2)
+            .padding(.horizontal, Space.s1)
         }
         .padding(Space.s2)
-        .coreWell(radius: Radius.pane)
         .accessibilityHidden(true)
-    }
-}
-
-/// The first card of the grid (mockup `d20-new`): a soft accent well with a plus; a tap makes a blank design and opens it.
-struct NewDesignCard: View {
-    let model: DesignModel
-    let settled: Bool
-    @State private var hovering = false
-
-    var body: some View {
-        VStack(spacing: Space.s3) {
-            Image(systemName: "plus").coreFont(size: MacTextSize.title, weight: .semibold)
-                .foregroundStyle(.white).frame(
-                    width: MacSize.controlLg + Space.s2, height: MacSize.controlLg + Space.s2
-                )
-                .background(coreShape(Radius.cardMac).fill(Color.accentColor)).accessibilityHidden(true)
-            VStack(spacing: Space.s1) {
-                Text("New design").coreFont(size: MacTextSize.headline, weight: .semibold)
-                Text("Start blank or let AI draw it").foregroundStyle(GlassInk.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: Space.s8 * 5 + Space.s8).padding(Space.s2)
-        .coreWell(radius: Radius.pane, active: hovering)
-        .contentShape(coreShape(Radius.pane))
-        .onTapGesture { Task { await model.quickNew() } }
-        .coreRise(settled, 0)
-        .animation(Motion.out(Motion.hover), value: hovering)
-        .onHover { hovering = $0 }
-        .disabled(model.readOnly)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .coreActivates { Task { await model.quickNew() } }
-        .accessibilityIdentifier("design-new-card")
     }
 }

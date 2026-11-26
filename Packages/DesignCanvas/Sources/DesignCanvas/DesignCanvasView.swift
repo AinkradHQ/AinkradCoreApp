@@ -193,6 +193,14 @@ public final class DesignCanvasNSView: NSView {
 
     public override func mouseDown(with e: NSEvent) {
         window?.makeFirstResponder(self)
+        // A double-click on a text node edits it (with the select tool; the text tool opens a session itself).
+        if e.clickCount == 2, engine.tool == DE_TOOL_SELECT, !engine.textActive {
+            let p = point(e)
+            if de_text_begin(engine.h, Float(p.x), Float(p.y)) == DE_OK {
+                textChanged()
+                return
+            }
+        }
         pointer(DE_POINTER_DOWN, e)
     }
     public override func mouseDragged(with e: NSEvent) { pointer(DE_POINTER_MOVE, e) }
@@ -226,6 +234,10 @@ public final class DesignCanvasNSView: NSView {
                 return .frameResize(position: c == DE_CURSOR_RESIZE_NWSE ? .topLeft : .topRight, directions: .all)
             }
             return .crosshair
+        case DE_CURSOR_CROSSHAIR: return .crosshair
+        case DE_CURSOR_GRAB: return .openHand
+        case DE_CURSOR_GRABBING: return .closedHand
+        case DE_CURSOR_TEXT: return .iBeam
         default: return .arrow
         }
     }
@@ -245,8 +257,19 @@ public final class DesignCanvasNSView: NSView {
 
     /// Delete, Escape and the arrows (nudge; Shift: 10 pt).
     public override func keyDown(with e: NSEvent) {
+        // Editing text: every key goes through the input system (typing, the IME, the caret keys; Escape ends it).
+        if engine.textActive {
+            interpretKeyEvents([e])
+            return
+        }
+        let f = e.modifierFlags.intersection([.command, .control, .option])
+        if f.isEmpty, let c = e.charactersIgnoringModifiers?.lowercased(), let t = Self.toolKey(c) {
+            editorSetTool(Int(t))
+            return
+        }
         let key: Int32? =
             switch e.keyCode {
+            case 36, 76: DE_KEY_ENTER
             case 51, 117: DE_KEY_DELETE
             case 53: DE_KEY_ESCAPE
             case 123: DE_KEY_LEFT
@@ -263,6 +286,11 @@ public final class DesignCanvasNSView: NSView {
     public override func performKeyEquivalent(with e: NSEvent) -> Bool {
         guard window?.firstResponder === self else { return super.performKeyEquivalent(with: e) }
         let f = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if engine.textActive, f == .command, e.charactersIgnoringModifiers?.lowercased() == "a" {
+            de_text_command(engine.h, UInt32(DE_TEXT_SELECT_ALL), 0)
+            textChanged()
+            return true
+        }
         switch (e.charactersIgnoringModifiers?.lowercased(), f) {
         case ("d", .command): send(key: DE_KEY_DUPLICATE, mods: 0)
         case ("z", .command): undo(redo: false)
@@ -300,6 +328,11 @@ extension DesignCanvasNSView {
     public func measureGestureEnd() {
         de_gesture_end(engine.h, reduceMotion ? 1 : 0)
         loop.wake()
+    }
+    public func measurePointer(down: Bool? = nil, at p: CGPoint, shift: Bool) {
+        pointer(
+            down == true ? DE_POINTER_DOWN : down == false ? DE_POINTER_UP : DE_POINTER_MOVE, at: p,
+            mods: shift ? UInt32(DE_MOD_SHIFT) : 0)
     }
     public func measurePointer(down: Bool? = nil, at p: CGPoint) {
         pointer(down == true ? DE_POINTER_DOWN : down == false ? DE_POINTER_UP : DE_POINTER_MOVE, at: p)

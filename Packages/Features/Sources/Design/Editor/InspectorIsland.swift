@@ -1,9 +1,10 @@
 import CoreUI
 import SwiftUI
 
-/// The inspector (V3-04): the selected node's layout, size, fill, stroke, radius, material, type, token pickers and
-/// overrides. Every control writes edit ops through `DesignEditor.set` (one undo step each, all selected nodes of that type),
-/// and shows what the node holds now, so a canvas drag or an AI edit shows up here at once.
+/// The inspector (V3-04), laid out like Figma's Design panel: Position (align, X, Y), Layout (auto layout, W, H, resizing,
+/// clip), Appearance (opacity, radius, blend, material), Fill (several, solid or gradient), Stroke, Effects (drop
+/// shadows), Typography and Overrides. Every control writes edit ops through `DesignEditor.set` (one undo step each, all
+/// selected nodes of that type) and shows what the node holds now, so a canvas drag or an AI edit shows up at once.
 struct InspectorIsland: View {
     let editor: DesignEditor
 
@@ -11,248 +12,427 @@ struct InspectorIsland: View {
         Group {
             if let n = editor.node {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Space.s5) {
+                    VStack(alignment: .leading, spacing: 0) {
                         header(n)
-                        if n.isContainer { layout(n) }
-                        if n.type != "page" { size(n) }
-                        appearance(n)
+                        if n.type != "page" { position(n) }
+                        if n.type != "page" { layout(n) }
+                        if n.type != "page" { appearance(n) }
                         fill(n)
                         if n.type != "page" { stroke(n) }
-                        if n.type == "text" { typeStyle(n) }
+                        if n.type != "page" { effects(n) }
+                        if n.type == "text" { typography(n) }
                         if n.type == "instance" { overrides(n) }
                     }
+                    // A new selection fades its sections in; edits to the same node change in place.
+                    .id(n.id)
+                    .transition(.opacity)
                 }
-                .scrollIndicators(.automatic)
+                .scrollIndicators(.never)
             } else {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text("Nothing selected").coreFont(size: MacTextSize.body, weight: .semibold)
-                    Text("Click something on the canvas, or pick a layer.").foregroundStyle(GlassInk.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Click something on the canvas, pick a layer, or add one from the toolbar.")
+                        .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .animation(Motion.out(Motion.ui), value: editor.node?.id)
         .accessibilityIdentifier("design-inspector")
     }
 
-    private func header(_ n: EditorNode) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            Text(n.name.isEmpty ? n.type.capitalizedFirst : n.name).coreFont(size: MacTextSize.title, weight: .semibold)
-                .lineLimit(1).help(n.name)
-            Text(
-                editor.selection.count > 1
-                    ? "\(editor.selection.count) selected. Changes apply to every \(n.type)."
-                    : n.type.capitalizedFirst
-            )
-            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+    private func num(_ n: EditorNode, _ key: String) -> Double? { n.props[key]?.double }
+    private func pair<A: View, B: View>(_ a: A, _ b: B) -> some View {
+        HStack(spacing: Space.s2) {
+            a
+            b
         }
     }
 
-    private func num(_ n: EditorNode, _ key: String) -> Double? { n.props[key]?.double }
+    // MARK: header
+
+    private func header(_ n: EditorNode) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(n.name.isEmpty ? n.type.capitalizedFirst : n.name).coreFont(
+                    size: MacTextSize.title, weight: .semibold
+                )
+                .lineLimit(1).help(n.name)
+                Text(
+                    editor.selection.count > 1
+                        ? "\(editor.selection.count) selected · changes apply to every \(n.type)"
+                        : n.type.capitalizedFirst
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+            Spacer(minLength: 0)
+            if n.type != "page" {
+                let hidden = n.props["visible"]?.bool == false
+                InspectorIcon(symbol: hidden ? "eye.slash" : "eye", label: hidden ? "Show Layer" : "Hide Layer") {
+                    editor.setHidden(n.id, !hidden)
+                }
+            }
+        }
+        .padding(.bottom, Space.s3)
+    }
+
+    // MARK: position
+
+    private func position(_ n: EditorNode) -> some View {
+        let parent = n.parent.flatMap { editor.node(of: $0) }
+        let pw = parent?.props["w"]?.double
+        let ph = parent?.props["h"]?.double
+        let w = num(n, "w") ?? 0
+        let h = num(n, "h") ?? 0
+        return InspectorBlock("Position") {
+            if let pw, let ph {
+                HStack(spacing: Space.s2) {
+                    alignRow([
+                        ("align.horizontal.left", "Align left", { editor.set("x", .number(0)) }),
+                        (
+                            "align.horizontal.center", "Align centre",
+                            { editor.set("x", .number(((pw - w) / 2).rounded())) }
+                        ),
+                        ("align.horizontal.right", "Align right", { editor.set("x", .number(pw - w)) }),
+                    ])
+                    alignRow([
+                        ("align.vertical.top", "Align top", { editor.set("y", .number(0)) }),
+                        (
+                            "align.vertical.center", "Align middle",
+                            { editor.set("y", .number(((ph - h) / 2).rounded())) }
+                        ),
+                        ("align.vertical.bottom", "Align bottom", { editor.set("y", .number(ph - h)) }),
+                    ])
+                }
+            }
+            pair(
+                InlineNumber(label: "X", value: num(n, "x")) {
+                    editor.set("x", DesignOptions.snap($0).map { .number($0) })
+                },
+                InlineNumber(label: "Y", value: num(n, "y")) {
+                    editor.set("y", DesignOptions.snap($0).map { .number($0) })
+                })
+        }
+    }
+
+    private func alignRow(_ items: [(String, String, () -> Void)]) -> some View {
+        HStack(spacing: 2) {
+            ForEach(items.indices, id: \.self) { i in
+                Button(action: items[i].2) {
+                    Image(systemName: items[i].0).coreFont(size: MacTextSize.body)
+                        .frame(maxWidth: .infinity, minHeight: MacSize.controlMd + 2)
+                        .contentShape(coreShape(Radius.control))
+                }
+                .buttonStyle(.plain).help(items[i].1).accessibilityLabel(items[i].1)
+            }
+        }
+        .padding(2)
+        .background(GlassInk.well, in: coreShape(Radius.control + 2))
+    }
 
     // MARK: layout
 
     @ViewBuilder private func layout(_ n: EditorNode) -> some View {
-        InspectorSection(title: "Layout") {
-            CoreSwitch(
-                "Auto layout",
-                isOn: Binding(
-                    get: { n.hasLayout },
-                    set: { editor.set("layout", $0 ? InspectorEdits.layout(n, "dir", .string("column")) : nil) }))
+        let l = n.props["layout"]
+        let sizing = n.props["sizing"]
+        InspectorBlock("Layout") {
+            if n.isContainer {
+                IconChoices(
+                    choices: [
+                        ("none", "square.dashed", "No auto layout"), ("column", "arrow.down", "Auto layout, vertical"),
+                        ("row", "arrow.right", "Auto layout, horizontal"),
+                    ],
+                    current: n.hasLayout ? (l?["dir"]?.string ?? "column") : "none"
+                ) { dir in
+                    editor.set("layout", dir == "none" ? nil : InspectorEdits.layout(n, "dir", .string(dir)))
+                }
+            }
+            pair(
+                InlineNumber(label: "W", value: num(n, "w")) {
+                    editor.set("w", DesignOptions.snap($0).map { .number(max(0, $0)) })
+                },
+                InlineNumber(label: "H", value: num(n, "h")) {
+                    editor.set("h", DesignOptions.snap($0).map { .number(max(0, $0)) })
+                })
+            pair(
+                InlineMenu(label: "W", value: sizing?["w"]?.string ?? "fixed", choices: ["fixed", "hug", "fill"]) {
+                    editor.set("sizing", InspectorEdits.sizing(n, "w", $0))
+                },
+                InlineMenu(label: "H", value: sizing?["h"]?.string ?? "fixed", choices: ["fixed", "hug", "fill"]) {
+                    editor.set("sizing", InspectorEdits.sizing(n, "h", $0))
+                })
             if n.hasLayout {
-                let l = n.props["layout"]
-                ChoiceRow(label: "Direction", value: l?["dir"]?.string, choices: ["row", "column"]) {
-                    editor.set("layout", InspectorEdits.layout(n, "dir", .string($0)))
-                }
-                NumberRow(label: "Gap", value: l?["gap"]?.double, suffix: "pt") {
-                    editor.set("layout", InspectorEdits.layout(n, "gap", $0.map { .number($0) }))
-                }
-                NumberRow(label: "Padding", value: InspectorEdits.padValue(n), suffix: "pt") {
-                    editor.set("layout", InspectorEdits.layout(n, "pad", $0.map(InspectorEdits.pad)))
-                }
-                ChoiceRow(label: "Align", value: l?["align"]?.string, choices: ["start", "center", "end", "stretch"]) {
-                    editor.set("layout", InspectorEdits.layout(n, "align", .string($0)))
-                }
-                ChoiceRow(
-                    label: "Justify", value: l?["justify"]?.string, choices: ["start", "center", "end", "between"]
-                ) {
-                    editor.set("layout", InspectorEdits.layout(n, "justify", .string($0)))
-                }
-                CoreSwitch(
-                    "Wrap",
-                    isOn: Binding(
-                        get: { l?["wrap"]?.bool == true },
-                        set: { editor.set("layout", InspectorEdits.layout(n, "wrap", .bool($0))) }))
-            }
-        }
-    }
-
-    // MARK: size
-
-    private func size(_ n: EditorNode) -> some View {
-        InspectorSection(title: "Size") {
-            HStack(alignment: .top, spacing: Space.s2) {
-                axis(n, "w", "Width")
-                axis(n, "h", "Height")
-            }
-            HStack(alignment: .top, spacing: Space.s2) {
-                NumberRow(label: "X", value: num(n, "x"), suffix: "pt", clearable: true) {
-                    editor.set("x", DesignOptions.snap($0).map { .number($0) })
-                }
-                NumberRow(label: "Y", value: num(n, "y"), suffix: "pt", clearable: true) {
-                    editor.set("y", DesignOptions.snap($0).map { .number($0) })
-                }
-            }
-        }
-    }
-
-    @ViewBuilder private func axis(_ n: EditorNode, _ key: String, _ label: String) -> some View {
-        let mode = n.props["sizing"]?[key]?.string ?? "fixed"
-        VStack(alignment: .leading, spacing: Space.s2) {
-            ChoiceRow(label: label, value: mode, choices: ["fixed", "hug", "fill"]) {
-                editor.set("sizing", InspectorEdits.sizing(n, key, $0))
-            }
-            if mode == "fixed" {
-                NumberRow(label: "\(label) in points", value: num(n, key), suffix: "pt") {
-                    editor.set(key, DesignOptions.snap($0).map { .number(max(0, $0)) })
-                }
-            }
-        }
-    }
-
-    // MARK: appearance (radius, material, opacity)
-
-    @ViewBuilder private func appearance(_ n: EditorNode) -> some View {
-        InspectorSection(title: "Appearance") {
-            if n.type != "page", n.type != "text", n.type != "ellipse", n.type != "vector" {
-                tokenOrNumber(n, key: "radius", label: "Radius", kind: "radius", suffix: "pt")
-            }
-            if ["frame", "rect", "component", "instance"].contains(n.type) {
-                let m = n.props["material"]
-                TokenSelect(label: "Material token", kind: "material", current: m, tokens: editor.tokens) {
-                    editor.set("material", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "material"))
-                }
-                if m?.tokenName == nil {
-                    ChoiceRow(
-                        label: "Material", value: m?.string ?? "none", choices: ["none", "glass", "well", "clear"]
-                    ) {
-                        editor.set("material", $0 == "none" ? nil : .string($0))
-                    }
-                }
-            }
-            if n.type != "page" {
-                NumberRow(label: "Opacity", value: num(n, "opacity").map { $0 * 100 }, suffix: "%", clearable: true) {
-                    editor.set("opacity", $0.map { .number(min(1, max(0, $0 / 100))) })
-                }
+                pair(
+                    InlineNumber(label: "Gap", value: l?["gap"]?.double) {
+                        editor.set("layout", InspectorEdits.layout(n, "gap", $0.map { .number(max(0, $0)) }))
+                    },
+                    InlineNumber(label: "Pad", value: InspectorEdits.padValue(n)) {
+                        editor.set("layout", InspectorEdits.layout(n, "pad", $0.map { InspectorEdits.pad(max(0, $0)) }))
+                    })
+                pair(
+                    InlineMenu(
+                        label: "Align", value: l?["align"]?.string ?? "start",
+                        choices: ["start", "center", "end", "stretch"]
+                    ) { editor.set("layout", InspectorEdits.layout(n, "align", .string($0))) },
+                    InlineMenu(
+                        label: "Justify", value: l?["justify"]?.string ?? "start",
+                        choices: ["start", "center", "end", "between"]
+                    ) { editor.set("layout", InspectorEdits.layout(n, "justify", .string($0))) })
             }
             if n.isContainer {
-                CoreSwitch(
+                Toggle(
                     "Clip content",
-                    isOn: Binding(get: { n.props["clip"]?.bool == true }, set: { editor.set("clip", .bool($0)) }))
+                    isOn: Binding(get: { n.props["clip"]?.bool == true }, set: { editor.set("clip", .bool($0)) })
+                )
+                .toggleStyle(.checkbox)
             }
         }
     }
 
-    /// A prop that is a number or a token (radius, gap): the token select when the system has some, else the number.
-    @ViewBuilder private func tokenOrNumber(_ n: EditorNode, key: String, label: String, kind: String, suffix: String)
-        -> some View
-    {
-        let v = n.props[key]
-        TokenSelect(label: "\(label) token", kind: kind, current: v, tokens: editor.tokens) {
-            editor.set(key, $0.map(DJSON.token) ?? InspectorEdits.literal(kind: kind))
-        }
-        if v?.tokenName == nil {
-            NumberRow(label: label, value: v?.double ?? v?.array?.first?.double, suffix: suffix, clearable: true) {
-                editor.set(key, $0.map { .number(max(0, $0)) })
+    // MARK: appearance
+
+    @ViewBuilder private func appearance(_ n: EditorNode) -> some View {
+        let rounds = ["frame", "rect", "image", "component", "instance"].contains(n.type)
+        InspectorBlock("Appearance") {
+            pair(
+                InlineNumber(label: "Opacity", value: num(n, "opacity") ?? 1, suffix: "%", scale: 100) {
+                    editor.set("opacity", $0.map { .number(min(1, max(0, $0))) })
+                },
+                Group {
+                    if rounds, n.props["radius"]?.tokenName == nil {
+                        InlineNumber(
+                            label: "Radius", value: n.props["radius"]?.double ?? n.props["radius"]?.array?.first?.double
+                        ) { editor.set("radius", $0.map { .number(max(0, $0)) }) }
+                    } else {
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    }
+                })
+            if rounds {
+                TokenSelect(label: "Radius token", kind: "radius", current: n.props["radius"], tokens: editor.tokens) {
+                    editor.set("radius", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "radius"))
+                }
             }
+            pair(
+                InlineMenu(
+                    label: "Blend", value: n.props["blend"]?.string ?? "normal",
+                    choices: ["normal", "multiply", "screen", "overlay", "darken", "lighten"]
+                ) { editor.set("blend", $0 == "normal" ? nil : .string($0)) },
+                Group {
+                    if ["frame", "rect", "component", "instance"].contains(n.type),
+                        n.props["material"]?.tokenName == nil
+                    {
+                        InlineMenu(
+                            label: "Material", value: n.props["material"]?.string ?? "none",
+                            choices: ["none", "glass", "well", "clear"]
+                        ) { editor.set("material", $0 == "none" ? nil : .string($0)) }
+                    } else {
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    }
+                })
         }
     }
 
-    // MARK: fill + stroke
+    // MARK: fill
 
     @ViewBuilder private func fill(_ n: EditorNode) -> some View {
-        let solid = InspectorEdits.firstSolid(n)
         let fills = InspectorEdits.fills(n)
-        InspectorSection(title: "Fill") {
-            if fills.isEmpty {
-                Button("Add Fill") {
-                    editor.set("fill", InspectorEdits.fill(n, color: InspectorEdits.literal(kind: "color")))
-                }
-                .buttonStyle(.coreSecondary)
-            } else if let solid {
-                TokenSelect(label: "Colour token", kind: "color", current: solid, tokens: editor.tokens) {
+        InspectorBlock("Fill") {
+            Menu {
+                Button("Solid") { editor.set("fill", .array(fills + [InsertPreset.grey.array?.first ?? .null])) }
+                Button("Linear gradient") { editor.set("fill", .array(fills + [Self.gradient])) }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .help("Add a fill").accessibilityLabel("Add a fill")
+        } content: {
+            if let first = fills.first, first["type"]?.string == "solid" {
+                TokenSelect(label: "Colour token", kind: "color", current: first["color"], tokens: editor.tokens) {
                     editor.set(
                         "fill",
                         InspectorEdits.fill(n, color: $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "color")))
                 }
-                if solid.tokenName == nil {
-                    ColorRow(label: "Colour", hex: solid.string) {
-                        editor.set("fill", InspectorEdits.fill(n, color: .string($0)))
+            }
+            ForEach(fills.indices, id: \.self) { i in
+                HStack(spacing: Space.s1) {
+                    fillRow(fills[i]) { editor.set("fill", .array(Self.replacing(fills, i, $0))) }
+                    InspectorIcon(symbol: "minus", label: "Remove this fill") {
+                        var rest = fills
+                        rest.remove(at: i)
+                        editor.set("fill", rest.isEmpty ? nil : .array(rest))
                     }
                 }
-                Button("Remove Fill") { editor.set("fill", InspectorEdits.removingFirstFill(n)) }
-                    .buttonStyle(.coreQuietDanger)
-            } else {
-                Text("A gradient or image fill. Edit it on the canvas or ask the AI.").foregroundStyle(
-                    GlassInk.secondary
-                )
-                .fixedSize(horizontal: false, vertical: true)
             }
-            if fills.count > 1 { Text("\(fills.count - 1) more").foregroundStyle(GlassInk.secondary) }
         }
     }
+
+    static let gradient = DJSON.object([
+        "type": .string("linear"), "angle": .number(90),
+        "stops": .array([
+            .object(["at": .number(0), "color": .string("#4f46e5")]),
+            .object(["at": .number(1), "color": .string("#ec4899")]),
+        ]),
+    ])
+
+    static func replacing(_ all: [DJSON], _ i: Int, _ v: DJSON) -> [DJSON] {
+        var a = all
+        a[i] = v
+        return a
+    }
+
+    @ViewBuilder private func fillRow(_ f: DJSON, set: @escaping (DJSON) -> Void) -> some View {
+        switch f["type"]?.string {
+        case "solid":
+            if let name = f["color"]?.tokenName {
+                Label(name, systemImage: "swatchpalette").frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ColorField(hex: f["color"]?.string) { set(.object(["type": .string("solid"), "color": .string($0)])) }
+            }
+        case "linear":
+            let stops = f["stops"]?.array ?? []
+            HStack(spacing: Space.s1) {
+                ForEach(stops.indices, id: \.self) { s in
+                    ColorField(hex: stops[s]["color"]?.string) { hex in
+                        var o = f.object ?? [:]
+                        var st = stops
+                        var stop = st[s].object ?? [:]
+                        stop["color"] = .string(hex)
+                        st[s] = .object(stop)
+                        o["stops"] = .array(st)
+                        set(.object(o))
+                    }
+                }
+            }
+        default:
+            Label("Image", systemImage: "photo").frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: stroke
 
     @ViewBuilder private func stroke(_ n: EditorNode) -> some View {
         let s = n.props["stroke"]
-        InspectorSection(title: "Stroke") {
+        InspectorBlock("Stroke") {
+            if s == nil {
+                InspectorIcon(symbol: "plus", label: "Add a stroke") {
+                    editor.set(
+                        "stroke", .object(["color": .string("#111111"), "width": .number(1)]))
+                }
+            }
+        } content: {
             if let s {
+                HStack(spacing: Space.s1) {
+                    if s["color"]?.tokenName == nil {
+                        ColorField(hex: s["color"]?.string) {
+                            editor.set("stroke", InspectorEdits.stroke(n, "color", .string($0)))
+                        }
+                    }
+                    InlineNumber(label: "W", value: s["width"]?.double) {
+                        editor.set("stroke", InspectorEdits.stroke(n, "width", .number(max(0, $0 ?? 1))))
+                    }
+                    .frame(width: Space.s8 * 2 + Space.s2)
+                    InspectorIcon(symbol: "minus", label: "Remove the stroke") { editor.set("stroke", nil) }
+                }
                 TokenSelect(label: "Colour token", kind: "color", current: s["color"], tokens: editor.tokens) {
                     editor.set(
                         "stroke",
-                        InspectorEdits.stroke(n, "color", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "color")))
+                        InspectorEdits.stroke(n, "color", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "color"))
+                    )
                 }
-                if s["color"]?.tokenName == nil {
-                    ColorRow(label: "Colour", hex: s["color"]?.string) {
-                        editor.set("stroke", InspectorEdits.stroke(n, "color", .string($0)))
-                    }
-                }
-                NumberRow(label: "Width", value: s["width"]?.double, suffix: "pt") {
-                    editor.set("stroke", InspectorEdits.stroke(n, "width", .number(max(0, $0 ?? 1))))
-                }
-                Button("Remove Stroke") { editor.set("stroke", nil) }.buttonStyle(.coreQuietDanger)
-            } else {
-                Button("Add Stroke") {
-                    editor.set("stroke", InspectorEdits.stroke(n, "color", InspectorEdits.literal(kind: "color")))
-                }
-                .buttonStyle(.coreSecondary)
             }
         }
     }
 
-    // MARK: type
+    // MARK: effects
 
-    @ViewBuilder private func typeStyle(_ n: EditorNode) -> some View {
+    @ViewBuilder private func effects(_ n: EditorNode) -> some View {
+        let list = n.props["shadow"]?.tokenName == nil ? (n.props["shadow"]?.array ?? []) : []
+        InspectorBlock("Effects") {
+            InspectorIcon(symbol: "plus", label: "Add a drop shadow") {
+                editor.set("shadow", .array(list + [Self.shadow]))
+            }
+        } content: {
+            if let name = n.props["shadow"]?.tokenName {
+                Label(name, systemImage: "swatchpalette")
+            }
+            ForEach(list.indices, id: \.self) { i in
+                let sh = list[i]
+                let put = { (k: String, v: DJSON) in
+                    var o = sh.object ?? [:]
+                    o[k] = v
+                    editor.set("shadow", .array(Self.replacing(list, i, .object(o))))
+                }
+                VStack(spacing: Space.s1) {
+                    HStack(spacing: Space.s1) {
+                        Text("Drop shadow").coreFont(size: MacTextSize.meta, weight: .medium)
+                        Spacer(minLength: 0)
+                        InspectorIcon(symbol: "minus", label: "Remove this shadow") {
+                            var rest = list
+                            rest.remove(at: i)
+                            editor.set("shadow", rest.isEmpty ? nil : .array(rest))
+                        }
+                    }
+                    pair(
+                        InlineNumber(label: "X", value: sh["x"]?.double) { put("x", .number($0 ?? 0)) },
+                        InlineNumber(label: "Y", value: sh["y"]?.double) { put("y", .number($0 ?? 0)) })
+                    pair(
+                        InlineNumber(label: "Blur", value: sh["blur"]?.double) {
+                            put("blur", .number(max(0, $0 ?? 0)))
+                        },
+                        InlineNumber(label: "Spread", value: sh["spread"]?.double) { put("spread", .number($0 ?? 0)) })
+                    ColorField(hex: sh["color"]?.string) { put("color", .string($0)) }
+                }
+            }
+        }
+    }
+
+    static let shadow = DJSON.object([
+        "x": .number(0), "y": .number(4), "blur": .number(12), "spread": .number(0), "color": .string("#00000040"),
+    ])
+
+    // MARK: typography
+
+    @ViewBuilder private func typography(_ n: EditorNode) -> some View {
         let t = n.props["type"]
-        InspectorSection(title: "Type") {
+        InspectorBlock("Typography") {
             TokenSelect(label: "Style token", kind: "type", current: t, tokens: editor.tokens) {
                 editor.set("type", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "type"))
             }
             if t?.tokenName == nil {
-                HStack(alignment: .top, spacing: Space.s2) {
-                    NumberRow(label: "Size", value: t?["size"]?.double, suffix: "pt") {
-                        if let v = $0 { editor.set("type", InspectorEdits.type(n, "size", .number(v))) }
-                    }
-                    ChoiceRow(
-                        label: "Weight", value: t?["weight"]?.double.map { String(Int($0)) },
-                        choices: ["300", "400", "500", "600", "700"]
-                    ) { editor.set("type", InspectorEdits.type(n, "weight", .number(Double($0) ?? 400))) }
-                }
-                ChoiceRow(label: "Align", value: t?["align"]?.string, choices: ["left", "center", "right", "justify"]) {
-                    editor.set("type", InspectorEdits.type(n, "align", .string($0)))
-                }
+                pair(
+                    InlineNumber(label: "Size", value: t?["size"]?.double) {
+                        if let v = $0 { editor.set("type", InspectorEdits.type(n, "size", .number(max(1, v)))) }
+                    },
+                    InlineMenu(
+                        label: "Weight", value: t?["weight"]?.double.map { String(Int($0)) } ?? "400",
+                        choices: ["300", "400", "500", "600", "700", "800"]
+                    ) { editor.set("type", InspectorEdits.type(n, "weight", .number(Double($0) ?? 400))) })
+                pair(
+                    InlineNumber(label: "Line", value: t?["line"]?.double, clearable: true) {
+                        editor.set("type", InspectorEdits.type(n, "line", $0.map { .number(max(0, $0)) } ?? .null))
+                    },
+                    InlineNumber(
+                        label: "Spacing", value: t?["tracking"]?.double, suffix: "%", scale: 100, clearable: true
+                    ) {
+                        editor.set(
+                            "type", InspectorEdits.type(n, "tracking", $0.map { .number(min(1, max(-1, $0))) } ?? .null)
+                        )
+                    })
+                pair(
+                    IconChoices(
+                        choices: [
+                            ("left", "text.alignleft", "Align left"), ("center", "text.aligncenter", "Align centre"),
+                            ("right", "text.alignright", "Align right"),
+                        ],
+                        current: t?["align"]?.string ?? "left"
+                    ) { editor.set("type", InspectorEdits.type(n, "align", .string($0))) },
+                    InlineMenu(
+                        label: "Case", value: t?["transform"]?.string ?? "none",
+                        choices: ["none", "uppercase", "lowercase", "capitalize"]
+                    ) { editor.set("type", InspectorEdits.type(n, "transform", .string($0))) })
             }
-            Text("Double-click the text on the canvas to edit it.").foregroundStyle(GlassInk.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text("Double-click the text on the canvas to edit it.").coreFont(size: MacTextSize.meta)
+                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -260,7 +440,7 @@ struct InspectorIsland: View {
 
     @ViewBuilder private func overrides(_ n: EditorNode) -> some View {
         let list = InspectorEdits.overridePaths(n)
-        InspectorSection(title: "Overrides") {
+        InspectorBlock("Overrides") {
             if list.isEmpty {
                 Text("This instance follows its component exactly.").foregroundStyle(GlassInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)

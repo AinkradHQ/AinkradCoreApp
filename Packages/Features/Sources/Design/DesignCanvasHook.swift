@@ -61,6 +61,16 @@ extension DesignModel {
     func editor(for doc: String) -> DesignEditor {
         if let e = editors[doc] { return e }
         let e = DesignEditor(doc: doc, service: service)
+        // Ask… draws on this canvas: three directions from the words, through the composer.
+        e.ask = { [weak self] req in
+            guard let self else { return false }
+            guard composeSupported else {
+                host.shell.showToast("This Core cannot draw with AI yet.", kind: .warn)
+                return false
+            }
+            await drawWithAI(prompt: req.text)
+            return true
+        }
         editors[doc] = e
         return e
     }

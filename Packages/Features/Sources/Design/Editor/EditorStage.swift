@@ -13,7 +13,7 @@ struct EditorStage: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
-            LayersIsland(editor: editor).frame(width: Space.s8 * 8)
+            LayersIsland(editor: editor).frame(width: Space.s8 * 9)
             ZStack(alignment: .bottom) {
                 canvas
                     .clipShape(coreShape(Radius.pane))
@@ -30,10 +30,12 @@ struct EditorStage: View {
                             Button("Dismiss") { editor.notice = nil }.buttonStyle(.corePlain)
                         }
                         .frame(maxWidth: Space.s8 * 14)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     Spacer(minLength: 0)
-                    AskBar(editor: editor)
+                    CanvasToolbar(model: model, editor: editor)
                 }
+                .animation(Motion.out(Motion.ui), value: editor.notice)
                 .padding(Space.s4)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

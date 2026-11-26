@@ -23,9 +23,11 @@ public final class DesignModel {
     /// The paired connection, for the canvas's sync socket; nil until a Core is attached.
     @ObservationIgnored var connection: CoreConnection?
 
-    var docs: [DesignDoc] = []
-    var assets: [DesignAsset] = []
-    var kits: [BrandKit] = []
+    var docs: [DesignDoc] = [] { didSet { sortItems() } }
+    var assets: [DesignAsset] = [] { didSet { sortItems() } }
+    var kits: [BrandKit] = [] { didSet { sortItems() } }
+    /// Every item, newest first: sorted once when a list changes, not on every count and redraw.
+    private(set) var items: [DesignItem] = []
     var load: DesignLoad = .notConnected
     /// The rail's pick.
     var category = DesignCategory.all
@@ -35,6 +37,12 @@ public final class DesignModel {
     var filter = ""
     /// The open item (a `DesignItem.id`), or nil for the home.
     var openID: String?
+    /// The card the keyboard is on (a `DesignItem.id`), or nil.
+    var selected: String?
+    /// The wall's column count, for ↑ ↓ (set by the wall as it lays out).
+    @ObservationIgnored var columns = 1
+    /// The open item's About panel.
+    var aboutOpen = false
     /// The pictures of loaded assets, by sha256.
     private(set) var images: [String: NSImage] = [:]
     @ObservationIgnored private var fetching: Set<String> = []
@@ -51,6 +59,8 @@ public final class DesignModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: the app's on-canvas probe (pointer and keys on the real canvas view), set by the app.
+    @ObservationIgnored public var debugCanvasProbe: (@MainActor (@escaping @MainActor (String) -> Void) async -> Void)?
     #endif
 
     public init(host: any AdminHost, projects: ProjectsModel) {
@@ -109,6 +119,8 @@ public final class DesignModel {
             assets = try await a
             kits = try await k
             load = .ready
+            // The handshake that proves the Core's minors happens on the first request, so ask after a load.
+            if let connection { composeSupported = await connection.serverSupports(minor: coreMinorV010) }
         } catch let e as DesignFailure where e.status == 404 || e.status == 501 {
             load = .absent
         } catch {
@@ -119,8 +131,8 @@ public final class DesignModel {
     // MARK: derived
 
     /// Every item, newest first.
-    var items: [DesignItem] {
-        (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
+    private func sortItems() {
+        items = (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
             .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
     }
 
@@ -143,6 +155,7 @@ public final class DesignModel {
         // TODO(V6-02): designs waiting for review or approval. TODO(V7-02): designs an AI session is drawing.
         case .needsYou, .drawing: []
         case .all: visible(in: project)
+        case .library: visible(in: project).filter { DesignCategory.libraryKinds.contains($0.category) }
         default: visible(in: project).filter { $0.category == c }
         }
     }
@@ -305,6 +318,8 @@ public final class DesignModel {
         guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else { return }
         let c = DesignComposer(model: self, doc: d.id, prompt: prompt)
         host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
+        // From the Ask… field the words are already there: start drawing at once.
+        if !prompt.isEmpty { c.draw() }
     }
 
     /// New design (advanced): the sheet with name, kind and project.
@@ -320,12 +335,14 @@ public final class DesignModel {
 
     func closeItem() {
         editors = [:]
+        aboutOpen = false
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 
     /// One rail row is selected at a time: a category clears the project, a project shows all of its designs.
     func pick(_ c: DesignCategory) {
-        category = c
+        withAnimation(Motion.out(Motion.ui)) { category = c }
+        selected = nil
         project = nil
         openID = nil
     }
@@ -349,6 +366,8 @@ public final class DesignModel {
         ) { DesignView(model: self) }
         spec.tab = "Design"
         spec.fullScreenOnly = true
+        // ⌘N (File, New) on this pane makes a blank design at once.
+        spec.onNew = { [weak self] in Task { await self?.quickNew() } }
         host.shell.openPane(spec)
         Task { await reload() }
     }

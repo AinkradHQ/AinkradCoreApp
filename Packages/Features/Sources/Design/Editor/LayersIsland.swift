@@ -25,8 +25,12 @@ struct LayersIsland: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: Space.s1) {
-                        ForEach(rows) { LayerRowView(editor: editor, row: $0) }
+                        ForEach(rows) {
+                            LayerRowView(editor: editor, row: $0).lineLimit(1)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
+                    .animation(Motion.out(Motion.ui), value: rows.map(\.id))
                 }
                 .scrollIndicators(.automatic)
             }

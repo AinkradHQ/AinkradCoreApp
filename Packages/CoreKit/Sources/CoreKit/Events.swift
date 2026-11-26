@@ -61,6 +61,10 @@ protocol EventSocket: Sendable {
     var closeReason: String { get }
     /// The status of a refused upgrade, when there was one.
     var responseStatus: Int? { get }
+    /// Requirements, not only extension defaults: called through `any EventSocket` (as `CoreSocket` does), an extension-only
+    /// method dispatches to the text-only default, so a module socket's binary frames came in as text and went out never.
+    func receiveFrame() async throws -> CoreSocketFrame
+    func sendFrame(_ frame: CoreSocketFrame) async throws
 }
 
 extension EventSocket {

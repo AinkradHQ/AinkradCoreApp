@@ -11,7 +11,7 @@ import Pairing
 /// that shows it.
 @MainActor
 enum DesignMeasure {
-    private static var view: DesignCanvasNSView?
+    static var view: DesignCanvasNSView?
 
     static func ready(_ v: DesignCanvasNSView) { view = v }
 

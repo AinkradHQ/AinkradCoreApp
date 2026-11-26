@@ -153,6 +153,8 @@ enum DesignItem: Identifiable, Equatable, Sendable {
 /// The rail of the home: what needs you, what AI is drawing, everything, then one row per kind.
 enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
     case needsYou, drawing, all, screens, brand, icons, illustrations, fonts, systems, mockups
+    /// Every library file and kit at once: brand, icons, illustrations and fonts.
+    case library
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -166,6 +168,7 @@ enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
         case .fonts: "Fonts"
         case .systems: "Design systems"
         case .mockups: "HTML mockups"
+        case .library: "Library"
         }
     }
     var symbol: String {
@@ -180,10 +183,28 @@ enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
         case .fonts: "textformat"
         case .systems: "swatchpalette"
         case .mockups: "chevron.left.forwardslash.chevron.right"
+        case .library: "photo.on.rectangle"
         }
     }
     /// The kinds, in the rail's order (the mockup's, with Fonts beside Illustrations).
     static let kinds: [DesignCategory] = [.screens, .brand, .icons, .illustrations, .fonts, .systems, .mockups]
+    /// The library's own kinds, in the Library page's order.
+    static let libraryKinds: [DesignCategory] = [.brand, .icons, .illustrations, .fonts]
+    /// The header's pages, each with its key (⌘1…⌘5).
+    static let pages: [DesignCategory] = [.all, .screens, .systems, .mockups, .library]
+    /// The header page this category lives on: a library kind on Library.
+    var page: DesignCategory { Self.libraryKinds.contains(self) ? .library : self }
+    /// The header's short name.
+    var short: String {
+        switch self {
+        case .all: "All"
+        case .screens: "Designs"
+        case .systems: "Systems"
+        case .mockups: "Mockups"
+        case .brand: "Brand"
+        default: title
+        }
+    }
 }
 
 enum DesignLoad: Equatable {

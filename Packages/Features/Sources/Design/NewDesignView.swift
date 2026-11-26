@@ -45,7 +45,8 @@ struct NewDesignView: View {
                                 Text(line).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(Space.s3)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                             .coreCard(
                                 kind == k.rawValue ? Color.accentColor.opacity(0.16) : GlassInk.well,
                                 radius: Radius.pane)
@@ -54,6 +55,8 @@ struct NewDesignView: View {
                         .accessibilityAddTraits(kind == k.rawValue ? .isSelected : [])
                     }
                 }
+                // Every tile as tall as the tallest, whatever its words wrap to.
+                .fixedSize(horizontal: false, vertical: true)
             }
             CoreSelect(
                 "Project", selection: $project,

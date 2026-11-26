@@ -36,7 +36,9 @@ final class DesignEditor {
     /// Answers the Ask… field (V7-02). Nil: no AI is wired yet, and the field says so.
     @ObservationIgnored var ask: (@MainActor (AskRequest) async -> Bool)?
     @ObservationIgnored private let service: (any DesignService)?
-    @ObservationIgnored private weak var backend: (any DesignEditBackend)?
+    /// Held strongly: the canvas hands over a fresh object and keeps none, so a weak hold dropped it at once and the
+    /// chrome never saw the canvas (no layers, no selection). The object holds the canvas view weakly, so no cycle.
+    private var backend: (any DesignEditBackend)?
     @ObservationIgnored private var pending = false
     /// What a brand-new design starts with (its page and a frame of the default canvas); written once, when the canvas is up
     /// and the design is still empty.
@@ -62,11 +64,21 @@ final class DesignEditor {
 
     var attached: Bool { backend != nil }
 
+    /// The canvas tool (`CanvasTool` raw value), read on every change: drawing a shape returns it to select.
+    private(set) var tool = 0
+    func setTool(_ t: CanvasTool) {
+        backend?.setTool(t.rawValue)
+        tool = backend?.tool ?? 0
+    }
+
+    /// One node as the engine has it now (not observed).
+    func node(of id: String) -> EditorNode? { backend?.node(id).flatMap { EditorNode(json: $0) } }
+
     /// A picture of one frame (the composer's direction cards); nil until the engine lists it.
     func sketch(frame id: String) -> FrameSketch? {
         guard let b = backend else { return nil }
-        let list = b.tree().flatMap { try? JSONDecoder().decode([DesignLayer].self, from: $0) } ?? []
-        return FrameSketch.make(frame: id, layers: LayerTree(list)) { b.node($0).flatMap { EditorNode(json: $0) } }
+        // Reads the observed `layers`, so a card waiting for its frame redraws when the sync brings it.
+        return FrameSketch.make(frame: id, layers: layers) { b.node($0).flatMap { EditorNode(json: $0) } }
     }
 
     /// The document or selection may have changed. Reads are coalesced to one per 60 ms: a drag or a remote burst must not
@@ -83,6 +95,7 @@ final class DesignEditor {
 
     func reload() {
         syncStuck = backend?.syncStuck ?? false
+        if let t = backend?.tool, t != tool { tool = t }
         guard let b = backend else {
             layers = LayerTree([])
             selection = []
@@ -92,6 +105,13 @@ final class DesignEditor {
         }
         let list = b.tree().flatMap { try? JSONDecoder().decode([DesignLayer].self, from: $0) } ?? []
         let next = LayerTree(list)
+        // The first time a design shows its layers, open its pages and their frames, so what is on the canvas is listed.
+        if layers.layers.isEmpty, !next.layers.isEmpty {
+            for p in next.children(of: nil) {
+                expanded.insert(p.id)
+                for f in next.children(of: p.id) where f.isContainer { expanded.insert(f.id) }
+            }
+        }
         if next != layers { layers = next }
         let sel = b.selection()
         if sel != selection {
@@ -135,13 +155,16 @@ final class DesignEditor {
         return false
     }
 
-    func select(_ id: String) {
-        guard let b = backend else { return }
+    /// Selects a layer. False when the canvas does not have it (yet): `quiet` for a caller that waits for the sync.
+    @discardableResult
+    func select(_ id: String, quiet: Bool = false) -> Bool {
+        guard let b = backend else { return false }
         if b.select([id]) {
             reload()
-        } else {
-            notice = "This canvas cannot select from the layers yet. Click it on the canvas."
+            return true
         }
+        if !quiet { notice = "That layer is not on the canvas yet. Try again in a moment." }
+        return false
     }
 
     func rename(_ id: String, to name: String) {
