@@ -36,18 +36,24 @@ extension CoreConnection {
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
         let socket = makeSocket(request)
         socket.start()
-        do {
-            try await socket.ping()
-        } catch {
+        // Opened once the Core answers the upgrade. Not by a ping: a module socket (Design's sync) sends its first frame at
+        // once, and URLSession holds the pong behind that unread frame, so a ping before the first read never returns.
+        // Never waits for ever: 10 s without an answer is "offline".
+        var status = socket.responseStatus
+        for _ in 0..<200 where status == nil {
+            try? await Task.sleep(for: .milliseconds(50))
+            status = socket.responseStatus
+        }
+        if status != 101 {
             socket.cancel()
-            switch socket.responseStatus {
+            switch status {
             case 401:
                 await sessions.invalidate(session.id)
                 throw CoreError.sessionExpired
             case 403?: throw CoreError.forbiddenScope
             case let status?:
                 throw CoreError.http(status: status, code: "refused", message: "The Core refused the connection.")
-            case nil: throw CoreError.offline("the connection did not open: \(error)")
+            case nil: throw CoreError.offline("the connection did not open in 10 s")
             }
         }
         return CoreSocket(socket)
