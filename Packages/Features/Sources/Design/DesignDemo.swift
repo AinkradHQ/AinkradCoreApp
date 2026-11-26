@@ -56,7 +56,8 @@ public final class DesignDemo {
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
-        "system-guide", "system-guide-night",
+        "system-guide", "system-guide-night", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors",
+        "tools-follow", "tools-shortcuts", "tools-paste", "tools-text",
     ]
 
     private let model: DesignModel
@@ -254,7 +255,8 @@ public final class DesignDemo {
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
-            "tools-probe":
+            "tools-probe", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors", "tools-follow",
+            "tools-shortcuts", "tools-paste", "tools-text":
             model.openID = "doc:\(Self.did(1))"
         case "open-system", "system-empty", "system-guide", "system-guide-night": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
@@ -294,6 +296,7 @@ public final class DesignDemo {
                 FileHandle.standardError.write(Data("PROBE no editor\n".utf8))
             }
         }
+        if scene.hasPrefix("tools-") { await tools(scene) }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
         if scene.hasPrefix("present-") {
             // Present on the real canvas (CORE_DESIGN_SCENE): the scene's frame in a phone, or as a desktop in a browser.
@@ -362,6 +365,64 @@ public final class DesignDemo {
             try? await Task.sleep(for: .milliseconds(300))
             model.projectsMenuOpen = true
         }
+    }
+}
+
+extension DesignDemo {
+    /// The editor tools on the real canvas (CORE_DESIGN_SCENE): zoom readout, pages, collaborators, shortcuts, paste.
+    func tools(_ scene: String) async {
+        try? await Task.sleep(for: .seconds(2))
+        guard let e = model.editors[Self.did(1)] else {
+            return FileHandle.standardError.write(Data("TOOLS no editor\n".utf8))
+        }
+        let frame = e.layers.layers.first { $0.type == "frame" }
+        func peer(_ n: Int, _ id: String, _ label: String, _ at: [Double]) -> String {
+            let sel = frame.map { ",\"selection\":[\"\($0.id)\"]" } ?? ""
+            return "{\"peer\":\"\(id)\",\"conn\":\(n),\"label\":\"\(label)\",\"cursor\":[\(at[0]),\(at[1])]\(sel)}"
+        }
+        switch scene {
+        case "tools-selftest":
+            EditorToolsSelfTest.run(e) { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }
+        case "tools-zoom":
+            e.backend?.zoom(to: 2)
+        case "tools-pages":
+            e.insert(InsertPreset.frames[0])
+            e.addPage()
+            e.insert(InsertPreset.frames[3])
+            e.insert(InsertPreset.shapes[0])
+            e.addPage()
+            e.showPage(1)
+        case "tools-cursors", "tools-follow":
+            e.backend?.debugPresence(peer(1, "person:d_maya", "Maya Ortiz", [180, 260]))
+            e.backend?.debugPresence(peer(2, "session:as_0a1b2c3d", "Claude", [90, 420]))
+            e.reload()
+            if scene == "tools-follow", let maya = e.collaborators.first { e.follow(maya) }
+        case "tools-shortcuts":
+            e.shortcutsOpen = true
+        case "tools-paste", "tools-text":
+            // A card of three layers is copied and pasted twice (the second time into another frame), grouped, and a
+            // line of plain text is pasted as a text layer.
+            guard let f = frame, e.select(f.id) else { return }
+            e.insert(InsertPreset.shapes[0])
+            e.insert(InsertPreset.shapes[1])
+            e.insert(InsertPreset.texts[1])
+            let three = e.layers.children(of: f.id).suffix(3).map(\.id)
+            e.selectMany(three)
+            e.copy()
+            e.paste()
+            if scene == "tools-paste" {
+                e.group()
+                e.selectMany(e.selection)
+            } else {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString("Pay now to finish the order", forType: .string)
+                e.select(f.id)
+                e.paste()
+            }
+        default: break
+        }
+        try? await Task.sleep(for: .seconds(1))
     }
 }
 

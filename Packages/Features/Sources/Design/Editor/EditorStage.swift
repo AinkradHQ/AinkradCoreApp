@@ -60,5 +60,11 @@ struct EditorStage: View {
             .coreWell(radius: Radius.pane)
             Island("Inspector") { InspectorIsland(editor: editor) }.frame(width: Space.s8 * 10)
         }
+        .onChange(of: model.assets, initial: true) { _, list in
+            editor.libraryFonts = list.filter { $0.kind == .font && $0.check == .ok }
+        }
+        .sheet(isPresented: Binding(get: { editor.shortcutsOpen }, set: { editor.shortcutsOpen = $0 })) {
+            ShortcutsSheet(editor: editor)
+        }
     }
 }

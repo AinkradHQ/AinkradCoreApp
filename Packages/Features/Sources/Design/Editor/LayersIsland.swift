@@ -45,6 +45,7 @@ struct LayersIsland: View {
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s2) {
+                if editor.attached { PageSwitcher(editor: editor) }
                 if finding {
                     HStack(spacing: Space.s2) {
                         Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary).accessibilityHidden(

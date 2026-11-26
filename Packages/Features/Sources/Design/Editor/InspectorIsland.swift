@@ -400,6 +400,7 @@ struct InspectorIsland: View {
                 editor.set("type", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "type"))
             }
             if t?.tokenName == nil {
+                FontRow(editor: editor, node: n)
                 pair(
                     InlineNumber(label: "Size", value: t?["size"]?.double) {
                         if let v = $0 { editor.set("type", InspectorEdits.type(n, "size", .number(max(1, v)))) }
