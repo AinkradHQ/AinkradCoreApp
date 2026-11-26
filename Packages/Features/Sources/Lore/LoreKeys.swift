@@ -47,8 +47,8 @@ enum LoreKeys {
 
     /// The key line along the bottom of the space.
     static let hints: [(String, String)] = [
-        (open.label, "Open"), (find.label, "Find"), (today.label, "Today"), ("⌘[ ⌘]", "Days"),
-        (outline.label, "Outline"), (versions.label, "Versions"), (focus.label, "Focus"),
+        (open.label, "Open"), (find.label, "Find"), (today.label, "Today"), ("⌘[ ⌘]", "Days"), ("/", "Insert"),
+        (focus.label, "Focus"),
     ]
 
     /// The row after (`step` 1) or before (-1) `cursor` in `ids`; the first or last when there is no cursor yet.
@@ -94,7 +94,7 @@ struct LoreKeyLine: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             line(LoreKeys.hints)
-            line(Array(LoreKeys.hints.prefix(6)))
+            line(Array(LoreKeys.hints.prefix(5)))
             line(Array(LoreKeys.hints.prefix(4)))
         }
         .frame(maxWidth: .infinity).frame(height: Space.s6)

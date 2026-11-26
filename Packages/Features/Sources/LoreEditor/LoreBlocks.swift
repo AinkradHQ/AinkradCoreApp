@@ -15,6 +15,12 @@ extension NSAttributedString.Key {
     static let loreCodeClose = NSAttributedString.Key("loreCodeClose")
     static let loreBold = NSAttributedString.Key("loreBold")
     static let loreItalic = NSAttributedString.Key("loreItalic")
+    static let loreStrike = NSAttributedString.Key("loreStrike")
+    /// An image ref (`![alt](url)`; the value is the address): the alt text on a well with a photo glyph. A click goes
+    /// through the link policy; nothing is fetched (T9).
+    static let loreImage = NSAttributedString.Key("loreImage")
+    /// A raw block that is a thematic break (`---`): drawn as a rule unless the caret is inside it.
+    static let loreRule = NSAttributedString.Key("loreRule")
     /// Inline code run: drawn on a rounded well.
     static let loreCode = NSAttributedString.Key("loreCode")
     /// Note link (wikilink): the value is the note title.
@@ -193,6 +199,7 @@ enum LoreInk {
         let bold = a[.loreBold] != nil
         let italic = a[.loreItalic] != nil
         let code = a[.loreCode] != nil
+        let strike = b != .code && a[.loreStrike] != nil
         let font: NSFont
         switch b {
         case .h(let n): font = Typeface.text(n <= 3 ? Typeface.heading(n) : Typeface.body, .semibold, italic: italic)
@@ -209,10 +216,13 @@ enum LoreInk {
         default: color = LoreInk.text
         }
         let link = a[.link] != nil
-        return [
+        var out: [NSAttributedString.Key: Any] = [
             .font: font, .foregroundColor: color, .kern: 0,
             .underlineStyle: link ? NSUnderlineStyle.single.rawValue : 0, .underlineColor: LoreInk.text2,
+            .strikethroughStyle: strike ? NSUnderlineStyle.single.rawValue : 0, .strikethroughColor: LoreInk.text2,
         ]
+        if a[.loreImage] != nil { out[.cursor] = NSCursor.pointingHand }
+        return out
     }
 
     /// Re-derives everything for one paragraph from its semantic attributes.
@@ -235,14 +245,16 @@ enum LoreInk {
         // Breathing room around inline code and note links: kern the character before and the run's last one.
         guard b != .code else { return }
         var wells: [NSRange] = []
-        for key in [NSAttributedString.Key.loreCode, .loreChip] {
+        for key in [NSAttributedString.Key.loreCode, .loreChip, .loreImage] {
             ts.enumerateAttribute(key, in: r) { v, rr, _ in if v != nil { wells.append(rr) } }
         }
         for rr in wells {
             if rr.location > r.location {
                 ts.addAttribute(.kern, value: 5, range: NSRange(location: rr.location - 1, length: 1))
             }
-            ts.addAttribute(.kern, value: 5, range: NSRange(location: NSMaxRange(rr) - 1, length: 1))
+            // An image's well holds its photo glyph after the text (`LoreFragment.drawRuns`).
+            let room: CGFloat = ts.attribute(.loreImage, at: rr.location, effectiveRange: nil) != nil ? 24 : 5
+            ts.addAttribute(.kern, value: room, range: NSRange(location: NSMaxRange(rr) - 1, length: 1))
         }
     }
 

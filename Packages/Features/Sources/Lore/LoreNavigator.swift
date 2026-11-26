@@ -17,18 +17,23 @@ struct LoreLeftSidebar: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s1 / 2) {
-                    search
+                    // The sidebar slides in; its parts arrive a beat after it, top first.
+                    search.loreArrive(0)
                     LoreWeekCard(model: model, cursor: cursor == "today").id("today")
                         .padding(.bottom, Space.s2)
-                    if let f = model.sideFilter {
-                        found(f)
-                    } else {
-                        groupSection("Notes", notes)
-                        groupSection("Projects", projects)
+                        .loreArrive(1)
+                    Group {
+                        if let f = model.sideFilter {
+                            found(f)
+                        } else {
+                            groupSection("Notes", notes)
+                            groupSection("Projects", projects)
+                        }
+                        docs
+                        tags
+                        recents
                     }
-                    docs
-                    tags
-                    recents
+                    .loreArrive(2)
                 }
                 .padding(.bottom, Space.s4)
             }

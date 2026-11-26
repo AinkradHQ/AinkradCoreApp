@@ -20,7 +20,7 @@ struct LoreView: View {
                 .onHover { if $0 { model.typing = false } }
             if let line = model.notice {
                 CoreNotice(symbol: "clock.arrow.circlepath", title: line, tone: .warn) { noticeButtons }
-                    .frame(maxWidth: Self.pageWidth)
+                    .frame(maxWidth: Self.measure)
                     .padding(.bottom, Space.s2)
                     .transition(.opacity)
             }
@@ -37,8 +37,9 @@ struct LoreView: View {
                 }
             }
             .padding(.horizontal, Space.s4)
-            .animation(Motion.out(Motion.ui), value: model.showLeft)
-            .animation(Motion.out(Motion.ui), value: model.showRight)
+            // A critically damped spring: the sidebar arrives without overshoot; Reduce Motion, a fade.
+            .animation(Motion.calm(.spring(duration: 0.36, bounce: 0), reduceMotion), value: model.showLeft)
+            .animation(Motion.calm(.spring(duration: 0.36, bounce: 0), reduceMotion), value: model.showRight)
             // Typing and focus mode put the key line away; it comes back on the next pause.
             LoreKeyLine().opacity(model.typing || !(model.showLeft || model.showRight) ? 0 : 1)
         }
@@ -114,6 +115,9 @@ struct LoreView: View {
                 .disabled(model.isToday || model.service == nil)
             Button(LoreKeys.save.title) { Task { await model.save() } }.loreKey(LoreKeys.save)
                 .disabled(model.load != .ready)
+            // Versions live in the inspector; the key opens all of them.
+            Button(LoreKeys.versions.title) { model.showVersions() }.loreKey(LoreKeys.versions)
+                .disabled(model.note == nil || model.load != .ready)
         }
         .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
     }
@@ -178,7 +182,8 @@ private struct LorePageIsland: View {
 }
 
 /// On the surface, no card: ‹ › days, the long date (or the note's title), Today when away from it, the project chip;
-/// the save state, versions, Open… ⌘O and New ⌘N. The sidebar toggles sit at the ends, over their sidebars.
+/// the save state, Open… ⌘O and New ⌘N (versions are in the inspector, and ⇧⌘H). The sidebar toggles sit at the
+/// ends, over their sidebars.
 private struct LoreTopBar: View {
     let model: LoreModel
     @State private var projectOpen = false
@@ -210,11 +215,6 @@ private struct LoreTopBar: View {
         } actions: {
             Text(model.syncWords).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
                 .accessibilityIdentifier("lore-sync")
-            CoreIconButton(symbol: "clock.arrow.circlepath", label: LoreKeys.versions.help) {
-                model.showVersions()
-            }
-            .loreKey(LoreKeys.versions)
-            .disabled(model.note == nil || model.load != .ready)
             Button {
                 LoreOpenSheet.open(model)
             } label: {

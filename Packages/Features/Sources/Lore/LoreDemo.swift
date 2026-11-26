@@ -192,12 +192,13 @@ public final class LoreDemo {
         }
     }
 
-    public static let scenes = [
-        "today-blank", "today", "past-day", "project-note", "conflict", "kept", "not-connected", "open-sheet",
-        "backlinks", "versions", "restored", "long-note", "new-note", "focus",
-    ]
+    public static let scenes =
+        [
+            "today-blank", "today", "past-day", "project-note", "conflict", "kept", "not-connected", "open-sheet",
+            "backlinks", "versions", "restored", "long-note", "new-note", "focus",
+        ] + toolScenes
 
-    private let model: LoreModel
+    let model: LoreModel
     private let service: Service
     /// The person's sidebars, put back when the walk ends (the walk opens both, and focus mode hides both).
     private let sidebars: (Bool, Bool)
@@ -272,7 +273,7 @@ public final class LoreDemo {
         case "open-sheet":
             await model.openDay(model.todayKey)
             LoreOpenSheet.open(model)
-        default: break
+        default: await showTools(scene)
         }
     }
 

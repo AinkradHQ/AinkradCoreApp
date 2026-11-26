@@ -90,11 +90,27 @@ extension LoreEditorController {
         guard let at = LoreHeadingScan.location(ofHeading: index, in: textView.ts) else { return }
         let line = (textView.string as NSString).paragraphRange(for: NSRange(location: at, length: 0))
         textView.setSelectedRange(NSRange(location: line.location, length: 0))
-        textView.scrollRangeToVisible(line)
+        // The picked heading is lit, even when the note is too short to bring it to the top.
+        spy.hold = Date().addingTimeInterval(Motion.ui + 0.3)
+        spy.heading = index
+        glide(to: line.location)
     }
 }
 
 enum LoreHeadingScan {
+    /// Where every heading of level 1 to 3 starts, in order.
+    static func starts(in ts: NSAttributedString) -> [Int] {
+        let ns = ts.string as NSString
+        var out: [Int] = []
+        var loc = 0
+        while loc < ns.length {
+            let para = ns.paragraphRange(for: NSRange(location: loc, length: 0))
+            if case .h(let level) = Block.at(ts, para.location), level <= 3 { out.append(para.location) }
+            loc = NSMaxRange(para)
+        }
+        return out
+    }
+
     /// The start of the `index`-th paragraph that is a heading of level 1 to 3.
     static func location(ofHeading index: Int, in ts: NSAttributedString) -> Int? {
         let ns = ts.string as NSString

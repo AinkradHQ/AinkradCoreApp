@@ -7,6 +7,8 @@ import QuartzCore
 final class LoreTextView: NSTextView {
     weak var controller: LoreEditorController?
     var picker: LorePicker?
+    /// The selection bar, the insert menu and the + (`LoreTools`).
+    lazy var tools = LoreTools(self)
     var busy = false
     var latency = LoreLatency()
     private let fragments = LoreFragmentProvider()
@@ -83,6 +85,7 @@ final class LoreTextView: NSTextView {
         if inTable || caretWasInTable { needsDisplay = true }
         if inTable != caretWasInTable { controller?.onTable?(inTable) }
         caretWasInTable = inTable
+        tools.selectionChanged(stillSelecting: stillSelecting)
     }
     private var caretWasInTable = false
     /// Text mode: tables always show their Markdown (E0-7), not a grid.
@@ -173,6 +176,7 @@ final class LoreTextView: NSTextView {
             if r.length > 0, NSMaxRange(r) <= ts.length { ts.removeAttribute(.loreRaw, range: r) }
         }
         super.didChangeText()
+        controller?.spy.starts = nil
         Style.renumber(ts, around: min(cursor, max(0, ts.length - 1)))
         controller?.onChange?()
     }
@@ -186,13 +190,16 @@ final class LoreTextView: NSTextView {
         guard !busy, selectedRange().length == 0,
             let s = (string as? String) ?? (string as? NSAttributedString)?.string
         else { return }
+        if tools.menu != nil { return tools.updateMenu() }
         if picker != nil { return updatePicker() }
         guard s.count == 1 else { return }
         switch s {
         case " ": blockTrigger()
         case "`": if !fenceTrigger() { inlineTrigger() }
-        case "*", "_": inlineTrigger()
+        case "*", "_", "~": inlineTrigger()
         case "[": linkTrigger()
+        case "/": tools.slashTyped()
+        case "-": ruleTrigger()
         default: break
         }
     }
@@ -250,6 +257,7 @@ final class LoreTextView: NSTextView {
         try! NSRegularExpression(pattern: p)
     }
     private static let inlineRules: [(NSRegularExpression, NSAttributedString.Key)] = [
+        (re(#"~~(?=\S)([^~\n]{1,256}?)(?<=\S)~~$"#), .loreStrike),
         (re(#"(?<!`)`([^`\n]{1,256})`$"#), .loreCode),
         (re(#"\*\*(?=\S)([^*\n]{1,256}?)(?<=\S)\*\*$"#), .loreBold),
         (re(#"(?<![*\w])\*(?=[^\s*])([^*\n]{1,256}?)(?<=\S)\*$"#), .loreItalic),
@@ -284,7 +292,7 @@ final class LoreTextView: NSTextView {
 
     // MARK: [[ note links
 
-    private func linkTrigger() {
+    func linkTrigger() {
         guard cursor >= 2, ns.substring(with: NSRange(location: cursor - 2, length: 2)) == "[[",
             currentBlock() != .code, let controller
         else { return }
@@ -324,20 +332,34 @@ final class LoreTextView: NSTextView {
         typingAttributes = plain
     }
 
-    override func moveUp(_ sender: Any?) { if let p = picker { p.move(-1) } else { super.moveUp(sender) } }
-    override func moveDown(_ sender: Any?) { if let p = picker { p.move(1) } else { super.moveDown(sender) } }
+    override func moveUp(_ sender: Any?) {
+        if tools.menu != nil { tools.move(-1) } else if let p = picker { p.move(-1) } else { super.moveUp(sender) }
+    }
+    override func moveDown(_ sender: Any?) {
+        if tools.menu != nil { tools.move(1) } else if let p = picker { p.move(1) } else { super.moveDown(sender) }
+    }
     override func cancelOperation(_ sender: Any?) {
-        if picker != nil { closePicker() } else { super.cancelOperation(sender) }
+        if tools.menu != nil {
+            tools.closeMenu(cancel: true)
+        } else if picker != nil {
+            closePicker()
+        } else if tools.bar != nil {
+            tools.hideBar()
+        } else {
+            super.cancelOperation(sender)
+        }
     }
     override func complete(_ sender: Any?) { if picker != nil { closePicker() } else { super.complete(sender) } }
     override func resignFirstResponder() -> Bool {
         closePicker()
+        tools.closeAll()
         return super.resignFirstResponder()
     }
 
     // MARK: Return, Tab, Delete
 
     override func insertNewline(_ sender: Any?) {
+        if tools.menu != nil { return tools.chooseCurrent() }
         if let p = picker {
             if let t = p.current { choose(t) } else { closePicker() }
             return
@@ -382,6 +404,7 @@ final class LoreTextView: NSTextView {
     }
 
     override func insertTab(_ sender: Any?) {
+        if tools.menu != nil { return tools.chooseCurrent() }
         if let p = picker {
             if let t = p.current { choose(t) }
             return
@@ -426,73 +449,22 @@ final class LoreTextView: NSTextView {
             if sel.location == pr.location && b != .p {
                 return edit { setBlock(b.isList && b.level > 0 ? b.with(level: b.level - 1) : .p) }
             }
+            // A note link or an image goes whole.
             var chip = NSRange()
-            if sel.location > 0, ts.attribute(.loreChip, at: sel.location - 1, effectiveRange: &chip) != nil {
+            for key in [NSAttributedString.Key.loreChip, .loreImage]
+            where sel.location > 0 && ts.attribute(key, at: sel.location - 1, effectiveRange: &chip) != nil {
                 return edit { replace(chip, with: "") }
             }
         }
         super.deleteBackward(sender)
+        if tools.menu != nil { tools.updateMenu() }
         if picker != nil { updatePicker() }
     }
 
-    // MARK: no previews, no Look Up on links (T9: nothing is fetched)
-
-    /// Force click and a three-finger tap would show a live web preview of a link, which loads the page.
-    override func quickLook(with event: NSEvent) {}
-
-    /// Look Up on a link shows a web preview too; on plain words it stays (the dictionary is local).
-    override func showDefinition(for attrString: NSAttributedString?, at textBaselineOrigin: NSPoint) {
-        if let a = attrString, a.length > 0 {
-            var hasLink = false
-            a.enumerateAttribute(.link, in: NSRange(location: 0, length: a.length)) { v, _, stop in
-                if v != nil {
-                    hasLink = true
-                    stop.pointee = true
-                }
-            }
-            if hasLink { return }
-        }
-        super.showDefinition(for: attrString, at: textBaselineOrigin)
-    }
-
-    /// A copy: `NSTextView.defaultMenu` is shared by every text view in the app and must not lose items.
-    override func menu(for event: NSEvent) -> NSMenu? {
-        (super.menu(for: event)?.copy() as? NSMenu).map(Self.safeMenu)
-    }
-
-    /// AppKit adds Look Up, Open Link, Share and Services after `menu(for:)`; filter again right before it shows.
-    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
-        super.willOpenMenu(menu, with: event)
-        _ = Self.safeMenu(menu)
-    }
-
-    /// The context menu without the items that open, preview or send text out on their own: Open Link (it bypasses the
-    /// link policy), Look Up, Search With, Share, Services, Writing Tools. A link still opens by click, through the policy.
-    static func safeMenu(_ menu: NSMenu) -> NSMenu {
-        // By action selector only, so it works in every language (titles are localised).
-        let blocked = ["openlink", "lookup", "searchwith", "share", "service", "writingtools", "translat", "quicklook"]
-        for item in menu.items.reversed() {
-            let key = (item.action.map(NSStringFromSelector) ?? "").lowercased()
-            if blocked.contains(where: key.contains) || (item.submenu != nil && item.submenu === NSApp?.servicesMenu) {
-                menu.removeItem(item)
-            } else if let sub = item.submenu {
-                _ = safeMenu(sub)
-                if sub.items.isEmpty { menu.removeItem(item) }
-            }
-        }
-        // No separator left first, last or doubled.
-        while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
-        while menu.items.last?.isSeparatorItem == true { menu.removeItem(at: menu.items.count - 1) }
-        for i in stride(from: menu.items.count - 1, to: 0, by: -1)
-        where menu.items[i].isSeparatorItem && menu.items[i - 1].isSeparatorItem {
-            menu.removeItem(at: i)
-        }
-        return menu
-    }
-
-    // MARK: find (⌘F, ⌘G, ⇧⌘G, ⌘E): the native find bar
+    // MARK: find (⌘F, ⌘G, ⇧⌘G): the native find bar. ⌘E is Code (`LoreTools`), not Use Selection for Find.
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, tools.keyEquivalent(event) { return true }
         guard window?.firstResponder === self,
             event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.shift) == .command,
             let key = event.charactersIgnoringModifiers?.lowercased()
@@ -502,7 +474,6 @@ final class LoreTextView: NSTextView {
             switch key {
             case "f" where !shift: .showFindInterface
             case "g": shift ? .previousMatch : .nextMatch
-            case "e" where !shift: .setSearchString
             default: nil
             }
         guard let action else { return super.performKeyEquivalent(with: event) }
@@ -517,25 +488,5 @@ final class LoreTextView: NSTextView {
     private static func noFocusRings(_ view: NSView) {
         view.focusRingType = .none
         view.subviews.forEach(noFocusRings)
-    }
-}
-
-/// Typing latency over the last 200 keystrokes (key press → visible text laid out again).
-struct LoreLatency {
-    private var ring: [Double] = []
-
-    mutating func record(_ seconds: Double) {
-        ring.append(seconds * 1000)
-        if ring.count > 200 { ring.removeFirst(ring.count - 200) }
-    }
-
-    mutating func reset() { ring.removeAll() }
-
-    /// Milliseconds.
-    var stats: (p50: Double, p95: Double, n: Int) {
-        guard !ring.isEmpty else { return (0, 0, 0) }
-        let s = ring.sorted()
-        func pct(_ p: Double) -> Double { s[min(s.count - 1, Int((Double(s.count - 1) * p).rounded()))] }
-        return (pct(0.5), pct(0.95), s.count)
     }
 }

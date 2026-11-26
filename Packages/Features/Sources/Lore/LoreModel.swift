@@ -619,7 +619,7 @@ public final class LoreModel {
     }
 
     func show(_ markdown: String, fold: Bool) {
-        guard fold, let tv = view else { return editor.load(markdown: markdown) }
+        guard fold, let tv = view else { return editor.load(markdown: markdown, fade: !fold) }
         // ponytail: the editor's `load` clears undo; a fold that keeps the undo stack needs an editor seam (proposal).
         let old = tv.string
         let sel = tv.selectedRange()

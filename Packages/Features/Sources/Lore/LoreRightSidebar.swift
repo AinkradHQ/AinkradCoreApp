@@ -10,8 +10,9 @@ import SwiftUI
 struct LoreRightSidebar: View {
     let model: LoreModel
     var focus: FocusState<Bool>.Binding
-    @State private var picked: Int?
     @State private var cursor: String?
+    /// The reading place moves between outline rows as one lit shape.
+    @Namespace private var here
     @AppStorage("lore.inspector.folded") private var foldedList = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -20,19 +21,25 @@ struct LoreRightSidebar: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     // Nothing about a note until one is open (not connected, loading, failed).
-                    if model.load == .ready { facts }
+                    if model.load == .ready { facts.loreArrive(0) }
                     if showsOutline {
-                        section("Outline", count: model.outline.count)
-                        if !folded("Outline") { outline }
+                        Group {
+                            section("Outline", count: model.outline.count)
+                            if !folded("Outline") { outline }
+                        }
+                        .loreArrive(1)
                     }
-                    if model.load == .ready, !model.backlinks.isEmpty {
-                        section("Linked from", count: model.backlinks.count)
-                        if !folded("Linked from") { backlinks }
+                    Group {
+                        if model.load == .ready, !model.backlinks.isEmpty {
+                            section("Linked from", count: model.backlinks.count)
+                            if !folded("Linked from") { backlinks }
+                        }
+                        if showsVersions {
+                            section("Versions", count: nil)
+                            if !folded("Versions") { versions }
+                        }
                     }
-                    if showsVersions {
-                        section("Versions", count: nil)
-                        if !folded("Versions") { versions }
-                    }
+                    .loreArrive(2)
                 }
                 .padding(.bottom, Space.s4)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -67,10 +74,10 @@ struct LoreRightSidebar: View {
         return out
     }
 
-    private func go(_ h: LoreHeading) {
-        picked = h.id
-        model.reveal(h)
-    }
+    private func go(_ h: LoreHeading) { model.reveal(h) }
+
+    /// The heading the top of the page is in (the editor's scroll spy).
+    private var reading: Int? { model.editor?.spy.heading }
 
     private func run(_ id: String) {
         let value = String(id.dropFirst(2))
@@ -130,10 +137,14 @@ struct LoreRightSidebar: View {
     private var outline: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(model.outline) { h in
-                LoreOutlineRow(heading: h, picked: picked == h.id, cursor: cursor == "h:\(h.id)") { go(h) }
-                    .id("h:\(h.id)")
+                LoreOutlineRow(
+                    heading: h, picked: reading == h.id, cursor: cursor == "h:\(h.id)", here: here, glide: !reduceMotion
+                ) { go(h) }
+                .id("h:\(h.id)")
             }
         }
+        // The lit row follows the reading place; Reduce Motion: it fades from row to row.
+        .animation(Motion.calm(.spring(duration: 0.32, bounce: 0), reduceMotion), value: reading)
         .transition(.opacity)
     }
 
@@ -205,22 +216,34 @@ private struct LoreOutlineRow: View {
     let heading: LoreHeading
     let picked: Bool
     let cursor: Bool
+    let here: Namespace.ID
+    let glide: Bool
     let action: () -> Void
     @State private var hover = false
 
     var body: some View {
         Button(action: action) {
             Text(heading.title)
-                .coreFont(size: heading.level == 1 ? MacTextSize.body : MacTextSize.meta + 1,
-                    weight: heading.level == 1 ? .semibold : .regular)
+                .coreFont(
+                    size: heading.level == 1 ? MacTextSize.body : MacTextSize.meta + 1,
+                    weight: heading.level == 1 ? .semibold : .regular
+                )
                 .foregroundStyle(heading.level == 3 ? GlassInk.secondary : GlassInk.primary)
                 .lineLimit(1).truncationMode(.tail)
                 .padding(.leading, Space.s3 + CGFloat(heading.level - 1) * Space.s3).padding(.trailing, Space.s3)
                 .frame(maxWidth: .infinity, minHeight: MacSize.controlSm + Space.s1, alignment: .leading)
                 .background(
-                    cursor ? GlassInk.lift(0.16) : picked || hover ? GlassInk.wellHover : .clear,
+                    cursor ? GlassInk.lift(0.16) : hover && !picked ? GlassInk.well : .clear,
                     in: coreShape(Radius.control)
                 )
+                .background {
+                    if picked {
+                        coreShape(Radius.control).fill(GlassInk.wellHover)
+                            // One shared id glides between rows; under Reduce Motion each row has its own, so it fades.
+                            .matchedGeometryEffect(id: glide ? "reading" : "reading-\(heading.index)", in: here)
+                            .transition(.opacity)
+                    }
+                }
                 .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
@@ -251,6 +274,7 @@ private struct LoreBacklinkCard: View {
             .padding(Space.s3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .coreWell(radius: Radius.cardMac, active: hover || cursor)
+            .loreLift(hover)
             // The keyboard's card (⌘3, ↑ ↓) is lit with the rows' cursor fill, so it reads on a light Look too.
             .overlay {
                 coreShape(Radius.cardMac).fill(GlassInk.wellHover).opacity(cursor ? 1 : 0).allowsHitTesting(false)

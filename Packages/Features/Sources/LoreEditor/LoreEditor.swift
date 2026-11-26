@@ -96,6 +96,8 @@ public enum LoreLinkPolicy {
     public var onNotice: ((String) -> Void)?
     /// The caret moved into (true) or out of (false) a table.
     public var onTable: ((Bool) -> Void)?
+    /// The outline heading the reader is at (the inspector lights it).
+    public let spy = LoreHeadingSpy()
 
     public init(titles: LoreNoteTitles = LoreStubTitles(), uploader: LoreAttachmentUploader = LoreNoUploads()) {
         self.titles = titles
@@ -112,11 +114,15 @@ public enum LoreLinkPolicy {
         super.init()
         textView.controller = self
         textView.delegate = self
+        watchScroll()
     }
 
-    /// Replaces the page with a note. Clears undo: the loaded text is the new starting point.
-    public func load(markdown: String) {
+    /// Replaces the page with a note. Clears undo: the loaded text is the new starting point. `fade`: another note is
+    /// opening, so the page crossfades.
+    public func load(markdown: String, fade: Bool = false) {
+        if fade { crossfade() }
         textView.closePicker()
+        textView.tools.closeAll()
         generation += 1
         let (text, map) = MarkdownReader.parse(markdown)
         self.map = map
@@ -125,6 +131,9 @@ public enum LoreLinkPolicy {
         textView.typingAttributes = Style.typing(textView.ts.length > 0 ? Block.at(textView.ts, 0) : .p)
         textView.undoManager?.removeAllActions()
         textView.scroll(.zero)
+        spy.starts = nil
+        updateSpy()
+        textView.tools.updateGutter()
     }
 
     /// Lore's own text size factor; the page is drawn again at the new size (the text and the cursor stay, undo restarts).
@@ -195,9 +204,20 @@ extension LoreTextView {
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 1, event.modifierFlags.intersection([.shift, .command, .option]).isEmpty {
             if let pr = taskBoxHit(event) { return toggleTask(pr) }
-            if let title = chipHit(event), let open = controller?.onOpenNote { return open(title) }
+            if let title = runHit(event, .loreChip) as? String, let open = controller?.onOpenNote { return open(title) }
+            if let ref = runHit(event, .loreImage) as? String, let url = URL(string: ref), let controller {
+                _ = controller.textView(self, clickedOnLink: url, at: 0)
+                return
+            }
         }
         super.mouseDown(with: event)
+    }
+
+    /// Focus arriving puts the + beside an empty line (the first responder changes after this returns).
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok { DispatchQueue.main.async { [weak self] in self?.tools.updateGutter() } }
+        return ok
     }
 
     private func taskBoxHit(_ event: NSEvent) -> NSRange? {
@@ -217,21 +237,21 @@ extension LoreTextView {
         return ns.paragraphRange(for: NSRange(location: loc, length: 0))
     }
 
-    private func chipHit(_ event: NSEvent) -> String? {
+    /// The value of `key` under the click (a note link's title, an image's address), nil off the run.
+    private func runHit(_ event: NSEvent, _ key: NSAttributedString.Key) -> Any? {
         guard let window else { return nil }
         let screen = window.convertPoint(toScreen: event.locationInWindow)
         let i = characterIndex(for: screen)
-        guard i < ts.length, let title = ts.attribute(.loreChip, at: i, effectiveRange: nil) as? String else {
-            return nil
-        }
+        guard i < ts.length, let value = ts.attribute(key, at: i, effectiveRange: nil) else { return nil }
         let rect = firstRect(forCharacterRange: NSRange(location: i, length: 1), actualRange: nil)
-        return rect.insetBy(dx: -2, dy: -2).contains(screen) ? title : nil
+        return rect.insetBy(dx: -2, dy: -2).contains(screen) ? value : nil
     }
 
     /// Flips `[ ]`/`[x]`: an attribute change of that paragraph only, one undo step.
     func toggleTask(_ pr: NSRange) {
         guard case .task(let l, let c) = Block.at(ts, pr.location) else { return }
         edit { setBlock(.task(l, !c), paragraph: pr, updateTyping: false) }
+        animateTick(pr, checked: !c)
     }
 
     // Copy gives Markdown; paste and drop read plain text, Markdown, files and image data, nothing rich.

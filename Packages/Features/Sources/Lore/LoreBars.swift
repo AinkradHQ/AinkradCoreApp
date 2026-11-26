@@ -26,7 +26,7 @@ struct LoreAIBanner: View {
             .help("Open the AI session that wrote this file")
         }
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
-        .frame(maxWidth: LoreView.pageWidth)
+        .frame(maxWidth: LoreView.measure)
         .background(GlassInk.accent(paneAccent).opacity(0.14), in: coreShape(Radius.cardMac))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lore-ai-banner")
@@ -50,7 +50,7 @@ struct LoreTableBar: View {
                 "Table view", segments: [CoreSegment(false, "Grid"), CoreSegment(true, "Text")],
                 selection: Binding(get: { model.tablesAsText }, set: { model.setTablesAsText($0) }))
         }
-        .frame(maxWidth: LoreView.pageWidth, minHeight: MacSize.controlMd)
+        .frame(maxWidth: LoreView.measure, minHeight: MacSize.controlMd)
         .accessibilityIdentifier("lore-table-bar")
     }
 

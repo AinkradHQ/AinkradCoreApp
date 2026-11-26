@@ -28,7 +28,12 @@ struct LoreWeekCard: View {
     let model: LoreModel
     var cursor = false
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var hover = false
+    /// A new week arrives from the side it lies on (1: later, -1: earlier), then settles at 0.
+    @State private var arrive: CGFloat = 0
+    /// The open day's mark moves between days as one lit shape.
+    @Namespace private var openDay
 
     var body: some View {
         let shown = model.day ?? model.todayKey
@@ -52,9 +57,17 @@ struct LoreWeekCard: View {
                 ForEach(week, id: \.self) { key in
                     LoreDayCell(
                         key: key, today: key == model.todayKey, open: key == model.day,
-                        written: written.contains(key)
+                        written: written.contains(key), mark: openDay, glide: !reduce
                     ) { Task { await model.openDay(key) } }
                 }
+            }
+            .offset(x: coreMove(reduce, arrive * Space.s6))
+            .opacity(1 - abs(arrive) * 0.8)
+            .animation(Motion.calm(.spring(duration: 0.32, bounce: 0), reduce), value: model.day)
+            .onChange(of: week.first) { old, new in
+                guard let old, let new, old != new else { return }
+                arrive = new > old ? 1 : -1
+                Task { @MainActor in withAnimation(Motion.calm(Motion.out(Motion.ui), reduce)) { arrive = 0 } }
             }
         }
         .padding(Space.s3)
@@ -76,6 +89,8 @@ private struct LoreDayCell: View {
     let today: Bool
     let open: Bool
     let written: Bool
+    let mark: Namespace.ID
+    let glide: Bool
     let action: () -> Void
     @Environment(\.corePalette) private var palette
     @State private var hover = false
@@ -94,9 +109,15 @@ private struct LoreDayCell: View {
                     .frame(width: Space.s1, height: Space.s1).opacity(written ? 1 : 0)
             }
             .frame(maxWidth: .infinity).padding(.vertical, Space.s2)
-            .background(
-                open ? GlassInk.wellHover : hover ? GlassInk.well : .clear, in: coreShape(Radius.control)
-            )
+            .background(hover && !open ? GlassInk.well : .clear, in: coreShape(Radius.control))
+            .background {
+                if open {
+                    // One id glides from day to day; under Reduce Motion each day has its own, so it fades.
+                    coreShape(Radius.control).fill(GlassInk.wellHover)
+                        .matchedGeometryEffect(id: glide ? "open" : key, in: mark)
+                        .transition(.opacity)
+                }
+            }
             .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
