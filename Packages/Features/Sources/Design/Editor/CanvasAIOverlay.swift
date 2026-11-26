@@ -136,15 +136,17 @@ struct CanvasAIOverlay: View {
 }
 
 extension DesignComposer {
-    /// Where the Core puts new frames (`compose.rs`): right of the rightmost top-level node, 60 apart, 360×630 each.
-    static func landing(count: Int, in editor: DesignEditor) -> [CGRect] {
+    /// Where the Core puts new frames (`compose.rs`): right of the rightmost top-level node, 60 apart, `size` each.
+    static func landing(count: Int, size: CGSize, in editor: DesignEditor) -> [CGRect] {
         guard let page = editor.layers.children(of: nil).first else { return [] }
         let right = editor.layers.children(of: page.id).compactMap { l -> Double? in
             guard let n = editor.node(of: l.id) else { return nil }
             return (n.props["x"]?.double ?? 0) + (n.props["w"]?.double ?? 0)
         }.max()
         let x0 = right.map { $0 + 60 } ?? 0
-        return (0..<count).map { CGRect(x: x0 + Double($0) * 420, y: 0, width: 360, height: 630) }
+        return (0..<count).map {
+            CGRect(x: x0 + Double($0) * (size.width + 60), y: 0, width: size.width, height: size.height)
+        }
     }
 
     /// A frame's document rect, from its props.

@@ -12,7 +12,7 @@ private final class ComposeService: DesignService, @unchecked Sendable {
     func kits() async throws -> [BrandKit] { [] }
     func data(_ sha: String) async throws -> Data { Data() }
     func link(_ item: DesignItem, project: String, _ on: Bool) async throws {}
-    func compose(doc: String, prompt: String, count: Int) async throws -> ComposeState {
+    func compose(doc: String, prompt: String, count: Int, size: CGSize) async throws -> ComposeState {
         started.append(prompt)
         return ComposeState(id: "dc_1", phase: .drawing, reason: "", session: "s_1", directions: [])
     }
@@ -76,5 +76,8 @@ struct ComposerTests {
             ])
         #expect(two.range(of: "text \"Hi\"")!.lowerBound < two.range(of: "rect")!.lowerBound)
         #expect(EditPrompt.make(change: "x", screen: "S", elements: []).contains("an empty screen"))
+        // The screen's own size and kind go with the change, so a desktop stays a desktop.
+        let desk = EditPrompt.make(change: "x", screen: "Home", size: CGSize(width: 1440, height: 900), elements: [])
+        #expect(desk.contains("desktop screen") && desk.contains("1440×900"))
     }
 }

@@ -53,9 +53,16 @@ final class DesignComposer {
     var request: String {
         guard let target, let editor = model?.editors[doc] else { return trimmed }
         return EditPrompt.make(
-            change: trimmed, screen: target.name, elements: EditPrompt.elements(of: target.id, in: editor))
+            change: trimmed, screen: target.name, size: screen, elements: EditPrompt.elements(of: target.id, in: editor)
+        )
     }
     var canDraw: Bool { !trimmed.isEmpty && trimmed.count <= 600 && !busy }
+    /// The screen to draw: the edited frame's size, else the default canvas (Settings, Design, Options).
+    var screen: CGSize {
+        if let target, let editor = model?.editors[doc], let r = Self.rect(of: target.id, in: editor) { return r.size }
+        let s = DesignOptions.canvas.size
+        return CGSize(width: s.w, height: s.h)
+    }
     /// How many frames the panel waits for.
     var expected: Int { editing || single ? 1 : 3 }
 
@@ -69,7 +76,7 @@ final class DesignComposer {
         if let editor = model?.editors[doc] {
             busyRects =
                 target.flatMap { Self.rect(of: $0.id, in: editor) }.map { [$0] }
-                ?? Self.landing(count: expected, in: editor)
+                ?? Self.landing(count: expected, size: screen, in: editor)
             // Show the canvas where the work happens.
             if let all = busyRects.first.map({ busyRects.dropFirst().reduce($0) { $0.union($1) } }) { editor.fit(all) }
         }
@@ -78,7 +85,8 @@ final class DesignComposer {
             guard let self else { return }
             defer { busy = false }
             do {
-                var s = try await service.compose(doc: doc, prompt: String(text.prefix(1000)), count: expected)
+                var s = try await service.compose(
+                    doc: doc, prompt: String(text.prefix(1000)), count: expected, size: screen)
                 state = s
                 busy = false
                 // ponytail: a 1.2 s poll; the Core finishes the drawing on the read that finds the AI done.
@@ -114,7 +122,7 @@ final class DesignComposer {
         if p == .drawing, let editor = model?.editors[doc] {
             busyRects =
                 target.flatMap { Self.rect(of: $0.id, in: editor) }.map { [$0] }
-                ?? Self.landing(count: expected, in: editor)
+                ?? Self.landing(count: expected, size: screen, in: editor)
         }
         phase = p
     }
@@ -237,9 +245,15 @@ enum EditPrompt {
         let y: Double
     }
 
-    static func make(change: String, screen: String, elements: [Element]) -> String {
+    static func make(
+        change: String, screen: String, size: CGSize = CGSize(width: 360, height: 630), elements: [Element]
+    )
+        -> String
+    {
+        let kind = size.width >= 1100 ? "desktop" : size.width >= 600 ? "tablet" : "phone"
         let head =
-            "Redraw the existing screen \"\(screen)\" with this change: \(change). Keep everything else as it is now "
+            "Redraw the existing \(kind) screen \"\(screen)\" (\(Int(size.width))×\(Int(size.height))) with this change: "
+            + "\(change). Keep everything else as it is now "
             + "(same texts, colours and layout) unless the change says otherwise. The screen now, top to bottom: "
         var body: [String] = []
         var used = head.count
