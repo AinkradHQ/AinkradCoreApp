@@ -24,6 +24,9 @@ final class LoreFragment: NSTextLayoutFragment {
 
     override func draw(at point: CGPoint, in ctx: CGContext) {
         if let s = paragraph, s.length > 0, !textLineFragments.isEmpty {
+            if s.attribute(.loreRule, at: 0, effectiveRange: nil) != nil, !caretInside, !asText {
+                return drawRule(point, ctx)
+            }
             ctx.saveGState()
             let grid = tableRows(s)
             drawBlock(s, point, ctx, well: grid == nil)
@@ -86,13 +89,24 @@ final class LoreFragment: NSTextLayoutFragment {
     /// The table's lines when it is drawn as a grid: a table block with the caret elsewhere. With the caret inside it
     /// stays text, so every edit is plain typing.
     private func tableRows(_ s: NSAttributedString) -> [String]? {
-        let text = (textLayoutManager?.textContainer?.textView as? LoreTextView)?.tablesAsText == true
-        guard s.attribute(.loreTable, at: 0, effectiveRange: nil) != nil, !caretInside, !text else { return nil }
+        guard s.attribute(.loreTable, at: 0, effectiveRange: nil) != nil, !caretInside, !asText else { return nil }
         let lines = s.string.trimmingCharacters(in: .newlines).components(separatedBy: "\u{2028}")
         guard lines.count >= 2, textLineFragments.count >= lines.count - 1, GFMTable.isSeparator(lines[1]) else {
             return nil
         }
         return lines
+    }
+
+    /// Text mode (E0-7): tables and rules show their Markdown.
+    private var asText: Bool { (textLayoutManager?.textContainer?.textView as? LoreTextView)?.tablesAsText == true }
+
+    /// A `---` line: one quiet rounded bar across the column, on the line's middle.
+    private func drawRule(_ pt: CGPoint, _ ctx: CGContext) {
+        guard let first = textLineFragments.first else { return }
+        let width = textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.width
+        let b = first.typographicBounds
+        let r = CGRect(x: pt.x - layoutFragmentFrame.minX, y: pt.y + b.midY - 1, width: width, height: 2)
+        Draw.fill(ctx, Draw.rect(r, radius: 1), LoreInk.cg.faint)
     }
 
     private var caretInside: Bool {
@@ -179,20 +193,31 @@ final class LoreFragment: NSTextLayoutFragment {
             let lr = line.characterRange
             guard lr.length > 0, NSMaxRange(lr) <= s.length else { continue }
             // One key at a time, so a run split by other attributes (kern, link) still draws as one well.
-            for key in [NSAttributedString.Key.loreCode, .loreChip] {
+            for key in [NSAttributedString.Key.loreCode, .loreChip, .loreImage] {
                 s.enumerateAttribute(key, in: lr) { v, r, _ in
                     guard v != nil else { return }
                     let font =
                         s.attribute(.font, at: r.location, effectiveRange: nil) as? NSFont ?? .systemFont(ofSize: 15)
                     let x0 = line.locationForCharacter(at: r.location).x
                     let kern = s.attribute(.kern, at: NSMaxRange(r) - 1, effectiveRange: nil) as? CGFloat ?? 0
-                    let x1 = line.locationForCharacter(at: min(NSMaxRange(r), NSMaxRange(lr))).x - kern
+                    var x1 = line.locationForCharacter(at: min(NSMaxRange(r), NSMaxRange(lr))).x - kern
+                    // At a line's end the next location leaves out the kern: measure an image's text instead.
+                    if key == .loreImage {
+                        let text = s.attributedSubstring(from: r).string as NSString
+                        x1 = x0 + ceil(text.size(withAttributes: [.font: font]).width)
+                    }
                     let ox = pt.x + line.typographicBounds.minX
                     let base = pt.y + line.typographicBounds.minY + line.glyphOrigin.y
+                    // An image's well also holds the photo glyph, in the room its last character's kern leaves.
+                    let glyph: CGFloat = key == .loreImage ? 19 : 0
                     let rect = CGRect(
-                        x: ox + x0 - 3, y: base - font.ascender - 1.5, width: x1 - x0 + 6,
+                        x: ox + x0 - 3, y: base - font.ascender - 1.5, width: x1 - x0 + 6 + glyph,
                         height: font.ascender - font.descender + 3)
-                    Draw.fill(ctx, Draw.rect(rect, radius: 4), key == .loreChip ? LoreInk.cg.chip : LoreInk.cg.code)
+                    Draw.fill(ctx, Draw.rect(rect, radius: 4), key == .loreCode ? LoreInk.cg.code : LoreInk.cg.chip)
+                    if key == .loreImage {
+                        Draw.symbol(
+                            ctx, "photo", in: CGRect(x: rect.maxX - 18, y: rect.midY - 7, width: 14, height: 14))
+                    }
                 }
             }
         }
@@ -227,6 +252,23 @@ enum Draw {
         ctx.strokePath()
     }
 
+    /// An SF Symbol in the secondary ink, fitted to `r` (drawing is on the main thread).
+    static func symbol(_ ctx: CGContext, _ name: String, in r: CGRect) {
+        let made = MainActor.assumeIsolated { () -> Glyph? in
+            let config = NSImage.SymbolConfiguration(pointSize: r.height - 2, weight: .medium)
+                .applying(.init(paletteColors: [LoreInk.text2]))
+            return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+                .map(Glyph.init)
+        }
+        guard let img = made?.image else { return }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
+        let s = img.size
+        let fit = CGRect(x: r.midX - s.width / 2, y: r.midY - s.height / 2, width: s.width, height: s.height)
+        img.draw(in: fit, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
     static func text(
         _ ctx: CGContext, _ str: String, font: NSFont, color: CGColor, rightEdge: CGFloat, baseline: CGFloat
     ) {
@@ -240,6 +282,9 @@ enum Draw {
         CTLineDraw(line, ctx)
     }
 }
+
+/// A symbol image carried out of `assumeIsolated` (drawing is on the main thread).
+private struct Glyph: @unchecked Sendable { let image: NSImage }
 
 /// Drawn text carried out of `assumeIsolated` (drawing is on the main thread; `NSAttributedString` is not `Sendable`).
 private struct Cells: @unchecked Sendable { let rows: [[NSAttributedString]] }

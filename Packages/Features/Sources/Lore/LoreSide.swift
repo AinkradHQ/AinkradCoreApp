@@ -79,6 +79,19 @@ extension LoreModel {
             wordCount = LoreOutline.words(md)
             hasTable = LoreOutline.hasTable(md)
             noteTags = LoreOutlineTags.tags(md)
+            pageBlank = md.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    /// A key was typed: the blank prompt goes at once, and the chrome steps back until 3 s without typing.
+    func typed() {
+        if pageBlank { pageBlank = false }
+        if !typing { typing = true }
+        typingTask?.cancel()
+        typingTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.typing = false
         }
     }
 
@@ -129,7 +142,9 @@ enum LoreOutlineTags {
 
 // MARK: views
 
-/// One compact line of a sidebar: icon, title, a count or chip on the right. 28 pt, 8 pt radius, no outline.
+/// One compact line of a sidebar: icon, title, a count or chip on the right. 28 pt, 8 pt radius, no outline. `cursor`:
+/// the keyboard's row (↑ ↓), lit with the hover fill. `rename`: the title is a field (Return keeps it, Esc puts the old
+/// one back, clicking away keeps it, like Finder).
 struct LoreSideRow: View {
     let title: String
     var symbol: String?
@@ -137,193 +152,96 @@ struct LoreSideRow: View {
     var selected = false
     var indented = false
     var subtitle: String?
+    var cursor = false
+    var rename: Binding<String>?
+    var done: (Bool) -> Void = { _ in }
     let action: () -> Void
     @State private var hover = false
+    @FocusState private var field: Bool
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: Space.s2) {
-                if let symbol {
-                    Image(systemName: symbol).coreFont(size: MacTextSize.meta + 1)
-                        .foregroundStyle(selected ? palette.primary : GlassInk.secondary)
-                        .frame(width: 16).accessibilityHidden(true)
+        Group {
+            if let rename {
+                line(
+                    TextField("", text: rename).textFieldStyle(.plain)
+                        .coreFont(size: MacTextSize.body, weight: .semibold)
+                        .focused($field)
+                        .onSubmit { done(true) }
+                        .onExitCommand { done(false) }
+                        .onAppear { field = true }
+                        .onChange(of: field) { if !field { done(true) } }
+                        .accessibilityLabel("New name for \(title)"),
+                    lit: true)
+            } else {
+                Button(action: action) {
+                    line(
+                        Text(title).coreFont(size: MacTextSize.body, weight: selected ? .semibold : .regular)
+                            .lineLimit(1),
+                        lit: false)
                 }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title).coreFont(size: MacTextSize.body, weight: selected ? .semibold : .regular).lineLimit(1)
-                    if let subtitle {
-                        Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                    }
-                }
-                Spacer(minLength: Space.s1)
-                if let count { Text(count).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary) }
+                .buttonStyle(.plain)
             }
-            .padding(.leading, indented ? Space.s5 + Space.s2 : Space.s2).padding(.trailing, Space.s2)
-            .frame(minHeight: subtitle == nil ? MacSize.controlMd : MacSize.controlLg + Space.s2, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected || hover ? GlassInk.wellHover : .clear, in: coreShape(Radius.control))
-            .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain)
         .onHover { hover = $0 }
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .animation(Motion.out(Motion.hover), value: hover)
+        .accessibilityAddTraits(selected || cursor ? .isSelected : [])
+    }
+
+    private func line(_ name: some View, lit: Bool) -> some View {
+        HStack(spacing: Space.s2) {
+            if let symbol {
+                Image(systemName: symbol).coreFont(size: MacTextSize.meta + 1)
+                    .foregroundStyle(selected ? palette.primary : GlassInk.secondary)
+                    .frame(width: Space.s4).accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                name
+                if let subtitle {
+                    Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: Space.s1)
+            if let count { Text(count).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary) }
+        }
+        .padding(.leading, indented ? Space.s6 + Space.s3 : Space.s3).padding(.trailing, Space.s3)
+        .frame(minHeight: subtitle == nil ? MacSize.controlMd : MacSize.controlLg + Space.s2, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            lit || cursor ? GlassInk.lift(0.16) : selected || hover ? GlassInk.wellHover : .clear,
+            in: coreShape(Radius.control)
+        )
+        .contentShape(coreShape(Radius.control))
     }
 }
 
-private struct LoreSideSection: View {
+struct LoreSideSection: View {
     let title: String
     var body: some View {
         Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
-            .padding(.horizontal, Space.s2).padding(.top, Space.s4).padding(.bottom, Space.s1)
+            .padding(.horizontal, Space.s3).padding(.top, Space.s4).padding(.bottom, Space.s1)
             .accessibilityAddTraits(.isHeader)
     }
 }
 
-/// Today, the notes tree, AI documents, projects, tags, recents.
-struct LoreLeftSidebar: View {
-    let model: LoreModel
-    @State private var open: Set<String> = ["personal"]
-    @State private var query = ""
-
+/// A tag in the list: the chip, lit while it filters or the keyboard's cursor is on it.
+struct LoreTagChip: View {
+    let tag: String
+    let on: Bool
+    let cursor: Bool
+    let pick: () -> Void
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                search
-                LoreSideRow(
-                    title: "Today", symbol: "sun.max", count: todayCount, selected: model.isToday
-                ) { Task { await model.openDay(model.todayKey) } }
-                if let f = model.sideFilter { found(f) } else { tree }
-                docs
-                projects
-                tags
-                recents
-            }
-            .padding(.horizontal, Space.s2).padding(.bottom, Space.s4)
+        Button(action: pick) {
+            CoreChip("#\(tag)", minWidth: 0).opacity(on || cursor ? 1 : 0.85)
+                .background(cursor ? GlassInk.lift(0.16) : .clear, in: coreShape(Radius.chip))
         }
-        .scrollIndicators(.hidden)
-        .accessibilityIdentifier("lore-left")
-    }
-
-    private var todayCount: String? {
-        let n = model.sideNotes.filter { $0.kind == "daily" && $0.day == model.todayKey }.count
-        return n > 0 ? "\(n)" : nil
-    }
-
-    private var search: some View {
-        HStack(spacing: Space.s2) {
-            Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.meta + 1).foregroundStyle(
-                GlassInk.secondary)
-            TextField("Search notes", text: $query).textFieldStyle(.plain).coreFont(size: MacTextSize.body)
-                .onChange(of: query) { model.setFilter(query.isEmpty ? nil : .query(query)) }
-        }
-        .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlMd)
-        .background(GlassInk.well, in: coreShape(Radius.control))
-        .padding(.bottom, Space.s1)
-    }
-
-    @ViewBuilder private var tree: some View {
-        LoreSideSection(title: "Notes")
-        ForEach(LoreTree.groups(model.sideNotes, projects: model.projectNames)) { g in
-            LoreSideRow(
-                title: g.name, symbol: open.contains(g.id) ? "folder.fill" : "folder", count: "\(g.notes.count)"
-            ) {
-                if open.contains(g.id) { open.remove(g.id) } else { open.insert(g.id) }
-            }
-            if open.contains(g.id) { ForEach(g.notes.prefix(60)) { noteRow($0, indented: true) } }
-        }
-    }
-
-    @ViewBuilder private func found(_ f: LoreSideFilter) -> some View {
-        let name: String = {
-            switch f {
-            case .project(let p): "In \(model.projectNames[p] ?? "project")"
-            case .tag(let t): "Tagged #\(t)"
-            case .query: "Found"
-            }
-        }()
-        HStack {
-            LoreSideSection(title: name)
-            Spacer()
-            Button("Clear") {
-                query = ""
-                model.setFilter(nil)
-            }
-            .buttonStyle(.plain).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-        }
-        if model.filterHits.isEmpty {
-            Text("Nothing found.").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                .padding(.horizontal, Space.s2)
-        }
-        ForEach(model.filterHits) { noteRow($0, indented: false) }
-    }
-
-    private func noteRow(_ n: LoreNote, indented: Bool) -> some View {
-        let t = n.title.trimmingCharacters(in: .whitespaces)
-        return LoreSideRow(
-            title: t.isEmpty ? "Untitled note" : t, symbol: "doc.text", selected: model.note?.id == n.id,
-            indented: indented
-        ) { Task { await model.openNote(n.id) } }
-    }
-
-    @ViewBuilder private var docs: some View {
-        if !model.sessionDocs.isEmpty {
-            LoreSideSection(title: "AI documents")
-            ForEach(model.sessionDocs.prefix(30)) { d in
-                LoreSideRow(
-                    title: d.fileName, symbol: "sparkles", selected: model.note?.id == d.note,
-                    subtitle: "From “\(d.sessionTitle ?? "an AI session")”"
-                ) { Task { await model.openNote(d.note) } }
-            }
-        }
-    }
-
-    @ViewBuilder private var projects: some View {
-        let live = model.projectChoices.filter { p in model.sideNotes.contains { $0.project == p.id } }
-        if !live.isEmpty {
-            LoreSideSection(title: "Projects")
-            ForEach(live, id: \.id) { p in
-                LoreSideRow(
-                    title: p.name, symbol: "folder", count: "\(model.sideNotes.filter { $0.project == p.id }.count)",
-                    selected: model.sideFilter == .project(p.id)
-                ) { model.setFilter(.project(p.id)) }
-            }
-        }
-    }
-
-    @ViewBuilder private var tags: some View {
-        if !model.sideTags.isEmpty {
-            LoreSideSection(title: "Tags")
-            FlowRow(spacing: Space.s2) {
-                ForEach(model.sideTags.prefix(24)) { t in
-                    Button {
-                        model.setFilter(.tag(t.tag))
-                    } label: {
-                        CoreChip("#\(t.tag)", minWidth: 0)
-                            .opacity(model.sideFilter == .tag(t.tag) ? 1 : 0.85)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, Space.s2)
-        }
-    }
-
-    @ViewBuilder private var recents: some View {
-        let recent = model.sideNotes.filter { $0.kind == "note" }.prefix(5)
-        if !recent.isEmpty {
-            LoreSideSection(title: "Recents")
-            ForEach(Array(recent)) { n in
-                LoreSideRow(
-                    title: n.title.isEmpty ? "Untitled note" : n.title, symbol: "clock",
-                    selected: model.note?.id == n.id
-                ) { Task { await model.openNote(n.id) } }
-            }
-        }
+        .buttonStyle(.plain)
+        .help("Show the notes tagged #\(tag)")
     }
 }
 
 /// Chips that wrap onto new lines.
-private struct FlowRow: Layout {
+struct FlowRow: Layout {
     var spacing: CGFloat
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         arrange(proposal.width ?? 200, subviews).size

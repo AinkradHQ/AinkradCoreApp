@@ -23,6 +23,12 @@ import SwiftUI
     func focus()
     /// The person is mid-composition (an input method's marked text): a fold waits.
     var composing: Bool { get }
+    /// Puts the caret after the last character.
+    func caretToEnd()
+}
+
+extension LorePageText {
+    func caretToEnd() {}
 }
 
 enum LoreLoad: Equatable {
@@ -57,7 +63,7 @@ public final class LoreModel {
     private(set) var backlinks: [LoreBacklink] = []
     var projectNames: [String: String] = [:]
 
-    // Sidebars (E10-1). Both open by default; ⌘. hides both (focus), ⌘[ the left, ⌘] the right.
+    // Sidebars (E10-1). Both open by default; ⌘. hides both (focus), ⌘1 the left, ⌘2 the right.
     var showLeft = LoreSidebarPrefs.read("left") { didSet { LoreSidebarPrefs.write("left", showLeft) } }
     var showRight = LoreSidebarPrefs.read("right") { didSet { LoreSidebarPrefs.write("right", showRight) } }
     /// Every live note without its text, newest change first (the tree, recents, project counts).
@@ -73,12 +79,19 @@ public final class LoreModel {
     var wordCount = 0
     var hasTable = false
     var noteTags: [String] = []
+    /// The page has no text: it shows the blank prompt (`LoreBlank`).
+    var pageBlank = false
+    /// Typed in the last few seconds: the header and the key line step back (`LoreView`).
+    var typing = false
+    @ObservationIgnored var typingTask: Task<Void, Never>?
     /// The caret is inside a table (the row and column tools are live).
     var caretInTable = false
     var tablesAsText = false
     /// A project, tag or search the left sidebar is filtered to; `filterHits` are its notes.
     var sideFilter: LoreSideFilter?
     var filterHits: [LoreNote] = []
+    /// A note the list should start renaming in place (the header's More, Rename…).
+    var renameRequest: String?
     @ObservationIgnored var outlineTask: Task<Void, Never>?
     @ObservationIgnored var filterTask: Task<Void, Never>?
     /// The Core serves `/tags` and `/session-docs` (minor 95); true until a connection says otherwise.
@@ -117,6 +130,7 @@ public final class LoreModel {
         self.page = page
         self.editor = editor
         self.drafts = drafts
+        editor?.placeholder = String(localized: "Start writing…", bundle: .module)
         editor?.onChange = { [weak self] in self?.changed() }
         editor?.onTable = { [weak self] in self?.caretInTable = $0 }
         editor?.onOpenInternal = { [weak self] in self?.openInternal($0) }
@@ -331,6 +345,7 @@ public final class LoreModel {
         guard load == .ready else { return }
         schedule(debounce)
         refreshOutline(after: .milliseconds(400))
+        typed()
     }
 
     private func schedule(_ wait: Duration) {
@@ -601,9 +616,20 @@ public final class LoreModel {
     func markdown() -> String { editor.markdown() }
     func focus() { editor.focus() }
     var composing: Bool { view?.hasMarkedText() ?? false }
+    /// At the end of the last line, not on the empty line after it: a template's last item ("- [ ] ") takes the typing.
+    func caretToEnd() {
+        guard let tv = view else { return }
+        let ns = tv.string as NSString
+        let end = ns.length > 0 && ns.character(at: ns.length - 1) == 10 ? ns.length - 1 : ns.length
+        tv.setSelectedRange(NSRange(location: end, length: 0))
+        tv.typingAttributes =
+            tv.textStorage.map { end < $0.length ? $0.attributes(at: end, effectiveRange: nil) : [:] }
+            ?? tv.typingAttributes
+        tv.scrollRangeToVisible(tv.selectedRange())
+    }
 
     func show(_ markdown: String, fold: Bool) {
-        guard fold, let tv = view else { return editor.load(markdown: markdown) }
+        guard fold, let tv = view else { return editor.load(markdown: markdown, fade: !fold) }
         // ponytail: the editor's `load` clears undo; a fold that keeps the undo stack needs an editor seam (proposal).
         let old = tv.string
         let sel = tv.selectedRange()

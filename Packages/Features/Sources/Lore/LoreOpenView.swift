@@ -124,35 +124,34 @@ struct LoreOpenView: View {
 
     private var footer: some View {
         HStack(spacing: Space.s2) {
-            Button {
-                Task { await finder.export() }
-            } label: {
-                Label("Export…", systemImage: "square.and.arrow.up")
-            }
-            .buttonStyle(CoreButtonStyle(.secondary))
+            // Export and Import as icons with their keys in the tooltip, so the four buttons fit on one line.
+            CoreIconButton(
+                symbol: "square.and.arrow.up",
+                label: finder.project.isEmpty
+                    ? "Save every note as a zip of Markdown files  ⇧⌘E"
+                    : "Save this project's notes as a zip of Markdown files  ⇧⌘E"
+            ) { Task { await finder.export() } }
+            .loreKey(LoreKeys.export)
             .disabled(finder.exporting)
-            .help(
-                finder.project.isEmpty
-                    ? "Save every note as a zip of Markdown files"
-                    : "Save this project's notes as a zip of Markdown files")
-            Button {
-                finder.importNotes()
-            } label: {
-                Label("Import…", systemImage: "square.and.arrow.down")
-            }
-            .buttonStyle(CoreButtonStyle(.secondary))
+            CoreIconButton(
+                symbol: "square.and.arrow.down",
+                label: "Bring in notes from a project's repo or from Markdown files  ⇧⌘I"
+            ) { finder.importNotes() }
+            .loreKey(LoreKeys.importNotes)
             .disabled(!LoreImport.supports(finder.lore.service))
-            .help("Bring in notes from a project's repo or from Markdown files")
             Spacer(minLength: Space.s3)
             Button("Close") { finder.lore.host.shell.closeDialog() }
                 .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
             Button("New Note (advanced)…") { finder.advancedNew() }
                 .buttonStyle(CoreButtonStyle(.secondary))
-                .help("Choose the project and tags of a new note")
+                .loreKey(LoreKeys.advancedNew)
+                .help(LoreKeys.advancedNew.help)
             Button("New Note") { finder.quickNew() }
-                .buttonStyle(CoreButtonStyle(.prominent))
-                .help("A blank note in this project, or personal")
+                .buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(.command)
+                .help("A blank note in this project, or personal  ⌘↵")
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .lineLimit(1)
     }
 }
 

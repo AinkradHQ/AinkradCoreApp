@@ -232,10 +232,11 @@ let corpus: [String] = [
         _ = NSApplication.shared
         let c = LoreEditorController(uploader: up)
         c.load(markdown: "![pixel](https://tracker.example/p.gif)\n")
-        #expect(c.textView.string == "!pixel\n")
+        // The alt text on an image well, a link (never loaded).
+        #expect(c.textView.string == "pixel\n")
         #expect(
-            c.textView.ts.attribute(.link, at: 1, effectiveRange: nil) as? URL
-                == URL(string: "https://tracker.example/p.gif"))
+            c.textView.ts.attribute(.loreImage, at: 0, effectiveRange: nil) as? String
+                == "https://tracker.example/p.gif")
         // A copied web address is text, not a file: it is never downloaded or uploaded.
         let pb = NSPasteboard(name: .init("lore-test-\(UUID().uuidString)"))
         defer { pb.releaseGlobally() }

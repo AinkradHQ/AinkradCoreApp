@@ -26,11 +26,13 @@ struct LoreSourceMap {
     private static let headingRE = re(#"^(#{1,6})\s+(.*)$"#)
     private static let listRE = re(#"^([ \t]*)([-*+]|\d+[.)])\s+(?:\[( |x|X)\]\s+)?(.*)$"#)
     private static let quoteRE = re(#"^\s*>\s?(.*)$"#)
+    /// A thematic break: three or more of one of `-`, `*`, `_`, spaces between allowed.
+    private static let ruleRE = re(#"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$"#)
     /// Every quantifier is bounded, so a hostile line costs at most a few hundred steps per position (imports and AI
     /// sessions write notes: an unbounded `.+?` made a 40 KB line of `[[` take 98 s).
     private static let inlineRE = re(
         [
-            #"\\([\\`*_\[\]#>|+.)!-])"#,  // 1 escape
+            #"\\([\\`*_\[\]#>|+.)!~-])"#,  // 1 escape
             #"`([^`\n]{1,256})`"#,  // 2 code
             #"\[\[([^\[\]\n]{1,256})\]\]"#,  // 3 note link
             #"\[([^\[\]\n]{1,256})\]\(([^()\s]{1,2048})\)"#,  // 4,5 link
@@ -38,6 +40,8 @@ struct LoreSourceMap {
             #"\*\*(?=\S)([^*\n]{1,256}?)(?<=\S)\*\*"#,  // 7 bold
             #"(?<![*\w])\*(?=[^\s*])([^*\n]{1,256}?)(?<=\S)\*(?![*\w])"#,  // 8 italic
             #"(?<![_\w])_(?=[^\s_])([^_\n]{1,256}?)(?<=\S)_(?![_\w])"#,  // 9 italic
+            #"!\[([^\[\]\n]{1,256})\]\(([^()\s]{1,2048})\)"#,  // 10,11 image (matched at the `!`, before the link)
+            #"~~(?=\S)([^~\n]{1,256}?)(?<=\S)~~"#,  // 12 strike
         ].joined(separator: "|"))
     /// A paragraph longer than this is shown as plain text, with no inline parse at all.
     static let inlineLimit = 4096
@@ -92,11 +96,13 @@ struct LoreSourceMap {
             let s = lines[n]
             let t = s.trimmingCharacters(in: .whitespaces)
             return t.isEmpty || t.hasPrefix("```") || t.hasPrefix("|") || match(headingRE, s) != nil
-                || match(listRE, s) != nil || match(quoteRE, s) != nil || GFMTable.extent(lines, at: n) != nil
+                || match(listRE, s) != nil || match(quoteRE, s) != nil || match(ruleRE, s) != nil
+                || GFMTable.extent(lines, at: n) != nil
         }
-        func rawBlock(_ a: Int, _ e: Int, open: String, close: String, table: Bool = false) {
+        func rawBlock(_ a: Int, _ e: Int, open: String, close: String, table: Bool = false, rule: Bool = false) {
             var extra: [NSAttributedString.Key: Any] = [.loreCodeOpen: open, .loreCodeClose: close]
             if table { extra[.loreTable] = true }
+            if rule { extra[.loreRule] = true }
             add(
                 NSAttributedString(string: lines[a..<e].joined(separator: "\u{2028}")), .code,
                 a - (open.isEmpty ? 0 : 1), e + (close.isEmpty ? 0 : 1), extra)
@@ -131,6 +137,12 @@ struct LoreSourceMap {
             if let n = GFMTable.extent(lines, at: i) {
                 rawBlock(i, i + n, open: "", close: "", table: true)
                 i += n
+                continue
+            }
+            // A rule stays its own text (like a table), drawn as a line while the caret is elsewhere.
+            if match(ruleRE, line) != nil {
+                rawBlock(i, i + 1, open: "", close: "", rule: true)
+                i += 1
                 continue
             }
             if let g = match(headingRE, line) {
@@ -230,6 +242,13 @@ struct LoreSourceMap {
             } else if let it = g(8) ?? g(9) {
                 let inner = NSMutableAttributedString(attributedString: inline(it, base))
                 inner.addAttribute(.loreItalic, value: true, range: NSRange(location: 0, length: inner.length))
+                out.append(inner)
+            } else if let alt = g(10), let u = g(11) {
+                // Never loaded: the alt text, a link the policy opens or copies (T9).
+                out.append(URL(string: u) != nil ? plain(alt, [.loreImage: u]) : raw(m.range))
+            } else if let st = g(12) {
+                let inner = NSMutableAttributedString(attributedString: inline(st, base))
+                inner.addAttribute(.loreStrike, value: true, range: NSRange(location: 0, length: inner.length))
                 out.append(inner)
             }
             pos = NSMaxRange(m.range)
@@ -352,8 +371,8 @@ struct LoreSourceMap {
     }
 
     private struct Sig: Equatable {
-        var bold = false, italic = false, code = false, raw = false
-        var chip: String?, link: String?
+        var bold = false, italic = false, code = false, raw = false, strike = false
+        var chip: String?, link: String?, image: String?
     }
 
     /// One paragraph's runs as inline Markdown.
@@ -365,6 +384,8 @@ struct LoreSourceMap {
             var sig = Sig()
             sig.bold = !heading && a[.loreBold] != nil
             sig.italic = a[.loreItalic] != nil
+            sig.strike = a[.loreStrike] != nil
+            sig.image = a[.loreImage] as? String
             sig.code = a[.loreCode] != nil
             sig.chip = a[.loreChip] as? String
             sig.raw = a[.loreRaw] != nil
@@ -376,17 +397,20 @@ struct LoreSourceMap {
             if sig.code { return "`" + t + "`" }
             if sig.chip != nil { return "[[" + t + "]]" }
             // Raw source text goes out as it came in.
-            if sig.raw && !sig.bold && !sig.italic && sig.link == nil { return t }
+            if sig.raw && !sig.bold && !sig.italic && !sig.strike && sig.link == nil && sig.image == nil { return t }
             var core = t.trimmingCharacters(in: .whitespaces)
             guard !core.isEmpty else { return t }
             let lead = String(t.prefix { $0 == " " })
             let trail = String(t.reversed().prefix { $0 == " " })
-            if let link = sig.link {
+            if let image = sig.image {
+                core = "![" + escape(core) + "](" + image + ")"
+            } else if let link = sig.link {
                 core = core == link ? link : "[" + escape(core) + "](" + link + ")"
             } else if !sig.raw {
                 core = escape(core)
             }
-            let open = sig.bold && sig.italic ? "**_" : sig.bold ? "**" : sig.italic ? "*" : ""
+            let open =
+                (sig.strike ? "~~" : "") + (sig.bold && sig.italic ? "**_" : sig.bold ? "**" : sig.italic ? "*" : "")
             return lead + open + core + String(open.reversed()) + trail
         }.joined()
     }
@@ -405,6 +429,8 @@ struct LoreSourceMap {
                 let c = b[i]
                 switch c {
                 case 0x2A, 0x60, 0x5B, 0x5D, 0x5F: out.append(0x5C)  // * ` [ ] _
+                // `~` only next to another (`~~` is strike); a lone one (`~/notes`) stays as typed.
+                case 0x7E where (i + 1 < n && b[i + 1] == 0x7E) || (i > 0 && b[i - 1] == 0x7E): out.append(0x5C)
                 case 0x5C where !(i + 3 < n && b[i + 1] == 0xE2 && b[i + 2] == 0x80 && b[i + 3] == 0xA8):
                     out.append(0x5C)
                 default: break

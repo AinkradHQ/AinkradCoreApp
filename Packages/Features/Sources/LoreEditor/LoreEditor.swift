@@ -96,6 +96,8 @@ public enum LoreLinkPolicy {
     public var onNotice: ((String) -> Void)?
     /// The caret moved into (true) or out of (false) a table.
     public var onTable: ((Bool) -> Void)?
+    /// The outline heading the reader is at (the inspector lights it).
+    public let spy = LoreHeadingSpy()
 
     public init(titles: LoreNoteTitles = LoreStubTitles(), uploader: LoreAttachmentUploader = LoreNoUploads()) {
         self.titles = titles
@@ -104,19 +106,37 @@ public enum LoreLinkPolicy {
         textView.frame = NSRect(x: 0, y: 0, width: 900, height: 700)
         textView.setUp()
         scrollView = NSScrollView(frame: textView.frame)
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
+        // No scroll bar at all (owner's choice): the page scrolls with the trackpad, wheel and keys; the outline shows place.
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
         scrollView.documentView = textView
+        // The page exactly as wide as what shows it, so the column is centred on the page (a legacy scroller took 15
+        // from the clip view and the text view stayed wider, off-centre).
+        textView.setFrameSize(NSSize(width: scrollView.contentSize.width, height: textView.frame.height))
         super.init()
         textView.controller = self
         textView.delegate = self
+        watchScroll()
+        // Every change to the text, typed or not (a template, a load, an AI append): the placeholder shows only on an
+        // empty page, so a change that empties or fills it redraws it.
+        NotificationCenter.default.addObserver(
+            forName: NSTextStorage.didProcessEditingNotification, object: textView.ts, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let tv = self?.textView, (tv.ts.length == 0) != tv.placeholderDrawn else { return }
+                tv.needsDisplay = true
+            }
+        }
     }
 
-    /// Replaces the page with a note. Clears undo: the loaded text is the new starting point.
-    public func load(markdown: String) {
+    /// Replaces the page with a note. Clears undo: the loaded text is the new starting point. `fade`: another note is
+    /// opening, so the page crossfades.
+    public func load(markdown: String, fade: Bool = false) {
+        if fade { crossfade() }
         textView.closePicker()
+        textView.tools.closeAll()
         generation += 1
         let (text, map) = MarkdownReader.parse(markdown)
         self.map = map
@@ -125,13 +145,35 @@ public enum LoreLinkPolicy {
         textView.typingAttributes = Style.typing(textView.ts.length > 0 ? Block.at(textView.ts, 0) : .p)
         textView.undoManager?.removeAllActions()
         textView.scroll(.zero)
+        spy.starts = nil
+        updateSpy()
+        textView.tools.updateGutter()
     }
 
     /// Lore's own text size factor; the page is drawn again at the new size (the text and the cursor stay, undo restarts).
     public func setTextScale(_ scale: CGFloat) {
         guard Typeface.userScale != scale else { return }
         Typeface.userScale = scale
+        // The measure follows the text size: the column is centred again.
+        textView.updateInset()
         load(markdown: markdown())
+    }
+
+    /// Light text where the first line goes while the page is empty ("Start writing…"); typing hides it at once.
+    public var placeholder: String? {
+        get { textView.placeholder }
+        set {
+            textView.placeholder = newValue
+            textView.needsDisplay = true
+        }
+    }
+
+    /// The last drawing of the page showed the placeholder (for the walk and the tests).
+    public var placeholderShown: Bool { textView.placeholderDrawn }
+
+    /// Where the text column starts in a page `width` wide: the measure centred, never closer than 48 to the edge.
+    public static func columnInset(width: CGFloat) -> CGFloat {
+        max(Space.s8 + Space.s4, ((width - (Typeface.body * 45).rounded()) / 2).rounded())
     }
 
     /// The note as Markdown: the loaded bytes where nothing changed, fresh Markdown for edited blocks only.
@@ -195,9 +237,42 @@ extension LoreTextView {
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 1, event.modifierFlags.intersection([.shift, .command, .option]).isEmpty {
             if let pr = taskBoxHit(event) { return toggleTask(pr) }
-            if let title = chipHit(event), let open = controller?.onOpenNote { return open(title) }
+            if let title = runHit(event, .loreChip) as? String, let open = controller?.onOpenNote { return open(title) }
+            if let ref = runHit(event, .loreImage) as? String, let url = URL(string: ref), let controller {
+                _ = controller.textView(self, clickedOnLink: url, at: 0)
+                return
+            }
         }
         super.mouseDown(with: event)
+    }
+
+    /// The text column is the measure, centred; the host lines things up with it through `columnInset`.
+    func updateInset() {
+        let inset = LoreEditorController.columnInset(width: frame.width)
+        if abs(textContainerInset.width - inset) > 0.5 { textContainerInset = NSSize(width: inset, height: Space.s6) }
+    }
+
+    /// The placeholder, drawn where the caret stands on the empty page: same font, same line, same start.
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        placeholderDrawn = placeholder != nil && ts.length == 0
+        guard let placeholder, placeholderDrawn else { return }
+        // The body text's own font and paragraph, never the typing attributes (a code line's would be monospaced).
+        var a = Style.typing(.p)
+        a[.foregroundColor] = LoreInk.text2
+        let o = textContainerOrigin
+        let line = firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        let top = window.map { convert($0.convertFromScreen(line), from: nil).minY } ?? o.y
+        NSAttributedString(string: placeholder, attributes: a).draw(
+            with: NSRect(x: o.x, y: top, width: textContainer?.size.width ?? frame.width, height: line.height * 2),
+            options: [.usesLineFragmentOrigin])
+    }
+
+    /// Focus arriving puts the + beside an empty line (the first responder changes after this returns).
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok { DispatchQueue.main.async { [weak self] in self?.tools.updateGutter() } }
+        return ok
     }
 
     private func taskBoxHit(_ event: NSEvent) -> NSRange? {
@@ -217,21 +292,21 @@ extension LoreTextView {
         return ns.paragraphRange(for: NSRange(location: loc, length: 0))
     }
 
-    private func chipHit(_ event: NSEvent) -> String? {
+    /// The value of `key` under the click (a note link's title, an image's address), nil off the run.
+    private func runHit(_ event: NSEvent, _ key: NSAttributedString.Key) -> Any? {
         guard let window else { return nil }
         let screen = window.convertPoint(toScreen: event.locationInWindow)
         let i = characterIndex(for: screen)
-        guard i < ts.length, let title = ts.attribute(.loreChip, at: i, effectiveRange: nil) as? String else {
-            return nil
-        }
+        guard i < ts.length, let value = ts.attribute(key, at: i, effectiveRange: nil) else { return nil }
         let rect = firstRect(forCharacterRange: NSRange(location: i, length: 1), actualRange: nil)
-        return rect.insetBy(dx: -2, dy: -2).contains(screen) ? title : nil
+        return rect.insetBy(dx: -2, dy: -2).contains(screen) ? value : nil
     }
 
     /// Flips `[ ]`/`[x]`: an attribute change of that paragraph only, one undo step.
     func toggleTask(_ pr: NSRange) {
         guard case .task(let l, let c) = Block.at(ts, pr.location) else { return }
         edit { setBlock(.task(l, !c), paragraph: pr, updateTyping: false) }
+        animateTick(pr, checked: !c)
     }
 
     // Copy gives Markdown; paste and drop read plain text, Markdown, files and image data, nothing rich.
