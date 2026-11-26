@@ -48,7 +48,11 @@ struct LoreLeftSidebar: View {
 
     private var groups: [LoreGroup] { LoreTree.groups(model.sideNotes, projects: model.projectNames) }
     /// Personal and Journal; the projects get their own heading.
-    private var notes: [LoreGroup] { groups.filter { !$0.id.hasPrefix("project-") } }
+    /// Journal first (the daily notes), then the rest in their order.
+    private var notes: [LoreGroup] {
+        let own = groups.filter { !$0.id.hasPrefix("project-") }
+        return own.filter { $0.id == "journal" } + own.filter { $0.id != "journal" }
+    }
     private var projects: [LoreGroup] { groups.filter { $0.id.hasPrefix("project-") } }
     private var recent: [LoreNote] { Array(model.sideNotes.filter { $0.kind == "note" }.prefix(5)) }
 
