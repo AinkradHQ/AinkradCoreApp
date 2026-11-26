@@ -8,55 +8,23 @@ import SwiftUI
 struct DesignDetail: View {
     let model: DesignModel
     let item: DesignItem
-    @State private var aboutOpen = false
+    @Environment(\.coreAccent) private var paneAccent
 
-    /// The editor chrome (V3-04) of a design that has a canvas.
+    /// The editor chrome (V3-04) of a design that has a canvas (none while the canvas cannot open: no tools for nothing).
     private var editor: DesignEditor? {
-        if case .doc(let d) = item, d.kind == .design, model.canvas != nil, model.service != nil {
+        if case .doc(let d) = item, d.kind == .design, model.canvasView(d) != nil {
             model.editor(for: d.id)
         } else {
             nil
         }
     }
 
+    private var aboutOpen: Binding<Bool> { Binding(get: { model.aboutOpen }, set: { model.aboutOpen = $0 }) }
+
     var body: some View {
-        VStack(spacing: Space.s2) {
-            AppHeader {
-                BackButton("Designs") { model.closeItem() }
-                Image(systemName: item.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-                Text(item.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-                    .accessibilityAddTraits(.isHeader)
-                if case .doc(let d) = item { KindChip(kind: d.kind) }
-                Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                // The mockup's title bar: what it is, and that the canvas is saved (edits sync as they are made).
-                if editor != nil { StateBadge("Saved", tone: .done, symbol: "checkmark.circle") }
-            } actions: {
-                if let editor { PresenceStrip(peers: editor.peers) }
-                if let editor { EditorToolbar(editor: editor, aboutOpen: $aboutOpen) }
-                if editor != nil, model.composeSupported, !model.readOnly {
-                    Button {
-                        Task { await model.drawWithAI() }
-                    } label: {
-                        Label("Draw with AI", systemImage: "sparkles")
-                    }
-                    .buttonStyle(CoreButtonStyle(.prominent))
-                    .help("Describe it and AI draws three directions on this canvas")
-                    .accessibilityIdentifier("design-draw-ai")
-                }
-                CoreDropdown(
-                    items: projectItems,
-                    isPresented: Binding(get: { model.projectsMenuOpen }, set: { model.projectsMenuOpen = $0 })
-                ) {
-                    Label("Projects", systemImage: "folder")
-                }
-                .disabled(model.allProjects.isEmpty || model.readOnly)
-                .help("Relate this to projects; it stays in the library either way")
-                .accessibilityIdentifier("design-projects")
-            }
-            .padding(.top, Space.s2)
-            .frame(maxWidth: .infinity)
-            .coreWell(radius: Radius.pane)
-            HStack(alignment: .top, spacing: Space.s2) {
+        VStack(spacing: 0) {
+            header
+            HStack(alignment: .top, spacing: Space.s3) {
                 if let editor, case .doc(let d) = item, let canvas = model.canvasView(d) {
                     EditorStage(model: model, item: item, editor: editor, canvas: canvas)
                 } else {
@@ -64,8 +32,12 @@ struct DesignDetail: View {
                     AboutIsland(model: model, item: item).frame(width: Space.s8 * 10)
                 }
             }
+            .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
         }
-        .popover(isPresented: $aboutOpen, arrowEdge: .bottom) {
+        .popover(
+            isPresented: Binding(get: { editor != nil && model.aboutOpen }, set: { model.aboutOpen = $0 }),
+            arrowEdge: .bottom
+        ) {
             AboutIsland(model: model, item: item).frame(width: Space.s8 * 10, height: Space.s8 * 14).padding(Space.s2)
         }
         .sheet(isPresented: Binding(get: { editor?.versionsOpen ?? false }, set: { editor?.versionsOpen = $0 })) {
@@ -73,6 +45,46 @@ struct DesignDetail: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("design-detail")
+    }
+
+    /// The app header: the way back (Esc), the name and what it is at the left; the editor's tools, Draw with AI and
+    /// Projects at the right.
+    private var header: some View {
+        AppHeader {
+            Button {
+                model.closeItem()
+            } label: {
+                Label("Designs", systemImage: "chevron.left")
+            }
+            .buttonStyle(CoreButtonStyle(.plain, size: .small))
+            .environment(\.coreKeycap, "esc")
+            .help("Back to the designs  Esc")
+            .accessibilityIdentifier("design-back")
+            Text(item.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+            Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            if editor != nil { StateBadge("Saved", tone: .done, symbol: "checkmark.circle") }
+        } actions: {
+            if let editor { PresenceStrip(peers: editor.peers) }
+            if let editor { EditorToolbar(editor: editor, aboutOpen: aboutOpen) }
+            CoreDropdown(
+                items: projectItems,
+                isPresented: Binding(get: { model.projectsMenuOpen }, set: { model.projectsMenuOpen = $0 })
+            ) {
+                Label("Projects", systemImage: "folder")
+            }
+            .disabled(model.allProjects.isEmpty || model.readOnly)
+            .help("Relate this to projects; it stays in the library either way")
+            .accessibilityIdentifier("design-projects")
+            if editor != nil, model.composeSupported, !model.readOnly {
+                AppActionTile(
+                    title: "Draw with AI", symbol: "sparkles", key: "", hue: GlassInk.accent(paneAccent),
+                    prominent: true
+                ) { Task { await model.drawWithAI() } }
+                .help("Describe it and AI draws three directions on this canvas")
+                .accessibilityIdentifier("design-draw-ai")
+            }
+        }
     }
 
     private var projectItems: [CoreDropdownItem] {
@@ -111,9 +123,9 @@ struct DesignDetail: View {
                     .padding(.bottom, Space.s4)
             }
         }
-        .padding(Space.s4)
+        .padding(Space.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .coreWell(radius: Radius.pane)
+        .background(GlassInk.well, in: coreShape(Radius.pane))
         .modifier(StageDrag(model: model, item: item))
         .contextMenu { DesignMenu(model: model, item: item) }
         .accessibilityElement(children: .contain)

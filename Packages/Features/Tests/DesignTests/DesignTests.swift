@@ -158,6 +158,22 @@ private func ready(_ s: FakeService) async -> DesignModel {
         #expect(m.project == nil)
     }
 
+    @Test func libraryHoldsTheFilesAndTheArrowsWalkTheWall() async {
+        let s = FakeService()
+        s.docList = [doc("dd_1", .design, "Checkout", ["1"])]
+        s.assetList = [asset("a1", .icon, "Cart"), asset("a2", .logo, "Mark"), asset("a3", .image, "Scene")]
+        let m = await ready(s)
+        #expect(m.count(.library) == 3)
+        #expect(DesignCategory.icons.page == .library && DesignCategory.screens.page == .screens)
+        m.pick(.library)
+        m.columns = 2
+        #expect(m.move(1) && m.selected == m.shown[0].id)  // the first press lands on the first card
+        #expect(m.move(2) && m.selected == m.shown[2].id)  // down one row
+        #expect(!m.move(2) && m.selected == m.shown[2].id)  // past the end stays put
+        m.pick(.all)
+        #expect(m.selected == nil)
+    }
+
     @Test func everySectionSharesThePageColumns() {
         // 1,648 pt fits eight 192 pt columns (the card width of E11-1), whatever a section holds.
         #expect(DesignWall.columns(width: 1648).count == 8)

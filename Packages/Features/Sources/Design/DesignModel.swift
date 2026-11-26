@@ -35,6 +35,12 @@ public final class DesignModel {
     var filter = ""
     /// The open item (a `DesignItem.id`), or nil for the home.
     var openID: String?
+    /// The card the keyboard is on (a `DesignItem.id`), or nil.
+    var selected: String?
+    /// The wall's column count, for ↑ ↓ (set by the wall as it lays out).
+    @ObservationIgnored var columns = 1
+    /// The open item's About panel.
+    var aboutOpen = false
     /// The pictures of loaded assets, by sha256.
     private(set) var images: [String: NSImage] = [:]
     @ObservationIgnored private var fetching: Set<String> = []
@@ -143,6 +149,7 @@ public final class DesignModel {
         // TODO(V6-02): designs waiting for review or approval. TODO(V7-02): designs an AI session is drawing.
         case .needsYou, .drawing: []
         case .all: visible(in: project)
+        case .library: visible(in: project).filter { DesignCategory.libraryKinds.contains($0.category) }
         default: visible(in: project).filter { $0.category == c }
         }
     }
@@ -320,12 +327,14 @@ public final class DesignModel {
 
     func closeItem() {
         editors = [:]
+        aboutOpen = false
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 
     /// One rail row is selected at a time: a category clears the project, a project shows all of its designs.
     func pick(_ c: DesignCategory) {
-        category = c
+        withAnimation(Motion.out(Motion.ui)) { category = c }
+        selected = nil
         project = nil
         openID = nil
     }
@@ -349,6 +358,8 @@ public final class DesignModel {
         ) { DesignView(model: self) }
         spec.tab = "Design"
         spec.fullScreenOnly = true
+        // ⌘N (File, New) on this pane makes a blank design at once.
+        spec.onNew = { [weak self] in Task { await self?.quickNew() } }
         host.shell.openPane(spec)
         Task { await reload() }
     }
