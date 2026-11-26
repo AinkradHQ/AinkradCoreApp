@@ -75,6 +75,10 @@ public final class LoreDemo {
                 }
                 n.rev += 1
                 n.text = merged
+                // The Core names a note by its first H1 (the rename of the list's menu).
+                if n.kind == "note", let h = merged.split(separator: "\n").first(where: { $0.hasPrefix("# ") }) {
+                    n.title = String(h.dropFirst(2))
+                }
                 notes[id] = n
                 history[id, default: [:]][n.rev] = merged
                 return LoreSaveResult(note: n, outcome: outcome, version: conflict ? "lv_1" : nil)
@@ -178,6 +182,14 @@ public final class LoreDemo {
                 return LoreSearchResult(hits: Array(hits.prefix(limit)), semantic: true)
             }
         }
+        func trash(_ id: String) async throws -> LoreNote {
+            try lock.withLock {
+                guard var n = notes[id] else { throw CoreError.http(status: 404, code: "not_found", message: "") }
+                n.trashed = true
+                notes[id] = n
+                return n
+            }
+        }
         func restore(_ id: String) async throws -> LoreNote {
             try lock.withLock {
                 guard var n = notes[id] else { throw CoreError.http(status: 404, code: "not_found", message: "") }
@@ -196,10 +208,11 @@ public final class LoreDemo {
         [
             "today-blank", "today", "past-day", "project-note", "conflict", "kept", "not-connected", "open-sheet",
             "backlinks", "versions", "restored", "long-note", "new-note", "focus",
+            "rename", "deleted",
         ] + toolScenes
 
     let model: LoreModel
-    private let service: Service
+    let service: Service
     /// The person's sidebars, put back when the walk ends (the walk opens both, and focus mode hides both).
     private let sidebars: (Bool, Bool)
 
@@ -270,6 +283,14 @@ public final class LoreDemo {
         case "focus":
             await model.openNote("ln_demolongnote")
             model.toggleFocus()
+        case "rename":
+            // The header's More, Rename…: the note's row in the list turns into a field with its name.
+            await model.openNote("ln_demoprojecta")
+            model.renameRequest = "ln_demoprojecta"
+        case "deleted":
+            // Delete from the list's menu: the note goes to the trash, today's note opens, the toast offers Undo.
+            await model.openNote("ln_demoprojecta")
+            await model.trashNote("ln_demoprojecta", title: "Launch checklist")
         case "open-sheet":
             await model.openDay(model.todayKey)
             LoreOpenSheet.open(model)

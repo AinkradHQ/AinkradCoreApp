@@ -33,6 +33,7 @@ enum LoreSpaceSnapshots {
             demo.restoreSidebars()
         }
         var n = 0
+        let shotTag = "\(theme)\(reduce ? "-reduce" : "")\(clear ? "-clear" : "")"
         func shot(_ name: String) async {
             n += 1
             try? await Task.sleep(for: .seconds(1.2))
@@ -67,6 +68,7 @@ enum LoreSpaceSnapshots {
         await key("3", [.command], window)
         await key("\u{F701}", [], window, code: 125)
         await shot("keys-outline")
+        if only.contains("menu") || only.isEmpty { await LoreMenuWalk.run(app, demo, window, tag: shotTag) }
         if only.contains("templates") || only.isEmpty {
             for id in LoreDemo.templateIDs {
                 await demo.show("today-blank")
@@ -188,7 +190,7 @@ enum LoreSpaceSnapshots {
         NSApp.terminate(nil)
     }
 
-    private static func type(_ s: String, _ w: NSWindow) async {
+    static func type(_ s: String, _ w: NSWindow) async {
         for ch in s {
             guard
                 let e = NSEvent.keyEvent(
@@ -201,7 +203,7 @@ enum LoreSpaceSnapshots {
         }
     }
 
-    private static func key(_ ch: String, _ mods: NSEvent.ModifierFlags, _ w: NSWindow, code: UInt16 = 0) async {
+    static func key(_ ch: String, _ mods: NSEvent.ModifierFlags, _ w: NSWindow, code: UInt16 = 0) async {
         guard
             let e = NSEvent.keyEvent(
                 with: .keyDown, location: .zero, modifierFlags: mods, timestamp: ProcessInfo.processInfo.systemUptime,

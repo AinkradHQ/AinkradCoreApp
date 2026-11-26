@@ -133,6 +133,13 @@ extension LoreDemo {
         model.editor?.resetLatency()
     }
 
+    /// The open note's name, the toast's words, and whether a note is in the trash, for the walk's checks.
+    public var noteTitle: String { model.title }
+    public var toastText: String { model.host.shell.toast?.message ?? "none" }
+    public func trashed(_ id: String) async -> Bool { (try? await service.note(id).trashed) ?? false }
+    /// ⌘Z on the toast: its Undo.
+    public func undoToast() { model.host.shell.undoToast() }
+
     public var latency: String {
         guard let l = model.editor?.latency else { return "none" }
         return String(format: "p50 %.2f ms · p95 %.2f ms · %d keys", l.p50, l.p95, l.n)

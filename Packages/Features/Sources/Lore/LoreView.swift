@@ -1,3 +1,4 @@
+import CoreKit
 import CoreUI
 import LoreEditor
 import Shell
@@ -180,10 +181,13 @@ private struct LorePageIsland: View {
 
 /// On the surface, no card: ‹ › days, the long date (or the note's title), Today when away from it, the project chip;
 /// the save state, Open… ⌘O and New ⌘N (versions are in the inspector, and ⇧⌘H). The sidebar toggles sit at the
-/// ends, over their sidebars.
+/// ends, over their sidebars. Every control is the apps' header kit: `AppActionTile` (New prominent), `CoreIconButton`,
+/// and the tile face (`LoreTileLabel`) on the two menus, so hover, press and the icon bounce match Leyline and Accounts.
 private struct LoreTopBar: View {
     let model: LoreModel
     @State private var projectOpen = false
+    @State private var moreOpen = false
+    @Environment(\.coreAccent) private var paneAccent
 
     var body: some View {
         AppHeader {
@@ -202,37 +206,44 @@ private struct LoreTopBar: View {
                 .accessibilityAddTraits(.isHeader)
                 .padding(.trailing, Space.s1)
             if !model.isToday, model.service != nil {
-                Button("Today") { Task { await model.openDay(model.todayKey) } }
-                    .buttonStyle(CoreButtonStyle(.secondary))
-                    .environment(\.coreKeycap, LoreKeys.today.label)
-                    .help(LoreKeys.today.help)
+                // ⌘D is bound by the space's hidden keys; the tooltip names it.
+                AppActionTile(
+                    title: "Today", symbol: "sun.max", key: LoreKeys.today.label, hue: GlassInk.accent(paneAccent)
+                ) {
+                    Task { await model.openDay(model.todayKey) }
+                }
             }
             LoreProjectChip(model: model, open: $projectOpen)
+            if let n = model.note, model.load == .ready {
+                CoreDropdown(items: more(n), isPresented: $moreOpen) {
+                    LoreTileLabel(title: "More", symbol: "ellipsis", chevron: true)
+                }
+                .help("Rename, copy a link to or delete this note")
+                .accessibilityLabel("More for this note")
+                .accessibilityIdentifier("lore-more")
+            }
             Button(LoreKeys.project.title) { projectOpen.toggle() }.loreKey(LoreKeys.project)
                 .disabled(model.note?.kind != "note")
                 .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
         } actions: {
             Text(model.syncWords).coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
                 .accessibilityIdentifier("lore-sync")
-            Button {
+            AppActionTile(
+                title: "Open…", symbol: "magnifyingglass", key: LoreKeys.open.label, hue: GlassInk.accent(paneAccent)
+            ) {
                 LoreOpenSheet.open(model)
-            } label: {
-                Label("Open…", systemImage: "magnifyingglass")
             }
-            .buttonStyle(CoreButtonStyle(.secondary))
             .loreKey(LoreKeys.open)
             .disabled(model.service == nil)
-            .help(LoreKeys.open.help)
-            // ⌘N is the shell's New (File menu), which runs this pane's `onNew`; the keycap shows it here.
-            Button {
+            .accessibilityIdentifier("lore-open")
+            // ⌘N is the shell's New (File menu), which runs this pane's `onNew`; the tooltip names it.
+            AppActionTile(
+                title: "New", symbol: "plus", key: LoreKeys.new.label, hue: GlassInk.accent(paneAccent),
+                prominent: true
+            ) {
                 Task { await model.newNote() }
-            } label: {
-                Label("New", systemImage: "plus")
             }
-            .buttonStyle(CoreButtonStyle(.prominent))
-            .environment(\.coreKeycap, LoreKeys.new.label)
             .disabled(model.load != .ready)
-            .help("A blank note in this project, or personal  ⌘N")
             .accessibilityIdentifier("lore-new")
             CoreIconButton(symbol: "sidebar.right", label: LoreKeys.right.help) {
                 model.showRight.toggle()
@@ -241,5 +252,21 @@ private struct LoreTopBar: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The open note's own menu: the list's right-click menu, minus Open and Move (the project chip moves it).
+    private func more(_ n: LoreNote) -> [CoreDropdownItem] {
+        let name = model.title
+        let edit = LoreModel.canEdit(n)
+        return [
+            CoreDropdownItem("Rename…", symbol: "pencil", enabled: edit) {
+                model.showLeft = true
+                model.renameRequest = n.id
+            },
+            CoreDropdownItem("Copy Link", symbol: "link") { model.copyLink(n.id, title: name) },
+            CoreDropdownItem("Delete", symbol: "trash", destructive: true, enabled: edit) {
+                Task { await model.trashNote(n.id, title: name) }
+            },
+        ]
     }
 }

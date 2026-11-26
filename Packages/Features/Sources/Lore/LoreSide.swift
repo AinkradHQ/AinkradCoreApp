@@ -143,7 +143,8 @@ enum LoreOutlineTags {
 // MARK: views
 
 /// One compact line of a sidebar: icon, title, a count or chip on the right. 28 pt, 8 pt radius, no outline. `cursor`:
-/// the keyboard's row (↑ ↓), lit with the hover fill.
+/// the keyboard's row (↑ ↓), lit with the hover fill. `rename`: the title is a field (Return keeps it, Esc puts the old
+/// one back, clicking away keeps it, like Finder).
 struct LoreSideRow: View {
     let title: String
     var symbol: String?
@@ -152,40 +153,65 @@ struct LoreSideRow: View {
     var indented = false
     var subtitle: String?
     var cursor = false
+    var rename: Binding<String>?
+    var done: (Bool) -> Void = { _ in }
     let action: () -> Void
     @State private var hover = false
+    @FocusState private var field: Bool
     @Environment(\.corePalette) private var palette
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: Space.s2) {
-                if let symbol {
-                    Image(systemName: symbol).coreFont(size: MacTextSize.meta + 1)
-                        .foregroundStyle(selected ? palette.primary : GlassInk.secondary)
-                        .frame(width: Space.s4).accessibilityHidden(true)
+        Group {
+            if let rename {
+                line(
+                    TextField("", text: rename).textFieldStyle(.plain)
+                        .coreFont(size: MacTextSize.body, weight: .semibold)
+                        .focused($field)
+                        .onSubmit { done(true) }
+                        .onExitCommand { done(false) }
+                        .onAppear { field = true }
+                        .onChange(of: field) { if !field { done(true) } }
+                        .accessibilityLabel("New name for \(title)"),
+                    lit: true)
+            } else {
+                Button(action: action) {
+                    line(
+                        Text(title).coreFont(size: MacTextSize.body, weight: selected ? .semibold : .regular)
+                            .lineLimit(1),
+                        lit: false)
                 }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title).coreFont(size: MacTextSize.body, weight: selected ? .semibold : .regular).lineLimit(1)
-                    if let subtitle {
-                        Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                    }
-                }
-                Spacer(minLength: Space.s1)
-                if let count { Text(count).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary) }
+                .buttonStyle(.plain)
             }
-            .padding(.leading, indented ? Space.s6 + Space.s3 : Space.s3).padding(.trailing, Space.s3)
-            .frame(minHeight: subtitle == nil ? MacSize.controlMd : MacSize.controlLg + Space.s2, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                cursor ? GlassInk.lift(0.16) : selected || hover ? GlassInk.wellHover : .clear,
-                in: coreShape(Radius.control)
-            )
-            .contentShape(coreShape(Radius.control))
         }
-        .buttonStyle(.plain)
         .onHover { hover = $0 }
         .animation(Motion.out(Motion.hover), value: hover)
         .accessibilityAddTraits(selected || cursor ? .isSelected : [])
+    }
+
+    private func line(_ name: some View, lit: Bool) -> some View {
+        HStack(spacing: Space.s2) {
+            if let symbol {
+                Image(systemName: symbol).coreFont(size: MacTextSize.meta + 1)
+                    .foregroundStyle(selected ? palette.primary : GlassInk.secondary)
+                    .frame(width: Space.s4).accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                name
+                if let subtitle {
+                    Text(subtitle).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: Space.s1)
+            if let count { Text(count).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary) }
+        }
+        .padding(.leading, indented ? Space.s6 + Space.s3 : Space.s3).padding(.trailing, Space.s3)
+        .frame(minHeight: subtitle == nil ? MacSize.controlMd : MacSize.controlLg + Space.s2, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            lit || cursor ? GlassInk.lift(0.16) : selected || hover ? GlassInk.wellHover : .clear,
+            in: coreShape(Radius.control)
+        )
+        .contentShape(coreShape(Radius.control))
     }
 }
 

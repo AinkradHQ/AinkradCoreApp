@@ -36,28 +36,24 @@ struct LoreBacklinksIsland: View {
     }
 }
 
-/// The project chip: Personal, or one of the projects. A daily note is always personal, so its chip does not open.
+/// The project chip: Personal, or one of the projects, drawn as the header's quiet action tile (`AppActionTile`'s well,
+/// hover and icon bounce) because it opens a glass menu. A daily note is always personal, so its chip does not open.
 struct LoreProjectChip: View {
     let model: LoreModel
     /// ⇧⌘P opens it.
     @Binding var open: Bool
-    @Environment(\.corePalette) private var palette
 
     var body: some View {
-        let personal = model.note?.project == nil
-        let chip = AppStatChip(personal ? "person" : "folder", model.projectName, palette.text2)
+        let symbol = model.note?.project == nil ? "person" : "folder"
         if model.note?.kind == "note" {
             CoreDropdown(items: items, isPresented: $open) {
-                HStack(spacing: Space.s1) {
-                    chip
-                    Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(palette.text2).accessibilityHidden(true)
-                }
+                LoreTileLabel(title: model.projectName, symbol: symbol, chevron: true)
             }
             .help("Move this note to a project, or keep it personal  \(LoreKeys.project.label)")
             .accessibilityLabel("Project: \(model.projectName)")
         } else {
-            chip.help("Daily notes are personal").accessibilityLabel("Project: \(model.projectName)")
+            LoreTileLabel(title: model.projectName, symbol: symbol, chevron: false)
+                .help("Daily notes are personal").accessibilityLabel("Project: \(model.projectName)")
         }
     }
 
@@ -73,6 +69,34 @@ struct LoreProjectChip: View {
                     Task { await model.move(to: p.id) }
                 }
             }
+    }
+}
+
+/// A header tile's face for a control that is not a plain button (a dropdown's trigger): `AppActionTile`'s look, the
+/// icon bouncing once on hover. `chevron`: it opens a menu. Without one it is a quiet label (no hover).
+struct LoreTileLabel: View {
+    let title: String
+    let symbol: String
+    var chevron = true
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
+                .coreEnterBounce(hovering && chevron)
+            Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+            if chevron {
+                Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta, weight: .semibold)
+                    .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            }
+        }
+        .foregroundStyle(chevron ? GlassInk.primary : GlassInk.secondary)
+        .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
+        .background(hovering && chevron ? GlassInk.wellHover : GlassInk.well, in: coreShape(Radius.control))
+        .contentShape(coreShape(Radius.control))
+        .fixedSize()
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering)
     }
 }
 

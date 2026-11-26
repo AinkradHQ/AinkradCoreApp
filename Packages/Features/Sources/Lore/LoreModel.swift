@@ -90,6 +90,8 @@ public final class LoreModel {
     /// A project, tag or search the left sidebar is filtered to; `filterHits` are its notes.
     var sideFilter: LoreSideFilter?
     var filterHits: [LoreNote] = []
+    /// A note the list should start renaming in place (the header's More, Rename…).
+    var renameRequest: String?
     @ObservationIgnored var outlineTask: Task<Void, Never>?
     @ObservationIgnored var filterTask: Task<Void, Never>?
     /// The Core serves `/tags` and `/session-docs` (minor 95); true until a connection says otherwise.

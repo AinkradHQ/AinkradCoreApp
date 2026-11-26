@@ -12,6 +12,9 @@ struct LoreLeftSidebar: View {
     @State private var open: Set<String> = ["personal"]
     @State private var query = ""
     @State private var cursor: String?
+    /// The row whose title is a field, and what is typed in it.
+    @State private var renaming: String?
+    @State private var draft = ""
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -40,7 +43,17 @@ struct LoreLeftSidebar: View {
             .scrollIndicators(.never)
             .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
         }
+        // ⌘⌫ on the list's cursor row (Finder's Move to Trash). A key equivalent, so it comes before the search
+        // field's own ⌘⌫; disabled (and so passed on) unless the cursor is on a note that can go.
+        .background {
+            Button("Delete the note") { trashCursor() }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!focus.wrappedValue || cursor.flatMap(noteFor).map(LoreModel.canEdit) != true)
+                .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
+        }
         .onChange(of: focus.wrappedValue) { if !focus.wrappedValue { cursor = nil } }
+        .onChange(of: model.renameRequest) { if let id = model.renameRequest { startRename(id) } }
+        .onAppear { if let id = model.renameRequest { startRename(id) } }
         .accessibilityIdentifier("lore-left")
     }
 
@@ -113,9 +126,89 @@ struct LoreLeftSidebar: View {
     ) -> some View {
         LoreSideRow(
             title: title, symbol: symbol, count: count, selected: selected, indented: indented, subtitle: subtitle,
-            cursor: cursor == id, action: action
+            cursor: cursor == id, rename: renaming == id ? $draft : nil, done: { finishRename(id, keep: $0) },
+            action: action
         )
         .id(id)
+    }
+
+    // MARK: rename, delete
+
+    /// The note under a row id (`tree:`, `found:`, `recent:`).
+    private func noteFor(_ rowID: String) -> LoreNote? {
+        guard let colon = rowID.firstIndex(of: ":"), ["tree", "found", "recent"].contains(rowID[..<colon]) else {
+            return nil
+        }
+        let id = rowID[rowID.index(after: colon)...]
+        return (model.sideNotes + model.filterHits).first { $0.id == id }
+    }
+
+    private func beginRename(_ rowID: String, _ n: LoreNote) {
+        draft = Self.name(n)
+        renaming = rowID
+    }
+
+    /// The header's Rename…: the row it is drawn on, its group opened first.
+    private func startRename(_ id: String) {
+        model.renameRequest = nil
+        guard let n = (model.sideNotes + model.filterHits).first(where: { $0.id == id }), LoreModel.canEdit(n) else {
+            return
+        }
+        if model.sideFilter != nil, model.filterHits.contains(where: { $0.id == id }) {
+            beginRename("found:\(id)", n)
+        } else if let g = groups.first(where: { $0.notes.prefix(60).contains { $0.id == id } }) {
+            open.insert(g.id)
+            if model.sideFilter != nil { clear() }
+            beginRename("tree:\(id)", n)
+        } else if recent.contains(where: { $0.id == id }) {
+            beginRename("recent:\(id)", n)
+        }
+    }
+
+    private func finishRename(_ rowID: String, keep: Bool) {
+        guard renaming == rowID else { return }
+        renaming = nil
+        if keep, let n = noteFor(rowID), draft != Self.name(n) {
+            let title = draft
+            Task { await model.rename(n.id, to: title) }
+        }
+    }
+
+    /// ⌘⌫ on the cursor's note (Finder's Move to Trash).
+    private func trashCursor() {
+        guard let c = cursor, let n = noteFor(c), LoreModel.canEdit(n) else { return }
+        cursor = LoreKeys.next(ids, from: c, step: 1).flatMap { $0 == c ? nil : $0 }
+        Task { await model.trashNote(n.id, title: Self.name(n)) }
+    }
+
+    @ViewBuilder private func menu(_ n: LoreNote, _ rowID: String) -> some View {
+        let name = Self.name(n)
+        Button("Open") { show(n) }
+        if LoreModel.canEdit(n) {
+            Button("Rename…") { beginRename(rowID, n) }
+            Menu("Move to") {
+                moveItem(n, to: nil, "Personal")
+                ForEach(model.projectChoices, id: \.id) { p in moveItem(n, to: p.id, p.name) }
+            }
+        }
+        Button("Copy Link") { model.copyLink(n.id, title: name) }
+        if LoreModel.canEdit(n) {
+            Divider()
+            Button("Delete", role: .destructive) { Task { await model.trashNote(n.id, title: name) } }
+                .keyboardShortcut(.delete, modifiers: .command)
+        }
+    }
+
+    private func moveItem(_ n: LoreNote, to project: String?, _ name: String) -> some View {
+        Button {
+            Task { await model.moveNote(n.id, to: project) }
+        } label: {
+            if n.project == project { Label(name, systemImage: "checkmark") } else { Text(name) }
+        }
+    }
+
+    private func show(_ n: LoreNote) {
+        Task { if n.kind == "daily", let d = n.day { await model.openDay(d) } else { await model.openNote(n.id) } }
     }
 
     // MARK: parts
@@ -186,9 +279,9 @@ struct LoreLeftSidebar: View {
         row(
             "\(section):\(n.id)", Self.name(n), symbol: n.kind == "daily" ? "sun.max" : "doc.text",
             selected: model.note?.id == n.id, indented: indented
-        ) {
-            Task { if n.kind == "daily", let d = n.day { await model.openDay(d) } else { await model.openNote(n.id) } }
-        }
+        ) { show(n) }
+        .contextMenu { menu(n, "\(section):\(n.id)") }
+        .accessibilityIdentifier("lore-row-\(section)-\(n.id)")
     }
 
     /// A note's title; a day's note is named by its date.
@@ -234,6 +327,8 @@ struct LoreLeftSidebar: View {
                 row("recent:\(n.id)", Self.name(n), symbol: "clock", selected: model.note?.id == n.id) {
                     Task { await model.openNote(n.id) }
                 }
+                .contextMenu { menu(n, "recent:\(n.id)") }
+                .accessibilityIdentifier("lore-row-recent-\(n.id)")
             }
         }
     }
