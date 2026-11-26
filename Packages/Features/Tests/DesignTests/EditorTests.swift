@@ -296,7 +296,7 @@ final class FakeBackend: DesignEditBackend {
         #expect(b.sel == ["u"] && e.node?.name == "Body")
         b.canSelect = false
         e.select("t")
-        #expect(e.notice?.contains("cannot select") == true)
+        #expect(e.notice?.contains("not on the canvas") == true)
     }
 
     @Test func renameWritesANameOpOnlyWhenItChanged() {
