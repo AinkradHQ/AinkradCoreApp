@@ -56,7 +56,7 @@ public final class DesignDemo {
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
-        "system-guide", "system-guide-night",
+        "system-guide", "system-guide-night", "ai-over-limit", "ai-flow", "system-replace-confirm",
     ]
 
     private let model: DesignModel
@@ -227,6 +227,7 @@ public final class DesignDemo {
             Service(
                 docs: empty ? [] : Self.docs(), assets: empty ? [] : s.assets, kits: empty ? [] : Self.kits(),
                 bytes: s.bytes))
+        model.debugSystemAsk = false
         if scene.hasPrefix("project-island") {
             shell.closePane("design")
             await ProjectsDemo(model: model.projectsModel).show("overview-running")
@@ -254,9 +255,10 @@ public final class DesignDemo {
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
-            "tools-probe":
+            "tools-probe", "ai-over-limit", "ai-flow":
             model.openID = "doc:\(Self.did(1))"
-        case "open-system", "system-empty", "system-guide", "system-guide-night": model.openID = "doc:\(Self.did(8))"
+        case "open-system", "system-empty", "system-guide", "system-guide-night", "system-replace-confirm":
+            model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
         case "open-logo": model.openID = "asset:\(Self.sha("Lanterna mark"))"
         case "open-icon-composer": model.openID = "asset:\(Self.sha("Lanterna app icon"))"
@@ -304,6 +306,17 @@ public final class DesignDemo {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+        if scene == "system-replace-confirm" {
+            // A system that already has tokens: Generate asks before replacing them.
+            try? await Task.sleep(for: .seconds(2))
+            model.editors[Self.did(8)]?.setTokens(SystemStarter.tokens)
+            try? await Task.sleep(for: .seconds(1))
+            model.debugSystemAsk = true
+            model.openID = nil
+            try? await Task.sleep(for: .milliseconds(300))
+            model.openID = "doc:\(Self.did(8))"
+            try? await Task.sleep(for: .seconds(2))
+        }
         if scene == "system-guide" || scene == "system-guide-night" {
             // The style guide on the real engine (CORE_DESIGN_SCENE): the default set written as token ops.
             try? await Task.sleep(for: .seconds(2))
@@ -335,6 +348,18 @@ public final class DesignDemo {
                 ])
             switch scene {
             case "ai-new": c?.prompt = ""
+            case "ai-over-limit":
+                c?.target = nil
+                c?.prompt = String(repeating: "A calm sign-in screen with a big logo and a short welcome. ", count: 11)
+            case "ai-flow":
+                c?.target = nil
+                c?.prompt = "An onboarding flow"
+                let ids = (1...3).map { "n_flow\($0)" }
+                let flow = ComposeState(
+                    id: "dc_1", phase: .done, reason: "", session: nil,
+                    directions: [.init(name: "Onboarding", summary: "Three steps", frame: ids[0], screens: ids)],
+                    flow: true)
+                c?.debugShow(flow, phase: .done("3 screens are on the canvas."))
             case "ai-edit": c?.prompt = "Make the button green"
             case "ai-drawing":
                 c?.prompt = "Make the button green"
