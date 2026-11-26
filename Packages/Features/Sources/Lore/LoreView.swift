@@ -165,9 +165,6 @@ private struct LorePageIsland: View {
                     .overlay(alignment: .top) {
                         if model.pageBlank, model.load == .ready {
                             LoreBlankPrompt(model: model, size: LoreView.textSize)
-                                .frame(maxWidth: LoreView.measure, alignment: .leading)
-                                .frame(maxWidth: .infinity)
-                                .padding(.horizontal, Space.s8 + Space.s4).padding(.top, Space.s6)
                         }
                     }
                     .animation(Motion.out(Motion.ui), value: model.pageBlank)
@@ -198,7 +195,9 @@ private struct LoreTopBar: View {
                 .loreKey(LoreKeys.dayBefore)
             CoreIconButton(symbol: "chevron.right", label: LoreKeys.nextDay.help) { model.step(1) }
                 .loreKey(LoreKeys.nextDay)
+            // A long title shortens instead of pushing the header out of the window.
             Text(model.title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                .truncationMode(.tail).frame(maxWidth: Space.s8 * 10, alignment: .leading)
                 .help(model.title)
                 .accessibilityAddTraits(.isHeader)
                 .padding(.trailing, Space.s1)

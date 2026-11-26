@@ -128,6 +128,7 @@ public final class LoreModel {
         self.page = page
         self.editor = editor
         self.drafts = drafts
+        editor?.placeholder = String(localized: "Start writing…", bundle: .module)
         editor?.onChange = { [weak self] in self?.changed() }
         editor?.onTable = { [weak self] in self?.caretInTable = $0 }
         editor?.onOpenInternal = { [weak self] in self?.openInternal($0) }

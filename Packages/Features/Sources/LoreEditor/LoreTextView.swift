@@ -63,8 +63,7 @@ final class LoreTextView: NSTextView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        let inset = max(Space.s8 + Space.s4, ((newSize.width - measure) / 2).rounded())
-        if abs(textContainerInset.width - inset) > 0.5 { textContainerInset = NSSize(width: inset, height: Space.s6) }
+        updateInset()
     }
 
     /// Keystroke → layout done: the key is handled and the viewport laid out synchronously, then timed.
@@ -90,6 +89,7 @@ final class LoreTextView: NSTextView {
     private var caretWasInTable = false
     /// Text mode: tables always show their Markdown (E0-7), not a grid.
     var tablesAsText = false
+    var placeholder: String?  // drawn on the empty page (`LoreEditorController.placeholder`)
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
@@ -176,6 +176,7 @@ final class LoreTextView: NSTextView {
             if r.length > 0, NSMaxRange(r) <= ts.length { ts.removeAttribute(.loreRaw, range: r) }
         }
         super.didChangeText()
+        if ts.length < 2 { needsDisplay = true }
         controller?.spy.starts = nil
         Style.renumber(ts, around: min(cursor, max(0, ts.length - 1)))
         controller?.onChange?()
@@ -186,6 +187,8 @@ final class LoreTextView: NSTextView {
     override func insertText(_ string: Any, replacementRange: NSRange) {
         // Typed text is the person's own: never raw source, so its `*` or `_` is escaped when written.
         typingAttributes[.loreRaw] = nil
+        // Undo takes back a word at a time, not the whole run of typing.
+        if (string as? String) == " ", !busy { breakUndoCoalescing() }
         super.insertText(string, replacementRange: replacementRange)
         guard !busy, selectedRange().length == 0,
             let s = (string as? String) ?? (string as? NSAttributedString)?.string

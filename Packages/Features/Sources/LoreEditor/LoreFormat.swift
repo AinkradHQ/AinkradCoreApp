@@ -161,6 +161,7 @@ extension LoreTextView {
     func applyBlock(_ b: Block) {
         let sel = selectedRange()
         let paras = selectedParagraphs
+        if b == .code, paras.count > 1 { return codeBlock(paras) }
         edit {
             for pr in paras.reversed() {
                 let raw =
@@ -175,6 +176,23 @@ extension LoreTextView {
         let at = min(sel.location, ts.length)
         setSelectedRange(NSRange(location: at, length: min(sel.length, ts.length - at)))
         typingAttributes = Style.typing(currentBlock())
+        tools.updateGutter()
+    }
+
+    /// Several paragraphs made Code: one code block with a line each (Markdown has no run of one-line code blocks),
+    /// the whole block selected. One undo step.
+    private func codeBlock(_ paras: [NSRange]) {
+        let start = paras[0].location
+        let end = NSMaxRange(content(paras[paras.count - 1]))
+        let text = paras.map { ns.substring(with: content($0)) }.joined(separator: "\u{2028}")
+        edit {
+            replace(
+                NSRange(location: start, length: end - start),
+                with: NSAttributedString(string: text, attributes: Style.typing(.code)))
+            setBlock(.code, paragraph: ns.paragraphRange(for: NSRange(location: start, length: 0)), updateTyping: false)
+        }
+        setSelectedRange(NSRange(location: start, length: (text as NSString).length))
+        typingAttributes = Style.typing(.code)
         tools.updateGutter()
     }
 

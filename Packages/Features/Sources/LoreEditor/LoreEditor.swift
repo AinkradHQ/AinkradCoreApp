@@ -111,6 +111,9 @@ public enum LoreLinkPolicy {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
         scrollView.documentView = textView
+        // The page exactly as wide as what shows it, so the column is centred on the page (a legacy scroller took 15
+        // from the clip view and the text view stayed wider, off-centre).
+        textView.setFrameSize(NSSize(width: scrollView.contentSize.width, height: textView.frame.height))
         super.init()
         textView.controller = self
         textView.delegate = self
@@ -140,7 +143,23 @@ public enum LoreLinkPolicy {
     public func setTextScale(_ scale: CGFloat) {
         guard Typeface.userScale != scale else { return }
         Typeface.userScale = scale
+        // The measure follows the text size: the column is centred again.
+        textView.updateInset()
         load(markdown: markdown())
+    }
+
+    /// Light text where the first line goes while the page is empty ("Start writing…"); typing hides it at once.
+    public var placeholder: String? {
+        get { textView.placeholder }
+        set {
+            textView.placeholder = newValue
+            textView.needsDisplay = true
+        }
+    }
+
+    /// Where the text column starts in a page `width` wide: the measure centred, never closer than 48 to the edge.
+    public static func columnInset(width: CGFloat) -> CGFloat {
+        max(Space.s8 + Space.s4, ((width - (Typeface.body * 45).rounded()) / 2).rounded())
     }
 
     /// The note as Markdown: the loaded bytes where nothing changed, fresh Markdown for edited blocks only.
@@ -211,6 +230,26 @@ extension LoreTextView {
             }
         }
         super.mouseDown(with: event)
+    }
+
+    /// The text column is the measure, centred; the host lines things up with it through `columnInset`.
+    func updateInset() {
+        let inset = LoreEditorController.columnInset(width: frame.width)
+        if abs(textContainerInset.width - inset) > 0.5 { textContainerInset = NSSize(width: inset, height: Space.s6) }
+    }
+
+    /// The placeholder, drawn where the caret stands on the empty page: same font, same line, same start.
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let placeholder, ts.length == 0 else { return }
+        var a = typingAttributes
+        a[.foregroundColor] = LoreInk.text2
+        let o = textContainerOrigin
+        let line = firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        let top = window.map { convert($0.convertFromScreen(line), from: nil).minY } ?? o.y
+        NSAttributedString(string: placeholder, attributes: a).draw(
+            with: NSRect(x: o.x, y: top, width: textContainer?.size.width ?? frame.width, height: line.height * 2),
+            options: [.usesLineFragmentOrigin])
     }
 
     /// Focus arriving puts the + beside an empty line (the first responder changes after this returns).

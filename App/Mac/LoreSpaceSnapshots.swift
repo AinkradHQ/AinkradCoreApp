@@ -67,6 +67,8 @@ enum LoreSpaceSnapshots {
         await key("3", [.command], window)
         await key("\u{F701}", [], window, code: 125)
         await shot("keys-outline")
+        if only.contains("latency") || only.isEmpty { await latency(demo, window) }
+        if only.contains("sizes") { await sizes(demo, only.contains("sizes-type")) }
         if !only.isEmpty { return finish(nil) }
 
         // Check 1: typing in the middle, an AI append lands at the end, the caret stays.
@@ -100,7 +102,62 @@ enum LoreSpaceSnapshots {
         try? await Task.sleep(for: .seconds(2))
         let sent = await demo.coreText()
         log("DRAFT after reconnect: sent=\(sent.contains("Offline line.")) draft=\(demo.hasDraft)")
+        await sizes(demo, true)
         finish(nil)
+    }
+
+    /// Keystroke to laid-out page on a 6,000-line note, typed with real key events in its middle.
+    private static func latency(_ demo: LoreDemo, _ window: NSWindow) async {
+        await demo.show("today")
+        demo.loadLong(1_000)
+        try? await Task.sleep(for: .seconds(1))
+        if let tv = demo.textView { window.makeFirstResponder(tv) }
+        await type("the quick brown fox jumps over the lazy dog and keeps on running ", window)
+        log("LAT long note (6000 lines): \(demo.latency)")
+        let dir = ProcessInfo.processInfo.environment["CORE_LORE_SPACE_SNAPSHOT"] ?? "/tmp"
+        try? await Task.sleep(for: .seconds(0.8))
+        log(
+            "shot latency \(SnapshotCapture.png(window, to: "\(dir)/latency-long-note-lore-space.png") ? "ok" : "FAILED")"
+        )
+    }
+
+    /// The blank page in windows from small to very wide, with the sidebars in every combination: the header, the
+    /// prompt (the caret at its start) and the key line must stay whole. Last: the editor moves into these windows.
+    private static func sizes(_ demo: LoreDemo, _ typeToo: Bool) async {
+        let theme = NSApp.appearance?.name == .aqua ? "day" : "night"
+        let dir = ProcessInfo.processInfo.environment["CORE_LORE_SPACE_SNAPSHOT"] ?? "/tmp"
+        for size in [
+            CGSize(width: 860, height: 560), CGSize(width: 1280, height: 760), CGSize(width: 2000, height: 1180),
+        ] {
+            for (name, left, right) in [
+                ("both", true, true), ("noleft", false, true), ("none", false, false), ("longtitle", true, true),
+            ] {
+                await demo.show("today-blank")
+                if name == "longtitle" { await demo.longTitle() }
+                demo.sides(left, right)
+                let w = demo.window(size)
+                try? await Task.sleep(for: .seconds(1.5))
+                if let tv = demo.textView {
+                    w.makeFirstResponder(tv)
+                    let caret = tv.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+                    let local = tv.convert(w.convertFromScreen(caret), from: nil)
+                    log(
+                        "SIZE \(Int(size.width))x\(Int(size.height)) \(name) caret x=\(Int(local.minX)) inset=\(Int(tv.textContainerOrigin.x))"
+                    )
+                }
+                try? await Task.sleep(for: .seconds(0.6))
+                let file = "\(dir)/size-\(Int(size.width))x\(Int(size.height))-\(name)-\(theme)-lore-space.png"
+                log("shot size \(Int(size.width)) \(name) \(SnapshotCapture.png(w, to: file) ? "ok" : "FAILED")")
+                if typeToo, name == "noleft", size.width == 1280 {
+                    await type("Hello", w)
+                    try? await Task.sleep(for: .seconds(0.6))
+                    _ = SnapshotCapture.png(w, to: "\(dir)/size-typed-\(theme)-lore-space.png")
+                }
+                w.orderOut(nil)
+                w.contentView = nil
+                w.close()
+            }
+        }
     }
 
     /// Puts the person's Look back before the app quits.

@@ -97,7 +97,8 @@ struct LoreKeyLine: View {
             line(Array(LoreKeys.hints.prefix(5)))
             line(Array(LoreKeys.hints.prefix(4)))
         }
-        .frame(maxWidth: .infinity).frame(height: Space.s6)
+        // At least a line tall and clear of the window's bottom edge at every text size (a fixed height clipped it).
+        .frame(maxWidth: .infinity, minHeight: Space.s6).padding(.bottom, Space.s2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Keys: " + LoreKeys.hints.map { "\($0.0) \($0.1)" }.joined(separator: ", "))
     }
