@@ -81,6 +81,24 @@ extension LoreDemo {
         model.apply(n)
     }
 
+    public static let templateIDs = LoreTemplates.all.map(\.id)
+
+    /// Taps a template on the blank page, as the button does.
+    public func startTemplate(_ id: String) {
+        if let t = LoreTemplates.all.first(where: { $0.id == id }) { model.start(t) }
+    }
+
+    /// The prompt as last drawn, and the line the caret is on.
+    public var pageState: String {
+        guard let tv = textView, let e = model.editor else { return "no page" }
+        let ns = tv.string as NSString
+        let loc = tv.selectedRange().location
+        let line = ns.paragraphRange(for: NSRange(location: min(loc, ns.length), length: 0))
+        let last = NSMaxRange(line) >= ns.length
+        let block = tv.typingAttributes[NSAttributedString.Key("loreBlock")] as? String ?? "?"
+        return "prompt=\(e.placeholderShown ? "DRAWN" : "hidden") caretBlock=\(block) lastLine=\(last)"
+    }
+
     public func sides(_ left: Bool, _ right: Bool) {
         model.showLeft = left
         model.showRight = right

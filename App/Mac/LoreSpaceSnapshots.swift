@@ -67,6 +67,16 @@ enum LoreSpaceSnapshots {
         await key("3", [.command], window)
         await key("\u{F701}", [], window, code: 125)
         await shot("keys-outline")
+        if only.contains("templates") || only.isEmpty {
+            for id in LoreDemo.templateIDs {
+                await demo.show("today-blank")
+                try? await Task.sleep(for: .seconds(0.5))
+                demo.startTemplate(id)
+                try? await Task.sleep(for: .seconds(0.8))
+                log("CHECK template \(id): \(demo.pageState)")
+                await shot("template-\(id)")
+            }
+        }
         if only.contains("latency") || only.isEmpty { await latency(demo, window) }
         if only.contains("sizes") { await sizes(demo, only.contains("sizes-type")) }
         if !only.isEmpty { return finish(nil) }

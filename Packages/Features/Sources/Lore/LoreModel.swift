@@ -614,9 +614,16 @@ public final class LoreModel {
     func markdown() -> String { editor.markdown() }
     func focus() { editor.focus() }
     var composing: Bool { view?.hasMarkedText() ?? false }
+    /// At the end of the last line, not on the empty line after it: a template's last item ("- [ ] ") takes the typing.
     func caretToEnd() {
         guard let tv = view else { return }
-        tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
+        let ns = tv.string as NSString
+        let end = ns.length > 0 && ns.character(at: ns.length - 1) == 10 ? ns.length - 1 : ns.length
+        tv.setSelectedRange(NSRange(location: end, length: 0))
+        tv.typingAttributes =
+            tv.textStorage.map { end < $0.length ? $0.attributes(at: end, effectiveRange: nil) : [:] }
+            ?? tv.typingAttributes
+        tv.scrollRangeToVisible(tv.selectedRange())
     }
 
     func show(_ markdown: String, fold: Bool) {

@@ -90,6 +90,7 @@ final class LoreTextView: NSTextView {
     /// Text mode: tables always show their Markdown (E0-7), not a grid.
     var tablesAsText = false
     var placeholder: String?  // drawn on the empty page (`LoreEditorController.placeholder`)
+    var placeholderDrawn = false  // what the last draw showed; a text change that flips it redraws
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
@@ -176,7 +177,6 @@ final class LoreTextView: NSTextView {
             if r.length > 0, NSMaxRange(r) <= ts.length { ts.removeAttribute(.loreRaw, range: r) }
         }
         super.didChangeText()
-        if ts.length < 2 { needsDisplay = true }
         controller?.spy.starts = nil
         Style.renumber(ts, around: min(cursor, max(0, ts.length - 1)))
         controller?.onChange?()

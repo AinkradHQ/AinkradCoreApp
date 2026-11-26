@@ -118,6 +118,16 @@ public enum LoreLinkPolicy {
         textView.controller = self
         textView.delegate = self
         watchScroll()
+        // Every change to the text, typed or not (a template, a load, an AI append): the placeholder shows only on an
+        // empty page, so a change that empties or fills it redraws it.
+        NotificationCenter.default.addObserver(
+            forName: NSTextStorage.didProcessEditingNotification, object: textView.ts, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let tv = self?.textView, (tv.ts.length == 0) != tv.placeholderDrawn else { return }
+                tv.needsDisplay = true
+            }
+        }
     }
 
     /// Replaces the page with a note. Clears undo: the loaded text is the new starting point. `fade`: another note is
@@ -156,6 +166,9 @@ public enum LoreLinkPolicy {
             textView.needsDisplay = true
         }
     }
+
+    /// The last drawing of the page showed the placeholder (for the walk and the tests).
+    public var placeholderShown: Bool { textView.placeholderDrawn }
 
     /// Where the text column starts in a page `width` wide: the measure centred, never closer than 48 to the edge.
     public static func columnInset(width: CGFloat) -> CGFloat {
@@ -241,8 +254,10 @@ extension LoreTextView {
     /// The placeholder, drawn where the caret stands on the empty page: same font, same line, same start.
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        guard let placeholder, ts.length == 0 else { return }
-        var a = typingAttributes
+        placeholderDrawn = placeholder != nil && ts.length == 0
+        guard let placeholder, placeholderDrawn else { return }
+        // The body text's own font and paragraph, never the typing attributes (a code line's would be monospaced).
+        var a = Style.typing(.p)
         a[.foregroundColor] = LoreInk.text2
         let o = textContainerOrigin
         let line = firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
