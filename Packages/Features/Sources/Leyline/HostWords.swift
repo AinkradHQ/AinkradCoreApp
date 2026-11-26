@@ -3,6 +3,11 @@ import SwiftUI
 
 /// Small words shared by the host pages.
 enum HostWords {
+    /// "Not answering since 8:41 PM · Leyline checks every 5 min" (the Core's reach round runs every five minutes).
+    static func offline(_ h: HostItem) -> String {
+        (h.reach?.seenAt.map { "Not answering since \($0.formatted(date: .omitted, time: .shortened))" }
+            ?? "Not answering") + " · Leyline checks every 5 min"
+    }
     static func ago(_ d: Date?) -> String {
         guard let d else { return "" }
         let f = RelativeDateTimeFormatter()
@@ -26,6 +31,29 @@ enum HostWords {
         case .skipped: "Skipped"
         }
     }
+    /// The run's state as the card's badge: a word and its tone.
+    static func badge(_ r: CommandRun) -> (word: String, tone: Tone) {
+        switch r.state {
+        case .queued, .running: ("Running", .run)
+        case .needsApproval: ("Waiting for approval", .warn)
+        case .ok: ("Done", .done)
+        case .failed: (r.exitCode.map { "Failed · exit \($0)" } ?? "Failed", .fail)
+        case .refused: ("Refused", .fail)
+        case .skipped: ("Skipped", .queue)
+        }
+    }
+
+    /// "exit 0 · 1.2 s · step 2": what the drawer says beside the badge; nil while nothing is known.
+    static func facts(_ r: CommandRun) -> String? {
+        var out: [String] = []
+        if let e = r.exitCode { out.append("exit \(e)") }
+        if let ms = r.durationMS {
+            out.append("\((Double(ms) / 1000).formatted(.number.precision(.fractionLength(1)))) s")
+        }
+        if let s = r.step, s > 1 { out.append("step \(s)") }
+        return out.isEmpty ? nil : out.joined(separator: " · ")
+    }
+
     static func symbol(_ w: HostEvent.Who) -> String {
         switch w {
         case .you: "person"

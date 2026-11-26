@@ -32,26 +32,34 @@ final class HostPageState {
         self.hostID = hostID
         #if DEBUG
         if let r = model.debugRunner { runnerState = r }
+        runs = model.debugRuns
+        shown = model.debugShown
         #endif
     }
 
     var host: HostItem? { model.hostItem(hostID) }
-    private var service: (any LeylineService)? { model.service }
-    private var shell: ShellModel { model.host.shell }
+    var service: (any LeylineService)? { model.service }
+    var shell: ShellModel { model.host.shell }
 
-    private func words(_ e: any Error) -> String { model.words(e) }
+    func words(_ e: any Error) -> String { model.words(e) }
 
     /// A read that can come back "not yet": the page shows the right words for it.
     private func read<T: Sendable>(_ op: (any LeylineService) async throws -> T) async -> PageLoad<T> {
         guard let service else { return .idle }
         do { return .ready(try await op(service)) } catch let e as LeylineFailure where e.isMissing {
             return .missing
-        } catch { return .failed(words(error)) }
+        } catch {
+            note(error)
+            return .failed(words(error))
+        }
     }
 
     // MARK: terminal
 
     private(set) var opening = false
+    /// The host's key as the Core knows it (`HostKey.swift`), and a Trust in flight.
+    var hostKeys = HostKeyStatus.unknown
+    var trusting = false
 
     /// Opens an ssh terminal on the host and shows it in the existing terminal pane.
     func connect() async {
@@ -75,17 +83,33 @@ final class HostPageState {
         health = await read { try await $0.health(host: hostID) }
     }
 
+    // MARK: problems
+
+    /// A failure that stops the whole page (a runner too old for ssh) is kept on the model, so every view of the host shows
+    /// the one state card with its fix.
+    func note(_ e: any Error) {
+        guard let f = e as? LeylineFailure, HostProblem(f) != nil else { return }
+        model.hostProblem[hostID] = f
+    }
+
+    var problem: HostProblem? { model.hostProblem[hostID].flatMap(HostProblem.init) }
+
     // MARK: commands
 
     var commands: PageLoad<[PresetCommand]> = .idle
     /// The latest run of each command on this host, by command id.
     private(set) var runs: [String: CommandRun] = [:]
+    /// The command whose output the drawer under the cards shows.
+    var shown: String?
+    /// The card lit by the arrows (⏎ runs it).
+    var lit: String?
+    private(set) var saving = false
     private var polling: Set<String> = []
 
-    /// The presets that are meant for this host.
-    var presets: [PresetCommand] {
+    /// The cards: the saved commands meant for this host, then the built-ins not saved yet.
+    var items: [HostCommandList.Item] {
         guard let h = host else { return [] }
-        return (commands.value ?? []).filter { $0.fits(h) }
+        return HostCommandList.items(saved: commands.value ?? [], host: h)
     }
 
     func loadCommands() async {
@@ -93,11 +117,20 @@ final class HostPageState {
         commands = await read { try await $0.commands() }
     }
 
-    /// One click. A command marked "confirm" asks first, on the one confirm card; Return runs it only after the card's own
-    /// highlighted choice, which starts on Cancel.
-    func tap(_ c: PresetCommand) {
-        guard model.mayWrite() else { return }
-        guard c.confirm, let h = host else {
+    /// One click. A built-in is saved first; a command marked "confirm" asks first, on the one confirm card, whose
+    /// highlighted choice starts on Cancel.
+    func tap(_ item: HostCommandList.Item) {
+        guard model.mayWrite(), let h = host else { return }
+        lit = item.id
+        if item.builtIn {
+            Task {
+                guard let saved = await save(item.command) else { return }
+                tap(HostCommandList.Item(command: saved, builtIn: false))
+            }
+            return
+        }
+        let c = item.command
+        guard c.confirm else {
             Task { await run(c, confirmed: false) }
             return
         }
@@ -111,15 +144,36 @@ final class HostPageState {
             ], symbol: "play.circle")
     }
 
+    /// ⏎ runs the lit card; the arrows move the light in reading order.
+    func runLit() -> Bool {
+        guard let id = lit, let item = items.first(where: { $0.id == id }) else { return false }
+        tap(item)
+        return true
+    }
+
+    func moveLit(_ by: Int) {
+        let all = items
+        guard !all.isEmpty else { return }
+        let at = all.firstIndex { $0.id == lit } ?? (by > 0 ? -1 : all.count)
+        lit = all[min(all.count - 1, max(0, at + by))].id
+    }
+
+    /// Runs through the Core's gate; Touch ID only when the Core asks for it (`elevated` retries once it has it).
     func run(_ c: PresetCommand, confirmed: Bool) async {
-        guard let service else { return }
-        runs[c.id] = CommandRun(id: "", commandName: c.name, state: .running)
+        guard let service, let h = host else { return }
+        runs[c.id] = CommandRun(id: "", commandName: c.name, state: .running, startedAt: Date())
+        shown = c.id
         do {
-            let id = try await service.runCommand(c.id, host: hostID, confirmed: confirmed)
-            runs[c.id] = CommandRun(id: id, commandName: c.name, state: .running)
+            let id = try await model.host.elevated(
+                "Run “\(c.name)” on \(h.name).", done: "started", keepsEdit: false
+            ) { try await service.runCommand(c.id, host: hostID, confirmed: confirmed) }
+            runs[c.id] = CommandRun(id: id, commandName: c.name, state: .running, startedAt: Date())
             await poll(c, run: id)
+        } catch is AdminDeclined {
+            runs[c.id] = nil
         } catch {
             runs[c.id] = nil
+            note(error)
             shell.showToast(words(error), kind: .warn)
         }
     }
@@ -128,8 +182,10 @@ final class HostPageState {
     private func poll(_ c: PresetCommand, run id: String) async {
         guard let service, polling.insert(id).inserted else { return }
         defer { polling.remove(id) }
+        let started = runs[c.id]?.startedAt
         for _ in 0..<600 {
-            guard let r = try? await service.run(id, host: hostID, name: c.name) else { break }
+            guard var r = try? await service.run(id, host: hostID, name: c.name) else { break }
+            r.startedAt = started
             runs[c.id] = r
             if r.finished {
                 await loadHistory()
@@ -137,6 +193,38 @@ final class HostPageState {
             }
             try? await Task.sleep(for: .seconds(r.state == .needsApproval ? 3 : 1))
             if Task.isCancelled { return }
+        }
+    }
+
+    /// New Command's Save: one step for every host. A read-only command (safe for AI) may ask for Touch ID.
+    func save(_ draft: CommandDraft) async -> Bool {
+        guard draft.problem == nil else { return false }
+        let c = PresetCommand(
+            id: "", name: draft.name.trimmingCharacters(in: .whitespaces), description: "",
+            steps: [draft.command.trimmingCharacters(in: .whitespaces)], scopeKind: nil, scopeValue: nil,
+            readOnly: false, confirm: draft.confirm)
+        guard let made = await save(c) else { return false }
+        lit = made.id
+        shell.showToast("\(made.name) saved")
+        return true
+    }
+
+    private func save(_ c: PresetCommand) async -> PresetCommand? {
+        guard let service, !saving, model.mayWrite() else { return nil }
+        saving = true
+        defer { saving = false }
+        do {
+            let made = try await model.host.elevated("Save the command \(c.name).", done: "saved", keepsEdit: true) {
+                try await service.createCommand(
+                    name: c.name, step: c.steps[0], readOnly: c.readOnly, confirm: c.confirm)
+            }
+            commands = .ready((commands.value ?? []) + [made])
+            return made
+        } catch is AdminDeclined {
+            return nil
+        } catch {
+            shell.showToast(words(error), kind: .warn)
+            return nil
         }
     }
 
@@ -149,7 +237,7 @@ final class HostPageState {
     var preview: PageLoad<String> = .idle
     /// Files whose contents a person asked to see with Touch ID, for as long as this page is open.
     private var revealed: Set<String> = []
-    private(set) var transfer: String?
+    var transfer: String?
 
     func loadFiles(_ p: String? = nil) async {
         if let p { path = p }
@@ -213,104 +301,6 @@ final class HostPageState {
         } catch { if selected == f { preview = .failed(words(error)) } }
     }
 
-    /// Where a drag out gets its bytes: a real file in a temporary folder, made when Finder asks.
-    nonisolated static func provider(for f: RemoteFile, host: String, service: any LeylineService) -> NSItemProvider {
-        let p = NSItemProvider()
-        let name = RemotePath.safeName(f.name)
-        p.suggestedName = name
-        p.registerFileRepresentation(forTypeIdentifier: UTType.data.identifier, fileOptions: [], visibility: .all) {
-            done in
-            nonisolated(unsafe) let done = done  // called once, from the one task below
-            Task {
-                do {
-                    let d = try await service.download(host: host, path: f.path)
-                    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(
-                        UUID().uuidString, isDirectory: true)
-                    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                    let url = dir.appendingPathComponent(name)
-                    try d.write(to: url, options: .atomic)
-                    done(url, true, nil)
-                } catch { done(nil, false, error) }
-            }
-            return nil
-        }
-        return p
-    }
-
-    func dragProvider(_ f: RemoteFile) -> NSItemProvider {
-        guard let service, f.kind == .file else { return NSItemProvider() }
-        return Self.provider(for: f, host: hostID, service: service)
-    }
-
-    /// Saves the file with the system panel ("Download").
-    func download(_ f: RemoteFile) async {
-        guard let service else { return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = RemotePath.safeName(f.name)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        transfer = "Downloading \(f.name)…"
-        defer { transfer = nil }
-        do {
-            try await service.download(host: hostID, path: f.path).write(to: url, options: .atomic)
-            shell.showToast("\(f.name) saved")
-        } catch { shell.showToast(words(error), kind: .warn) }
-    }
-
-    /// "Upload…": the system panel, then the same path a drop takes.
-    func chooseUpload() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        guard panel.runModal() == .OK else { return }
-        upload(panel.urls)
-    }
-
-    /// Files dropped in or chosen: folders are skipped, and a name that is already there asks before it is replaced.
-    func upload(_ urls: [URL]) {
-        guard model.mayWrite() else { return }
-        let files = urls.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true }
-        if files.count < urls.count { shell.showToast("Folders are not uploaded here. Drop files.", kind: .warn) }
-        guard !files.isEmpty else { return }
-        let have = Set((entries.value ?? []).map(\.name))
-        let clash = files.filter { have.contains(RemotePath.safeName($0.lastPathComponent)) }
-        guard !clash.isEmpty else { return start(files) }
-        shell.presentSheet(
-            title: clash.count == 1 ? "Replace “\(clash[0].lastPathComponent)”?" : "Replace \(clash.count) files?",
-            message: "They already exist in \(path) on \(host?.name ?? "the host"). The old versions are overwritten.",
-            actions: [
-                ShellSheetAction("Cancel"),
-                ShellSheetAction("Replace", destructive: true) { [weak self] in self?.start(files) },
-            ])
-    }
-
-    private func start(_ files: [URL]) {
-        Task {
-            guard let service else { return }
-            for url in files {
-                let name = RemotePath.safeName(url.lastPathComponent)
-                transfer = "Uploading \(name)…"
-                do {
-                    let data = try await Task.detached { try Data(contentsOf: url) }.value
-                    // Writing a file on a host needs Touch ID, like a terminal.
-                    try await model.host.elevated(
-                        "Write \(name) to \(host?.name ?? "the host").", done: "written", keepsEdit: false
-                    ) { try await service.upload(host: hostID, path: RemotePath.join(path, name), data: data) }
-                } catch is AdminDeclined {
-                    transfer = nil
-                    return
-                } catch {
-                    transfer = nil
-                    shell.showToast(words(error), kind: .warn)
-                    await loadFiles()
-                    return
-                }
-            }
-            transfer = nil
-            shell.showToast(files.count == 1 ? "Uploaded" : "Uploaded \(files.count) files")
-            await loadFiles()
-        }
-    }
-
     // MARK: history and replay
 
     var history: PageLoad<[HostEvent]> = .idle
@@ -322,11 +312,9 @@ final class HostPageState {
     private(set) var playing = false
     private var player: Task<Void, Never>?
 
-    var shownHistory: [HostEvent] {
-        let all = history.value ?? []
-        guard let who else { return all }
-        return all.filter { $0.who == who }
-    }
+    var shownHistory: [HostEvent] { HostTimeline.shown(history.value ?? [], who: who) }
+    /// The history entry opened in the timeline.
+    var opened: String?
 
     func loadHistory() async {
         if history.value == nil { history = .loading }

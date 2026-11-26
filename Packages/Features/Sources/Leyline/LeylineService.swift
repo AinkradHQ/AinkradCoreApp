@@ -20,6 +20,8 @@ protocol LeylineService: Sendable {
     func openTerminal(host: String, rows: Int, cols: Int) async throws -> String
     func health(host: String) async throws -> HostHealth
     func commands() async throws -> [PresetCommand]
+    /// Saves a one-step command for every host (`POST /commands`; a read-only one may ask for Touch ID).
+    func createCommand(name: String, step: String, readOnly: Bool, confirm: Bool) async throws -> PresetCommand
     /// Runs a pre-set command on the host through the gate; returns the run's id.
     func runCommand(_ command: String, host: String, confirmed: Bool) async throws -> String
     func run(_ id: String, host: String, name: String) async throws -> CommandRun
@@ -42,12 +44,15 @@ protocol LeylineService: Sendable {
     func hostKeys(host: String) async throws -> [HostKeyItem]
     /// A person trusts a key the host offered (`POST /hosts/{h}/host-keys/trust`).
     func trustHostKey(host: String, fingerprint: String) async throws
+    /// A person makes the key the host offered since the pin its only pin (`POST /hosts/{h}/host-keys/replace`, step-up).
+    func replaceHostKey(host: String, fingerprint: String) async throws
 }
 
 /// One host key the Core knows for a host.
 struct HostKeyItem: Equatable, Sendable, Decodable {
     let fingerprint: String
     let state: String
+    var trustedAt: String?
 }
 
 /// The Core's answer to "does this address answer SSH?".
@@ -61,6 +66,9 @@ extension LeylineService {
     func openTerminal(host: String, rows: Int, cols: Int) async throws -> String { throw LeylineFailure.notYet }
     func health(host: String) async throws -> HostHealth { throw LeylineFailure.notYet }
     func commands() async throws -> [PresetCommand] { throw LeylineFailure.notYet }
+    func createCommand(name: String, step: String, readOnly: Bool, confirm: Bool) async throws -> PresetCommand {
+        throw LeylineFailure.notYet
+    }
     func runCommand(_ command: String, host: String, confirmed: Bool) async throws -> String {
         throw LeylineFailure.notYet
     }
@@ -78,6 +86,7 @@ extension LeylineService {
     func checkHost(address: String, port: Int) async throws -> HostCheck { throw LeylineFailure.notYet }
     func hostKeys(host: String) async throws -> [HostKeyItem] { throw LeylineFailure.notYet }
     func trustHostKey(host: String, fingerprint: String) async throws { throw LeylineFailure.notYet }
+    func replaceHostKey(host: String, fingerprint: String) async throws { throw LeylineFailure.notYet }
 }
 
 /// A new host, as the Add Host sheets fill it. Nothing optional is sent as null: the Core takes its defaults.
@@ -252,7 +261,8 @@ struct LiveLeylineService: LeylineService {
                 sentence: "Trust the host key of every host on the way first (Access).", code: code, status: status)
         case 409 where code == "runner_cannot_ssh" || code == "runner_cannot_sftp":
             LeylineFailure(
-                sentence: "The runner that reaches this host is too old for ssh. Update it first.", code: code,
+                sentence: "This runner can’t open SSH. It’s offline, or it wasn’t started with --enable-exec.",
+                code: code,
                 status: status)
         case 409 where code == "out_of_order":
             LeylineFailure(sentence: "The upload got out of order. Try again.", code: code, status: status)
@@ -266,11 +276,13 @@ struct LiveLeylineService: LeylineService {
             LeylineFailure(sentence: "The host key is not trusted yet. Check it on Access.", code: code, status: status)
         case 409 where code == "real_secret_refused":
             LeylineFailure(
-                sentence: "Your Core takes test keys only. To keep a real key, set Keys and secrets to Real in Settings → "
+                sentence:
+                    "Your Core takes test keys only. To keep a real key, set Keys and secrets to Real in Settings → "
                     + "Feature switches.", code: code, status: status)
         case 409 where code == "secrets_disabled":
             LeylineFailure(
-                sentence: "Keys and secrets is Off. Turn it on in Settings → Feature switches.", code: code, status: status)
+                sentence: "Keys and secrets is Off. Turn it on in Settings → Feature switches.", code: code,
+                status: status)
         // Only the Core's own name clash is a taken name; any other refusal keeps its own words.
         case 409 where code == "conflict":
             LeylineFailure(sentence: "That name is already taken. Pick another.", code: code, status: status)

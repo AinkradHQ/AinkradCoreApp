@@ -11,6 +11,7 @@ extension LeylineDemo {
         private let known: [KnownHostItem]
         private let healthOf: [String: HostHealth]
         private let historyOf: [String: [HostEvent]]
+        private var commandList = LeylineDemo.commands()
         private var next = 100
         init(
             hosts: [HostItem], keys: [KeyItem], known: [KnownHostItem], health: [String: HostHealth] = [:],
@@ -83,6 +84,24 @@ extension LeylineDemo {
             ]
         }
         func history(host: String) async throws -> [HostEvent] { historyOf[host] ?? [] }
+        func commands() async throws -> [PresetCommand] { lock.withLock { commandList } }
+        func createCommand(name: String, step: String, readOnly: Bool, confirm: Bool) async throws -> PresetCommand {
+            lock.withLock {
+                next += 1
+                let c = PresetCommand(
+                    id: "lc_\(next)", name: name, description: "", steps: [step], scopeKind: nil, scopeValue: nil,
+                    readOnly: readOnly, confirm: confirm)
+                commandList.append(c)
+                return c
+            }
+        }
+        func runCommand(_ command: String, host: String, confirmed: Bool) async throws -> String { "lr_\(command)" }
+        func run(_ id: String, host: String, name: String) async throws -> CommandRun {
+            try await Task.sleep(for: .milliseconds(700))
+            return CommandRun(
+                id: id, commandName: name, state: .ok, exitCode: 0, durationMS: 640,
+                output: "$ \(name)\nDone on the stand-in host.\n")
+        }
         func makeRunner(host: String, rows: Int, cols: Int) async throws -> RunnerInstall {
             RunnerInstall(terminal: "t_demo", expiresAt: Date().addingTimeInterval(840))
         }
@@ -90,10 +109,21 @@ extension LeylineDemo {
             try await Task.sleep(for: .milliseconds(900))
             return HostCheck(ok: true, ms: 31, reason: nil)
         }
+        /// Scenes set a host's keys here; else a host in `known` is trusted (changed: trusted and a new one seen), others wait.
+        var hostKeysOf: [String: [HostKeyItem]] = [:]
         func hostKeys(host: String) async throws -> [HostKeyItem] {
-            [HostKeyItem(fingerprint: LeylineDemo.newHostKey, state: "seen")]
+            let (set, name) = lock.withLock { (hostKeysOf[host], hostList.first { $0.id == host }?.name) }
+            if let set { return set }
+            guard let k = known.first(where: { $0.host == name }) else {
+                return [HostKeyItem(fingerprint: LeylineDemo.newHostKey, state: "seen")]
+            }
+            let at = k.since.map { $0.formatted(.iso8601) }
+            let pin = HostKeyItem(fingerprint: k.fingerprint, state: "trusted", trustedAt: at)
+            return k.state == .changed ? [pin, HostKeyItem(fingerprint: LeylineDemo.newHostKey, state: "seen")] : [pin]
         }
-        func trustHostKey(host: String, fingerprint: String) async throws {}
+        func trustHostKey(host: String, fingerprint: String) async throws {
+            lock.withLock { hostKeysOf[host] = [HostKeyItem(fingerprint: fingerprint, state: "trusted")] }
+        }
     }
 
     nonisolated static let newHostKey = "SHA256:Eph4qztpKgRLXQCd1/vZLwairT4nw5FOANWe6f7Xk2i"
@@ -219,27 +249,91 @@ extension LeylineDemo {
                 pts.append(v)
             }
         }
+        let up = s.ms != nil
         return HostExtras(
-            latencyHistory: pts, osName: "Ubuntu 24.04", uptime: "23 days", memoryTotal: "8 GB",
-            diskFree: "\(Int((100 - s.disk) * 0.8)) GB free",
+            latencyHistory: pts, osName: "Ubuntu 24.04 · x86_64", uptime: up ? "23 days" : nil, memoryTotal: "8 GB",
+            diskFree: up ? "\(Int((100 - s.disk) * 0.8)) GB free of 80 GB" : nil,
+            network: up ? "↓ 1.2 MB/s  ↑ 340 KB/s" : nil, networkSeries: up ? trend(40, 5 + s.item.name.count) : [],
             approval: s.item.name == "lan-web-1" || s.item.name == "lan-cron-11" ? "systemctl reload nginx" : nil)
     }
 
     static func history(_ s: Seed) -> [HostEvent] {
         let now = Date()
-        func e(_ i: Int, _ who: HostEvent.Who, _ what: String, _ ago: Double) -> HostEvent {
+        func e(
+            _ i: Int, _ who: HostEvent.Who, _ what: String, _ detail: String, _ ago: Double, rec: Bool = false,
+            min: Int? = nil
+        ) -> HostEvent {
             HostEvent(
-                id: "\(s.item.id)-\(i)", who: who, what: what, detail: "", at: now.addingTimeInterval(-ago),
-                recording: nil, minutes: nil)
+                id: "\(s.item.id)-\(i)", who: who, what: what, detail: detail, at: now.addingTimeInterval(-ago),
+                recording: rec ? "\(s.item.id)-rec-\(i)" : nil, minutes: min)
         }
         let first: HostEvent =
             switch s.item.name {
-            case "lan-web-1": e(0, .ai, "AI session “fix cache headers”", 240)
-            case "lan-staging": e(0, .system, "Disk 83% full", 3600)
-            case "backup-box": e(0, .system, "Offline since 09:12", 3 * 3600)
-            default: e(0, .you, "You · ssh", 2 * 3600)
+            case "lan-web-1": e(0, .ai, "AI session “fix cache headers”", "asked to run systemctl reload nginx", 240)
+            case "lan-staging": e(0, .system, "Disk 83% full", "alert", 3600)
+            case "backup-box": e(0, .system, "Offline since 09:12", "alert", 3 * 3600)
+            default: e(0, .you, "Terminal", "relayed", 2 * 3600, min: 4)
             }
-        return [first, e(1, .fleet, "Deploy v2.4.1", 86400), e(2, .you, "You opened logs", 2 * 86400)]
+        guard s.item.name == "lan-web-1" else {
+            return [
+                first, e(1, .fleet, "Deploy v2.4.1", "scheduled run", 86400),
+                e(2, .you, "Opened logs", "files", 2 * 86400),
+            ]
+        }
+        return [
+            first,
+            e(1, .you, "Ran “Disk usage”", "pre-set command · ok", 18 * 60),
+            e(2, .you, "Terminal", "relayed · recorded", 52 * 60, rec: true, min: 12),
+            e(3, .ai, "Approved: systemctl reload nginx", "approved with Touch ID", 3 * 3600),
+            e(4, .you, "Uploaded nginx.conf", "file change · /etc/nginx", 5 * 3600),
+            e(5, .fleet, "Deploy v2.4.1", "scheduled run · ok", 26 * 3600, min: 3),
+            e(6, .system, "Memory 88%", "alert · cleared after 6 min", 30 * 3600),
+            e(7, .you, "Signed in", "Mac-direct · ssh from this Mac", 50 * 3600, min: 20),
+        ]
+    }
+
+    /// The saved commands of the stand-in Core: two of the user's, and one runbook.
+    nonisolated static func commands() -> [PresetCommand] {
+        func c(_ id: String, _ name: String, _ steps: [String], ro: Bool = false, confirm: Bool = false)
+            -> PresetCommand
+        {
+            PresetCommand(
+                id: id, name: name, description: "", steps: steps, scopeKind: nil, scopeValue: nil, readOnly: ro,
+                confirm: confirm)
+        }
+        return [
+            c("lc_logs", "Tail the app log", ["tail -n 200 /srv/app/storage/logs/laravel.log"], ro: true),
+            c("lc_restart", "Restart the queue", ["sudo systemctl restart app-queue"], confirm: true),
+            c("lc_cache", "Clear the app cache", ["cd /srv/app && php artisan cache:clear"]),
+        ]
+    }
+
+    /// Runs on lan-web-1 as the shots show them: some done, one failed, and (`running`) one in flight.
+    static func runs(running: Bool) -> [String: CommandRun] {
+        let now = Date()
+        var out: [String: CommandRun] = [
+            "builtin-disk": CommandRun(
+                id: "lr_1", commandName: "Disk usage", state: .ok, exitCode: 0, durationMS: 210,
+                output: """
+                    Filesystem      Size  Used Avail Use% Mounted on
+                    /dev/sda1        80G   49G   31G  61% /
+                    /dev/sdb1       200G  122G   78G  62% /srv
+                    /dev/sda15      105M  6.1M   99M   6% /boot/efi
+                    """, startedAt: now.addingTimeInterval(-18 * 60)),
+            "lc_logs": CommandRun(
+                id: "lr_2", commandName: "Tail the app log", state: .ok, exitCode: 0, durationMS: 180,
+                output: "[2026-11-25 10:41:02] production.INFO: cache warmed (412 keys)\n",
+                startedAt: now.addingTimeInterval(-3 * 3600)),
+            "lc_cache": CommandRun(
+                id: "lr_3", commandName: "Clear the app cache", state: .failed, exitCode: 1, durationMS: 930,
+                output: "In Filesystem.php line 233:\n  Permission denied: storage/framework/cache\n",
+                startedAt: now.addingTimeInterval(-26 * 3600)),
+        ]
+        if running {
+            out["lc_restart"] = CommandRun(
+                id: "lr_4", commandName: "Restart the queue", state: .running, startedAt: now.addingTimeInterval(-4))
+        }
+        return out
     }
 
     static func known() -> [KnownHostItem] {

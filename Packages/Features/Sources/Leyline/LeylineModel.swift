@@ -26,6 +26,8 @@ public final class LeylineModel {
     public var runnerGlance: (@MainActor (String) -> RunnerGlance?)?
     /// Opens a runner's page in Devices & Runners.
     public var openRunner: (@MainActor (String) -> Void)?
+    /// The paired runners (not the Core's built-in one), to tell which host already runs one.
+    public var runners: (@MainActor () -> [RunnerSummary])?
 
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
@@ -50,7 +52,15 @@ public final class LeylineModel {
     var openGroup: String?
     /// The host whose view is open (nil: the map or the list).
     var openID: String?
-    var section = HostSection.terminal
+    var section = HostSection.overview
+    /// The Access panel, slid in over the right of the open host's page (⌘, toggles it, Esc closes it).
+    var accessOpen = false
+    /// The New Command form on the open host's overview (⌘N), while it is open.
+    var commandForm: CommandDraft?
+    /// Why a host's page cannot work right now and what fixes it (a runner too old for ssh), by host id.
+    var hostProblem: [String: LeylineFailure] = [:]
+    /// The open host's page state, for the pane's keys (⏎ runs the lit command, ⌥1…⌥9 run the first nine).
+    @ObservationIgnored weak var page: HostPageState?
     /// Each host's health, read from the Core's stored samples (at most once a minute).
     var healthByHost: [String: HostHealth] = [:]
     var healthReadAt: Date?
@@ -66,7 +76,8 @@ public final class LeylineModel {
     /// The terminal each host's view embeds, so coming back shows the same one.
     var hostTerminals: [String: String] = [:]
     /// Draws a Core terminal inside the host view. The app sets it; nil (the Debug demo) shows a stand-in.
-    public var terminalView: (@MainActor (String) -> AnyView?)?
+    /// The second argument hears the shell's exit code (70 when the host key was not pinned).
+    public var terminalView: (@MainActor (String, @escaping @MainActor (Int32) -> Void) -> AnyView?)?
     /// The Core's project names, for Add Host's Project picker. The app sets it.
     public var projectNames: (@MainActor () -> [String])?
     /// A refusal from the Core (or the sheet's own check) for the write in flight, in words.
@@ -79,6 +90,9 @@ public final class LeylineModel {
     #if DEBUG
     /// Snapshots only: the Make Runner state a host page opens in.
     var debugRunner: HostPageState.RunnerInstallState?
+    /// Snapshots only: the command runs a host page opens with, and the one its result drawer shows.
+    var debugRuns: [String: CommandRun] = [:]
+    var debugShown: String?
     #endif
 
     public init(host: any AdminHost) { self.host = host }
@@ -106,6 +120,7 @@ public final class LeylineModel {
         healthReadAt = nil
         activity = [:]
         hostTerminals = [:]
+        hostProblem = [:]
         readOnly = false
     }
 
@@ -176,21 +191,6 @@ public final class LeylineModel {
 
     // MARK: derived
 
-    /// Whether an address answers like an SSH server from the Core, for Add Host's live check.
-    func checkHost(_ address: String, _ port: Int) async throws -> HostCheck {
-        guard let service, !checkNeedsStepUp else { throw LeylineFailure.notYet }
-        do { return try await service.checkHost(address: address, port: port) } catch let e as LeylineFailure
-            where e.code == "step_up_required"
-        {
-            // The check needs a live step-up; typing never prompts for one, so it stays quiet until the person unlocks.
-            checkNeedsStepUp = true
-            throw e
-        }
-    }
-
-    /// The Core refused a host check for want of a step-up: Add Host stops asking while it is typed into.
-    var checkNeedsStepUp = false
-
     func hostItem(_ id: String?) -> HostItem? { id.flatMap { id in hosts.first { $0.id == id } } }
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
     var open: HostItem? { hostItem(openID) }
@@ -212,9 +212,6 @@ public final class LeylineModel {
 
     /// The hosts a key logs in to, for the "used by" chips.
     func usedBy(_ key: KeyItem) -> [HostItem] { hosts.filter { $0.keyID == key.id } }
-
-    /// The host key pinned for a host, if the Core has one.
-    func pinned(_ h: HostItem) -> KnownHostItem? { knownHosts.first { $0.host == h.name } }
 
     /// The names a host is reached through: the Core (or its runner), then each jump host, then the host itself.
     func route(_ h: HostItem) -> [String] {
@@ -402,20 +399,52 @@ public final class LeylineModel {
 
     // MARK: navigation
 
-    /// Opens a host's view on a tab: the terminal at once by default. An offline host stays on the page.
-    func openHost(_ id: String, _ tab: HostSection = .terminal) {
-        guard hostItem(id)?.light != .off else {
-            host.shell.showToast("It is not answering. Leyline tries again every minute.", kind: .warn)
-            return
-        }
-        selected = id
-        section = tab
+    /// Opens a host's page: the overview by default, or straight into its terminal or files, or with Access open. An offline
+    /// host opens on its overview, which says so (its terminal and files cannot work).
+    func openHost(_ id: String, _ to: HostSection = .overview) {
+        let off = hostItem(id)?.light == .off
+        section = to == .access || (off && to != .overview) ? .overview : to
+        accessOpen = to == .access
+        commandForm = nil
         LeylineOptions.markOpened(id)
         if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = id } } else { openID = id }
+        // After the page is up: a new selection re-lays the map out, which held the page back (the map is hidden by then).
+        if selected != id { Task { @MainActor in self.selected = id } }
     }
 
     func closeHost() {
+        accessOpen = false
+        commandForm = nil
         if LeylineOptions.calmOn { withAnimation(Motion.out(Motion.move)) { openID = nil } } else { openID = nil }
+    }
+
+    /// A move on the open host's page: the terminal or the files over the pane, the overview, or Access toggled. An offline
+    /// host keeps to its overview.
+    func go(_ to: HostSection) {
+        guard let id = openID else { return }
+        if to == .access { return accessOpen.toggle() }
+        if to != .overview, hostItem(id)?.light == .off {
+            host.shell.showToast("It is not answering. Leyline checks every 5 minutes.", kind: .warn)
+            return
+        }
+        accessOpen = false
+        section = to
+    }
+
+    /// "Try Now" on an offline host: the Core reaches it now (Touch ID: the check is a step-up route), a toast says how it
+    /// went, and the hosts are read again.
+    func tryNow(_ h: HostItem) async {
+        guard let service else { return }
+        do {
+            let c = try await host.elevated("Check whether \(h.name) answers.", done: "checked", keepsEdit: false) {
+                try await service.checkHost(address: h.address, port: h.port)
+            }
+            host.shell.showToast(
+                c.ok ? "\(h.name) answered in \(c.ms ?? 0) ms" : "\(h.name) did not answer: \(c.reason ?? "no reply")",
+                kind: c.ok ? .info : .warn)
+        } catch is AdminDeclined {
+        } catch { host.shell.showToast(words(error), kind: .warn) }
+        await reload()
     }
 
     func newHost() {
@@ -423,12 +452,18 @@ public final class LeylineModel {
         show()
         keysOpen = false
         writeError = nil
-        checkNeedsStepUp = false
         AddHostWizard.open(self)
     }
 
     /// ⌘N while the page is up: the same as Add Host.
-    func newItem() { if openID == nil { newHost() } }
+    /// On a host's page it opens New Command instead.
+    func newItem() {
+        guard openID != nil else { return newHost() }
+        guard !readOnly else { return }
+        accessOpen = false
+        section = .overview
+        if commandForm == nil { commandForm = CommandDraft() }
+    }
 
     func show() {
         let shell = host.shell
@@ -440,56 +475,5 @@ public final class LeylineModel {
         spec.onNew = { [weak self] in self?.newItem() }
         shell.openPane(spec)
         Task { await reload() }
-    }
-
-    // MARK: launcher
-
-    public func install() {
-        let shell = host.shell
-        // Settings, Apps, Leyline: Look (follows Appearance unless turned off) and Options.
-        shell.settings.section(
-            SettingsSection(
-                id: "leyline", group: .apps, title: "Leyline", sub: "Its look and what it shows",
-                symbol: "point.3.connected.trianglepath.dotted", order: 7,
-                tabs: [
-                    SettingsTab("look", "Look", order: 0) {
-                        AppLookSection(appName: "Leyline", prefs: AppLookPrefs.shared("leyline"))
-                            .foregroundStyle(GlassInk.primary)
-                    },
-                    SettingsTab("options", "Options", order: 1) { LeylineOptionsTab() },
-                ]))
-        func entry(
-            _ id: String, _ title: String, _ sub: String, _ symbol: String, _ keys: [String], action: Bool = false,
-            _ run: @escaping @MainActor (LeylineModel) -> Void
-        ) {
-            shell.launcher.register(
-                LauncherEntry(id: id, title: title, sub: sub, symbol: symbol, keywords: keys, isAction: action) {
-                    [weak self] in if let self { run(self) }
-                })
-        }
-        entry(
-            "leyline", "Leyline", "Your hosts, their keys and how to reach them",
-            "point.3.connected.trianglepath.dotted", ["ssh", "host", "server", "key", "terminal"]
-        ) { $0.show() }
-        entry(
-            "add-host", "Add Host", "Server, sign in, name, check · asks first by default", "plus",
-            ["ssh", "server", "create", "host"], action: true
-        ) { $0.newHost() }
-        entry(
-            "add-host-advanced", "Add Host (advanced)…", "Key, jump hosts, group and tags, AI rule",
-            "slider.horizontal.3",
-            ["ssh", "server", "create", "host", "jump"], action: true
-        ) {
-            $0.show()
-            $0.keysOpen = false
-            HostDialogs.openAdd($0, login: "")
-        }
-        entry(
-            "generate-key", "Generate Key", "A new SSH key, sealed in the Core · needs Touch ID", "key",
-            ["ssh", "keypair", "create"], action: true
-        ) {
-            $0.show()
-            $0.openKeyForm(.generate)
-        }
     }
 }

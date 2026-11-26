@@ -4,8 +4,9 @@ import Shell
 import SwiftUI
 
 /// The Leyline pane: the hosts as a map or a list with the selected host's panel and the Keys panel, or an opened host. Every
-/// action has a key: type to find (⌘K focuses the field), arrows move, Return opens the terminal, ⌘2 files, ⌘3 history,
-/// ⌘, access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. The pane's surface follows the
+/// action has a key: type to find (⌘K focuses the field), arrows move, Return opens the host, ⌘1 its terminal, ⌘2 its files,
+/// ⌘, its access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. On a host: Return opens the terminal (or runs the lit
+/// command), ⌥1…⌥9 run the first nine commands, arrows light a command, ⌘N saves a new one. The pane's surface follows the
 /// Look's transparency and blur.
 struct LeylineView: View {
     let model: LeylineModel
@@ -47,7 +48,7 @@ struct LeylineView: View {
         let c = press.characters.lowercased()
         if press.key == .escape {
             if model.openID != nil {
-                model.closeHost()
+                back()
                 paneFocus = true
                 return .handled
             }
@@ -65,11 +66,12 @@ struct LeylineView: View {
             }
             return .ignored
         }
-        if cmd, let ch = c.first, let tab = HostSection.forKey(ch) {
+        if cmd, let ch = c.first, let to = HostSection.forKey(ch) {
             guard let id = model.openID ?? model.selected else { return .ignored }
-            if model.openID != nil { model.section = tab } else { model.openHost(id, tab) }
+            if model.openID != nil { model.go(to) } else { model.openHost(id, to) }
             return .handled
         }
+        if model.openID != nil { return hostKey(press) }
         guard model.openID == nil, model.load == .ready else { return .ignored }
         if model.keysOpen {
             // ↑ ↓ open the next key; ⌘G, ⌘I and ⌘C are the panel's own.
@@ -113,6 +115,37 @@ struct LeylineView: View {
         }
         return .ignored
     }
+
+    /// Esc on a host: one level back each time.
+    private func back() {
+        if model.accessOpen {
+            model.accessOpen = false
+        } else if model.commandForm != nil {
+            model.commandForm = nil
+        } else if model.section != .overview {
+            model.section = .overview
+        } else if model.page?.lit != nil {
+            model.page?.lit = nil
+        } else {
+            model.closeHost()
+        }
+    }
+
+    /// The overview's keys: ⏎ runs the lit command, else opens the terminal; the arrows move the light. The terminal and the
+    /// files keep their keys (a focused terminal never sends them here).
+    private func hostKey(_ press: KeyPress) -> KeyPress.Result {
+        guard model.section == .overview, model.commandForm == nil, !model.accessOpen,
+            press.modifiers.isEmpty
+        else { return .ignored }
+        switch press.key {
+        case .return:
+            if model.page?.runLit() != true { model.go(.terminal) }
+        case .leftArrow, .upArrow: model.page?.moveLit(-1)
+        case .rightArrow, .downArrow: model.page?.moveLit(1)
+        default: return .ignored
+        }
+        return .handled
+    }
 }
 
 /// The top bar and the hosts (map or list, with the host panel); the Keys panel slides in over the right of them, the map
@@ -121,12 +154,14 @@ struct LeylineHome: View {
     let model: LeylineModel
     var findFocus: FocusState<Bool>.Binding
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.coreAccent) private var paneAccent
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
-                bar
+                header
                 hosts.frame(maxWidth: .infinity, maxHeight: .infinity)
+                LeylineFooter(model: model)
             }
             if model.keysOpen {
                 KeysPanel(model: model)
@@ -140,91 +175,93 @@ struct LeylineHome: View {
         .coreFont(size: MacTextSize.body)
     }
 
-    private var bar: some View {
-        HStack(spacing: Space.s2 + 2) {
-            FindField(
-                text: Binding(
-                    get: { model.filter },
-                    set: {
-                        model.filter = $0
-                        model.filterChanged()
-                    }), focus: findFocus
-            ) {
-                if let id = model.selected { model.openHost(id) }
+    /// The app header every pane uses: Map and List as the page tiles at the left; find, Keys and Add Host at the right.
+    private var header: some View {
+        AppHeader {
+            AppFilterTile(title: "Map", count: -1, on: model.layout == .map, key: "⌘M") { show(.map) }
+                .accessibilityIdentifier("tab-Map")
+            AppFilterTile(title: "List", count: -1, on: model.layout == .list, key: "⌘L") { show(.list) }
+                .accessibilityIdentifier("tab-List")
+        } actions: {
+            HStack(spacing: Space.s2) {
+                FindField(
+                    text: Binding(
+                        get: { model.filter },
+                        set: {
+                            model.filter = $0
+                            model.filterChanged()
+                        }), focus: findFocus
+                ) {
+                    if let id = model.selected { model.openHost(id) }
+                }
+                AppActionTile(title: "Keys", symbol: "key", key: "", hue: GlassInk.accent(paneAccent)) {
+                    if model.keysOpen { model.closeKeys() } else { model.keysOpen = true }
+                }
+                .accessibilityIdentifier("leyline-keys-button")
+                AppActionTile(
+                    title: "Add Host", symbol: "plus", key: "N", hue: GlassInk.accent(paneAccent), prominent: true
+                ) {
+                    model.newHost()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+                .disabled(model.readOnly || model.load != .ready)
+                .accessibilityIdentifier("leyline-add-host")
             }
-            if model.load == .ready {
-                Text("\(Words.count(model.fleet.count, "host")) · \(model.onlineCount) online")
-                    .coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
-            }
-            Spacer(minLength: Space.s3)
-            trailing
-                // Under the Keys panel: hidden, so no edge of them shows beside it (Esc or the panel's esc closes it).
-                .opacity(model.keysOpen ? 0 : 1).allowsHitTesting(!model.keysOpen).accessibilityHidden(model.keysOpen)
+            // Under the Keys panel: hidden, so no edge of them shows beside it (Esc or the panel's esc closes it).
+            .opacity(model.keysOpen ? 0 : 1).allowsHitTesting(!model.keysOpen).accessibilityHidden(model.keysOpen)
         }
-        .padding(.horizontal, Space.s5).padding(.top, Space.s3 + 2).padding(.bottom, Space.s3)
     }
 
-    /// Map or list, Keys and Add Host.
-    @ViewBuilder private var trailing: some View {
-        HStack(spacing: Space.s2 + 2) {
-            KeyTabs(
-                label: "Map or list",
-                tabs: [
-                    .init(
-                        id: LeylineLayout.map, title: "Map", symbol: "point.3.connected.trianglepath.dotted",
-                        key: "⌘M"),
-                    .init(id: .list, title: "List", symbol: "list.bullet", key: "⌘L"),
-                ],
-                selection: Binding(
-                    get: { model.layout }, set: { l in withAnimation(Motion.out(Motion.ui)) { model.layout = l } }))
-            CoreIconButton(symbol: "key", label: "Keys", selected: model.keysOpen) {
-                if model.keysOpen { model.closeKeys() } else { model.keysOpen = true }
-            }
-            .help("Keys")
-            .accessibilityIdentifier("leyline-keys-button")
-            Button {
-                model.newHost()
-            } label: {
-                Label("Add Host", systemImage: "plus")
-            }
-            .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            .environment(\.coreKeycap, "N")
-            .disabled(model.readOnly || model.load != .ready)
-            .accessibilityIdentifier("leyline-add-host")
-        }
+    private func show(_ layout: LeylineLayout) {
+        withAnimation(Motion.out(Motion.ui)) { model.layout = layout }
     }
 
     @ViewBuilder private var hosts: some View {
         switch model.load {
         case .loading:
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+            page(LeylineSkeleton())
         case .notConnected:
-            centered(
-                CoreStateCard(
+            page(
+                LeylineStateCard(
                     symbol: "wifi.slash", title: "Not connected",
-                    line: "Hosts live on your Core. They show up here once this Mac is connected."))
+                    text: "Hosts live on your Core. They show up here once this Mac is connected."))
         case .absent:
-            centered(
-                CoreStateCard(
+            page(
+                LeylineStateCard(
                     symbol: "point.3.connected.trianglepath.dotted", title: "This Core has no Leyline",
-                    line: "Leyline arrives with a Core update. Hosts and keys show up here after it."))
+                    text: "Leyline arrives with a Core update. Hosts and keys show up here after it."))
         case .failed(let why):
-            centered(
-                CoreStateCard(
-                    symbol: "exclamationmark.triangle", title: "Hosts did not load", line: why,
-                    primary: CoreAction("Try again") { model.resync() }))
+            page(
+                LeylineStateCard(
+                    symbol: "exclamationmark.triangle", title: "Hosts did not load",
+                    text: "\(why) Nothing was changed.", tone: .fail
+                ) {
+                    AppActionTile(
+                        title: "Try again", symbol: "arrow.clockwise", key: "", hue: GlassInk.accent(paneAccent)
+                    ) {
+                        model.resync()
+                    }
+                })
         case .ready:
             if model.hosts.isEmpty {
-                centered(
-                    CoreStateCard(
+                page(
+                    LeylineStateCard(
                         symbol: "server.rack", title: "No hosts yet",
-                        line: "Add one with N. Paste a whole ssh command into Host and the rest fills in.",
-                        primary: CoreAction("Add Host") { model.newHost() }))
+                        text: "Add one with N. Paste a whole ssh command into Host and the rest fills in."
+                    ) {
+                        AppActionTile(
+                            title: "Add Host", symbol: "plus", key: "N", hue: GlassInk.accent(paneAccent),
+                            prominent: true
+                        ) {
+                            model.newHost()
+                        }
+                        .disabled(model.readOnly)
+                    })
             } else if model.fleet.isEmpty {
-                centered(
-                    CoreStateCard(
+                page(
+                    LeylineStateCard(
                         symbol: "line.3.horizontal.decrease", title: "No host to show",
-                        line: "No host fits “\(LeylineOptions.current.title)”. Change it in Settings, Leyline, Options."
+                        text: "No host fits “\(LeylineOptions.current.title)”. Change it in Settings, Leyline, Options."
                     ))
             } else {
                 ready
@@ -233,38 +270,35 @@ struct LeylineHome: View {
     }
 
     private var ready: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .bottomTrailing) {
-                Group {
-                    switch model.layout {
-                    case .map:
-                        if model.bigMap { GroupsMap(model: model) } else { RoutesMap(model: model) }
-                    case .list:
-                        if model.shown.isEmpty {
-                            Text("No host matches “\(model.filter)”.").foregroundStyle(GlassInk.secondary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            HostList(model: model)
-                        }
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                switch model.layout {
+                case .map:
+                    if model.bigMap { GroupsMap(model: model) } else { RoutesMap(model: model) }
+                case .list:
+                    if model.shown.isEmpty {
+                        page(
+                            LeylineStateCard(
+                                symbol: "magnifyingglass", title: "No host matches “\(model.filter)”",
+                                text: "Try another name or address. Esc clears the find field."))
+                    } else {
+                        HostList(model: model)
                     }
                 }
-                .transition(.opacity)
-                if let h = model.selectedHost, !model.keysOpen {
-                    HostPeek(model: model, host: h)
-                        .padding(.trailing, Space.s5).padding(.bottom, Space.s1)
-                        .transition(.opacity)
-                }
             }
-            .animation(Motion.out(Motion.ui), value: model.layout)
-            .animation(Motion.out(Motion.ui), value: model.selected == nil)
-            KeyHints(hints: [
-                ("↑↓←→", "move"), ("⏎", "terminal"), ("⌘2", "files"), ("⌘3", "history"), ("N", "add host"),
-                ("type", "find"),
-            ])
+            .transition(.opacity)
+            if let h = model.selectedHost, !model.keysOpen {
+                HostPeek(model: model, host: h)
+                    .padding(.trailing, Space.s4).padding(.bottom, Space.s1)
+                    .transition(.opacity)
+            }
         }
+        .animation(Motion.out(Motion.ui), value: model.layout)
+        .animation(Motion.out(Motion.ui), value: model.selected == nil)
     }
 
-    private func centered<V: View>(_ v: V) -> some View {
-        v.frame(maxWidth: .infinity, maxHeight: .infinity).padding(Space.s4)
+    /// A state in place of the hosts: at the top of the page, inside its margins, like Accounts and Connections.
+    private func page<V: View>(_ v: V) -> some View {
+        v.padding(.horizontal, Space.s4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
