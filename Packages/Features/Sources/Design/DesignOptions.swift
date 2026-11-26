@@ -49,7 +49,7 @@ import SwiftUI
     }
 
     /// A node id the engine accepts: `n_` and 12 characters of a-z, 2-7.
-    static func nodeID() -> String {
+    nonisolated static func nodeID() -> String {
         let alphabet = Array("abcdefghijklmnopqrstuvwxyz234567")
         return "n_" + String((0..<12).map { _ in alphabet.randomElement()! })
     }
