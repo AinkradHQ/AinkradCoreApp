@@ -25,6 +25,9 @@ public final class DesignCanvasNSView: NSView {
     /// Called on the main thread when the document or the selection may have changed (a remote update, a pointer press or
     /// release, a key, an undo, an edit from the chrome): the layers panel and inspector read the engine again.
     public var onChange: (() -> Void)?
+    /// Presenting (a mockup or a prototype): clicks report the node under them instead of editing, scroll and pinch are
+    /// off. Nil while editing.
+    public var presentTap: ((String?) -> Void)?
     private var fitted = false
     var lastEditTooLarge = false
     var reduceMotion = false {
@@ -120,6 +123,7 @@ public final class DesignCanvasNSView: NSView {
     // MARK: scroll + pinch
 
     public override func scrollWheel(with e: NSEvent) {
+        if presentTap != nil { return }  // presenting: the screen stays put
         let p = point(e)
         if e.modifierFlags.contains(.command) || e.modifierFlags.contains(.control) {
             let d = e.hasPreciseScrollingDeltas ? e.scrollingDeltaY : e.scrollingDeltaY * 8
@@ -146,6 +150,7 @@ public final class DesignCanvasNSView: NSView {
     private var pinchStamp = 0.0
 
     public override func magnify(with e: NSEvent) {
+        if presentTap != nil { return }
         let p = point(e)
         if e.phase.contains(.began) {
             loop.state.withLock { $0.zoomRate = 0 }
@@ -192,6 +197,12 @@ public final class DesignCanvasNSView: NSView {
     }
 
     public override func mouseDown(with e: NSEvent) {
+        // Presenting: a click is a tap on the screen (prototype links), never an edit.
+        if let tap = presentTap {
+            let p = point(e)
+            tap(engine.hit(Float(p.x), Float(p.y)))
+            return
+        }
         window?.makeFirstResponder(self)
         // A double-click on a text node edits it (with the select tool; the text tool opens a session itself).
         if e.clickCount == 2, engine.tool == DE_TOOL_SELECT, !engine.textActive {
@@ -203,9 +214,10 @@ public final class DesignCanvasNSView: NSView {
         }
         pointer(DE_POINTER_DOWN, e)
     }
-    public override func mouseDragged(with e: NSEvent) { pointer(DE_POINTER_MOVE, e) }
-    public override func mouseMoved(with e: NSEvent) { pointer(DE_POINTER_MOVE, e) }
+    public override func mouseDragged(with e: NSEvent) { if presentTap == nil { pointer(DE_POINTER_MOVE, e) } }
+    public override func mouseMoved(with e: NSEvent) { if presentTap == nil { pointer(DE_POINTER_MOVE, e) } }
     public override func mouseUp(with e: NSEvent) {
+        if presentTap != nil { return }
         pointer(DE_POINTER_UP, e)
         sync?.flush()
     }

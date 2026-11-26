@@ -43,6 +43,14 @@ struct DesignDetail: View {
         .sheet(isPresented: Binding(get: { editor?.versionsOpen ?? false }, set: { editor?.versionsOpen = $0 })) {
             if let editor { VersionsSheet(editor: editor) }
         }
+        .overlay {
+            if let p = model.presenter {
+                DesignPresentView(model: model, presenter: p)
+                    .background(GlassInk.adaptive(Color(white: 0.06), day: Color(white: 0.93)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(Motion.out(Motion.ui), value: model.presenter == nil)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("design-detail")
     }
@@ -76,6 +84,13 @@ struct DesignDetail: View {
             .disabled(model.allProjects.isEmpty || model.readOnly)
             .help("Relate this to projects; it stays in the library either way")
             .accessibilityIdentifier("design-projects")
+            if editor != nil, case .doc(let d) = item {
+                AppActionTile(title: "Present", symbol: "play.rectangle", key: "", hue: GlassInk.accent(paneAccent)) {
+                    model.present(d)
+                }
+                .help("Show a screen in a device and click through its prototype links")
+                .accessibilityIdentifier("design-present-button")
+            }
             if editor != nil, model.composeSupported, !model.readOnly {
                 AppActionTile(
                     title: "Draw with AI", symbol: "sparkles", key: "", hue: GlassInk.accent(paneAccent),

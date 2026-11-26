@@ -32,6 +32,9 @@ final class CanvasEditing: DesignEditBackend {
         view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }
     }
     func fit(_ rect: CGRect) { view?.editorFit(rect) }
+    func present(_ tap: (@MainActor (String?) -> Void)?) {
+        view?.editorPresent(tap.map { t in { id in MainActor.assumeIsolated { t(id) } } })
+    }
 
     /// Hands the chrome the canvas and has the canvas tell it when the document or selection may have changed.
     static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {
