@@ -53,8 +53,9 @@ public final class DesignDemo {
         "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "needs-you",
         "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
-        "project-island", "project-island-empty", "new-advanced", "rename", "delete", "directions",
-        "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "compose-prompt",
+        "project-island", "project-island-empty", "new-advanced", "rename", "delete",
+        "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
+        "ai-directions", "ai-done", "ai-drawing-new",
     ]
 
     private let model: DesignModel
@@ -249,7 +250,8 @@ public final class DesignDemo {
         case "offline": model.load = .notConnected
         case "absent": model.load = .absent
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
-        case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest",
+        case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
+            "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new",
             "tools-probe":
             model.openID = "doc:\(Self.did(1))"
         case "open-system": model.openID = "doc:\(Self.did(8))"
@@ -291,29 +293,48 @@ public final class DesignDemo {
             }
         }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
-        if scene == "compose-prompt" {
-            let c = DesignComposer(model: model, doc: Self.did(1), prompt: "A portfolio landing page")
-            model.host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
-        }
-        if scene == "directions" {
-            let c = DesignComposer(model: model, doc: Self.did(1), prompt: "A portfolio landing page")
-            c.debugShow(
-                ComposeState(
-                    id: "dc_1", phase: .done, reason: "", session: nil,
-                    directions: [
-                        .init(
-                            name: "Calm", summary: "A light, airy layout with soft cards and one blue accent.",
-                            frame: nil),
-                        .init(
-                            name: "Bold",
-                            summary:
-                                "A dark, poster-style layout with huge type and a lime accent, for a loud first impression.",
-                            frame: nil),
-                        .init(
-                            name: "Editorial", summary: "A warm, paper-like layout with a serif name and thin rules.",
-                            frame: nil),
-                    ]))
-            model.host.shell.present(ShellDialog(id: "design-composer") { ComposerView(composer: c) })
+        if scene.hasPrefix("ai-") {
+            // The AI panel on the real canvas (CORE_DESIGN_SCENE): new, edit, drawing, directions, done.
+            try? await Task.sleep(for: .seconds(2))
+            let e = model.editors[Self.did(1)]
+            if scene != "ai-new", scene != "ai-drawing-new",
+                let frame = e?.layers.layers.first(where: { $0.type == "frame" })
+            {
+                e?.select(frame.id)
+            }
+            await model.drawWithAI()
+            // As a person would: the panel opens, then the drawing starts.
+            try? await Task.sleep(for: .milliseconds(500))
+            let c = model.composer
+            let three = ComposeState(
+                id: "dc_1", phase: .done, reason: "", session: nil,
+                directions: [
+                    .init(
+                        name: "Calm", summary: "A light, airy layout with soft cards and one blue accent.", frame: nil),
+                    .init(
+                        name: "Bold", summary: "A dark, poster-style layout with huge type and a lime accent.",
+                        frame: nil),
+                    .init(name: "Editorial", summary: "A warm, paper-like layout with a serif name.", frame: nil),
+                ])
+            switch scene {
+            case "ai-new": c?.prompt = ""
+            case "ai-edit": c?.prompt = "Make the button green"
+            case "ai-drawing":
+                c?.prompt = "Make the button green"
+                c?.debugShow(nil, phase: .drawing)
+            case "ai-drawing-new":
+                c?.target = nil
+                c?.single = false
+                c?.prompt = "A pricing page"
+                c?.debugShow(nil, phase: .drawing)
+            case "ai-directions":
+                c?.target = nil
+                c?.single = false
+                c?.debugShow(three, phase: .directions)
+            case "ai-done": c?.debugShow(nil, phase: .done("Desktop is updated."))
+            default: break
+            }
+
         }
         if scene == "delete" { model.askDelete(.doc(Self.docs()[0])) }
         if scene == "open-design-menu" {

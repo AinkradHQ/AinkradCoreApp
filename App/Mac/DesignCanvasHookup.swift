@@ -26,6 +26,10 @@ final class CanvasEditing: DesignEditBackend {
     var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
     var tool: Int { view?.editorTool ?? 0 }
     func setTool(_ tool: Int) { view?.editorSetTool(tool) }
+    func camera() -> CanvasCamera? {
+        view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }
+    }
+    func fit(_ rect: CGRect) { view?.editorFit(rect) }
 
     /// Hands the chrome the canvas and has the canvas tell it when the document or selection may have changed.
     static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {

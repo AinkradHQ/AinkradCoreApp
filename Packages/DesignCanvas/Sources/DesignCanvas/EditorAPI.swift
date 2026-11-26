@@ -45,6 +45,16 @@ extension DesignCanvasNSView {
         guard engine.presenceSet(json) else { return }
         sync?.flushPresence()
     }
+    /// How document points show in this view: `view = doc × zoom + (panX, panY)`.
+    public var editorCamera: (zoom: Double, panX: Double, panY: Double)? {
+        guard let c = engine.camera(), c.pan.count == 2 else { return nil }
+        return (c.zoom, c.pan[0], c.pan[1])
+    }
+    /// Moves the camera to fit a document rect (animated unless Reduce Motion).
+    public func editorFit(_ r: CGRect) {
+        de_fit_rect(engine.h, Float(r.minX), Float(r.minY), Float(r.width), Float(r.height), reduceMotion ? 0 : 1)
+        loop.wake()
+    }
     /// 1 while a text node is being edited on the canvas.
     public var editorTextActive: Bool { engine.textActive }
     /// The design system's tokens as a JSON array of `{name, kind}`; nil while the engine cannot list them.
