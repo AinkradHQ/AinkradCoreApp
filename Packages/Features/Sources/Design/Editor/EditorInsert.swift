@@ -123,31 +123,101 @@ extension DesignEditor {
     }
 }
 
-/// The toolbar along the canvas's foot, as in Figma: Frame, Shape, Text and Image each add their first kind on a click and
-/// list the rest on the arrow (⌥⌘1…⌥⌘4 add the first kinds); Draw with AI; then the Ask… field.
+/// The canvas tools (the engine's `DE_TOOL_*`). A drawing tool draws one shape by dragging, then the canvas goes back to
+/// Move. The letters work on the canvas whenever no text is being edited, as in Figma.
+enum CanvasTool: Int, CaseIterable {
+    case select = 0
+    case hand, frame, rect, ellipse, line, text, pen
+    var title: String {
+        switch self {
+        case .select: "Move"
+        case .hand: "Hand"
+        case .frame: "Frame"
+        case .rect: "Rectangle"
+        case .ellipse: "Ellipse"
+        case .line: "Line"
+        case .text: "Text"
+        case .pen: "Pen"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .select: "cursorarrow"
+        case .hand: "hand.raised"
+        case .frame: "number"
+        case .rect: "square"
+        case .ellipse: "circle"
+        case .line: "line.diagonal"
+        case .text: "textformat"
+        case .pen: "pencil.tip"
+        }
+    }
+    var key: String {
+        switch self {
+        case .select: "V"
+        case .hand: "H"
+        case .frame: "F"
+        case .rect: "R"
+        case .ellipse: "O"
+        case .line: "L"
+        case .text: "T"
+        case .pen: "P"
+        }
+    }
+    var help: String {
+        switch self {
+        case .select: "Move: select, drag to move, handles resize  V"
+        case .hand: "Hand: drag to pan the canvas  H"
+        case .pen: "Pen: click to add points, click the first to close, Return to finish  P"
+        case .text: "Text: click to type, drag to set its width  T"
+        default: "\(title): drag on the canvas to draw, Shift keeps it square  \(key)"
+        }
+    }
+}
+
+/// The toolbar along the canvas's foot, as in Figma: Move and Hand, then Frame, Shape, Pen and Text as drawing tools (the
+/// arrow next to each also lists ready-made kinds to place at once), Image from the library, Draw with AI and Ask.
 struct CanvasToolbar: View {
     let model: DesignModel
     @Bindable var editor: DesignEditor
     @Environment(\.coreAccent) private var paneAccent
 
+    private var current: CanvasTool { CanvasTool(rawValue: editor.tool) ?? .select }
     private var pictures: [DesignAsset] {
         model.assets.filter { $0.loadable && [.image, .icon, .logo].contains($0.kind) }
     }
 
     var body: some View {
-        HStack(spacing: Space.s1) {
-            tool("Move", "cursorarrow", lit: true) {}
-                .help("Select and move: click on the canvas, drag to move, handles resize")
-            group("Frame", "number", key: "1", InsertPreset.frames)
-            group("Shape", "square", key: "2", InsertPreset.shapes)
-            group("Text", "textformat", key: "3", InsertPreset.texts)
+        HStack(spacing: 2) {
+            tool(.select)
+            tool(.hand)
+            divider
+            group(
+                [.frame], symbol: CanvasTool.frame.symbol, presets: InsertPreset.frames, label: "Frame",
+                presetsTitle: "Place a frame")
+            group(
+                [.rect, .ellipse, .line],
+                symbol: [CanvasTool.rect, .ellipse, .line].contains(current) ? current.symbol : CanvasTool.rect.symbol,
+                presets: Array(InsertPreset.shapes.dropFirst(3)), label: "Shape", presetsTitle: "Place a shape")
+            tool(.pen)
+            group(
+                [.text], symbol: CanvasTool.text.symbol, presets: InsertPreset.texts, label: "Text",
+                presetsTitle: "Place text")
             images
             divider
-            tool("Draw with AI", "sparkles", lit: false) { Task { await model.drawWithAI() } }
-                .disabled(!model.composeSupported || model.readOnly)
-                .help(
-                    model.composeSupported
-                        ? "Draw with AI: describe it, AI draws it here" : "This Core cannot draw with AI yet")
+            Button {
+                Task { await model.drawWithAI() }
+            } label: {
+                icon("sparkles", lit: false)
+            }
+            .buttonStyle(.plain)
+            .modifier(ToolHover())
+            .disabled(!model.composeSupported || model.readOnly)
+            .help(
+                model.composeSupported
+                    ? "Draw with AI: describe it, AI draws it here" : "This Core cannot draw with AI yet"
+            )
+            .accessibilityLabel("Draw with AI")
             divider
             AskField(editor: editor)
         }
@@ -155,6 +225,7 @@ struct CanvasToolbar: View {
         // Opaque: over a white board a see-through bar washed out.
         .background(GlassInk.adaptive(Color(white: 0.15), day: .white), in: coreShape(Radius.cardMac + 2))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+        .animation(Motion.out(Motion.hover), value: editor.tool)
         .disabled(!editor.attached || model.readOnly)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tools")
@@ -165,48 +236,79 @@ struct CanvasToolbar: View {
             .padding(.horizontal, Space.s1)
     }
 
-    private func tool(_ title: String, _ symbol: String, lit: Bool, _ run: @escaping () -> Void) -> some View {
-        Button(action: run) {
-            Image(systemName: symbol).coreFont(size: MacTextSize.title)
-                .foregroundStyle(lit ? .white : GlassInk.primary)
-                .frame(width: MacSize.controlLg + Space.s1, height: MacSize.controlLg + Space.s1)
-                .background(lit ? GlassInk.accent(paneAccent) : .clear, in: coreShape(Radius.control))
-                .contentShape(coreShape(Radius.control))
-        }
-        .buttonStyle(.plain)
-        .modifier(ToolHover())
-        .accessibilityLabel(title)
+    private func icon(_ symbol: String, lit: Bool) -> some View {
+        Image(systemName: symbol).coreFont(size: MacTextSize.title)
+            .foregroundStyle(lit ? .white : GlassInk.primary)
+            .frame(width: MacSize.controlLg + Space.s1, height: MacSize.controlLg + Space.s1)
+            .background(lit ? GlassInk.accent(paneAccent) : .clear, in: coreShape(Radius.control))
+            .contentShape(coreShape(Radius.control))
     }
 
-    /// A tool with its kinds: a click adds the first, the menu lists them all.
-    private func group(_ title: String, _ symbol: String, key: Character, _ presets: [InsertPreset]) -> some View {
-        Menu {
-            ForEach(presets) { p in
-                Button {
-                    editor.insert(p)
-                } label: {
-                    Label(p.title, systemImage: p.symbol)
-                }
-            }
+    private func tool(_ t: CanvasTool) -> some View {
+        Button {
+            editor.setTool(t)
         } label: {
-            HStack(spacing: 2) {
-                Image(systemName: symbol).coreFont(size: MacTextSize.title).foregroundStyle(GlassInk.primary)
-                Image(systemName: "chevron.down").coreFont(size: 9, weight: .semibold).foregroundStyle(
-                    GlassInk.secondary)
-            }
-        } primaryAction: {
-            if let first = presets.first { editor.insert(first) }
+            icon(t.symbol, lit: current == t)
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .frame(height: MacSize.controlLg + Space.s1).padding(.horizontal, Space.s2)
         .modifier(ToolHover())
-        .keyboardShortcut(KeyEquivalent(key), modifiers: [.command, .option])
-        .help("\(title): click to add a \(presets.first?.title.lowercased() ?? ""), or pick one  ⌥⌘\(key)")
-        .accessibilityLabel(title)
-        .accessibilityIdentifier("design-tool-\(title.lowercased())")
+        .help(t.help)
+        .accessibilityLabel(t.title)
+        .accessibilityAddTraits(current == t ? .isSelected : [])
+        .accessibilityIdentifier("design-tool-\(t.title.lowercased())")
+    }
+
+    /// A drawing tool with its kinds: a click picks the (first) tool; the arrow lists every tool of the group and the
+    /// ready-made kinds that are placed at once.
+    private func group(
+        _ tools: [CanvasTool], symbol: String, presets: [InsertPreset], label: String, presetsTitle: String
+    ) -> some View {
+        let lit = tools.contains(current)
+        return HStack(spacing: 0) {
+            Button {
+                editor.setTool(tools.contains(current) ? current : tools[0])
+            } label: {
+                icon(symbol, lit: lit)
+            }
+            .buttonStyle(.plain)
+            .help(
+                tools.count == 1
+                    ? tools[0].help : "\(label): \(tools.map { "\($0.title) \($0.key)" }.joined(separator: ", "))"
+            )
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(lit ? .isSelected : [])
+            .accessibilityIdentifier("design-tool-\(label.lowercased())")
+            Menu {
+                ForEach(tools, id: \.rawValue) { t in
+                    Button {
+                        editor.setTool(t)
+                    } label: {
+                        Label("\(t.title)    \(t.key)", systemImage: t.symbol)
+                    }
+                }
+                Divider()
+                Section(presetsTitle) {
+                    ForEach(presets) { p in
+                        Button {
+                            editor.insert(p)
+                        } label: {
+                            Label(p.title, systemImage: p.symbol)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.down").coreFont(size: 9, weight: .semibold).foregroundStyle(
+                    GlassInk.secondary
+                )
+                .frame(width: Space.s4, height: MacSize.controlLg + Space.s1).contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel("More \(label.lowercased()) kinds")
+        }
+        .modifier(ToolHover())
     }
 
     @ViewBuilder private var images: some View {
@@ -227,14 +329,15 @@ struct CanvasToolbar: View {
                 Image(systemName: "chevron.down").coreFont(size: 9, weight: .semibold).foregroundStyle(
                     GlassInk.secondary)
             }
+            .frame(height: MacSize.controlLg + Space.s1).padding(.horizontal, Space.s2)
+            .contentShape(Rectangle())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .frame(height: MacSize.controlLg + Space.s1).padding(.horizontal, Space.s2)
         .modifier(ToolHover())
-        .help("Image: a picture from the library")
+        .help("Image: place a picture from the library")
         .accessibilityLabel("Image")
     }
 }

@@ -24,6 +24,8 @@ final class CanvasEditing: DesignEditBackend {
     func tokens() -> Data? { view?.editorTokens() }
     var syncStuck: Bool { view?.editorSyncStuck ?? false }
     var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
+    var tool: Int { view?.editorTool ?? 0 }
+    func setTool(_ tool: Int) { view?.editorSetTool(tool) }
 
     /// Hands the chrome the canvas and has the canvas tell it when the document or selection may have changed.
     static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {
@@ -43,6 +45,7 @@ enum DesignCanvasHookup {
         #if DEBUG
         if let dir = ProcessInfo.processInfo.environment["CORE_DESIGN_SCENE"], !dir.isEmpty {
             let scene = URL(fileURLWithPath: dir)
+            app.design.debugCanvasProbe = { log in await ToolProbe.run(log) }
             app.design.canvas = { input in
                 AnyView(
                     DesignCanvas(

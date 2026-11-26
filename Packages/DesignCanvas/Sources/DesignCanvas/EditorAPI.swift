@@ -45,6 +45,8 @@ extension DesignCanvasNSView {
         guard engine.presenceSet(json) else { return }
         sync?.flushPresence()
     }
+    /// 1 while a text node is being edited on the canvas.
+    public var editorTextActive: Bool { engine.textActive }
     /// The design system's tokens as a JSON array of `{name, kind}`; nil while the engine cannot list them.
     public func editorTokens() -> Data? { engine.tokens() }
 

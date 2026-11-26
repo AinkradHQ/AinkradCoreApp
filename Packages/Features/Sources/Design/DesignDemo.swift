@@ -54,7 +54,7 @@ public final class DesignDemo {
         "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
         "project-island", "project-island-empty", "new-advanced", "rename", "delete", "directions",
-        "open-design-insert", "open-design-text", "editor-selftest", "compose-prompt",
+        "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "compose-prompt",
     ]
 
     private let model: DesignModel
@@ -249,7 +249,8 @@ public final class DesignDemo {
         case "offline": model.load = .notConnected
         case "absent": model.load = .absent
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
-        case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest":
+        case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest",
+            "tools-probe":
             model.openID = "doc:\(Self.did(1))"
         case "open-system": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
@@ -260,6 +261,10 @@ public final class DesignDemo {
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
+        if scene == "tools-probe" {
+            try? await Task.sleep(for: .seconds(2))
+            await model.debugCanvasProbe?({ FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
+        }
         if scene == "editor-selftest" {
             try? await Task.sleep(for: .seconds(2))
             if let e = model.editors[Self.did(1)] {

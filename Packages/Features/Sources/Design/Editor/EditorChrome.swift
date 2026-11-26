@@ -92,7 +92,10 @@ struct AskField: View {
                 .disabled(!editor.canAsk || editor.askText.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(.horizontal, Space.s3)
-        .frame(width: Space.s8 * 11, height: MacSize.controlLg + Space.s1)
+        .frame(
+            minWidth: Space.s8 * 4, maxWidth: Space.s8 * 11, minHeight: MacSize.controlLg + Space.s1,
+            maxHeight: MacSize.controlLg + Space.s1
+        )
         .background(GlassInk.well, in: coreShape(Radius.control))
         .help(
             editor.canAsk

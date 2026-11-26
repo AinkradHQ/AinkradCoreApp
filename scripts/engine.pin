@@ -1,7 +1,7 @@
 # DesignEngine.xcframework pin (V3-02, plan T6). Built by `scripts/design-engine.sh build` (make engine) in AinkradCore at
-# CORE_COMMIT below (head of epic-build/design, the Design epic build pass). The rest is its SHA256SUMS.
-CORE_COMMIT=9322d6ba5935cf8a577bc41c482d156155a5700e
+# CORE_COMMIT below (feat/design-draw-tools, AinkradCore #522: the draw, text, pen and hand tools). The rest is its SHA256SUMS.
+CORE_COMMIT=e5bf16575772f916b3896a67e1f4670c18f96a95
 1b96ae3314c14ce5662cacd4f4ce2fa35237e41fe022cf8e7f471556be0115b2  DesignEngine.xcframework/Info.plist
-dc41e7ae2606538ef15824a2e2f2d6a21d0567c6782a6f1b3c5aa353a7d9f7c4  DesignEngine.xcframework/macos-arm64_x86_64/Headers/DesignEngine.h
+b2c1b65fddcf58b27fdf29124ccb65020da31321986cafb2df00e1b92a8f525d  DesignEngine.xcframework/macos-arm64_x86_64/Headers/DesignEngine.h
 0586d0369f947adc4016922175451fa9f3fd10bb49bf47a3c6aa0a3dc2a38b0d  DesignEngine.xcframework/macos-arm64_x86_64/Headers/module.modulemap
-0089d7daa8ad738ef1e23584004652013b09c73e1d9536c83ab0f3bafa4191b4  DesignEngine.xcframework/macos-arm64_x86_64/libDesignEngine.a
+fcc6d3308edb634cd0905cf3157a1af26bb36e8783ebadcdfae397a2008d5d32  DesignEngine.xcframework/macos-arm64_x86_64/libDesignEngine.a

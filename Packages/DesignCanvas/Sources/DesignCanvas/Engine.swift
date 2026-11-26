@@ -163,7 +163,7 @@ public final class Engine: Sendable {
     }
 
     /// Calls an out-buffer function, growing the buffer once to the size it asks for.
-    private func read(_ f: (UnsafeMutablePointer<UInt8>?, Int, UnsafeMutablePointer<Int>?) -> Int32) -> Data? {
+    func read(_ f: (UnsafeMutablePointer<UInt8>?, Int, UnsafeMutablePointer<Int>?) -> Int32) -> Data? {
         let (rc, d) = fetch(f)
         return rc == DE_OK ? d : nil
     }

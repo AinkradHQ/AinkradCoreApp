@@ -64,6 +64,13 @@ final class DesignEditor {
 
     var attached: Bool { backend != nil }
 
+    /// The canvas tool (`CanvasTool` raw value), read on every change: drawing a shape returns it to select.
+    private(set) var tool = 0
+    func setTool(_ t: CanvasTool) {
+        backend?.setTool(t.rawValue)
+        tool = backend?.tool ?? 0
+    }
+
     /// One node as the engine has it now (not observed).
     func node(of id: String) -> EditorNode? { backend?.node(id).flatMap { EditorNode(json: $0) } }
 
@@ -88,6 +95,7 @@ final class DesignEditor {
 
     func reload() {
         syncStuck = backend?.syncStuck ?? false
+        if let t = backend?.tool, t != tool { tool = t }
         guard let b = backend else {
             layers = LayerTree([])
             selection = []

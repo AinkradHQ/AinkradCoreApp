@@ -194,9 +194,14 @@ public protocol DesignEditBackend: AnyObject {
     var syncStuck: Bool { get }
     /// The last `edit` was refused because the change is too large for one update.
     var lastEditTooLarge: Bool { get }
+    /// The canvas tool (`CanvasTool`); it returns to select by itself after a shape is drawn.
+    var tool: Int { get }
+    func setTool(_ tool: Int)
 }
 
 extension DesignEditBackend {
     public var syncStuck: Bool { false }
     public var lastEditTooLarge: Bool { false }
+    public var tool: Int { 0 }
+    public func setTool(_ tool: Int) {}
 }

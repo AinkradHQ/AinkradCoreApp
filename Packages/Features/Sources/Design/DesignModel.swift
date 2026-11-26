@@ -59,6 +59,8 @@ public final class DesignModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: the app's on-canvas probe (pointer and keys on the real canvas view), set by the app.
+    @ObservationIgnored public var debugCanvasProbe: (@MainActor (@escaping @MainActor (String) -> Void) async -> Void)?
     #endif
 
     public init(host: any AdminHost, projects: ProjectsModel) {
