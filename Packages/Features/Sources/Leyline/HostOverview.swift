@@ -18,8 +18,9 @@ struct HostOverview: View {
                         await state.loadHistory()
                     }
                 } else if host.light == .off {
-                    OfflineCard(model: model, host: host)
+                    OfflineLine(model: model, host: host)
                 }
+                HostKeyPrompt(state: state)
                 HostHealthSection(model: model, host: host, state: state).coreRise(settled, 0)
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: Space.s6) {
@@ -43,30 +44,30 @@ struct HostOverview: View {
     }
 }
 
-/// An offline host: when it last answered, what still works, and Try Now.
-private struct OfflineCard: View {
+/// An offline host, in one line at the top: since when, how often Leyline looks, and Try Now (Touch ID).
+private struct OfflineLine: View {
     let model: LeylineModel
     let host: HostItem
     @State private var trying = false
-    @Environment(\.coreAccent) private var paneAccent
 
     var body: some View {
-        LeylineStateCard(
-            symbol: "moon.zzz", title: "\(host.name) is not answering",
-            text: (host.reach?.seenAt.map { "No answer since \($0.formatted(date: .omitted, time: .shortened)). " }
-                ?? "")
-                + "Leyline tries again every minute. History and Access still work; the terminal and files wait for it."
-        ) {
-            AppActionTile(title: "Try Now", symbol: "arrow.clockwise", key: "", hue: GlassInk.accent(paneAccent)) {
-                guard !trying else { return }
+        HStack(spacing: Space.s2) {
+            Image(systemName: "moon.zzz").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            Text(HostWords.offline(host)).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            Spacer(minLength: Space.s2)
+            Button("Try Now") {
                 trying = true
                 Task {
                     await model.tryNow(host)
                     trying = false
                 }
             }
-            .disabled(trying)
+            .buttonStyle(CoreButtonStyle(.secondary, size: .small, busy: trying)).disabled(trying)
+            .accessibilityIdentifier("host-try-now")
         }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .coreWell(radius: Radius.cardMac)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("host-offline")
     }
 }
@@ -95,7 +96,7 @@ extension HostSectionTitle where Accessory == EmptyView {
 // MARK: health
 
 /// The health monitor: a tile per number with its trend over the last half hour, in blue, amber or red, and the reach chip.
-/// What the Core does not report yet shows as a quiet tile, never as a made-up number.
+/// A number the Core does not report is left out, never made up.
 struct HostHealthSection: View {
     let model: LeylineModel
     let host: HostItem
@@ -117,24 +118,33 @@ struct HostHealthSection: View {
                     }
                 }
             }
-            // Six across when they fit, else three by two: the row always spans the page.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Space.s2) { cells }
-                Grid(horizontalSpacing: Space.s2, verticalSpacing: Space.s2) {
-                    let all = Array(cellList.enumerated())
-                    GridRow { ForEach(all.prefix(3), id: \.offset) { $0.element } }
-                    GridRow { ForEach(all.dropFirst(3), id: \.offset) { $0.element } }
-                }
+            if cellList.isEmpty {
+                Text("Health appears after the first successful check.").foregroundStyle(GlassInk.secondary)
+                    .accessibilityIdentifier("host-health-none")
+            } else {
+                grid
             }
-            .animation(Motion.out(Motion.ui), value: health)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("host-health")
     }
 
+    /// Up to six across when they fit, else three to a row: the row always spans the page.
+    private var grid: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Space.s2) { cells }
+            Grid(horizontalSpacing: Space.s2, verticalSpacing: Space.s2) {
+                let all = Array(cellList.enumerated())
+                GridRow { ForEach(all.prefix(3), id: \.offset) { $0.element } }
+                GridRow { ForEach(all.dropFirst(3), id: \.offset) { $0.element } }
+            }
+        }
+        .animation(Motion.out(Motion.ui), value: health)
+    }
+
     private let tileHeight = Space.s8 * 4 - Space.s2
 
-    /// The Core has no health for this host (an older Core, or a host it cannot probe): every tile says so.
+    /// The Core has no health for this host (an older Core, or a host it cannot probe): no tiles, the quiet line.
     private var gone: Bool {
         switch state.health {
         case .missing, .failed: true
@@ -142,17 +152,13 @@ struct HostHealthSection: View {
         }
     }
 
-    private var checked: String? {
-        if host.light == .off, health == nil { return "no reading while it is not answering" }
-        return health?.checkedAt.map { "checked \(HostWords.ago($0))" }
-            ?? (gone ? "not reported by this Core yet" : nil)
-    }
+    private var checked: String? { health?.checkedAt.map { "checked \(HostWords.ago($0))" } }
 
     @ViewBuilder private var reachChip: some View {
         if let w = host.latencyWord {
             let hue = host.light == .ok ? GlassInk.green : host.light == .slow ? GlassInk.amber : GlassInk.slate
             AppStatChip("dot.radiowaves.left.and.right", host.light == .off ? "Not answering" : "Reachable · \(w)", hue)
-                .help(host.seenLine ?? "The Core checks the host once a minute")
+                .help(host.seenLine ?? "The Core checks the host every 5 minutes")
         }
     }
 
@@ -160,7 +166,7 @@ struct HostHealthSection: View {
         ForEach(Array(cellList.enumerated()), id: \.offset) { $0.element }
     }
 
-    /// The six tiles, or six quiet placeholders while the first read is on its way.
+    /// The tiles of the numbers that have data (none: the quiet line), or six placeholders while the first read is on its way.
     private var cellList: [AnyView] {
         if health == nil, state.health.isLoading || state.health.value == nil && !gone {
             return (0..<6).map { _ in
@@ -197,7 +203,7 @@ struct HostHealthSection: View {
                 title: "Uptime", symbol: "clock.arrow.circlepath", value: extras.uptime, unit: "", sub: os,
                 series: [], ceiling: nil, tone: .run),
         ]
-        return tiles.map { AnyView($0) }
+        return tiles.filter { $0.value != nil }.map { AnyView($0) }
     }
 }
 

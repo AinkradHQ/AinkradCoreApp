@@ -42,7 +42,8 @@ struct HostView: View {
         .task {
             async let c: Void = state.loadCommands()
             async let h: Void = state.loadHistory()
-            _ = await (c, h)
+            async let k: Void = state.loadHostKeys()
+            _ = await (c, h, k)
         }
         .task {
             // The Core stores a probe a minute; the page reads it on the map's beat.
@@ -169,19 +170,16 @@ struct HostProblemCard: View {
     var body: some View {
         LeylineStateCard(symbol: problem.symbol, title: problem.title, text: problem.line, tone: .warn) {
             switch problem.fix {
-            case .updates:
-                AppActionTile(
-                    title: "Open Updates", symbol: "arrow.down.circle", key: "", hue: GlassInk.accent(paneAccent),
-                    prominent: true
-                ) { model.openUpdates() }
-                .accessibilityIdentifier("host-open-updates")
             case .access:
                 AppActionTile(
                     title: "Open Access", symbol: "lock", key: "⌘,", hue: GlassInk.accent(paneAccent), prominent: true
                 ) { model.go(.access) }
             case .none: EmptyView()
             }
-            AppActionTile(title: "Try Again", symbol: "arrow.clockwise", key: "", hue: GlassInk.accent(paneAccent)) {
+            AppActionTile(
+                title: "Try Again", symbol: "arrow.clockwise", key: "", hue: GlassInk.accent(paneAccent),
+                prominent: problem.fix == .none
+            ) {
                 model.hostProblem[hostID] = nil
                 Task { await retry() }
             }

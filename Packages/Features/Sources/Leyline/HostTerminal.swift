@@ -20,9 +20,12 @@ struct HostTerminalTab: View {
         Group {
             if let p = state.problem {
                 HostProblemCard(problem: p, model: model, hostID: host.id) { await open() }.hostPage()
+            } else if state.hostKeys.asked != nil {
+                // Terminals refuse until the key is trusted: the one prompt, never "Exited with code 70".
+                HostKeyPrompt(state: state).hostPage()
             } else if model.terminalView == nil {
                 surface(StandInTerminal(host: host))
-            } else if let id = model.hostTerminals[host.id], let v = model.terminalView?(id) {
+            } else if let id = model.hostTerminals[host.id], let v = model.terminalView?(id, ended) {
                 surface(v)
             } else if let failure {
                 LeylineStateCard(
@@ -43,10 +46,25 @@ struct HostTerminalTab: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .task(id: host.id) {
-            if model.terminalView != nil, model.hostTerminals[host.id] == nil, state.problem == nil { await open() }
+        // Again once the key is trusted from the prompt.
+        .task(id: state.hostKeys) {
+            guard state.hostKeys != .unknown else { return }
+            if model.terminalView != nil, model.hostTerminals[host.id] == nil, state.problem == nil,
+                state.hostKeys.asked == nil
+            {
+                await open()
+            }
         }
         .accessibilityIdentifier("host-page-Terminal")
+    }
+
+    /// A shell that ends at once with 70 met a host key nobody pinned: the Core stored what it saw, so the prompt takes over.
+    private func ended(_ code: Int32) {
+        guard code == 70 else { return }
+        Task {
+            await state.loadHostKeys()
+            if state.hostKeys.asked != nil { model.hostTerminals[host.id] = nil }
+        }
     }
 
     private func surface(_ v: some View) -> some View {

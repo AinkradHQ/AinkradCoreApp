@@ -57,6 +57,9 @@ final class HostPageState {
     // MARK: terminal
 
     private(set) var opening = false
+    /// The host's key as the Core knows it (`HostKey.swift`), and a Trust in flight.
+    var hostKeys = HostKeyStatus.unknown
+    var trusting = false
 
     /// Opens an ssh terminal on the host and shows it in the existing terminal pane.
     func connect() async {

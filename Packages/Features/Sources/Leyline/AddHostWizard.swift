@@ -281,7 +281,10 @@ struct AddHostWizard: View {
                 .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.primary)
                 .accessibilityIdentifier("add-host-open-terminal")
             } else if let failure = f.failure {
-                Button("Try Again") { set { $0.resetCheck() } }.buttonStyle(CoreButtonStyle(.plain))
+                Button("Try Again") {
+                    set { $0.resetCheck() }
+                    Task { await model.runAddCheck() }
+                }.buttonStyle(CoreButtonStyle(.plain))
                     .keyboardShortcut("r", modifiers: .command).environment(\.coreKeycap, "⌘R")
                 Button(AddHostFlow.fix(for: failure).title) { set { $0.applyFix() } }
                     .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.primary)
@@ -314,7 +317,8 @@ extension LeylineModel {
     /// Reach → (seal the imported key) → save → the host key. Nothing is saved until the host answers; a host behind a jump
     /// host is not reachable from the Core alone, so its reach is taken on trust and the first terminal proves it.
     func runAddCheck() async {
-        guard let service, let f = wizard, f.made == nil else { return }
+        // Once per Check / Try Again, never while typing: the Core takes a few checks a minute, each behind Touch ID.
+        guard let service, let f = wizard, f.made == nil, f.reach != .running else { return }
         clearWriteError()
         wizard?.failure = nil
         wizard?.reach = .running

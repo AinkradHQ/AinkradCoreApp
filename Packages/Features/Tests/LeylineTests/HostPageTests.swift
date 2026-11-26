@@ -150,9 +150,9 @@ struct HostPageTests {
         #expect(days[0].title == "Today" && days[1].title == "Yesterday")
     }
 
-    @Test func aRunnerTooOldIsAPageProblemWithUpdatesAsItsFix() {
+    @Test func aRunnerThatCannotSSHIsAPageProblemWithTryAgain() {
         let p = HostProblem(LeylineFailure(sentence: "", code: "runner_cannot_ssh", status: 409))
-        #expect(p?.fix == .updates && p?.title == "This runner can’t reach hosts yet")
+        #expect(p?.fix == Optional(HostProblem.Fix.none) && p?.title == "This runner can’t open SSH")
         #expect(HostProblem(LeylineFailure(sentence: "", code: "gate_refused", status: 403)) == nil)
     }
 
@@ -162,5 +162,30 @@ struct HostPageTests {
         #expect(CommandDraft(name: "lc_x", command: "ls").problem != nil)
         #expect(CommandDraft(name: "x", command: "a\nb").problem != nil)
         #expect(CommandDraft(name: "Disk", command: "df -h").problem == nil)
+    }
+
+    @Test func hostKeyStatusComesFromTheCoreList() {
+        func k(_ fp: String, _ st: String) -> HostKeyItem { HostKeyItem(fingerprint: fp, state: st) }
+        #expect(HostKeyStatus([]) == .none)
+        #expect(HostKeyStatus([k("a", "seen")]) == .waiting("a"))
+        #expect(HostKeyStatus([k("a", "trusted")]) == .trusted("a", since: nil))
+        #expect(HostKeyStatus([k("a", "trusted"), k("b", "seen")]) == .changed(old: "a", new: "b"))
+        #expect(HostKeyStatus([k("a", "replaced"), k("b", "trusted")]).asked == nil)
+    }
+
+    @Test func aHostMatchesItsRunnerByDeviceThenAddressThenName() {
+        func h(_ name: String, _ address: String, device: String? = nil) -> HostItem {
+            HostItem(
+                id: "h", name: name, address: address, port: 22, username: "u", keyID: nil, jumpChain: [],
+                viaRunner: nil, group: nil, tags: [], aiRule: .ask, os: nil, createdAt: nil, runnerDevice: device)
+        }
+        let rs = [
+            RunnerSummary(id: "d1", name: "Azure", online: true), RunnerSummary(id: "d2", name: "vps-1", online: false),
+        ]
+        #expect(LeylineModel.runner(of: h("x", "1.2.3.4", device: "d2"), in: rs)?.id == "d2")
+        #expect(LeylineModel.runner(of: h("x", "vps-1.example.com"), in: rs)?.id == "d2")
+        #expect(LeylineModel.runner(of: h("azure", "4.213.123.76"), in: rs)?.id == "d1")
+        #expect(LeylineModel.runner(of: h("web", "10.0.0.1"), in: rs) == nil)
+        #expect(LeylineModel.runner(of: h("x", "1.2.3.4", device: "gone"), in: rs) == nil)
     }
 }

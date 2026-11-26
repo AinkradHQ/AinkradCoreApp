@@ -11,7 +11,8 @@ public final class LeylineDemo {
     public static let scenes = [
         "map", "map-filtered", "peek-offline", "map-many", "map-many-acme", "list", "list-many",
         "host-overview", "host-commands-running", "host-command-output", "host-access-panel", "host-terminal",
-        "host-files", "host-runner-too-old", "host-offline", "host-new-command", "wiz-server", "wiz-signin",
+        "host-files", "host-runner-cannot-ssh", "host-offline", "host-key-waiting", "host-key-waiting-access",
+        "host-key-trusted", "host-runner-match", "host-new-command", "wiz-server", "wiz-signin",
         "wiz-signin-file", "wiz-signin-text", "wiz-name", "wiz-check", "wiz-failed", "wiz-done", "hosts-empty",
         "hosts-loading",
         "hosts-offline", "hosts-absent", "hosts-failed", "keys", "keys-empty", "keys-generate", "keys-import",
@@ -50,6 +51,8 @@ public final class LeylineDemo {
         model.debugShown = nil
         model.debugRunner = nil
         model.deviceLookup = nil
+        model.runners = nil
+        model.openRunner = nil
         model.previewGaps = true
         model.wizard = nil
         model.clearWriteError()
@@ -78,10 +81,21 @@ public final class LeylineDemo {
         }
         model.extras = Dictionary(uniqueKeysWithValues: seeds.map { ($0.item.id, Self.extras($0)) })
         model.activity = [:]
-        await model.useNow(
-            Service(
-                hosts: seeds.map(\.item), keys: keys, known: scene == "keys-empty" ? [] : Self.known(), health: health,
-                history: history))
+        let service = Service(
+            hosts: seeds.map(\.item), keys: keys, known: scene == "keys-empty" ? [] : Self.known(), health: health,
+            history: history)
+        if scene.hasPrefix("host-key-waiting"), let web = seeds.first(where: { $0.item.name == "lan-web-1" }) {
+            service.hostKeysOf[web.item.id] = [HostKeyItem(fingerprint: Self.newHostKey, state: "seen")]
+        }
+        if scene == "host-runner-match" {
+            // Made apart from the host: no runner_device, matched by name.
+            model.runners = { [RunnerSummary(id: "d_00000000000000aa", name: "build-box", online: true)] }
+            if let b = seeds.first(where: { $0.item.name == "build-box" }) {
+                service.hostKeysOf[b.item.id] = [HostKeyItem(fingerprint: Self.newHostKey, state: "trusted")]
+            }
+            model.openRunner = { _ in }
+        }
+        await model.useNow(service)
         await model.refreshHealth(force: true)
         model.show()
         let named = { (n: String) in seeds.first { $0.item.name == n }?.item.id }
@@ -128,13 +142,16 @@ public final class LeylineDemo {
         case "host-access-panel": model.openHost(named("lan-web-1")!, .access)
         case "host-terminal": model.openHost(named("lan-web-1")!, .terminal)
         case "host-files": model.openHost(named("lan-web-1")!, .files)
-        case "host-runner-too-old":
+        case "host-runner-cannot-ssh":
             model.hostProblem[named("lan-web-1")!] = LeylineFailure(
                 sentence: "", code: "runner_cannot_ssh", status: 409)
             model.openHost(named("lan-web-1")!, .terminal)
         case "host-offline":
             model.openHost(named("backup-box")!)
         case "host-access-allowed": model.openHost(named("lan-staging")!, .access)
+        case "host-key-waiting": model.openHost(named("lan-web-1")!)
+        case "host-key-waiting-access", "host-key-trusted": model.openHost(named("lan-web-1")!, .access)
+        case "host-runner-match": model.openHost(named("build-box")!, .access)
         case "runner-waiting":
             model.debugRunner = .waiting(until: Date().addingTimeInterval(840))
             model.openHost(named("build-box")!, .access)

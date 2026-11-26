@@ -148,7 +148,7 @@ enum HostTimeline {
 
 /// A failure that stops the whole page, with the words and the fix the state card shows.
 struct HostProblem: Equatable {
-    enum Fix: Equatable { case updates, access, none }
+    enum Fix: Equatable { case access, none }
     let symbol: String
     let title: String
     let line: String
@@ -159,8 +159,10 @@ struct HostProblem: Equatable {
         switch e.code {
         case "runner_cannot_ssh", "runner_cannot_sftp":
             self.init(
-                symbol: "arrow.down.circle", title: "This runner can’t reach hosts yet",
-                line: "Update your Core and its runner in Settings → Updates. Then try again.", fix: .updates)
+                symbol: "server.rack", title: "This runner can’t open SSH",
+                line:
+                    "It’s offline, or it wasn’t started with --enable-exec. Turn that on for the runner, then try again.",
+                fix: .none)
         case "no_runner":
             self.init(
                 symbol: "server.rack", title: "No runner can reach this host",

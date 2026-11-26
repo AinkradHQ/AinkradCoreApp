@@ -157,6 +157,10 @@ extension LiveLeylineService {
         _ = try await raw("POST", "/hosts/\(Self.seg(host))/host-keys/trust", ["fingerprint": fingerprint])
     }
 
+    func replaceHostKey(host: String, fingerprint: String) async throws {
+        _ = try await raw("POST", "/hosts/\(Self.seg(host))/host-keys/replace", ["fingerprint": fingerprint])
+    }
+
     func checkHost(address: String, port: Int) async throws -> HostCheck {
         guard await connection.serverSupports(minor: coreMinorV010) else { throw LeylineFailure.notYet }
         struct Body: Encodable {

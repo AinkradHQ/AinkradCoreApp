@@ -109,10 +109,21 @@ extension LeylineDemo {
             try await Task.sleep(for: .milliseconds(900))
             return HostCheck(ok: true, ms: 31, reason: nil)
         }
+        /// Scenes set a host's keys here; else a host in `known` is trusted (changed: trusted and a new one seen), others wait.
+        var hostKeysOf: [String: [HostKeyItem]] = [:]
         func hostKeys(host: String) async throws -> [HostKeyItem] {
-            [HostKeyItem(fingerprint: LeylineDemo.newHostKey, state: "seen")]
+            let (set, name) = lock.withLock { (hostKeysOf[host], hostList.first { $0.id == host }?.name) }
+            if let set { return set }
+            guard let k = known.first(where: { $0.host == name }) else {
+                return [HostKeyItem(fingerprint: LeylineDemo.newHostKey, state: "seen")]
+            }
+            let at = k.since.map { $0.formatted(.iso8601) }
+            let pin = HostKeyItem(fingerprint: k.fingerprint, state: "trusted", trustedAt: at)
+            return k.state == .changed ? [pin, HostKeyItem(fingerprint: LeylineDemo.newHostKey, state: "seen")] : [pin]
         }
-        func trustHostKey(host: String, fingerprint: String) async throws {}
+        func trustHostKey(host: String, fingerprint: String) async throws {
+            lock.withLock { hostKeysOf[host] = [HostKeyItem(fingerprint: fingerprint, state: "trusted")] }
+        }
     }
 
     nonisolated static let newHostKey = "SHA256:Eph4qztpKgRLXQCd1/vZLwairT4nw5FOANWe6f7Xk2i"

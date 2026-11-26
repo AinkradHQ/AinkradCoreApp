@@ -132,7 +132,7 @@ struct AccessPanel: View {
                 }
                 VStack(alignment: .leading, spacing: Space.s2) {
                     CoreFieldLabel("Host key")
-                    hostKey
+                    HostKeySection(state: state)
                 }
             }
         }
@@ -145,30 +145,6 @@ struct AccessPanel: View {
                 ? "\(host.login) · a password typed in the terminal" : "\(host.login) · a key that is gone"
         }
         return "\(host.login) · key “\(k.name)” (\(k.typeWord))"
-    }
-
-    @ViewBuilder private var hostKey: some View {
-        let rule = "If it ever changes, Leyline stops before signing in and asks you."
-        if let p = model.pinned(host) {
-            HStack(alignment: .top, spacing: Space.s3) {
-                FingerprintPattern(fingerprint: p.fingerprint)
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text(
-                        p.state == .changed
-                            ? "Changed · review"
-                            : p.since.map { "Trusted on \($0.formatted(.dateTime.day().month(.abbreviated)))" }
-                                ?? "Trusted"
-                    )
-                    .coreFont(size: MacTextSize.body, weight: .medium)
-                    Text(FingerprintPattern.short(p.fingerprint)).coreFont(size: MacTextSize.meta, design: .monospaced)
-                        .foregroundStyle(GlassInk.secondary)
-                    Text(rule).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        } else {
-            // The host offered a key that nobody trusted yet: show it, and Trust pins it (terminals refuse until then).
-            SeenHostKey(model: model, host: host, rule: rule)
-        }
     }
 
     // MARK: AI rule
@@ -243,38 +219,57 @@ struct AccessPanel: View {
 
     // MARK: Make it a runner
 
+    /// A host that is a runner says so (with its runner's page in Machines); only one that is not offers Make Runner.
     private var runner: some View {
         part("Runner", sub: "run AI sessions and projects here", accessory: { EmptyView() }) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                runnerStatus
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    ForEach(
-                        Array(
-                            [
-                                "Create a one-time invite", "Copy it to the host over SSH",
-                                "Install the Ainkrad runner (system service with passwordless sudo, else for this user)",
-                                "Pair with the Core",
-                            ].enumerated()), id: \.offset
-                    ) { i, step in
-                        Text("\(i + 1). \(step)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                if let r = model.runner(of: host), !busyInstalling {
+                    isRunner(r)
+                } else if let device = host.runnerDevice, !busyInstalling {
+                    claimer(device)
+                } else {
+                    makeRunner
                 }
-                Button {
-                    confirmRunner()
-                } label: {
-                    Label("Make Runner…", systemImage: "server.rack")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary, busy: state.runnerState == .starting))
-                .disabled(model.readOnly || host.runnerDevice != nil || busyInstalling)
-                .help(
-                    host.runnerDevice != nil
-                        ? "This host is already a runner" : "Install the Ainkrad runner here (Touch ID)"
-                )
-                .accessibilityIdentifier("runner-make")
             }
         }
         .accessibilityIdentifier("access-runner")
+    }
+
+    @ViewBuilder private func isRunner(_ r: RunnerSummary) -> some View {
+        CoreNotice(
+            symbol: "server.rack", title: "This host runs a runner",
+            text: "\(r.name) · \(r.online ? "Online" : "Offline")", tone: r.online ? .done : .queue
+        )
+        .accessibilityIdentifier("runner-match")
+        if let open = model.openRunner {
+            Button("Open in Machines") { open(r.id) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        }
+    }
+
+    @ViewBuilder private var makeRunner: some View {
+        runnerStatus
+        VStack(alignment: .leading, spacing: Space.s1) {
+            ForEach(
+                Array(
+                    [
+                        "Create a one-time invite", "Copy it to the host over SSH",
+                        "Install the Ainkrad runner (system service with passwordless sudo, else for this user)",
+                        "Pair with the Core",
+                    ].enumerated()), id: \.offset
+            ) { i, step in
+                Text("\(i + 1). \(step)").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        Button {
+            state.confirmRunner()
+        } label: {
+            Label("Make Runner…", systemImage: "server.rack")
+        }
+        .buttonStyle(CoreButtonStyle(.secondary, busy: state.runnerState == .starting))
+        .disabled(model.readOnly || busyInstalling)
+        .help("Install the Ainkrad runner here (Touch ID)")
+        .accessibilityIdentifier("runner-make")
     }
 
     private var busyInstalling: Bool {
@@ -284,10 +279,8 @@ struct AccessPanel: View {
         }
     }
 
-    private func confirmRunner() { state.confirmRunner() }
-
-    /// What the install is doing, and, once it paired, which machine claimed the invite: the invite is its own approval, so this
-    /// is the person's one check that it is the machine they meant.
+    /// What the install is doing: the invite is its own approval, so the paired notice is the person's one check that it is
+    /// the machine they meant.
     @ViewBuilder private var runnerStatus: some View {
         switch state.runnerState {
         case .waiting(let until):
@@ -303,11 +296,11 @@ struct AccessPanel: View {
                 text: "Nothing was installed and the invite is gone. Start again.", tone: .warn)
         case .failed(let why):
             CoreNotice(symbol: "exclamationmark.triangle", title: "The install did not finish", text: why, tone: .fail)
-        default:
-            if let device = host.runnerDevice { claimer(device) }
+        default: EmptyView()
         }
     }
 
+    /// Paired, but the runner is not in the list (yet): who claimed the invite.
     private func claimer(_ device: String) -> some View {
         let c = model.deviceLookup?(device)
         let facts = [c?.name, c?.platform, c?.fingerprint.map { "key \($0)" }].compactMap { $0 }

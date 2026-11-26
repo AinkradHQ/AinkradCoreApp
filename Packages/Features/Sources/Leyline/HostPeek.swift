@@ -72,11 +72,8 @@ struct HostPeek: View {
 
     private var offline: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            Text(
-                (host.reach?.seenAt.map { "No answer since \($0.formatted(date: .omitted, time: .shortened)). " }
-                    ?? "It is not answering. ") + "Leyline tries again every minute."
-            )
-            .coreFont(size: MacTextSize.meta).fixedSize(horizontal: false, vertical: true)
+            Text(HostWords.offline(host))
+                .coreFont(size: MacTextSize.meta).fixedSize(horizontal: false, vertical: true)
             Button("Try Now") { Task { await tryNow() } }
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small, busy: trying)).disabled(trying)
                 .accessibilityIdentifier("peek-try-now")

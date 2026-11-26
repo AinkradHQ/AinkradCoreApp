@@ -3,6 +3,11 @@ import SwiftUI
 
 /// Small words shared by the host pages.
 enum HostWords {
+    /// "Not answering since 8:41 PM · Leyline checks every 5 min" (the Core's reach round runs every five minutes).
+    static func offline(_ h: HostItem) -> String {
+        (h.reach?.seenAt.map { "Not answering since \($0.formatted(date: .omitted, time: .shortened))" }
+            ?? "Not answering") + " · Leyline checks every 5 min"
+    }
     static func ago(_ d: Date?) -> String {
         guard let d else { return "" }
         let f = RelativeDateTimeFormatter()

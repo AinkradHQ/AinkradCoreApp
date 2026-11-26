@@ -26,6 +26,8 @@ public final class LeylineModel {
     public var runnerGlance: (@MainActor (String) -> RunnerGlance?)?
     /// Opens a runner's page in Devices & Runners.
     public var openRunner: (@MainActor (String) -> Void)?
+    /// The paired runners (not the Core's built-in one), to tell which host already runs one.
+    public var runners: (@MainActor () -> [RunnerSummary])?
 
     var hosts: [HostItem] = []
     var keys: [KeyItem] = []
@@ -74,7 +76,8 @@ public final class LeylineModel {
     /// The terminal each host's view embeds, so coming back shows the same one.
     var hostTerminals: [String: String] = [:]
     /// Draws a Core terminal inside the host view. The app sets it; nil (the Debug demo) shows a stand-in.
-    public var terminalView: (@MainActor (String) -> AnyView?)?
+    /// The second argument hears the shell's exit code (70 when the host key was not pinned).
+    public var terminalView: (@MainActor (String, @escaping @MainActor (Int32) -> Void) -> AnyView?)?
     /// The Core's project names, for Add Host's Project picker. The app sets it.
     public var projectNames: (@MainActor () -> [String])?
     /// A refusal from the Core (or the sheet's own check) for the write in flight, in words.
@@ -188,21 +191,6 @@ public final class LeylineModel {
 
     // MARK: derived
 
-    /// Whether an address answers like an SSH server from the Core, for Add Host's live check.
-    func checkHost(_ address: String, _ port: Int) async throws -> HostCheck {
-        guard let service, !checkNeedsStepUp else { throw LeylineFailure.notYet }
-        do { return try await service.checkHost(address: address, port: port) } catch let e as LeylineFailure
-            where e.code == "step_up_required"
-        {
-            // The check needs a live step-up; typing never prompts for one, so it stays quiet until the person unlocks.
-            checkNeedsStepUp = true
-            throw e
-        }
-    }
-
-    /// The Core refused a host check for want of a step-up: Add Host stops asking while it is typed into.
-    var checkNeedsStepUp = false
-
     func hostItem(_ id: String?) -> HostItem? { id.flatMap { id in hosts.first { $0.id == id } } }
     func key(_ id: String?) -> KeyItem? { id.flatMap { id in keys.first { $0.id == id } } }
     var open: HostItem? { hostItem(openID) }
@@ -224,9 +212,6 @@ public final class LeylineModel {
 
     /// The hosts a key logs in to, for the "used by" chips.
     func usedBy(_ key: KeyItem) -> [HostItem] { hosts.filter { $0.keyID == key.id } }
-
-    /// The host key pinned for a host, if the Core has one.
-    func pinned(_ h: HostItem) -> KnownHostItem? { knownHosts.first { $0.host == h.name } }
 
     /// The names a host is reached through: the Core (or its runner), then each jump host, then the host itself.
     func route(_ h: HostItem) -> [String] {
@@ -439,28 +424,27 @@ public final class LeylineModel {
         guard let id = openID else { return }
         if to == .access { return accessOpen.toggle() }
         if to != .overview, hostItem(id)?.light == .off {
-            host.shell.showToast("It is not answering. Leyline tries again every minute.", kind: .warn)
+            host.shell.showToast("It is not answering. Leyline checks every 5 minutes.", kind: .warn)
             return
         }
         accessOpen = false
         section = to
     }
 
-    /// "Try Now" on an offline host: the Core reaches it now, a toast says how it went, and the hosts are read again.
+    /// "Try Now" on an offline host: the Core reaches it now (Touch ID: the check is a step-up route), a toast says how it
+    /// went, and the hosts are read again.
     func tryNow(_ h: HostItem) async {
+        guard let service else { return }
         do {
-            let c = try await checkHost(h.address, h.port)
+            let c = try await host.elevated("Check whether \(h.name) answers.", done: "checked", keepsEdit: false) {
+                try await service.checkHost(address: h.address, port: h.port)
+            }
             host.shell.showToast(
                 c.ok ? "\(h.name) answered in \(c.ms ?? 0) ms" : "\(h.name) did not answer: \(c.reason ?? "no reply")",
                 kind: c.ok ? .info : .warn)
+        } catch is AdminDeclined {
         } catch { host.shell.showToast(words(error), kind: .warn) }
         await reload()
-    }
-
-    /// Settings › Updates, where the Core and its runners are updated.
-    func openUpdates() {
-        host.shell.settings.selected = "updates"
-        host.shell.open(.settings)
     }
 
     func newHost() {
@@ -468,7 +452,6 @@ public final class LeylineModel {
         show()
         keysOpen = false
         writeError = nil
-        checkNeedsStepUp = false
         AddHostWizard.open(self)
     }
 
