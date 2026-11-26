@@ -97,6 +97,13 @@ final class DesignEditor {
         }
         let list = b.tree().flatMap { try? JSONDecoder().decode([DesignLayer].self, from: $0) } ?? []
         let next = LayerTree(list)
+        // The first time a design shows its layers, open its pages and their frames, so what is on the canvas is listed.
+        if layers.layers.isEmpty, !next.layers.isEmpty {
+            for p in next.children(of: nil) {
+                expanded.insert(p.id)
+                for f in next.children(of: p.id) where f.isContainer { expanded.insert(f.id) }
+            }
+        }
         if next != layers { layers = next }
         let sel = b.selection()
         if sel != selection {

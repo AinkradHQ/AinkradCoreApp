@@ -30,7 +30,7 @@ struct InsertPreset: Identifiable, Equatable {
     }
     static func text(_ id: String, _ title: String, size: Double, weight: Double, _ words: String) -> InsertPreset {
         InsertPreset(
-            id: id, title: title, symbol: "textformat", type: "text", w: max(120, size * 10), h: size * 1.4,
+            id: id, title: title, symbol: "textformat", type: "text", w: max(120, size * 10), h: (size * 1.4).rounded(),
             props: [
                 "type": .object(["size": .number(size), "weight": .number(weight)]), "fill": solid("#111111"),
             ],
@@ -152,7 +152,8 @@ struct CanvasToolbar: View {
             AskField(editor: editor)
         }
         .padding(Space.s1)
-        .background(GlassInk.card, in: coreShape(Radius.cardMac + 2))
+        // Opaque: over a white board a see-through bar washed out.
+        .background(GlassInk.adaptive(Color(white: 0.15), day: .white), in: coreShape(Radius.cardMac + 2))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .disabled(!editor.attached || model.readOnly)
         .accessibilityElement(children: .contain)
@@ -173,6 +174,7 @@ struct CanvasToolbar: View {
                 .contentShape(coreShape(Radius.control))
         }
         .buttonStyle(.plain)
+        .modifier(ToolHover())
         .accessibilityLabel(title)
     }
 
@@ -200,6 +202,7 @@ struct CanvasToolbar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .frame(height: MacSize.controlLg + Space.s1).padding(.horizontal, Space.s2)
+        .modifier(ToolHover())
         .keyboardShortcut(KeyEquivalent(key), modifiers: [.command, .option])
         .help("\(title): click to add a \(presets.first?.title.lowercased() ?? ""), or pick one  ⌥⌘\(key)")
         .accessibilityLabel(title)
@@ -230,7 +233,19 @@ struct CanvasToolbar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .frame(height: MacSize.controlLg + Space.s1).padding(.horizontal, Space.s2)
+        .modifier(ToolHover())
         .help("Image: a picture from the library")
         .accessibilityLabel("Image")
+    }
+}
+
+/// A tool's hover: a soft well behind it, eased in and out.
+struct ToolHover: ViewModifier {
+    @State private var on = false
+    func body(content: Content) -> some View {
+        content
+            .background(on ? GlassInk.wellHover : .clear, in: coreShape(Radius.control))
+            .onHover { on = $0 }
+            .animation(Motion.out(Motion.hover), value: on)
     }
 }

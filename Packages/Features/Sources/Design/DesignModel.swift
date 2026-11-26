@@ -23,9 +23,11 @@ public final class DesignModel {
     /// The paired connection, for the canvas's sync socket; nil until a Core is attached.
     @ObservationIgnored var connection: CoreConnection?
 
-    var docs: [DesignDoc] = []
-    var assets: [DesignAsset] = []
-    var kits: [BrandKit] = []
+    var docs: [DesignDoc] = [] { didSet { sortItems() } }
+    var assets: [DesignAsset] = [] { didSet { sortItems() } }
+    var kits: [BrandKit] = [] { didSet { sortItems() } }
+    /// Every item, newest first: sorted once when a list changes, not on every count and redraw.
+    private(set) var items: [DesignItem] = []
     var load: DesignLoad = .notConnected
     /// The rail's pick.
     var category = DesignCategory.all
@@ -127,8 +129,8 @@ public final class DesignModel {
     // MARK: derived
 
     /// Every item, newest first.
-    var items: [DesignItem] {
-        (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
+    private func sortItems() {
+        items = (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
             .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
     }
 

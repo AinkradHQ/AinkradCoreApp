@@ -23,6 +23,9 @@ struct InspectorIsland: View {
                         if n.type == "text" { typography(n) }
                         if n.type == "instance" { overrides(n) }
                     }
+                    // A new selection fades its sections in; edits to the same node change in place.
+                    .id(n.id)
+                    .transition(.opacity)
                 }
                 .scrollIndicators(.never)
             } else {
@@ -34,6 +37,7 @@ struct InspectorIsland: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .animation(Motion.out(Motion.ui), value: editor.node?.id)
         .accessibilityIdentifier("design-inspector")
     }
 

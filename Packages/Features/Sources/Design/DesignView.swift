@@ -10,13 +10,17 @@ struct DesignView: View {
     let model: DesignModel
     @FocusState private var paneFocus: Bool
     @FocusState private var findFocus: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         ZStack {
+            // Opening grows the item in from the wall a touch; going back settles the wall in. A fade under Reduce Motion.
             if let item = model.open {
-                DesignDetail(model: model, item: item).transition(.opacity)
+                DesignDetail(model: model, item: item)
+                    .transition(reduce ? .opacity : .opacity.combined(with: .scale(scale: 0.985)))
             } else {
-                DesignHome(model: model, findFocus: $findFocus).transition(.opacity)
+                DesignHome(model: model, findFocus: $findFocus)
+                    .transition(reduce ? .opacity : .opacity.combined(with: .scale(scale: 1.01)))
             }
         }
         .foregroundStyle(GlassInk.primary)
@@ -287,7 +291,7 @@ struct DesignWall: View {
         if list.isEmpty {
             CoreStateCard(
                 symbol: model.filter.isEmpty ? model.category.symbol : "magnifyingglass",
-                title: model.filter.isEmpty ? "No \(model.category.title.lowercased()) yet" : "No match",
+                title: model.filter.isEmpty ? "Nothing here yet" : "No match",
                 line: model.filter.isEmpty
                     ? "What you make or add here shows up as a picture."
                     : "Nothing is called “\(model.filter)”. Try another word."
