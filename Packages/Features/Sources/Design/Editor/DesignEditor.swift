@@ -19,6 +19,8 @@ final class DesignEditor {
     private(set) var node: EditorNode?
     private(set) var peers: [DesignPeer] = []
     private(set) var tokens: [DesignToken] = []
+    /// A design system's own tokens with their values (the style guide), name order.
+    private(set) var systemTokens: [SystemToken] = []
     /// A sentence when the engine refused the last write; cleared by the next change.
     var notice: String?
     /// The canvas cannot send an unsent edit to the Core: shown until the design is reopened (never a retry).
@@ -90,6 +92,26 @@ final class DesignEditor {
     /// Presenting: clicks report the node under them; nil goes back to editing.
     func present(_ tap: (@MainActor (String?) -> Void)?) { backend?.present(tap) }
 
+    /// Sets a token of this design system (nil removes it): one undo step, synced like any edit.
+    @discardableResult
+    func setToken(_ name: String, kind: String, day: DJSON?, night: DJSON?) -> Bool {
+        let value: DJSON =
+            day.map { d in .object(["kind": .string(kind), "day": d, "night": night ?? d]) } ?? .null
+        return apply([["op": .string("token"), "name": .string(name), "value": value]])
+    }
+
+    /// Writes many tokens in one undo step (a starter set).
+    @discardableResult
+    func setTokens(_ list: [SystemToken]) -> Bool {
+        apply(
+            list.map {
+                [
+                    "op": .string("token"), "name": .string($0.name),
+                    "value": .object(["kind": .string($0.kind), "day": $0.day, "night": $0.night]),
+                ]
+            })
+    }
+
     /// One node as the engine has it now (not observed).
     func node(of id: String) -> EditorNode? { backend?.node(id).flatMap { EditorNode(json: $0) } }
 
@@ -116,6 +138,11 @@ final class DesignEditor {
         syncStuck = backend?.syncStuck ?? false
         let conn = backend?.syncConnected ?? true
         if conn != syncConnected { syncConnected = conn }
+        if let d = backend?.docTokens(), let list = try? JSONDecoder().decode([SystemToken].self, from: d),
+            list != systemTokens
+        {
+            systemTokens = list
+        }
         if let t = backend?.tool, t != tool { tool = t }
         guard let b = backend else {
             layers = LayerTree([])

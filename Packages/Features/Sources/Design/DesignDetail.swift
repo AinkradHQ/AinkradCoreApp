@@ -117,6 +117,8 @@ struct DesignDetail: View {
                 .padding(Space.s2)
                 .coreWell(radius: Radius.pane)
                 .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .doc(let d) = item, d.kind == .system, let canvas = model.canvasView(d) {
+            SystemStyleGuide(model: model, doc: d, editor: model.editor(for: d.id), canvas: canvas)
         } else if case .doc(let d) = item, let canvas = model.canvasView(d) {
             canvas
                 .clipShape(coreShape(Radius.pane))

@@ -200,6 +200,8 @@ public protocol DesignEditBackend: AnyObject {
     var lastEditTooLarge: Bool { get }
     /// The canvas tool (`CanvasTool`); it returns to select by itself after a shape is drawn.
     var tool: Int { get }
+    /// A design system's own tokens as JSON `[{name, kind, day, night}]`.
+    func docTokens() -> Data?
     func setTool(_ tool: Int)
     /// How document points show in the canvas view: `view = doc × zoom + pan`.
     func camera() -> CanvasCamera?
@@ -224,8 +226,22 @@ extension DesignEditBackend {
     public var syncConnected: Bool { true }
     public var lastEditTooLarge: Bool { false }
     public var tool: Int { 0 }
+    public func docTokens() -> Data? { nil }
     public func setTool(_ tool: Int) {}
     public func camera() -> CanvasCamera? { nil }
     public func present(_ tap: (@MainActor (String?) -> Void)?) {}
     public func fit(_ rect: CGRect) {}
+}
+
+/// One token of a design system as the style guide edits it: a literal per theme.
+struct SystemToken: Identifiable, Equatable, Decodable, Sendable {
+    var id: String { name }
+    let name: String
+    let kind: String
+    let day: DJSON
+    let night: DJSON
+
+    /// The group it shows in: the part before the first dot (`color.primary` → `color`).
+    var group: String { String(name.split(separator: ".").first ?? "") }
+    var short: String { name.split(separator: ".").dropFirst().joined(separator: ".") }
 }

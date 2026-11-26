@@ -67,6 +67,8 @@ extension DesignCanvasNSView {
     }
     /// 1 while a text node is being edited on the canvas.
     public var editorTextActive: Bool { engine.textActive }
+    /// This document's own tokens (a design system): `[{name, kind, day, night}]`, name order.
+    public func editorDocTokens() -> Data? { engine.read { de_doc_tokens(engine.h, $0, $1, $2) } }
     /// The design system's tokens as a JSON array of `{name, kind}`; nil while the engine cannot list them.
     public func editorTokens() -> Data? { engine.tokens() }
 
