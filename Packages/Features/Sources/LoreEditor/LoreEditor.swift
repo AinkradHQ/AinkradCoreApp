@@ -106,7 +106,9 @@ public enum LoreLinkPolicy {
         textView.frame = NSRect(x: 0, y: 0, width: 900, height: 700)
         textView.setUp()
         scrollView = NSScrollView(frame: textView.frame)
+        scrollView.verticalScroller = LoreScroller()
         scrollView.hasVerticalScroller = true
+        scrollView.scrollerStyle = .overlay
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
