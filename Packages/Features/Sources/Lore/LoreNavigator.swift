@@ -9,7 +9,7 @@ import SwiftUI
 struct LoreLeftSidebar: View {
     let model: LoreModel
     var focus: FocusState<Bool>.Binding
-    @State private var open: Set<String> = ["personal"]
+    @State private var open: Set<String> = []  // every folder starts collapsed
     @State private var query = ""
     @State private var cursor: String?
     /// The row whose title is a field, and what is typed in it.
