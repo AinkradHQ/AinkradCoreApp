@@ -3,7 +3,7 @@ import Projects
 import Shell
 import SwiftUI
 
-/// The Leyline pane: the hosts as a map or a list with the selected host's panel, the Keys page, or an opened host. Every
+/// The Leyline pane: the hosts as a map or a list with the selected host's panel and the Keys panel, or an opened host. Every
 /// action has a key: type to find (⌘K focuses the field), arrows move, Return opens the terminal, ⌘2 files, ⌘3 history,
 /// ⌘, access, ⌘M / ⌘L map or list, N adds a host, Esc goes back. The pane's surface follows the
 /// Look's transparency and blur.
@@ -51,12 +51,16 @@ struct LeylineView: View {
                 paneFocus = true
                 return .handled
             }
-            if !model.filter.isEmpty {
-                model.filter = ""
+            if model.keyForm != nil {
+                model.closeKeyForm()
                 return .handled
             }
-            if model.page == .keys {
-                model.page = .hosts
+            if model.keysOpen {
+                model.closeKeys()
+                return .handled
+            }
+            if !model.filter.isEmpty {
+                model.filter = ""
                 return .handled
             }
             return .ignored
@@ -66,7 +70,13 @@ struct LeylineView: View {
             if model.openID != nil { model.section = tab } else { model.openHost(id, tab) }
             return .handled
         }
-        guard model.openID == nil, model.page == .hosts, model.load == .ready else { return .ignored }
+        guard model.openID == nil, model.load == .ready else { return .ignored }
+        if model.keysOpen {
+            // ↑ ↓ open the next key; ⌘G, ⌘I and ⌘C are the panel's own.
+            guard press.key == .upArrow || press.key == .downArrow, model.keyForm == nil else { return .ignored }
+            model.moveKey(down: press.key == .downArrow)
+            return .handled
+        }
         if cmd {
             switch c {
             case "k":
@@ -105,66 +115,73 @@ struct LeylineView: View {
     }
 }
 
-/// The top bar and what it picks: the hosts (map or list, with the host panel) or Keys.
+/// The top bar and the hosts (map or list, with the host panel); the Keys panel slides in over the right of them, the map
+/// staying usable beside it.
 struct LeylineHome: View {
     let model: LeylineModel
     var findFocus: FocusState<Bool>.Binding
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
-        VStack(spacing: 0) {
-            bar
-            ZStack(alignment: .bottomTrailing) {
-                switch model.page {
-                case .keys: KeysPage(model: model)
-                case .hosts: hosts
-                }
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                bar
+                hosts.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if model.keysOpen {
+                KeysPanel(model: model)
+                    .padding(Space.s3)
+                    // Slides a few points in from the right edge and fades; a fade only under Reduce Motion.
+                    .transition(reduce ? .opacity : .opacity.combined(with: .offset(x: Space.s5)))
+            }
         }
+        .animation(Motion.calm(Motion.out(Motion.ui), reduce), value: model.keysOpen)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
     }
 
     private var bar: some View {
         HStack(spacing: Space.s2 + 2) {
-            if model.page == .hosts {
-                FindField(
-                    text: Binding(
-                        get: { model.filter },
-                        set: {
-                            model.filter = $0
-                            model.filterChanged()
-                        }), focus: findFocus
-                ) {
-                    if let id = model.selected { model.openHost(id) }
-                }
-                if model.load == .ready {
-                    Text("\(Words.count(model.fleet.count, "host")) · \(model.onlineCount) online")
-                        .coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
-                }
-            } else {
-                Button {
-                    model.page = .hosts
-                } label: {
-                    Label("Hosts", systemImage: "chevron.left")
-                }
-                .buttonStyle(CoreButtonStyle(.plain, size: .small)).environment(\.coreKeycap, "esc")
+            FindField(
+                text: Binding(
+                    get: { model.filter },
+                    set: {
+                        model.filter = $0
+                        model.filterChanged()
+                    }), focus: findFocus
+            ) {
+                if let id = model.selected { model.openHost(id) }
+            }
+            if model.load == .ready {
+                Text("\(Words.count(model.fleet.count, "host")) · \(model.onlineCount) online")
+                    .coreFont(size: MacTextSize.meta + 1).foregroundStyle(GlassInk.secondary)
             }
             Spacer(minLength: Space.s3)
-            if model.page == .hosts {
-                KeyTabs(
-                    label: "Map or list",
-                    tabs: [
-                        .init(
-                            id: LeylineLayout.map, title: "Map", symbol: "point.3.connected.trianglepath.dotted",
-                            key: "⌘M"),
-                        .init(id: .list, title: "List", symbol: "list.bullet", key: "⌘L"),
-                    ],
-                    selection: Binding(
-                        get: { model.layout }, set: { l in withAnimation(Motion.out(Motion.ui)) { model.layout = l } }))
-                CoreIconButton(symbol: "key", label: "Keys") { model.page = .keys }
-                    .help("Keys")
+            trailing
+                // Under the Keys panel: hidden, so no edge of them shows beside it (Esc or the panel's esc closes it).
+                .opacity(model.keysOpen ? 0 : 1).allowsHitTesting(!model.keysOpen).accessibilityHidden(model.keysOpen)
+        }
+        .padding(.horizontal, Space.s5).padding(.top, Space.s3 + 2).padding(.bottom, Space.s3)
+    }
+
+    /// Map or list, Keys and Add Host.
+    @ViewBuilder private var trailing: some View {
+        HStack(spacing: Space.s2 + 2) {
+            KeyTabs(
+                label: "Map or list",
+                tabs: [
+                    .init(
+                        id: LeylineLayout.map, title: "Map", symbol: "point.3.connected.trianglepath.dotted",
+                        key: "⌘M"),
+                    .init(id: .list, title: "List", symbol: "list.bullet", key: "⌘L"),
+                ],
+                selection: Binding(
+                    get: { model.layout }, set: { l in withAnimation(Motion.out(Motion.ui)) { model.layout = l } }))
+            CoreIconButton(symbol: "key", label: "Keys", selected: model.keysOpen) {
+                if model.keysOpen { model.closeKeys() } else { model.keysOpen = true }
             }
+            .help("Keys")
+            .accessibilityIdentifier("leyline-keys-button")
             Button {
                 model.newHost()
             } label: {
@@ -175,7 +192,6 @@ struct LeylineHome: View {
             .disabled(model.readOnly || model.load != .ready)
             .accessibilityIdentifier("leyline-add-host")
         }
-        .padding(.horizontal, Space.s5).padding(.top, Space.s3 + 2).padding(.bottom, Space.s3)
     }
 
     @ViewBuilder private var hosts: some View {
@@ -233,7 +249,7 @@ struct LeylineHome: View {
                     }
                 }
                 .transition(.opacity)
-                if let h = model.selectedHost {
+                if let h = model.selectedHost, !model.keysOpen {
                     HostPeek(model: model, host: h)
                         .padding(.trailing, Space.s5).padding(.bottom, Space.s1)
                         .transition(.opacity)

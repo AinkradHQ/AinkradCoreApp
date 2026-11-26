@@ -231,4 +231,12 @@ struct AddHostFlow: Equatable {
         guard len > 0, i + len <= bytes.count else { return false }
         return String(decoding: bytes[i..<i + len], as: UTF8.self) != "none"
     }
+
+    /// `base`, or `base-2`, `base-3`… — the first one no key has yet.
+    static func freeName(_ base: String, taken: Set<String>) -> String {
+        guard taken.contains(base) else { return base }
+        var n = 2
+        while taken.contains("\(base)-\(n)") { n += 1 }
+        return "\(base)-\(n)"
+    }
 }

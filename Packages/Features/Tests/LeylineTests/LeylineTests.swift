@@ -244,3 +244,11 @@ struct LeylineTests {
         #expect(m.usedBy(m.keys[0]).map(\.name) == ["w"])
     }
 }
+
+struct AddHostFreeNameTests {
+    @Test func aTakenKeyNameGetsTheNextFreeOne() {
+        #expect(AddHostFlow.freeName("deploy", taken: []) == "deploy")
+        #expect(AddHostFlow.freeName("deploy", taken: ["deploy"]) == "deploy-2")
+        #expect(AddHostFlow.freeName("deploy", taken: ["deploy", "deploy-2"]) == "deploy-3")
+    }
+}

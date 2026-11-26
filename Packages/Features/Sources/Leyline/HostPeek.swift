@@ -265,7 +265,7 @@ enum HostMore {
             },
             CoreDropdownItem("Keys", symbol: "key") {
                 m.closeHost()
-                m.page = .keys
+                m.keysOpen = true
             },
         ]
         if let state {

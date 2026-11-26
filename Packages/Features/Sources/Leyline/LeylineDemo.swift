@@ -13,7 +13,8 @@ public final class LeylineDemo {
         "host-terminal", "host-files", "host-history", "host-access", "host-commands", "wiz-server", "wiz-signin",
         "wiz-signin-file", "wiz-signin-text", "wiz-name", "wiz-check", "wiz-failed", "wiz-done", "hosts-empty",
         "hosts-loading",
-        "hosts-offline", "hosts-absent", "hosts-failed", "keys", "keys-empty", "key-generate", "key-import",
+        "hosts-offline", "hosts-absent", "hosts-failed", "keys", "keys-empty", "keys-generate", "keys-import",
+        "keys-import-file", "keys-expanded",
         "add-advanced", "host-access-allowed", "runner-waiting", "runner-paired",
     ]
 
@@ -37,7 +38,9 @@ public final class LeylineDemo {
         model.selected = nil
         model.openGroup = nil
         model.layout = scene.hasPrefix("list") ? .list : .map
-        model.page = .hosts
+        model.closeKeys()
+        model.keySelected = nil
+        model.keyFresh = nil
         model.section = .terminal
         model.debugRunner = nil
         model.deviceLookup = nil
@@ -88,13 +91,19 @@ public final class LeylineDemo {
         case "hosts-offline": model.setLoad(.notConnected)
         case "hosts-absent": model.setLoad(.absent)
         case "hosts-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
-        case "keys", "keys-empty": model.page = .keys
-        case "key-generate":
-            model.page = .keys
-            KeyDialogs.openGenerate(model)
-        case "key-import":
-            model.page = .keys
-            KeyDialogs.openImport(model)
+        case "keys", "keys-empty": model.keysOpen = true
+        case "keys-expanded":
+            model.keysOpen = true
+            model.keySelected = model.keyList.first { $0.name == "lanterna-deploy" }?.id
+        case "keys-generate": model.openKeyForm(.generate)
+        case "keys-import": model.openKeyForm(.importing)
+        case "keys-import-file":
+            // A dropped encrypted key: its type and pattern show, and the passphrase field.
+            model.openKeyForm(.importing)
+            model.keyDraft.load(
+                file: "id_ed25519_ops",
+                text: KeyText.sample(cipher: "aes256-ctr", publicFields: [Data((0..<32).map { UInt8($0 * 7) })]),
+                taken: model.keyNames)
         case "add-advanced": HostDialogs.openAdd(model, login: "ops@198.51.100.40")
         case "host-terminal": model.openHost(named("lan-web-1")!, .terminal)
         case "host-files": model.openHost(named("lan-web-1")!, .files)

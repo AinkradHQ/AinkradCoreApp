@@ -103,10 +103,13 @@ struct DropZone: View {
     }
 
     private func load(_ url: URL) {
-        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 64 << 10,
-            let text = try? String(contentsOf: url, encoding: .utf8)
-        else { return }
-        read(url.lastPathComponent, text)
+        if let text = Self.text(url) { read(url.lastPathComponent, text) }
+    }
+
+    /// A key file's text; nil for anything over 64 KB or not text.
+    static func text(_ url: URL) -> String? {
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 64 << 10 else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 }
 
