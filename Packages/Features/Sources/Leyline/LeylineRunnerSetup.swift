@@ -62,7 +62,7 @@ extension LeylineModel {
         hosts.map {
             RunnerHostChoice(
                 id: $0.id, name: $0.name, detail: [$0.os, $0.login].compactMap { $0 }.joined(separator: " · "),
-                isRunner: $0.runnerDevice != nil)
+                isRunner: $0.runnerDevice != nil || runner(of: $0) != nil)
         }
     }
 
@@ -72,4 +72,35 @@ extension LeylineModel {
 
     /// Opens Leyline's Add Host sheet, for "Add a host" inside Add runner.
     public func presentAddHost() { HostDialogs.openAdd(self, login: "") }
+}
+
+/// A paired runner, as the host page asks "is this host one?": its device id, name and whether it is connected.
+public struct RunnerSummary: Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let online: Bool
+    public init(id: String, name: String, online: Bool) {
+        self.id = id
+        self.name = name
+        self.online = online
+    }
+}
+
+extension LeylineModel {
+    /// The runner this host is: its `runner_device` when the Core linked them, else a runner named like the host's address
+    /// (its first label for a DNS name), else like the host. The Core reports no runner hostname or IP, and has no route to
+    /// link a host to a runner made apart from it, so a name is all there is to match on.
+    /// ponytail: name match only; match by address once the runner list carries one.
+    nonisolated static func runner(of h: HostItem, in runners: [RunnerSummary]) -> RunnerSummary? {
+        if let d = h.runnerDevice { return runners.first { $0.id == d } }
+        func norm(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
+        let isIP = h.address.allSatisfy { $0.isNumber || $0 == "." || $0 == ":" }
+        let label = isIP ? h.address : String(h.address.split(separator: ".").first ?? "")
+        for want in [h.address, label, h.name].map(norm) where !want.isEmpty {
+            if let r = runners.first(where: { norm($0.name) == want }) { return r }
+        }
+        return nil
+    }
+
+    func runner(of h: HostItem) -> RunnerSummary? { Self.runner(of: h, in: runners?() ?? []) }
 }

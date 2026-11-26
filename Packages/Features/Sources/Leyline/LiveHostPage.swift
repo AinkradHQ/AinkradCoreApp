@@ -32,6 +32,23 @@ extension LiveLeylineService {
         try await call("GET", "/commands", as: [CommandWire].self).map(\.item)
     }
 
+    func createCommand(name: String, step: String, readOnly: Bool, confirm: Bool) async throws -> PresetCommand {
+        struct Body: Encodable {
+            let name: String
+            let steps: [String]
+            let readOnly: Bool
+            let confirm: Bool
+            enum CodingKeys: String, CodingKey {
+                case name, steps, confirm
+                case readOnly = "read_only"
+            }
+        }
+        return try await call(
+            "POST", "/commands", Body(name: name, steps: [step], readOnly: readOnly, confirm: confirm),
+            as: CommandWire.self
+        ).item
+    }
+
     func runCommand(_ command: String, host: String, confirmed: Bool) async throws -> String {
         struct Body: Encodable {
             let host: String
@@ -138,6 +155,10 @@ extension LiveLeylineService {
 
     func trustHostKey(host: String, fingerprint: String) async throws {
         _ = try await raw("POST", "/hosts/\(Self.seg(host))/host-keys/trust", ["fingerprint": fingerprint])
+    }
+
+    func replaceHostKey(host: String, fingerprint: String) async throws {
+        _ = try await raw("POST", "/hosts/\(Self.seg(host))/host-keys/replace", ["fingerprint": fingerprint])
     }
 
     func checkHost(address: String, port: Int) async throws -> HostCheck {

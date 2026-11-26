@@ -103,9 +103,9 @@ struct AddHostWizard: View {
         VStack(alignment: .leading, spacing: Space.s3) {
             head("Which server?", "Paste a whole ssh user@host -p 22 into any field and the rest fills in.")
             HStack(alignment: .top, spacing: Space.s3) {
-                serverField(.user, "User", "deploy", f.user).frame(maxWidth: .infinity)
-                serverField(.host, "Host or IP", "203.0.113.10", f.host)
-                    .frame(minWidth: Space.s8 * 8, maxWidth: .infinity).layoutPriority(1)
+                // Fixed User and Port, Host takes the rest: a layout priority on Host squeezed User to a sliver.
+                serverField(.user, "User", "deploy", f.user).frame(width: Space.s8 * 5)
+                serverField(.host, "Host or IP", "203.0.113.10", f.host).frame(maxWidth: .infinity)
                     .accessibilityIdentifier("add-host-field")
                 serverField(.port, "Port", "22", f.port).frame(width: Space.s8 * 3)
             }
@@ -281,7 +281,10 @@ struct AddHostWizard: View {
                 .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.primary)
                 .accessibilityIdentifier("add-host-open-terminal")
             } else if let failure = f.failure {
-                Button("Try Again") { set { $0.resetCheck() } }.buttonStyle(CoreButtonStyle(.plain))
+                Button("Try Again") {
+                    set { $0.resetCheck() }
+                    Task { await model.runAddCheck() }
+                }.buttonStyle(CoreButtonStyle(.plain))
                     .keyboardShortcut("r", modifiers: .command).environment(\.coreKeycap, "⌘R")
                 Button(AddHostFlow.fix(for: failure).title) { set { $0.applyFix() } }
                     .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.primary)
@@ -314,13 +317,17 @@ extension LeylineModel {
     /// Reach → (seal the imported key) → save → the host key. Nothing is saved until the host answers; a host behind a jump
     /// host is not reachable from the Core alone, so its reach is taken on trust and the first terminal proves it.
     func runAddCheck() async {
-        guard let service, let f = wizard, f.made == nil else { return }
+        // Once per Check / Try Again, never while typing: the Core takes a few checks a minute, each behind Touch ID.
+        guard let service, let f = wizard, f.made == nil, f.reach != .running else { return }
         clearWriteError()
         wizard?.failure = nil
         wizard?.reach = .running
         if f.jump == nil, let port = f.portNumber {
             do {
-                let c = try await service.checkHost(address: f.host, port: port)
+                // Through the Touch ID helper like every other Leyline action: the Core asks for proof here.
+                let c = try await host.elevated("Check and add \(f.host).", done: "checked", keepsEdit: true) {
+                    try await service.checkHost(address: f.host, port: port)
+                }
                 guard c.ok else {
                     let why = c.reason ?? "it did not answer"
                     wizard?.reach = .failed(why.prefix(1).uppercased() + why.dropFirst())
@@ -330,6 +337,10 @@ extension LeylineModel {
                 wizard?.reach = .done(c.ms.map { "\($0) ms" })
             } catch let e as LeylineFailure where e.isMissing {
                 wizard?.reach = .done(nil)  // an older Core cannot check before saving
+            } catch is AdminDeclined {
+                wizard?.reach = .failed("Adding a server needs Touch ID. Try again and confirm it.")
+                wizard?.failure = .reach
+                return
             } catch {
                 wizard?.reach = .failed(words(error))
                 wizard?.failure = .reach
@@ -344,15 +355,19 @@ extension LeylineModel {
         case .saved(let id): keyID = id
         case .importing:
             wizard?.signIn = .running
+            // A name another key already has gets a free one ("deploy-2"): the Core refuses a taken name.
+            let name = AddHostFlow.freeName(f.importName, taken: Set(keys.map(\.name)))
             do {
                 let k = try await host.elevated(
-                    "Import the key \(f.importName) into the Core.", done: "imported", keepsEdit: true
+                    "Import the key \(name) into the Core.", done: "imported", keepsEdit: true
                 ) {
                     try await service.importKey(
-                        name: f.importName, privateKey: f.keyText, passphrase: f.passphrase.isEmpty ? nil : f.passphrase
+                        name: name, privateKey: f.keyText, passphrase: f.passphrase.isEmpty ? nil : f.passphrase
                     )
                 }
                 keyID = k.id
+                // The key is in the Core's list now, for this and later hosts: a retry uses it, never imports it twice.
+                wizard?.key = .saved(k.id)
             } catch is AdminDeclined {
                 wizard?.signIn = .failed("The key needs Touch ID to be sealed in the Core.")
                 wizard?.failure = .key

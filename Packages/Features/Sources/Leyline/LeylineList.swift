@@ -25,7 +25,7 @@ struct HostList: View {
                         }
                     }
                 }
-                .padding(.leading, Space.s5).padding(.trailing, HostPeek.width + Space.s8 + Space.s2)
+                .padding(.leading, Space.s4).padding(.trailing, HostPeek.width + Space.s8 + Space.s1)
                 .padding(.bottom, Space.s4)
             }
             .scrollIndicators(.never)

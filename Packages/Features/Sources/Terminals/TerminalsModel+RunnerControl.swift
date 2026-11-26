@@ -159,6 +159,11 @@ public struct RunnerProgress: Equatable, Sendable {
 }
 
 extension TerminalsModel {
+    /// The paired runners, without the Core's built-in one: Leyline tells from them which host already runs one.
+    public var pairedRunners: [(id: String, name: String, online: Bool)] {
+        runners.filter { !$0.builtIn }.map { ($0.id, $0.name, $0.online) }
+    }
+
     /// The runner by device id or by name; nil until the Core lists it.
     public func runnerProgress(id: String? = nil, name: String? = nil) -> RunnerProgress? {
         guard let r = runners.first(where: { ($0.id == id && id != nil) || ($0.name == name && name != nil) }) else {

@@ -116,6 +116,8 @@ struct CommandRun: Equatable, Sendable {
     var durationMS: Int?
     /// Each step's command line and output, redacted by the Core, at most 64 KB.
     var output: String?
+    /// When this Mac started it (the Core's run has its own times; this is for "2 min ago" on the card).
+    var startedAt: Date?
     var finished: Bool { state != .running && state != .queued && state != .needsApproval }
 }
 

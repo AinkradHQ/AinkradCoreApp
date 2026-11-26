@@ -143,59 +143,38 @@ enum LeylineLoad: Equatable {
     case absent
 }
 
-/// The two pages of the gallery's top bar. TODO(Y9-04): Fleet.
-enum LeylinePage: String, CaseIterable, Identifiable {
-    case hosts, keys
-    var id: String { rawValue }
-    var title: String { self == .hosts ? "Hosts" : "Keys" }
-}
-
-/// The tabs of a host's view. Commands has no tab: it opens from More.
+/// Where a host's page is: the overview (health, pre-set commands, history), or the terminal or the files over the whole pane.
+/// Access is not a place: it is the slide-over panel on top of the page (`LeylineModel.accessOpen`).
 enum HostSection: String, CaseIterable, Identifiable {
-    case terminal, files, history, access, commands
+    case overview, terminal, files, access
     var id: String { rawValue }
-    static let tabs: [HostSection] = [.terminal, .files, .history, .access]
     var title: String {
         switch self {
+        case .overview: "Overview"
         case .terminal: "Terminal"
         case .files: "Files"
-        case .commands: "Commands"
-        case .history: "History"
         case .access: "Access"
         }
     }
     var symbol: String {
         switch self {
+        case .overview: "gauge.with.dots.needle.33percent"
         case .terminal: "terminal"
         case .files: "folder"
-        case .commands: "chevron.right.2"
-        case .history: "clock"
         case .access: "lock"
         }
     }
-    /// ⌘1, ⌘2, ⌘3 and ⌘, (Access is where a host's settings are).
-    var key: Character? {
+    /// ⌘1 terminal, ⌘2 files, ⌘3 the overview, ⌘, access (where a host's settings are).
+    var key: Character {
         switch self {
         case .terminal: "1"
         case .files: "2"
-        case .history: "3"
+        case .overview: "3"
         case .access: ","
-        case .commands: nil
         }
     }
-    var keyWord: String { key.map { "⌘\($0)" } ?? "" }
-    static func forKey(_ c: Character) -> HostSection? { tabs.first { $0.key == c } }
-
-    /// What a page says while it has nothing to show.
-    var empty: (title: String, line: String) {
-        switch self {
-        case .terminal: ("Terminal", "No terminal is open on this host.")
-        case .files: ("Files", "Browse the host over SFTP, drag files in to upload and out to download.")
-        case .commands: ("Pre-set commands", "No commands yet. Add the ones you run often; AI follows the same rules.")
-        case .history: ("History", "Nothing has run on this host yet. Everything you and AI do is listed here.")
-        case .access: ("Access", "")
-        }
-    }
+    var keyWord: String { "⌘\(key)" }
+    static func forKey(_ c: Character) -> HostSection? { allCases.first { $0.key == c } }
 }
 
 /// A group of the gallery: a project or group name and its hosts. Hosts with no group fall under "Shared".

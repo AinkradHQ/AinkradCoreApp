@@ -52,13 +52,16 @@ public struct EmbeddedTerminal: View {
 public struct AttachedTerminal: View {
     let model: TerminalsModel
     let terminal: String
+    /// Called with the exit code once the shell ended (at once when it had ended before the attach).
+    var onExit: (@MainActor (Int32) -> Void)?
     @State private var session: TerminalSession?
     @State private var missing = false
     @Environment(\.corePalette) private var palette
 
-    public init(model: TerminalsModel, terminal: String) {
+    public init(model: TerminalsModel, terminal: String, onExit: (@MainActor (Int32) -> Void)? = nil) {
         self.model = model
         self.terminal = terminal
+        self.onExit = onExit
     }
 
     public var body: some View {
@@ -75,5 +78,6 @@ public struct AttachedTerminal: View {
             session = await model.embed(existing: terminal)
             missing = session == nil
         }
+        .onChange(of: session?.item.exitCode, initial: true) { _, code in if let code { onExit?(code) } }
     }
 }
