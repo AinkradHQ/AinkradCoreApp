@@ -130,28 +130,31 @@ struct LoreOpenView: View {
                 Label("Export…", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(CoreButtonStyle(.secondary))
+            .loreKey(LoreKeys.export)
             .disabled(finder.exporting)
             .help(
                 finder.project.isEmpty
-                    ? "Save every note as a zip of Markdown files"
-                    : "Save this project's notes as a zip of Markdown files")
+                    ? "Save every note as a zip of Markdown files  ⇧⌘E"
+                    : "Save this project's notes as a zip of Markdown files  ⇧⌘E")
             Button {
                 finder.importNotes()
             } label: {
                 Label("Import…", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(CoreButtonStyle(.secondary))
+            .loreKey(LoreKeys.importNotes)
             .disabled(!LoreImport.supports(finder.lore.service))
-            .help("Bring in notes from a project's repo or from Markdown files")
+            .help("Bring in notes from a project's repo or from Markdown files  ⇧⌘I")
             Spacer(minLength: Space.s3)
             Button("Close") { finder.lore.host.shell.closeDialog() }
                 .buttonStyle(CoreButtonStyle(.secondary)).coreShortcut(.cancel)
             Button("New Note (advanced)…") { finder.advancedNew() }
                 .buttonStyle(CoreButtonStyle(.secondary))
-                .help("Choose the project and tags of a new note")
+                .loreKey(LoreKeys.advancedNew)
+                .help(LoreKeys.advancedNew.help)
             Button("New Note") { finder.quickNew() }
-                .buttonStyle(CoreButtonStyle(.prominent))
-                .help("A blank note in this project, or personal")
+                .buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(.command)
+                .help("A blank note in this project, or personal  ⌘↵")
         }
     }
 }

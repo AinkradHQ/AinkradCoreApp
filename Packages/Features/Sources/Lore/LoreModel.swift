@@ -57,7 +57,7 @@ public final class LoreModel {
     private(set) var backlinks: [LoreBacklink] = []
     var projectNames: [String: String] = [:]
 
-    // Sidebars (E10-1). Both open by default; ⌘. hides both (focus), ⌘[ the left, ⌘] the right.
+    // Sidebars (E10-1). Both open by default; ⌘. hides both (focus), ⌘1 the left, ⌘2 the right.
     var showLeft = LoreSidebarPrefs.read("left") { didSet { LoreSidebarPrefs.write("left", showLeft) } }
     var showRight = LoreSidebarPrefs.read("right") { didSet { LoreSidebarPrefs.write("right", showRight) } }
     /// Every live note without its text, newest change first (the tree, recents, project counts).

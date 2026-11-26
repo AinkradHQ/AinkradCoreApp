@@ -3,11 +3,14 @@ import LoreEditor
 import Shell
 import SwiftUI
 
-/// The Lore space: a slim top bar island and the page island over the wallpaper. The pane draws no background of its
-/// own (`own: true`), like the Projects and Leyline spaces. Opens on today's note with the cursor ready (L1).
+/// The Lore space: the top bar, the note list, the page and the outline as cards on the pane's surface, which follows
+/// the Look (transparency and blur) like Accounts, Connections and Leyline. Opens on today's note with the cursor ready
+/// (L1). Every action has a key (`LoreKeys`); the key line along the bottom names them.
 struct LoreView: View {
     let model: LoreModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var listFocus: Bool
+    @FocusState private var outlineFocus: Bool
 
     var body: some View {
         VStack(spacing: Space.s2) {
@@ -19,24 +22,31 @@ struct LoreView: View {
             }
             HStack(spacing: Space.s2) {
                 if model.showLeft {
-                    LoreLeftSidebar(model: model).frame(width: Self.leftWidth).coreWell(radius: Radius.pane)
+                    LoreLeftSidebar(model: model, focus: $listFocus).frame(width: Self.leftWidth)
+                        .coreWell(radius: Radius.pane)
                         .transition(.opacity)
                 }
-                content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The page is capped and centred: on a wide window the room left goes to the margins beside it.
+                content.frame(maxWidth: Self.paneWidth, maxHeight: .infinity).frame(maxWidth: .infinity)
                 if model.showRight {
-                    LoreRightSidebar(model: model).frame(width: Self.rightWidth).coreWell(radius: Radius.pane)
+                    LoreRightSidebar(model: model, focus: $outlineFocus).frame(width: Self.rightWidth)
+                        .coreWell(radius: Radius.pane)
                         .transition(.opacity)
                 }
             }
             // Reduce Motion: the sidebars simply appear.
             .animation(reduceMotion ? nil : Motion.out(Motion.ui), value: model.showLeft)
             .animation(reduceMotion ? nil : Motion.out(Motion.ui), value: model.showRight)
+            LoreKeyLine()
         }
-        .padding(Space.s2)
+        .padding([.horizontal, .top], Space.s2)
+        .background { keys }
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
         .animation(Motion.out(Motion.ui), value: model.notice)
-        .appLook(AppLookPrefs.shared("lore"))
+        // The pane's surface follows the Look (Settings, Appearance, or Lore's own): transparency and blur.
+        .paneLook(AppLookPrefs.shared("lore").look)
+        .appLookTheme(AppLookPrefs.shared("lore"))
         .onAppear {
             model.editor?.setTextScale(LoreOptions.scale(LoreOptions.options.string(LoreOptions.textSize, "medium")))
         }
@@ -62,10 +72,35 @@ struct LoreView: View {
         }
     }
 
-    /// The page's widest text column. It was 768; the page now takes the room the sidebars leave (E10-1).
+    /// The widest bar over the page (the AI banner, the table tools). The text column itself is the editor's measure,
+    /// centred inside a scroll view that spans the whole page, so its scroller sits at the page's right edge.
     static let pageWidth = Space.s8 * 28
-    static let leftWidth = Space.s8 * 7.5
-    static let rightWidth = Space.s8 * 8
+    /// The page pane's widest (Ahmed, 2026-11-26: "reduce the editor pane's width"); the editor's text column and its
+    /// side insets fit inside it.
+    static let paneWidth = Space.s8 * 30
+    /// The sidebars took a little more of the room too.
+    static let leftWidth = Space.s8 * 8.5
+    static let rightWidth = Space.s8 * 9
+
+    /// The keys without a control of their own on screen. Hidden buttons, so the menu bar's keys still come first.
+    private var keys: some View {
+        Group {
+            Button(LoreKeys.find.title) {
+                model.showLeft = true
+                listFocus = true
+            }
+            .loreKey(LoreKeys.find)
+            Button(LoreKeys.outline.title) {
+                model.showRight = true
+                outlineFocus = true
+            }
+            .loreKey(LoreKeys.outline)
+            Button(LoreKeys.focus.title) { model.toggleFocus() }.loreKey(LoreKeys.focus)
+            Button(LoreKeys.save.title) { Task { await model.save() } }.loreKey(LoreKeys.save)
+                .disabled(model.load != .ready)
+        }
+        .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
+    }
 
     @ViewBuilder private var content: some View {
         switch model.load {
@@ -94,22 +129,27 @@ private struct LorePageIsland: View {
     let model: LoreModel
 
     var body: some View {
-        VStack(spacing: Space.s2) {
-            if let doc = model.openDoc { LoreAIBanner(model: model, doc: doc) }
-            if model.hasTable { LoreTableBar(model: model) }
-            Group {
-                if let editor = model.editor {
-                    LoreEditor(editor)
-                        .opacity(model.load == .ready ? 1 : 0)
-                        .onAppear { model.ready() }
-                        .onChange(of: model.load) { if model.load == .ready { model.ready() } }
+        VStack(spacing: 0) {
+            if model.openDoc != nil || model.hasTable {
+                VStack(spacing: Space.s2) {
+                    if let doc = model.openDoc { LoreAIBanner(model: model, doc: doc) }
+                    if model.hasTable { LoreTableBar(model: model) }
                 }
+                .padding(.horizontal, Space.s6).padding(.top, Space.s5)
             }
-            .frame(maxWidth: LoreView.pageWidth)
+            // Full width: the editor centres its text column with insets, so the scroller sits at the page's edge.
+            if let editor = model.editor {
+                LoreEditor(editor)
+                    .opacity(model.load == .ready ? 1 : 0)
+                    .onAppear { model.ready() }
+                    .onChange(of: model.load) { if model.load == .ready { model.ready() } }
+            }
         }
-        .padding(.horizontal, Space.s6).padding(.vertical, Space.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .coreFrame(radius: Radius.pane)
+        // The page sits on the pane's Look surface (transparency and blur) with only a faint lift, lighter than the
+        // sidebar cards, so the wallpaper shows through as much as the Look allows. No outline.
+        .background(GlassInk.lift(0.04), in: coreShape(Radius.pane))
+        .clipShape(coreShape(Radius.pane))
         .accessibilityLabel(model.title)
         .accessibilityIdentifier("lore-page")
     }
@@ -118,32 +158,36 @@ private struct LorePageIsland: View {
 /// Long date (or the note's title), ‹ › days, Today, the project chip; the save state, Open… ⌘O and New ⌘N.
 private struct LoreTopBar: View {
     let model: LoreModel
+    @State private var projectOpen = false
 
     var body: some View {
         AppHeader {
-            CoreIconButton(symbol: "chevron.left", label: "Show the day before  ⌥⌘[") { model.step(-1) }
-                .keyboardShortcut("[", modifiers: [.command, .option])
-            CoreIconButton(symbol: "chevron.right", label: "Show the next day  ⌥⌘]") { model.step(1) }
-                .keyboardShortcut("]", modifiers: [.command, .option])
+            CoreIconButton(symbol: "chevron.left", label: LoreKeys.dayBefore.help) { model.step(-1) }
+                .loreKey(LoreKeys.dayBefore)
+            CoreIconButton(symbol: "chevron.right", label: LoreKeys.nextDay.help) { model.step(1) }
+                .loreKey(LoreKeys.nextDay)
             Text(model.title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 .help(model.title)
                 .accessibilityAddTraits(.isHeader)
             Button("Today") { Task { await model.openDay(model.todayKey) } }
                 .buttonStyle(CoreButtonStyle(.secondary))
+                .loreKey(LoreKeys.today)
                 .disabled(model.isToday || model.service == nil)
-                .help("Go to today's note")
-            LoreProjectChip(model: model)
+                .help(LoreKeys.today.help)
+            LoreProjectChip(model: model, open: $projectOpen)
+            Button(LoreKeys.project.title) { projectOpen.toggle() }.loreKey(LoreKeys.project)
+                .disabled(model.note?.kind != "note")
+                .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
         } actions: {
             Text(model.syncWords).foregroundStyle(GlassInk.secondary).accessibilityIdentifier("lore-sync")
-            CoreIconButton(symbol: "sidebar.left", label: "Hide the left sidebar  ⌘[") { model.showLeft.toggle() }
-                .keyboardShortcut("[", modifiers: .command)
-            CoreIconButton(symbol: "sidebar.right", label: "Hide the right sidebar  ⌘]") { model.showRight.toggle() }
-                .keyboardShortcut("]", modifiers: .command)
-            Button("Focus") { model.toggleFocus() }.keyboardShortcut(".", modifiers: .command).hidden()
-                .frame(width: 0, height: 0).accessibilityHidden(true)
-            CoreIconButton(symbol: "clock.arrow.circlepath", label: "Show earlier versions of this note") {
+            CoreIconButton(symbol: "sidebar.left", label: LoreKeys.left.help) { model.showLeft.toggle() }
+                .loreKey(LoreKeys.left)
+            CoreIconButton(symbol: "sidebar.right", label: LoreKeys.right.help) { model.showRight.toggle() }
+                .loreKey(LoreKeys.right)
+            CoreIconButton(symbol: "clock.arrow.circlepath", label: LoreKeys.versions.help) {
                 model.showVersions()
             }
+            .loreKey(LoreKeys.versions)
             .disabled(model.note == nil || model.load != .ready)
             Button {
                 LoreOpenSheet.open(model)
@@ -151,15 +195,17 @@ private struct LoreTopBar: View {
                 Label("Open…", systemImage: "magnifyingglass")
             }
             .buttonStyle(CoreButtonStyle(.secondary))
-            .keyboardShortcut("o", modifiers: .command)
+            .loreKey(LoreKeys.open)
             .disabled(model.service == nil)
-            .help("Find a note  ⌘O")
+            .help(LoreKeys.open.help)
+            // ⌘N is the shell's New (File menu), which runs this pane's `onNew`; the keycap shows it here.
             Button {
                 Task { await model.newNote() }
             } label: {
                 Label("New", systemImage: "plus")
             }
             .buttonStyle(CoreButtonStyle(.prominent))
+            .environment(\.coreKeycap, LoreKeys.new.label)
             .disabled(model.load != .ready)
             .help("A blank note in this project, or personal  ⌘N")
             .accessibilityIdentifier("lore-new")

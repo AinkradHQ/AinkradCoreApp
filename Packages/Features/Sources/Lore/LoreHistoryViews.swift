@@ -39,20 +39,22 @@ struct LoreBacklinksIsland: View {
 /// The project chip: Personal, or one of the projects. A daily note is always personal, so its chip does not open.
 struct LoreProjectChip: View {
     let model: LoreModel
+    /// ⇧⌘P opens it.
+    @Binding var open: Bool
     @Environment(\.corePalette) private var palette
 
     var body: some View {
         let personal = model.note?.project == nil
         let chip = AppStatChip(personal ? "person" : "folder", model.projectName, palette.text2)
         if model.note?.kind == "note" {
-            CoreDropdown(items: items) {
+            CoreDropdown(items: items, isPresented: $open) {
                 HStack(spacing: Space.s1) {
                     chip
                     Image(systemName: "chevron.up.chevron.down").coreFont(size: MacTextSize.meta, weight: .semibold)
                         .foregroundStyle(palette.text2).accessibilityHidden(true)
                 }
             }
-            .help("Move this note to a project, or keep it personal")
+            .help("Move this note to a project, or keep it personal  \(LoreKeys.project.label)")
             .accessibilityLabel("Project: \(model.projectName)")
         } else {
             chip.help("Daily notes are personal").accessibilityLabel("Project: \(model.projectName)")
