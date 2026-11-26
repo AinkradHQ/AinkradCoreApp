@@ -3,60 +3,208 @@ import Projects
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The layers panel (V3-04): the page's nodes as a tree, front layer first. Click selects, double-click (or the menu) renames,
-/// the eye hides, and a drag reorders, nests or un-nests. Everything it does is an edit op; the keyboard and VoiceOver reorder
-/// with Move Forward / Move Backward in the row's menu.
+/// The layers panel (V3-04), compact like Figma's: one slim row per layer with its kind's icon, thin guides for nesting,
+/// a chevron only where there is something inside. Click selects, double-click (or Return) renames, the eye (shown on
+/// hover, or always for a hidden layer) hides, and a drag reorders, nests or un-nests. With the panel focused the keys
+/// move: ↑ ↓ the next layer, → open, ← close (or go to the parent), Return rename, Delete delete. Find narrows the list to
+/// matching names and their parents. Everything is an edit op; VoiceOver reorders with Move Forward / Move Backward.
 struct LayersIsland: View {
-    let editor: DesignEditor
+    @Bindable var editor: DesignEditor
+    @State private var find = ""
+    @State private var finding = false
+    @FocusState private var findFocus: Bool
+    @FocusState private var listFocus: Bool
+
+    private var rows: [LayerRow] {
+        let q = find.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return editor.layers.rows(expanded: editor.expanded) }
+        // Every layer open, then only the matches and the layers they sit in.
+        let all = editor.layers.rows(expanded: Set(editor.layers.layers.map(\.id)))
+        let hits = Set(all.filter { $0.layer.title.lowercased().contains(q) }.map(\.id))
+        let keep = hits.union(hits.flatMap { editor.layers.ancestors(of: $0) })
+        return all.filter { keep.contains($0.id) }
+    }
 
     var body: some View {
-        let rows = editor.layers.rows(expanded: editor.expanded)
-        Island("Layers", sub: editor.layers.layers.isEmpty ? nil : "\(editor.layers.layers.count)") {
-            if rows.isEmpty {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text("No layers").coreFont(size: MacTextSize.body, weight: .semibold)
-                    Text(
-                        editor.attached
-                            ? "Draw on the canvas, or ask the AI to." : "Layers show once the canvas is open."
-                    )
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, Space.s2)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: Space.s1) {
-                        ForEach(rows) {
-                            LayerRowView(editor: editor, row: $0).lineLimit(1)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
+        let rows = rows
+        let shapes = editor.layers.layers.filter { $0.type != "page" }.count
+        Island(
+            title: "Layers", sub: shapes == 0 ? nil : "\(shapes)",
+            accessory: {
+                HStack(spacing: 2) {
+                    CoreIconButton(symbol: "magnifyingglass", label: "Find a layer", selected: finding) {
+                        withAnimation(Motion.out(Motion.ui)) { finding.toggle() }
+                        if finding { findFocus = true } else { find = "" }
+                    }
+                    CoreIconButton(symbol: "rectangle.compress.vertical", label: "Close every group") {
+                        withAnimation(Motion.out(Motion.ui)) {
+                            editor.expanded = Set(editor.layers.children(of: nil).map(\.id))
                         }
                     }
-                    .animation(Motion.out(Motion.ui), value: rows.map(\.id))
                 }
-                .scrollIndicators(.automatic)
+            }
+        ) {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                if finding {
+                    HStack(spacing: Space.s2) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary).accessibilityHidden(
+                            true)
+                        TextField("", text: $find, prompt: Text("Find a layer").foregroundStyle(GlassInk.secondary))
+                            .textFieldStyle(.plain).focused($findFocus)
+                            .onExitCommand {
+                                find = ""
+                                withAnimation(Motion.out(Motion.ui)) { finding = false }
+                            }
+                    }
+                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd + 2)
+                    .coreFieldSurface(focused: findFocus)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                if shapes == 0 {
+                    empty
+                } else if rows.isEmpty {
+                    Text("No layer is called “\(find)”.").foregroundStyle(GlassInk.secondary)
+                        .padding(.top, Space.s1)
+                } else {
+                    ScrollViewReader { reader in
+                        ScrollView {
+                            LazyVStack(spacing: 1) {
+                                ForEach(rows) {
+                                    LayerRowView(editor: editor, row: $0).lineLimit(1).id($0.id)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+                            }
+                            .animation(Motion.out(Motion.ui), value: rows.map(\.id))
+                        }
+                        .scrollIndicators(.never)
+                        .onChange(of: editor.selection) { _, sel in
+                            if let id = sel.first { withAnimation(Motion.out(Motion.ui)) { reader.scrollTo(id) } }
+                        }
+                    }
+                    .focusable().focused($listFocus).focusEffectDisabled()
+                    .onKeyPress(phases: .down) { key($0, rows) }
+                }
             }
         }
         .accessibilityIdentifier("design-layers")
+    }
+
+    /// Nothing drawn yet: how to start, with the keys.
+    private var empty: some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            Text(editor.attached ? "Nothing on this page yet" : "Layers show once the canvas is open")
+                .coreFont(size: MacTextSize.body, weight: .semibold)
+            if editor.attached {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    hint("F", "Draw a frame")
+                    hint("R", "Draw a rectangle")
+                    hint("T", "Write text")
+                    hint("P", "Draw with the pen")
+                }
+                Text("Or describe it in the Ask field below and AI draws it.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, Space.s1)
+    }
+
+    private func hint(_ key: String, _ what: String) -> some View {
+        HStack(spacing: Space.s2) {
+            CoreKeycap(key)
+            Text(what).foregroundStyle(GlassInk.secondary)
+        }
+    }
+
+    /// The list's keys (only while the list has focus).
+    private func key(_ press: KeyPress, _ rows: [LayerRow]) -> KeyPress.Result {
+        guard editor.renaming == nil else { return .ignored }
+        let ids = rows.map(\.id)
+        let at = editor.selection.first.flatMap(ids.firstIndex(of:))
+        let current = at.map { rows[$0] }
+        switch press.key {
+        case .downArrow, .upArrow:
+            let step = press.key == .downArrow ? 1 : -1
+            let next = at.map { min(max($0 + step, 0), ids.count - 1) } ?? 0
+            if ids.indices.contains(next) { editor.select(ids[next], quiet: true) }
+        case .rightArrow:
+            guard let r = current, r.hasChildren else { return .ignored }
+            withAnimation(Motion.out(Motion.ui)) { _ = editor.expanded.insert(r.id) }
+        case .leftArrow:
+            guard let r = current else { return .ignored }
+            if r.hasChildren, r.expanded {
+                withAnimation(Motion.out(Motion.ui)) { _ = editor.expanded.remove(r.id) }
+            } else if let p = r.layer.parent {
+                editor.select(p, quiet: true)
+            }
+        case .return:
+            guard let r = current, r.layer.type != "page" else { return .ignored }
+            editor.renaming = r.id
+        case .delete, .deleteForward:
+            guard let r = current else { return .ignored }
+            editor.delete(r.id)
+        default: return .ignored
+        }
+        return .handled
     }
 }
 
 private struct LayerRowView: View {
     @Environment(\.coreAccent) private var paneAccent
+    @Environment(\.corePalette) private var palette
     let editor: DesignEditor
     let row: LayerRow
-    @State private var height: CGFloat = MacSize.controlLg
+    @State private var height: CGFloat = 28
     @State private var hint: LayerDrop?
     @State private var draft = ""
+    @State private var hovering = false
     @FocusState private var focused: Bool
     private var layer: DesignLayer { row.layer }
     private var selected: Bool { editor.selection.contains(layer.id) }
+    private var page: Bool { layer.type == "page" }
+    static let indent: CGFloat = 14
 
     var body: some View {
-        HStack(spacing: Space.s1) {
-            Color.clear.frame(width: CGFloat(row.depth) * Space.s4, height: 1)
+        HStack(spacing: 4) {
+            guides
             chevron
-            if editor.renaming == layer.id { renameField } else { rowBody }
+            Image(systemName: icon).coreFont(size: 12, weight: .medium)
+                .foregroundStyle(selected ? GlassInk.primary : GlassInk.secondary)
+                .frame(width: 16).accessibilityHidden(true)
+            if editor.renaming == layer.id {
+                renameField
+            } else {
+                Text(layer.title).coreFont(
+                    size: MacTextSize.body, weight: page || row.depth == 1 ? .semibold : .regular
+                )
+                .foregroundStyle(GlassInk.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !page, hovering || layer.hidden {
+                Button {
+                    editor.setHidden(layer.id, !layer.hidden)
+                } label: {
+                    Image(systemName: layer.hidden ? "eye.slash" : "eye").coreFont(size: 11)
+                        .foregroundStyle(GlassInk.secondary).frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(layer.hidden ? "Show Layer" : "Hide Layer")
+                .accessibilityLabel(layer.hidden ? "Show Layer" : "Hide Layer")
+                .transition(.opacity)
+            }
         }
+        .padding(.horizontal, Space.s1)
+        .frame(height: 28)
+        .background(
+            selected ? palette.btnPrimary.opacity(0.24) : hovering ? GlassInk.wellHover : .clear,
+            in: coreShape(Radius.control)
+        )
+        .contentShape(coreShape(Radius.control))
         .opacity(layer.hidden ? 0.5 : 1)
+        .onTapGesture(count: 2) { beginRename() }
+        .onTapGesture { editor.select(layer.id) }
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.hover), value: selected)
         .overlay(alignment: .top) { if case .above = hint { bar } }
         .overlay(alignment: .bottom) { if case .below = hint { bar } }
         .background { if case .into = hint { coreShape(Radius.control).fill(GlassInk.wellHover) } }
@@ -69,11 +217,26 @@ private struct LayerRowView: View {
             of: [.plainText], delegate: LayerDropDelegate(editor: editor, layer: layer, height: height, hint: $hint)
         )
         .contextMenu { menu }
+        .help(layer.title)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(layer.title)
         .accessibilityValue(layer.hidden ? "Hidden" : "")
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityAction(named: "Move Forward") { editor.step(layer.id, up: true) }
         .accessibilityAction(named: "Move Backward") { editor.step(layer.id, up: false) }
+    }
+
+    /// Frames read as #, like Figma.
+    private var icon: String { layer.type == "frame" ? "number" : layer.symbol }
+
+    /// One thin line per nesting level, so what sits inside what reads at a glance.
+    private var guides: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<row.depth, id: \.self) { _ in
+                coreShape(0).fill(GlassInk.secondary.opacity(0.18)).frame(width: 1, height: 28)
+                    .frame(width: Self.indent, alignment: .center)
+            }
+        }
     }
 
     private var bar: some View {
@@ -82,34 +245,33 @@ private struct LayerRowView: View {
 
     @ViewBuilder private var chevron: some View {
         if row.hasChildren {
-            CoreIconButton(
-                symbol: row.expanded ? "chevron.down" : "chevron.right", label: row.expanded ? "Collapse" : "Expand"
-            ) {
-                if row.expanded { editor.expanded.remove(layer.id) } else { editor.expanded.insert(layer.id) }
+            Button {
+                withAnimation(Motion.out(Motion.ui)) {
+                    if row.expanded {
+                        _ = editor.expanded.remove(layer.id)
+                    } else {
+                        _ = editor.expanded.insert(layer.id)
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.right").coreFont(size: 9, weight: .bold)
+                    .foregroundStyle(GlassInk.secondary)
+                    .rotationEffect(.degrees(row.expanded ? 90 : 0))
+                    .frame(width: 14, height: 28).contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(row.expanded ? "Collapse" : "Expand")
         } else {
-            Color.clear.frame(width: MacSize.controlMd, height: 1)
+            Color.clear.frame(width: 14, height: 1)
         }
-    }
-
-    private var rowBody: some View {
-        CoreRow(layer.title, symbol: layer.symbol, selected: selected, action: { editor.select(layer.id) }) {
-            if layer.type != "page" {
-                CoreIconButton(
-                    symbol: layer.hidden ? "eye.slash" : "eye", label: layer.hidden ? "Show Layer" : "Hide Layer"
-                ) { editor.setHidden(layer.id, !layer.hidden) }
-            }
-        }
-        .simultaneousGesture(TapGesture(count: 2).onEnded { beginRename() })
-        .help(layer.title)
     }
 
     private var renameField: some View {
         TextField("Layer name", text: $draft)
             .textFieldStyle(.plain)
             .coreFont(size: MacTextSize.body)
-            .padding(.horizontal, Space.s3)
-            .frame(minHeight: MacSize.controlLg)
+            .padding(.horizontal, Space.s1)
+            .frame(height: 22)
             .coreFieldSurface(focused: true)
             .focused($focused)
             .onSubmit { editor.rename(layer.id, to: draft) }
@@ -121,10 +283,10 @@ private struct LayerRowView: View {
             .accessibilityLabel("Layer name")
     }
 
-    private func beginRename() { if layer.type != "page" { editor.renaming = layer.id } }
+    private func beginRename() { if !page { editor.renaming = layer.id } }
 
     @ViewBuilder private var menu: some View {
-        if layer.type != "page" {
+        if !page {
             Button("Rename") { beginRename() }
             Button(layer.hidden ? "Show Layer" : "Hide Layer") { editor.setHidden(layer.id, !layer.hidden) }
             Divider()
