@@ -55,7 +55,7 @@ public final class DesignDemo {
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
-        "ai-directions", "ai-done", "ai-drawing-new",
+        "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
     ]
 
     private let model: DesignModel
@@ -251,7 +251,7 @@ public final class DesignDemo {
         case "absent": model.load = .absent
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
-            "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new",
+            "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
             "tools-probe":
             model.openID = "doc:\(Self.did(1))"
         case "open-system": model.openID = "doc:\(Self.did(8))"
@@ -293,6 +293,15 @@ public final class DesignDemo {
             }
         }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
+        if scene.hasPrefix("present-") {
+            // Present on the real canvas (CORE_DESIGN_SCENE): the scene's frame in a phone, or as a desktop in a browser.
+            try? await Task.sleep(for: .seconds(2))
+            if let item = model.open, case .doc(let d) = item {
+                model.present(d)
+                if scene == "present-phone" { model.presenter?.device = .phone }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
         if scene.hasPrefix("ai-") {
             // The AI panel on the real canvas (CORE_DESIGN_SCENE): new, edit, drawing, directions, done.
             try? await Task.sleep(for: .seconds(2))

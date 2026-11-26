@@ -201,6 +201,8 @@ public protocol DesignEditBackend: AnyObject {
     func camera() -> CanvasCamera?
     /// Moves the camera so the document rect fits the view.
     func fit(_ rect: CGRect)
+    /// Presenting: clicks report the node under them (prototype links) and nothing is edited; nil ends it.
+    func present(_ tap: (@MainActor (String?) -> Void)?)
 }
 
 public struct CanvasCamera: Sendable, Equatable {
@@ -218,5 +220,6 @@ extension DesignEditBackend {
     public var tool: Int { 0 }
     public func setTool(_ tool: Int) {}
     public func camera() -> CanvasCamera? { nil }
+    public func present(_ tap: (@MainActor (String?) -> Void)?) {}
     public func fit(_ rect: CGRect) {}
 }

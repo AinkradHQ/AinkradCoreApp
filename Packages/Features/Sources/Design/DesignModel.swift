@@ -45,6 +45,8 @@ public final class DesignModel {
     var aboutOpen = false
     /// The AI panel over the open design's canvas, or nil.
     var composer: DesignComposer?
+    /// Present (the mockup and prototype view) over the open design, or nil.
+    var presenter: DesignPresenter?
     /// The pictures of loaded assets, by sha256.
     private(set) var images: [String: NSImage] = [:]
     @ObservationIgnored private var fetching: Set<String> = []
@@ -341,6 +343,7 @@ public final class DesignModel {
         editors = [:]
         aboutOpen = false
         composer = nil
+        presenter = nil
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 

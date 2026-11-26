@@ -50,6 +50,12 @@ extension DesignCanvasNSView {
         guard let c = engine.camera(), c.pan.count == 2 else { return nil }
         return (c.zoom, c.pan[0], c.pan[1])
     }
+    /// Presenting on: clicks call `tap` with the node under them (nil: nothing); nil turns editing back on.
+    public func editorPresent(_ tap: ((String?) -> Void)?) {
+        presentTap = tap
+        if tap != nil { de_set_tool(engine.h, UInt32(DE_TOOL_SELECT)) }
+        loop.wake()
+    }
     /// Moves the camera to fit a document rect (animated unless Reduce Motion).
     public func editorFit(_ r: CGRect) {
         de_fit_rect(engine.h, Float(r.minX), Float(r.minY), Float(r.width), Float(r.height), reduceMotion ? 0 : 1)

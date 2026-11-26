@@ -26,6 +26,15 @@ extension DesignModel {
     func key(_ press: KeyPress, find: FocusState<Bool>.Binding) -> KeyPress.Result {
         let cmd = press.modifiers.contains(.command)
         let c = press.characters.lowercased()
+        if let p = presenter {
+            switch press.key {
+            case .escape: p.close()
+            case .leftArrow, .upArrow: p.step(-1)
+            case .rightArrow, .downArrow, .space: p.step(1)
+            default: return .ignored
+            }
+            return .handled
+        }
         if press.key == .escape {
             if aboutOpen {
                 aboutOpen = false
