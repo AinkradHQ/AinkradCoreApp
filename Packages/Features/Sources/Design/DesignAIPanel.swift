@@ -168,12 +168,8 @@ struct DesignAIPanel: View {
                 }
                 .animation(Motion.out(Motion.ui), value: seconds / 4)
             }
-            HStack(spacing: Space.s3) {
-                ForEach(0..<composer.expected, id: \.self) { i in
-                    ShimmerScreen(delay: Double(i) * 0.25, running: !reduce, ink: ink)
-                        .frame(maxWidth: .infinity).frame(height: Space.s8 * 5)
-                }
-            }
+            // The canvas shows the work (CanvasAIOverlay); here only that it is going on.
+            CoreBusyBar()
             HStack {
                 Text("“\(composer.trimmed)”").foregroundStyle(GlassInk.secondary).lineLimit(1)
                 Spacer(minLength: Space.s2)
