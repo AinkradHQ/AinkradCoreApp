@@ -16,6 +16,12 @@ struct EditorStage: View {
             LayersIsland(editor: editor).frame(width: Space.s8 * 9)
             ZStack(alignment: .bottom) {
                 canvas
+                    .overlay {
+                        if let c = model.composer, c.phase == .drawing, !c.busyRects.isEmpty {
+                            CanvasAIOverlay(editor: editor, rects: c.busyRects, editing: c.editing)
+                                .transition(.opacity)
+                        }
+                    }
                     .clipShape(coreShape(Radius.pane))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contextMenu { DesignMenu(model: model, item: item) }

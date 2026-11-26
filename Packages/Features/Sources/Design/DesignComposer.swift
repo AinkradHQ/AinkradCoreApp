@@ -34,6 +34,8 @@ final class DesignComposer {
     private(set) var busy = false
     /// When the current drawing started, for the panel's stages and timer.
     private(set) var startedAt: Date?
+    /// While drawing: the document rects the canvas overlay animates (the frame being redrawn, or where new ones land).
+    private(set) var busyRects: [CGRect] = []
     @ObservationIgnored private weak var model: DesignModel?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var originalText = ""
@@ -64,6 +66,13 @@ final class DesignComposer {
         if originalText.isEmpty { originalText = trimmed }
         task?.cancel()
         startedAt = Date()
+        if let editor = model?.editors[doc] {
+            busyRects =
+                target.flatMap { Self.rect(of: $0.id, in: editor) }.map { [$0] }
+                ?? Self.landing(count: expected, in: editor)
+            // Show the canvas where the work happens.
+            if let all = busyRects.first.map({ busyRects.dropFirst().reduce($0) { $0.union($1) } }) { editor.fit(all) }
+        }
         withAnimation(Motion.out(Motion.ui)) { phase = .drawing }
         task = Task { [weak self] in
             guard let self else { return }
@@ -102,6 +111,11 @@ final class DesignComposer {
     func debugShow(_ s: ComposeState?, phase p: Phase) {
         state = s
         startedAt = Date().addingTimeInterval(-7)
+        if p == .drawing, let editor = model?.editors[doc] {
+            busyRects =
+                target.flatMap { Self.rect(of: $0.id, in: editor) }.map { [$0] }
+                ?? Self.landing(count: expected, in: editor)
+        }
         phase = p
     }
     #endif

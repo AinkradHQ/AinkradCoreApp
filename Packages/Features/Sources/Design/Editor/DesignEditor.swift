@@ -81,6 +81,10 @@ final class DesignEditor {
         return nil
     }
 
+    /// The canvas camera now (not observed: the AI overlay reads it every display frame).
+    func camera() -> CanvasCamera? { backend?.camera() }
+    func fit(_ rect: CGRect) { backend?.fit(rect) }
+
     /// One node as the engine has it now (not observed).
     func node(of id: String) -> EditorNode? { backend?.node(id).flatMap { EditorNode(json: $0) } }
 

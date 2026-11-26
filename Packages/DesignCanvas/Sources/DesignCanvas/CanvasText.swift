@@ -14,6 +14,16 @@ extension Engine {
     }
 
     var textActive: Bool { de_text_active(h) == 1 }
+
+    /// `view = doc × zoom + pan` (`de_camera`).
+    struct Camera: Decodable {
+        let zoom: Double
+        let pan: [Double]
+    }
+    func camera() -> Camera? {
+        guard let d = read({ de_camera(h, $0, $1, $2) }) else { return nil }
+        return try? JSONDecoder().decode(Camera.self, from: d)
+    }
     var tool: Int32 { max(0, de_tool(h)) }
     @discardableResult func setTool(_ t: Int32) -> Bool { de_set_tool(h, UInt32(t)) == DE_OK }
 

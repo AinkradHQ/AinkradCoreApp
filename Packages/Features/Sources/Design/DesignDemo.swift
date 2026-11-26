@@ -55,7 +55,7 @@ public final class DesignDemo {
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
-        "ai-directions", "ai-done",
+        "ai-directions", "ai-done", "ai-drawing-new",
     ]
 
     private let model: DesignModel
@@ -251,7 +251,7 @@ public final class DesignDemo {
         case "absent": model.load = .absent
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
-            "ai-edit", "ai-drawing", "ai-directions", "ai-done",
+            "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new",
             "tools-probe":
             model.openID = "doc:\(Self.did(1))"
         case "open-system": model.openID = "doc:\(Self.did(8))"
@@ -297,10 +297,14 @@ public final class DesignDemo {
             // The AI panel on the real canvas (CORE_DESIGN_SCENE): new, edit, drawing, directions, done.
             try? await Task.sleep(for: .seconds(2))
             let e = model.editors[Self.did(1)]
-            if scene != "ai-new", let frame = e?.layers.layers.first(where: { $0.type == "frame" }) {
+            if scene != "ai-new", scene != "ai-drawing-new",
+                let frame = e?.layers.layers.first(where: { $0.type == "frame" })
+            {
                 e?.select(frame.id)
             }
             await model.drawWithAI()
+            // As a person would: the panel opens, then the drawing starts.
+            try? await Task.sleep(for: .milliseconds(500))
             let c = model.composer
             let three = ComposeState(
                 id: "dc_1", phase: .done, reason: "", session: nil,
@@ -318,6 +322,11 @@ public final class DesignDemo {
             case "ai-drawing":
                 c?.prompt = "Make the button green"
                 c?.debugShow(nil, phase: .drawing)
+            case "ai-drawing-new":
+                c?.target = nil
+                c?.single = false
+                c?.prompt = "A pricing page"
+                c?.debugShow(nil, phase: .drawing)
             case "ai-directions":
                 c?.target = nil
                 c?.single = false
@@ -325,6 +334,7 @@ public final class DesignDemo {
             case "ai-done": c?.debugShow(nil, phase: .done("Desktop is updated."))
             default: break
             }
+
         }
         if scene == "delete" { model.askDelete(.doc(Self.docs()[0])) }
         if scene == "open-design-menu" {

@@ -77,11 +77,10 @@ struct LayersIsland: View {
                             .animation(Motion.out(Motion.ui), value: rows.map(\.id))
                         }
                         .scrollIndicators(.never)
-                        .onChange(of: editor.selection) { _, sel in
-                            if let id = sel.first { withAnimation(Motion.out(Motion.ui)) { reader.scrollTo(id) } }
-                        }
                     }
-                    .focusable().focused($listFocus).focusEffectDisabled()
+                    // Focusable only by a click: focus that wandered in on its own (when the AI panel's field went away) froze
+                    // the window.
+                    .focusable(true, interactions: .activate).focused($listFocus).focusEffectDisabled()
                     .onKeyPress(phases: .down) { key($0, rows) }
                 }
             }

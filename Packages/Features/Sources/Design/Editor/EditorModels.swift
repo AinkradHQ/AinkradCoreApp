@@ -197,6 +197,19 @@ public protocol DesignEditBackend: AnyObject {
     /// The canvas tool (`CanvasTool`); it returns to select by itself after a shape is drawn.
     var tool: Int { get }
     func setTool(_ tool: Int)
+    /// How document points show in the canvas view: `view = doc × zoom + pan`.
+    func camera() -> CanvasCamera?
+    /// Moves the camera so the document rect fits the view.
+    func fit(_ rect: CGRect)
+}
+
+public struct CanvasCamera: Sendable, Equatable {
+    public let zoom: Double
+    public let pan: CGPoint
+    public init(zoom: Double, pan: CGPoint) {
+        self.zoom = zoom
+        self.pan = pan
+    }
 }
 
 extension DesignEditBackend {
@@ -204,4 +217,6 @@ extension DesignEditBackend {
     public var lastEditTooLarge: Bool { false }
     public var tool: Int { 0 }
     public func setTool(_ tool: Int) {}
+    public func camera() -> CanvasCamera? { nil }
+    public func fit(_ rect: CGRect) {}
 }
