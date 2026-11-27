@@ -17,6 +17,7 @@ extension ProjectsModel {
             p.setupChecked = true
         }
         p.stale = isStale
+        p.kind = kind(p)
         var live = p.live ?? ProjectLive()
         let parts = liveParts[p.id]
         if let parts {

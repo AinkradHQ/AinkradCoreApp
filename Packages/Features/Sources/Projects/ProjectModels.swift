@@ -164,6 +164,10 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var stale = false
     /// The colour the Core holds for the project (API 110): one of the accent names; nil when it has none or is older.
     var colourName: String?
+    /// The kind the Core holds (API 111): `web`, `app`, `infra` or `other`; nil from an older Core.
+    var kindName: String?
+    /// What it is, as shown: the Core's kind, else the one chosen on this Mac, else web (set by `ProjectsModel.applying`).
+    var kind = ProjectKind.web
     /// A service of it crashed (`project.service_crashed`) and it has not run again since.
     var crash: ServiceCrash?
 
@@ -224,6 +228,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The state as the design system's badge says it.
     var badge: (label: String, tone: Tone, symbol: String) {
         if archived { return ("Archived", .queue, "archivebox") }
+        if kind == .other { return (kind.short, .queue, kind.symbol) }
         if crash != nil, !stale { return ("Crashed", .fail, "exclamationmark.triangle") }
         if stale, tag == .running || tag == .starting { return ("Status unknown", .queue, "questionmark.circle") }
         return switch tag {
@@ -251,6 +256,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The line under the name: "Running · 5 services · 2 AI sessions".
     var subtitle: String {
         if archived { return "Archived · \(Self.count(repos.count, "repo"))" }
+        if kind == .other { return repos.isEmpty ? "No code · notes and AI sessions" : Self.count(repos.count, "repo") }
         if let crash, !stale { return crash.words }
         if stale, tag == .running || tag == .starting { return "Last seen running · the Core is not answering" }
         if let run {

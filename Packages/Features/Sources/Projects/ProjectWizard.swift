@@ -1,15 +1,16 @@
 import CoreUI
 import SwiftUI
 
-/// The steps of the New Project wizard (D-30): name, code (GitHub first), Brain place, where it runs, review.
+/// The steps of the New Project wizard (D-30): name, code (GitHub first), what it is, Brain place, where it runs, review.
 enum WizardStep: Int, CaseIterable {
     case name = 1
-    case code, brain, runs, review
+    case code, kind, brain, runs, review
 
     var title: String {
         switch self {
         case .name: "Name"
         case .code: "Code"
+        case .kind: "Kind"
         case .brain: "Brain"
         case .runs: "Where it runs"
         case .review: "Review"
@@ -39,6 +40,9 @@ struct ProjectWizard: View {
     @State private var place: BrainPlace?
     @State private var existingPlace = false
     @State private var publicLink = false
+    /// What it is: follows the repos until the person picks one.
+    @State private var kind = ProjectKind.web
+    @State private var kindPicked = false
     /// "Start with no code": the code step is passed with nothing picked.
     @State private var noCode = false
     @State private var creating = false
@@ -68,6 +72,14 @@ struct ProjectWizard: View {
     private var nameReady: Bool { ProjectRules.nameProblem(name) == nil && ProjectRules.slugProblem(slug) == nil }
     private var made: ProjectItem? { model.project(model.wizardProjectID) }
     private var chosen: [PickRepo] { model.chosen(picked, pasted: pasted) }
+    private var suggestion: KindSuggestion { ProjectKind.suggest(from: chosen) }
+    /// A project that is not software has nothing to run, so the "where it runs" step is left out.
+    private var steps: [WizardStep] { WizardStep.allCases.filter { $0 != .runs || kind.runs } }
+    private func next(_ s: WizardStep) -> WizardStep { steps.first { $0.rawValue > s.rawValue } ?? .review }
+    private func previous(_ s: WizardStep) -> WizardStep { steps.last { $0.rawValue < s.rawValue } ?? .name }
+    private func followSuggestion() {
+        if !kindPicked, step.rawValue >= WizardStep.kind.rawValue { kind = suggestion.kind }
+    }
     /// GitHub is not connected and nothing was pasted: the code step asks to connect first.
     private var needsGithub: Bool {
         switch model.catalogState {
@@ -86,6 +98,7 @@ struct ProjectWizard: View {
                             switch step {
                             case .name: nameStep
                             case .code: codeStep
+                            case .kind: WizardKindStep(kind: $kind, suggestion: suggestion, chosenByPerson: $kindPicked)
                             case .brain: brainStep
                             case .runs: runsStep
                             case .review: reviewStep
@@ -102,9 +115,9 @@ struct ProjectWizard: View {
                     .clipped()
                     WizardPreviewCard(
                         name: name, colour: colour,
-                        host: name.isEmpty || slugProblem != nil ? nil : ProjectRules.host(slug),
+                        host: name.isEmpty || slugProblem != nil || !kind.hasPublicLink ? nil : ProjectRules.host(slug),
                         repos: (made?.repos.map(\.name)) ?? chosen.map(\.name), runner: runner, publicLink: publicLink,
-                        place: existingPlace ? place?.name : nil, step: step,
+                        place: existingPlace ? place?.name : nil, kind: kind, step: step,
                         progress: made.map { WizardProgress($0.repos) })
                 }
                 .frame(height: Space.s8 * 14 + Space.s4)
@@ -115,13 +128,18 @@ struct ProjectWizard: View {
         .animation(Motion.out(Motion.ui), value: moreOptions)
         .onChange(of: name) { _, _ in model.clearWriteError() }
         .onChange(of: slugText) { _, _ in model.clearWriteError() }
-        .task { model.wizardProjectID = nil }
+        .onChange(of: suggestion) { _, _ in followSuggestion() }
+        .task {
+            model.wizardProjectID = nil
+            followSuggestion()
+        }
         .accessibilityIdentifier("project-new")
     }
 
     private func go(_ s: WizardStep) {
         forward = s.rawValue > step.rawValue
         step = s
+        followSuggestion()
     }
 
     // MARK: header
@@ -129,14 +147,16 @@ struct ProjectWizard: View {
     private var header: some View {
         HStack(spacing: Space.s3) {
             HStack(spacing: Space.s1) {
-                ForEach(WizardStep.allCases, id: \.self) { s in
+                ForEach(steps, id: \.self) { s in
                     coreShape(Radius.chip / 3).fill(s.rawValue <= step.rawValue ? palette.primary : palette.track)
                         .frame(width: Space.s8 + Space.s3, height: Space.s1)
                 }
             }
             .accessibilityHidden(true)
-            Text("Step \(step.rawValue) of \(WizardStep.allCases.count) · \(step.title)").foregroundStyle(palette.text2)
-                .contentTransition(.opacity)
+            Text("Step \((steps.firstIndex(of: step) ?? 0) + 1) of \(steps.count) · \(step.title)").foregroundStyle(
+                palette.text2
+            )
+            .contentTransition(.opacity)
             Spacer()
             Button(action: close) { Image(systemName: "xmark") }
                 .buttonStyle(CoreButtonStyle(.plain, size: .small)).help("Close (Esc)")
@@ -302,36 +322,8 @@ struct ProjectWizard: View {
     // MARK: 4 · where it runs
 
     private var runsStep: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            DialogHead(title: "Where should it run?", line: "You can change this later.")
-            HStack(spacing: Space.s2) {
-                ForEach(WizardRunner.allCases, id: \.self) { r in
-                    WizardChoiceTile(
-                        symbol: r.symbol, title: r == .auto ? "\(r.title) · Best" : r.title,
-                        line: r.line(model.runners),
-                        selected: runner == r
-                    ) { runner = r }
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            if !model.runnerSupported {
-                Text("This Core keeps one place for now. The choice is remembered when it can.")
-                    .foregroundStyle(palette.text2)
-            }
-            HStack(alignment: .top, spacing: Space.s3) {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    Text("Public link").coreFont(size: MacTextSize.body, weight: .semibold)
-                    Text("Anyone with the link can see the project page, not your code.").foregroundStyle(palette.text2)
-                    if publicLink {
-                        Text(ProjectRules.host(slug)).font(.system(size: MacTextSize.body, design: .monospaced))
-                            .foregroundStyle(palette.text2)
-                    }
-                }
-                Spacer()
-                CoreSwitch("Public link", isOn: $publicLink)
-            }
-            .padding(Space.s3).coreCard(GlassInk.well, radius: Radius.cardMac)
-        }
+        WizardRunsStep(
+            model: model, kind: kind, runner: $runner, publicLink: $publicLink, host: ProjectRules.host(slug))
     }
 
     // MARK: 4 · review, then live progress
@@ -344,8 +336,9 @@ struct ProjectWizard: View {
                 title: !started
                     ? "Ready to create \(name)?" : made == nil ? "Setting up \(name)" : progress.title(name: name),
                 line:
-                    "\(ProjectItem.count(made?.repos.count ?? chosen.count, "repo")) · Runs on \(runner.title) · "
-                    + (publicLink ? "Public link on" : "Private"))
+                    "\(ProjectItem.count(made?.repos.count ?? chosen.count, "repo")) · \(kind.short)"
+                    + (kind.runs ? " · Runs on \(runner.title)" : "")
+                    + (kind.hasPublicLink ? (publicLink ? " · Public link on" : " · Private") : ""))
             if started {
                 WizardSetupList(creating: model.creating, made: made, copy: made.map { WizardProgress($0.repos) })
                     .transition(.opacity)
@@ -434,17 +427,21 @@ struct ProjectWizard: View {
         case .code:
             CoreDialogFooter(
                 cancel: CoreAction("Back") { go(.name) },
-                primary: CoreAction("Next", key: .primary) { go(.brain) },
+                primary: CoreAction("Next", key: .primary) { go(.kind) },
                 alternate: needsGithub
                     ? CoreAction("Start with no code") {
                         noCode = true
-                        go(.brain)
+                        go(.kind)
                     } : nil,
                 enabled: !needsGithub)
-        case .brain:
+        case .kind:
             CoreDialogFooter(
                 cancel: CoreAction("Back") { go(.code) },
-                primary: CoreAction("Next", key: .primary) { go(.runs) })
+                primary: CoreAction("Next", key: .primary) { go(.brain) })
+        case .brain:
+            CoreDialogFooter(
+                cancel: CoreAction("Back") { go(.kind) },
+                primary: CoreAction("Next", key: .primary) { go(next(.brain)) })
         case .runs:
             CoreDialogFooter(
                 cancel: CoreAction("Back") { go(.brain) },
@@ -452,7 +449,7 @@ struct ProjectWizard: View {
         case .review:
             if made == nil {
                 CoreDialogFooter(
-                    cancel: model.busy ? nil : CoreAction("Back") { go(.runs) },
+                    cancel: model.busy ? nil : CoreAction("Back") { go(previous(.review)) },
                     primary: CoreAction("Create project", key: .primary, run: create), busy: model.busy)
             } else {
                 CoreDialogFooter(
@@ -466,9 +463,10 @@ struct ProjectWizard: View {
         guard nameReady, !model.busy else { return }
         Task {
             await model.create(
-                name: name, slug: slug, colour: colour, repos: chosen, expose: publicLink, runner: runner.rawValue,
+                name: name, slug: slug, colour: colour, repos: chosen, expose: kind.hasPublicLink ? publicLink : false,
+                runner: kind.runs ? runner.rawValue : "auto",
                 description: description.trimmingCharacters(in: .whitespaces), autoSuffix: !slugEdited, wizard: true,
-                place: existingPlace ? place : nil)
+                place: existingPlace ? place : nil, kind: kind)
         }
     }
 }

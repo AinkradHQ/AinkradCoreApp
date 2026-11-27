@@ -37,11 +37,12 @@ struct SettingsPage: View {
         HStack(alignment: .top, spacing: Space.s2) {
             VStack(spacing: Space.s2) {
                 general.coreRise(settled, 0)
-                publicLink.coreRise(settled, 1)
+                KindSettings(model: model, project: project).coreRise(settled, 1)
+                if project.kind.hasPublicLink { publicLink.coreRise(settled, 1) }
             }
             VStack(spacing: Space.s2) {
                 if insights.supported { keepFresh.coreRise(settled, 2) }
-                limits.coreRise(settled, 3)
+                if project.kind.runs { limits.coreRise(settled, 3) }
                 deleteCard.coreRise(settled, 4)
             }
         }
@@ -72,7 +73,9 @@ struct SettingsPage: View {
                     Text(
                         project.tag == .running || project.tag == .starting
                             ? "Stop the project to change its link name."
-                            : "Public link: \(ProjectRules.host(slug)). It can change while the project is stopped and holds no secrets."
+                            : project.kind.hasPublicLink
+                                ? "Public link: \(ProjectRules.host(slug)). It can change while the project is stopped and holds no secrets."
+                                : "The link name is how the Core knows this project. It can change while the project is stopped."
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }

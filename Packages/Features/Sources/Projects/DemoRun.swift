@@ -7,6 +7,9 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
     private let lock = NSLock()
     private var versions: [Int64: [SpecVersionItem]] = [:]
     private var stored: [Int64: [SecretItem]] = [:]
+    /// Services a running project reports (only the scenes that set them show any; the others keep reading none).
+    var services: [Int64: [ProjectLive.Service]] = [:]
+    func services(project: Int64) async throws -> [ProjectLive.Service] { lock.withLock { services[project] ?? [] } }
 
     static let full = """
         {"services": {
