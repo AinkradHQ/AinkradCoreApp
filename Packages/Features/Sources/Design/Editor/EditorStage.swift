@@ -60,5 +60,6 @@ struct EditorStage: View {
             .coreWell(radius: Radius.pane)
             Island("Inspector") { InspectorIsland(editor: editor) }.frame(width: Space.s8 * 10)
         }
+        .environment(model.collab)
     }
 }
