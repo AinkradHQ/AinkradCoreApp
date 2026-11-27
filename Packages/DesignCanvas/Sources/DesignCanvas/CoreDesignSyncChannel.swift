@@ -46,7 +46,7 @@ public enum DesignSyncWire {
 /// resumes from it with `Last-Update-Seq`) and the updates the Core has not acknowledged (resent on the next connect:
 /// applying a repeat is harmless). The Core has no state-vector exchange, so the first one `DesignSync` sends on a
 /// connection is dropped; a later one means "send everything again": the socket is closed and the next connect carries no
-/// cursor, so the Core answers with a snapshot. Presence frames are not carried yet.
+/// cursor, so the Core answers with a snapshot. Presence rides the text frames: a peer's message is labelled and handed on as `.awareness`, and this device's goes out as one.
 public actor CoreDesignSyncChannel: DesignSyncChannel {
     /// Opens the socket for a design, resuming after `lastSeq` when there is one.
     public typealias Opener = @Sendable (_ doc: String, _ lastSeq: UInt64?) async throws -> any DesignSocket
@@ -77,7 +77,12 @@ public actor CoreDesignSyncChannel: DesignSyncChannel {
         let pump = Task { [weak self] in
             do {
                 while true {
-                    guard case .binary(let data) = try await socket.receive() else { continue }
+                    let frame = try await socket.receive()
+                    if case .text(let t) = frame {
+                        if let m = Self.relay(t) { out.yield(.awareness(m)) }
+                        continue
+                    }
+                    guard case .binary(let data) = frame else { continue }
                     switch DesignSyncWire.decode(data) {
                     case .update(let seq, let body), .snapshot(let seq, let body):
                         await self?.applied(doc, seq)
@@ -109,8 +114,20 @@ public actor CoreDesignSyncChannel: DesignSyncChannel {
                 sockets[doc]?.cancel()
                 return
             }
-        case .awareness: break
+        case .awareness(let a):
+            try await sockets[doc]?.send(.text(String(decoding: a, as: UTF8.self)))
         }
+    }
+
+    /// A peer's presence text with the label the engine shows: the Core says who (`person:d_…`, `session:as_…`), not their
+    /// name. Hostile text: anything that is not a small JSON object is dropped.
+    static func relay(_ text: String) -> Data? {
+        guard text.utf8.count <= 4096, var o = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any]
+        else { return nil }
+        if o["gone"] == nil, let peer = o["peer"] as? String {
+            o["label"] = peer.hasPrefix("session:") ? "An AI session" : "Another device"
+        }
+        return try? JSONSerialization.data(withJSONObject: o)
     }
 
     private func applied(_ doc: String, _ seq: UInt64) { cursor[doc] = max(cursor[doc] ?? 0, seq) }

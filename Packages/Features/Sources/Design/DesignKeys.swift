@@ -6,7 +6,12 @@ import SwiftUI
 /// open item: Esc goes back, ⌘I shows or hides About.
 extension DesignModel {
     /// What the wall shows now, in its order.
-    var shown: [DesignItem] { items(in: category) }
+    /// On Library's Everything the wall groups by kind, so the keys follow that grouped order, not the newest-first one.
+    var shown: [DesignItem] {
+        let list = items(in: category)
+        guard category == .library, filter.isEmpty else { return list }
+        return DesignCategory.libraryKinds.flatMap { k in list.filter { $0.category == k } }
+    }
 
     /// Moves the keyboard's card by `step` (±1 across, ±columns down and up). The first press lands on the first card.
     @discardableResult
@@ -26,6 +31,15 @@ extension DesignModel {
     func key(_ press: KeyPress, find: FocusState<Bool>.Binding) -> KeyPress.Result {
         let cmd = press.modifiers.contains(.command)
         let c = press.characters.lowercased()
+        if let p = presenter {
+            switch press.key {
+            case .escape: p.close()
+            case .leftArrow, .upArrow: p.step(-1)
+            case .rightArrow, .downArrow, .space: p.step(1)
+            default: return .ignored
+            }
+            return .handled
+        }
         if press.key == .escape {
             if aboutOpen {
                 aboutOpen = false
@@ -33,6 +47,10 @@ extension DesignModel {
             }
             if openID != nil {
                 closeItem()
+                return .handled
+            }
+            if !lib.multi.isEmpty {
+                lib.clearSelection()
                 return .handled
             }
             if !filter.isEmpty {
@@ -56,6 +74,10 @@ extension DesignModel {
                 find.wrappedValue = true
                 return .handled
             }
+            if c == "a", !find.wrappedValue {
+                selectAll()
+                return .handled
+            }
             if let n = Int(c), (1...DesignCategory.pages.count).contains(n) {
                 pick(DesignCategory.pages[n - 1])
                 return .handled
@@ -63,10 +85,14 @@ extension DesignModel {
             return .ignored
         }
         if find.wrappedValue { return press.key == .return ? openSelectedOrFirst() : .ignored }
+        if press.key == .delete, !lib.multi.isEmpty {
+            askDelete(items.filter { lib.multi.contains($0.id) })
+            return .handled
+        }
         if press.key == .delete, press.modifiers.contains(.command) || press.modifiers.isEmpty,
             let item = item(selected)
         {
-            askDelete(item)
+            askDelete(lib.multi.count > 1 ? targets(item) : [item])
             return .handled
         }
         switch press.key {

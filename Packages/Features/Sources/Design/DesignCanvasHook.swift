@@ -32,12 +32,17 @@ public struct DesignEditorHandle: Sendable {
     let editor: DesignEditor
     public func attach(_ backend: (any DesignEditBackend)?) { editor.attach(backend) }
     public func changed() { editor.changed() }
+    /// Reads the canvas now (a right-click just chose a layer, and the menu is about to open).
+    public func reloadNow() { editor.reload() }
+    /// The canvas could not start (no Metal, a bad id).
+    public func failed() { editor.canvasFailed = true }
 }
 
 extension DesignModel {
     /// The canvas for a design doc, or nil when the app has none (tests) or the doc cannot sync yet.
-    func canvasView(_ d: DesignDoc) -> AnyView? {
-        guard d.kind == .design, let canvas, let service else { return nil }
+    func canvasView(_ d: DesignDoc, editor viewer: DesignEditor? = nil) -> AnyView? {
+        // A design draws on it; a design system opens on it too (the style guide reads and writes its tokens).
+        guard d.kind == .design || d.kind == .system, let canvas, let service else { return nil }
         let socketOpener: (@Sendable (String, UInt64?) async throws -> CoreSocket)? = connection.map { connection in
             { @Sendable (doc: String, lastSeq: UInt64?) async throws -> CoreSocket in
                 let headers: [String: String] = lastSeq.map { ["Last-Update-Seq": String($0)] } ?? [:]
@@ -52,7 +57,7 @@ extension DesignModel {
                 return .init(contentType: a.contentType, check: a.check.rawValue)
             },
             data: { try await service.data($0) },
-            editor: DesignEditorHandle(editor: editor(for: d.id)),
+            editor: DesignEditorHandle(editor: viewer ?? editor(for: d.id)),
             openSocket: socketOpener)
         return canvas(input)
     }

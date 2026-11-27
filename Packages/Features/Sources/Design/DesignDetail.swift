@@ -43,6 +43,14 @@ struct DesignDetail: View {
         .sheet(isPresented: Binding(get: { editor?.versionsOpen ?? false }, set: { editor?.versionsOpen = $0 })) {
             if let editor { VersionsSheet(editor: editor) }
         }
+        .overlay {
+            if let p = model.presenter {
+                DesignPresentView(model: model, presenter: p)
+                    .background(GlassInk.adaptive(Color(white: 0.06), day: Color(white: 0.93)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(Motion.out(Motion.ui), value: model.presenter == nil)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("design-detail")
     }
@@ -63,9 +71,17 @@ struct DesignDetail: View {
             Text(item.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            if editor != nil { StateBadge("Saved", tone: .done, symbol: "checkmark.circle") }
+            if let editor {
+                #if DEBUG
+                SaveBadge(editor: editor, forced: model.debugSave)
+                #else
+                SaveBadge(editor: editor)
+                #endif
+            }
         } actions: {
-            if let editor { PresenceStrip(peers: editor.peers) }
+            if let editor {
+                PresenceStrip(peers: editor.peers, collaborators: editor.collaborators) { editor.follow($0) }
+            }
             if let editor { EditorToolbar(editor: editor, aboutOpen: aboutOpen) }
             CoreDropdown(
                 items: projectItems,
@@ -76,6 +92,21 @@ struct DesignDetail: View {
             .disabled(model.allProjects.isEmpty || model.readOnly)
             .help("Relate this to projects; it stays in the library either way")
             .accessibilityIdentifier("design-projects")
+            if case .doc(let d) = item { DesignCollabHeader(model: model, doc: d, editor: editor) }
+            if let editor, case .doc(let d) = item {
+                let screens = !DesignPresenter.screens(in: editor).isEmpty
+                AppActionTile(title: "Present", symbol: "play.rectangle", key: "", hue: GlassInk.accent(paneAccent)) {
+                    model.present(d)
+                }
+                .disabled(!screens)
+                .help(
+                    screens
+                        ? "Show a screen in a device and click through its prototype links"
+                        : editor.loaded
+                            ? "Nothing to present yet: draw a screen (a top-level frame) first" : "Opening the design…"
+                )
+                .accessibilityIdentifier("design-present-button")
+            }
             if editor != nil, model.composeSupported, !model.readOnly {
                 AppActionTile(
                     title: "Draw with AI", symbol: "sparkles", key: "", hue: GlassInk.accent(paneAccent),
@@ -102,6 +133,12 @@ struct DesignDetail: View {
                 .padding(Space.s2)
                 .coreWell(radius: Radius.pane)
                 .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .kit(let k) = item {
+            BrandKitEditor(model: model, kit: k)
+                .coreWell(radius: Radius.pane)
+                .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .doc(let d) = item, d.kind == .system, let canvas = model.canvasView(d) {
+            SystemStyleGuide(model: model, doc: d, editor: model.editor(for: d.id), canvas: canvas)
         } else if case .doc(let d) = item, let canvas = model.canvasView(d) {
             canvas
                 .clipShape(coreShape(Radius.pane))
@@ -138,7 +175,7 @@ struct DesignDetail: View {
         case .design:
             return "The canvas opens here once this Core can sync designs: you will watch AI draw, note and tweak."
         case .mockup: return nil
-        case .system: return "Tokens, components and rules show here once design systems arrive, in a later update."
+        case .system: return "The style guide opens here once this Core can sync design systems."
         }
     }
 }
@@ -201,14 +238,24 @@ struct AboutIsland: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// `session:as_…` is an AI session, anything else a person on a device.
-    static func who(_ origin: String) -> String { origin.hasPrefix("session:") ? "An AI session" : "You" }
+    /// This device's id (set when a Core is attached), to tell "You" from another person's device.
+    nonisolated(unsafe) static var me: String?
+
+    /// `session:as_…` is an AI session, `system` the Core itself, `person:d_…` a device: this one is "You".
+    static func who(_ origin: String, me: String? = AboutIsland.me) -> String {
+        if origin.hasPrefix("session:") { return "An AI session" }
+        if origin == "system" { return "The Core" }
+        if origin.hasPrefix("person:") {
+            return me.map { origin == "person:\($0)" ? "You" : "Another device" } ?? "A person"
+        }
+        return origin.isEmpty ? "Unknown" : "Another device"
+    }
 
     @ViewBuilder private var facts: some View {
         switch item {
         case .doc(let d):
             fact("Kind", item.kindWord.capitalizedFirst)
-            if d.kind == .design { fact("System", model.doc(d.system)?.name ?? "None") }
+            if d.kind == .design { DocSystemPicker(model: model, doc: d) }
             fact("Updated", Ago.words(d.updatedAt))
             fact("Made by", Self.who(d.createdBy))
             if d.aiPaused { fact("AI", "Paused") }
@@ -226,9 +273,9 @@ struct AboutIsland: View {
 
     @ViewBuilder private var extra: some View {
         switch item {
-        case .asset(let a) where !a.tags.isEmpty:
+        case .asset(let a):
             heading("Tags")
-            Text(a.tags.joined(separator: " · ")).fixedSize(horizontal: false, vertical: true)
+            AssetTagsEditor(model: model, asset: a)
         case .kit(let k):
             if !k.colors.isEmpty {
                 heading("Colours")
@@ -302,5 +349,75 @@ struct KindChip: View {
             .foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s2).frame(minHeight: MacSize.chip)
             .coreCard(GlassInk.well, radius: Radius.control)
             .accessibilityLabel("Kind: \(word)")
+    }
+}
+
+/// What saving is doing, from the editor's sync state: the badge beside a design's name. "Saved" is only true while the
+/// socket is up and nothing has stopped it.
+enum SaveState: Equatable {
+    case saved, saving, reconnecting, notSaving
+
+    static func of(connected: Bool, stuck: Bool, halted: Bool, recentEdit: Bool) -> SaveState {
+        if stuck || halted { return .notSaving }
+        if !connected { return .reconnecting }
+        return recentEdit ? .saving : .saved
+    }
+
+    var label: String {
+        switch self {
+        case .saved: "Saved"
+        case .saving: "Saving…"
+        case .reconnecting: "Reconnecting…"
+        case .notSaving: "Not saving — reopen"
+        }
+    }
+    var tone: Tone {
+        switch self {
+        case .saved: .done
+        case .saving: .run
+        case .reconnecting: .warn
+        case .notSaving: .fail
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .saved: "checkmark.circle"
+        case .saving: "arrow.triangle.2.circlepath"
+        case .reconnecting: "wifi.exclamationmark"
+        case .notSaving: "exclamationmark.triangle"
+        }
+    }
+    var help: String {
+        switch self {
+        case .saved: "Every change is on the Core"
+        case .saving: "Sending your last change to the Core"
+        case .reconnecting: "The link to the Core dropped. Changes are kept here and sent when it is back"
+        case .notSaving: "This design stopped syncing, so changes are not saved. Close it and open it again"
+        }
+    }
+}
+
+struct SaveBadge: View {
+    let editor: DesignEditor
+    var forced: SaveState?
+    @State private var recent = false
+
+    var body: some View {
+        let state =
+            forced
+            ?? SaveState.of(
+                connected: editor.syncConnected, stuck: editor.syncStuck, halted: editor.syncHalted, recentEdit: recent)
+        StateBadge(state.label, tone: state.tone, symbol: state.symbol)
+            .help(state.help)
+            .animation(Motion.out(Motion.hover), value: state)
+            .accessibilityIdentifier("design-save-state")
+            // A change sends at once, so "Saving…" shows for a moment after one (the link gives no acknowledgement).
+            .onChange(of: editor.layers) {
+                recent = true
+                Task {
+                    try? await Task.sleep(for: .milliseconds(900))
+                    recent = false
+                }
+            }
     }
 }

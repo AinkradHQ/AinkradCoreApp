@@ -20,8 +20,8 @@ struct DesignsIsland: View {
                 .disabled(!model.isConnected)
             }
         ) {
-            if model.load == .absent {
-                Text("This Core has no Design yet.").foregroundStyle(GlassInk.secondary)
+            if list.isEmpty, let why = Self.unavailable(model.load) {
+                Text(why).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             } else if list.isEmpty {
                 Text("No designs yet. Relate one from Design with its Projects menu.")
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
@@ -41,6 +41,17 @@ struct DesignsIsland: View {
             }
         }
         .accessibilityIdentifier("project-designs-island")
+    }
+
+    /// Why the island cannot list anything (so it never says "No designs yet" for a Core it could not ask).
+    static func unavailable(_ load: DesignLoad) -> String? {
+        switch load {
+        case .ready: nil
+        case .notConnected: "Not connected to a Core. Designs show here once this Mac is."
+        case .loading: "Loading designs…"
+        case .absent: "This Core has no Design yet."
+        case .failed(let why): "Designs did not load. \(why)"
+        }
     }
 
     private func subtitle(_ item: DesignItem) -> String {

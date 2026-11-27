@@ -11,18 +11,21 @@ struct CanvasAIOverlay: View {
     /// Document rects: the frame being redrawn (edit) or where new frames will land.
     let rects: [CGRect]
     let editing: Bool
+    /// Drawing now; false fades it out and stops the timeline.
+    var active = true
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.coreAccent) private var paneAccent
     @State private var shown = false
-    /// The camera, read a few times a second (not every frame: a read takes the engine's lock the renderer holds).
-    @State private var cam: CanvasCamera?
+    /// Bumped by a slow tick while Reduce Motion pauses the timeline, so the camera is still re-read.
+    @State private var tick = 0
 
     private var ink: Color { GlassInk.accent(paneAccent) }
 
     var body: some View {
-        TimelineView(.animation(paused: reduce)) { ctx in
+        TimelineView(.animation(paused: reduce || !active)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
-            if let cam {
+            // A cheap engine call, read every frame so the overlay follows pan, zoom and fits exactly.
+            if let cam = camera(tick) {
                 ZStack(alignment: .topLeading) {
                     ForEach(Array(rects.enumerated()), id: \.offset) { i, r in
                         let v = CGRect(
@@ -39,17 +42,21 @@ struct CanvasAIOverlay: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .opacity(active ? 1 : 0)
+        .animation(Motion.out(Motion.ui), value: active)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear { shown = true }
-        .task {
+        .task(id: reduce) {
+            guard reduce else { return }
             while !Task.isCancelled {
-                let now = editor.camera()
-                if now != cam { cam = now }
-                try? await Task.sleep(for: .milliseconds(120))
+                try? await Task.sleep(for: .milliseconds(250))
+                tick &+= 1
             }
         }
     }
+
+    private func camera(_ tick: Int) -> CanvasCamera? { editor.camera() }
 
     // MARK: edit
 

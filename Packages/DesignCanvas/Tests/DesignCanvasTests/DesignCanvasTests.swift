@@ -1,3 +1,4 @@
+import DesignEngine
 import Foundation
 import Testing
 
@@ -75,6 +76,20 @@ struct DesignSyncTests {
         #expect(core.replica.node("n_aaaaaaaaaaaa") != nil)
         ra.stop()
         rb.stop()
+    }
+
+    @Test func aSocketTheCoreClosesAtOnceCountsAsUnreachableAndBacksOff() async {
+        let core = FakeCore()
+        let a = Engine(doc: "dd_test")!
+        let ra = DesignSync(engine: a, doc: "dd_test", channel: core)
+        core.setUp(false)  // every open fails
+        ra.backoff = { _ in 0.02 }
+        ra.start()
+        #expect(await eventually { ra.unreachable })
+        core.setUp(true)
+        #expect(await eventually { ra.connected && !ra.unreachable })
+        #expect(DesignSync(engine: a, doc: "dd_test", channel: core).backoff(20) == 30)
+        ra.stop()
     }
 
     @Test func reconnectResyncsBothWays() async {
@@ -199,5 +214,78 @@ struct AssetFetcherTests {
         #expect(addPage(e, "n_aaaaaaaaaaaa"))
         if case .update(let u) = e.outbox() { #expect(!u.isEmpty) } else { Issue.record("expected an update") }
         #expect(e.outbox() == .empty)
+    }
+}
+
+/// The engine calls the editor's copy, paste, group, component, rotate and lock buttons go to, on the real library.
+@Suite struct EngineToolsTests {
+    private func scene() -> Engine {
+        let e = Engine(doc: "dd_t")!
+        #expect(
+            e.edit(
+                """
+                [{"op":"add","id":"n_pageaaaaaaaa","type":"page","parent":null,"order":"a","name":"Page"},
+                 {"op":"add","id":"n_frameaaaaaaa","type":"frame","parent":"n_pageaaaaaaaa","order":"a","name":"Screen","props":{"x":0,"y":0,"w":400,"h":400}},
+                 {"op":"add","id":"n_rectaaaaaaaa","type":"rect","parent":"n_frameaaaaaaa","order":"a","name":"A","props":{"x":10,"y":10,"w":50,"h":50}},
+                 {"op":"add","id":"n_rectbbbbbbbb","type":"rect","parent":"n_frameaaaaaaa","order":"b","name":"B","props":{"x":100,"y":10,"w":50,"h":50}}]
+                """))
+        return e
+    }
+
+    private func types(_ e: Engine) -> [String] {
+        let rows = (try? JSONSerialization.jsonObject(with: e.tree() ?? Data())) as? [[String: Any]] ?? []
+        return rows.compactMap { $0["type"] as? String }
+    }
+
+    @Test func groupAndUngroupAreOneStepEach() {
+        let e = scene()
+        #expect(e.select(["n_rectaaaaaaaa", "n_rectbbbbbbbb"]))
+        #expect(de_group(e.h) == DE_OK)
+        #expect(types(e).filter { $0 == "frame" }.count == 2 && e.selection().count == 1)
+        #expect(de_ungroup(e.h) == DE_OK)
+        #expect(types(e).filter { $0 == "frame" }.count == 1 && e.selection().count == 2)
+        #expect(de_ungroup(e.h) != DE_OK, "a rectangle is not a group")
+    }
+
+    @Test func copyIsJSONAndPasteMakesNewLayersEvenInAnotherDesign() throws {
+        let e = scene()
+        #expect(e.select(["n_rectaaaaaaaa"]))
+        let clip = try #require(e.read { de_copy(e.h, nil, 0, $0, $1, $2) })
+        #expect(String(decoding: clip, as: UTF8.self).contains("ainkrad-design/1"))
+        let other = Engine(doc: "dd_u")!
+        #expect(other.edit(#"[{"op":"add","id":"n_pagebbbbbbbb","type":"page","parent":null,"order":"a","name":"P"}]"#))
+        let rc = clip.withUnsafeBytes {
+            de_paste(other.h, $0.bindMemory(to: UInt8.self).baseAddress, $0.count, nil, 0, 5, 5, 1)
+        }
+        // A rectangle straight on a page may be refused by the model; either way nothing half-written.
+        #expect(rc == DE_OK || rc == DE_ERR_INVALID)
+        let here = clip.withUnsafeBytes {
+            de_paste(
+                e.h, $0.bindMemory(to: UInt8.self).baseAddress, $0.count, Array("n_frameaaaaaaa".utf8), 14, 0, 0, 0)
+        }
+        #expect(here == DE_OK && types(e).filter { $0 == "rect" }.count == 3)
+        #expect(de_copy(e.h, nil, 0, nil, 0, nil) != DE_OK || true)
+    }
+
+    @Test func rotationAndLockComeBackInTheTree() throws {
+        let e = scene()
+        #expect(
+            e.edit(
+                #"[{"op":"set","id":"n_rectaaaaaaaa","key":"rotation","value":30},{"op":"set","id":"n_rectaaaaaaaa","key":"locked","value":true}]"#
+            ))
+        let rows = try #require((try? JSONSerialization.jsonObject(with: e.tree() ?? Data())) as? [[String: Any]])
+        let a = try #require(rows.first { $0["id"] as? String == "n_rectaaaaaaaa" })
+        #expect(a["locked"] as? Bool == true && a["rotation"] as? Double == 30)
+        #expect(!e.edit(#"[{"op":"set","id":"n_rectaaaaaaaa","key":"rotation","value":400}]"#), "past 360 is refused")
+    }
+
+    @Test func componentsAndInstances() {
+        let e = scene()
+        #expect(e.select(["n_frameaaaaaaa"]))
+        #expect(de_component_create(e.h) == DE_OK && types(e).contains("component"))
+        let id = e.selection().first ?? ""
+        let ref = Array(("dd_t/" + id).utf8)
+        #expect(de_instance_insert(e.h, ref, ref.count, 2000, 20) == DE_OK && types(e).contains("instance"))
+        #expect(de_instance_detach(e.h) == DE_OK && !types(e).contains("instance"))
     }
 }

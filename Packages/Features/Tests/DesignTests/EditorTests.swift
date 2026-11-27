@@ -231,8 +231,43 @@ final class FakeBackend: DesignEditBackend {
     var refuse = false
     var canSelect = true
     var syncStuck = false
+    var syncHalted = false
+    var loaded = true
     var lastEditTooLarge = false
     var peerJSON: String?
+    /// The engine calls the editor made (`group`, `paste into f`…), and whether the engine accepts them.
+    var calls: [String] = []
+    var engineOK = true
+    var clip: Data?
+    func copy() -> Data? {
+        calls.append("copy")
+        return engineOK ? clip : nil
+    }
+    func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool {
+        calls.append("paste " + (parent.map { "into \($0)" } ?? "on the page") + (atCenter ? " at the centre" : ""))
+        return engineOK
+    }
+    func duplicate() -> Bool { call("duplicate") }
+    func group() -> Bool { call("group") }
+    func ungroup() -> Bool { call("ungroup") }
+    func createComponent() -> Bool { call("createComponent") }
+    /// Like the engine: with no point the instance goes in what is at the middle of the view, here the component itself.
+    var instanceParent = "p"
+    func insertInstance(_ component: String, at: CGPoint?) -> Bool {
+        calls.append("instance \(component)" + (at.map { " at \(Int($0.x)),\(Int($0.y))" } ?? ""))
+        guard engineOK else { return false }
+        let parent = at == nil ? instanceParent : "p"
+        treeJSON.removeLast()
+        treeJSON += #",{"id":"n_inst","type":"instance","parent":"\#(parent)","order":"z","name":""}]"#
+        sel = ["n_inst"]
+        return true
+    }
+    func camera() -> CanvasCamera? { CanvasCamera(zoom: 2, pan: CGPoint(x: 10, y: 20)) }
+    func detachInstance() -> Bool { call("detachInstance") }
+    private func call(_ s: String) -> Bool {
+        calls.append(s)
+        return engineOK
+    }
     func tree() -> Data? { treeJSON.data(using: .utf8) }
     func node(_ id: String) -> String? { nodes[id] }
     func selection() -> [String] { sel }
@@ -246,7 +281,10 @@ final class FakeBackend: DesignEditBackend {
         edits.append(json)
         return true
     }
-    func undo() { edits.append("undo") }
+    func undo() {
+        edits.append("undo")
+        if let r = treeJSON.range(of: #",{"id":"n_inst""#) { treeJSON = String(treeJSON[..<r.lowerBound]) + "]" }
+    }
     func redo() { edits.append("redo") }
     func fitSelection() {}
     func peers() -> Data? { peerJSON?.data(using: .utf8) }
@@ -423,10 +461,10 @@ final class FakeBackend: DesignEditBackend {
         let w = try d.decode(
             [VersionWire].self,
             from: Data(
-                #"[{"id":"v7","kind":"approval","name":"B","created_by":"device:d_1","created_at":"2026-11-18T10:02:00Z"}]"#
+                #"[{"id":"v7","kind":"approval","name":"B","origin":"person:d_1","created_at":"2026-11-18T10:02:00Z","bytes":9}]"#
                     .utf8))
         #expect(w[0].version.kind == .approval && w[0].version.createdAt != nil && w[0].version.id == "v7")
-        #expect(VersionWire(id: "v1", kind: "weird", name: "", createdBy: "", createdAt: "").version.kind == .auto)
+        #expect(VersionWire(id: "v1", kind: "weird", name: nil, origin: "", createdAt: "", bytes: nil).version.kind == .auto)
     }
 }
 

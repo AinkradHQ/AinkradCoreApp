@@ -1,3 +1,4 @@
+import AppKit
 import CoreKit
 import Design
 import DesignCanvas
@@ -20,22 +21,81 @@ final class CanvasEditing: DesignEditBackend {
     func redo() { view?.editorRedo() }
     func fitSelection() { view?.editorFitSelection() }
     func peers() -> Data? { view?.editorPeers() }
-    func setPresence(_ json: String) { view?.editorSetPresence(json) }
+    func setPresence(_ json: String) { view?.editorSetPresence() }
+    var syncHalted: Bool { view?.editorSyncHalted ?? false }
+    var syncUnreachable: Bool { view?.editorSyncUnreachable ?? false }
+    var lastUndoTooLarge: Bool { view?.editorLastUndoTooLarge ?? false }
+    var assetFailures: Int { view?.editorAssetFailures ?? 0 }
+    func retryAssets() { view?.editorRetryAssets() }
+    func setReadOnly(_ on: Bool) { view?.editorSetReadOnly(on) }
     func tokens() -> Data? { view?.editorTokens() }
     var syncStuck: Bool { view?.editorSyncStuck ?? false }
+    var loaded: Bool { view?.editorLoaded ?? false }
+    var syncConnected: Bool { view?.editorSyncConnected ?? false }
     var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
     var tool: Int { view?.editorTool ?? 0 }
+    func docTokens() -> Data? { view?.editorDocTokens() }
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport {
+        guard let view else { return .failed }
+        switch view.editorExportPNG(node: node, scale: scale, night: night) {
+        case .png(let d): return .png(d)
+        case .tooLarge: return .tooLarge
+        case .failed: return .failed
+        }
+    }
     func setTool(_ tool: Int) { view?.editorSetTool(tool) }
     func camera() -> CanvasCamera? {
         view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }
     }
     func fit(_ rect: CGRect) { view?.editorFit(rect) }
+    func presenceList() -> Data? { view?.editorPresenceList() }
+    func follow(_ peer: String) { view?.editorFollow(peer) }
+    func setPage(_ index: Int) { view?.editorSetPage(index) }
+    func zoom(by factor: Double) { view?.editorZoom(by: factor) }
+    func zoom(to scale: Double) { view?.editorZoom(to: scale) }
+    func fitAll() { view?.editorFitAll() }
+    func copy() -> Data? { view?.editorCopy() }
+    func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool {
+        guard let view else { return false }
+        return view.editorPaste(json, parent: parent, at: atCenter ? view.center : nil)
+    }
+    func duplicate() -> Bool { view?.editorDuplicate() ?? false }
+    func group() -> Bool { view?.editorGroup() ?? false }
+    func ungroup() -> Bool { view?.editorUngroup() ?? false }
+    func createComponent() -> Bool { view?.editorComponentCreate() ?? false }
+    func insertInstance(_ component: String, at: CGPoint?) -> Bool {
+        guard let view else { return false }
+        return view.editorInstanceInsert(component, at: at ?? view.center)
+    }
+    func detachInstance() -> Bool { view?.editorInstanceDetach() ?? false }
+    func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?) {
+        guard let view else { return }
+        guard let handler else {
+            view.keyHandler = nil
+            return
+        }
+        view.keyHandler = { @MainActor (e: NSEvent) -> Bool in handler(EditorKey(e)) }
+    }
+    func debugPresence(_ json: String) {
+        #if DEBUG
+        view?.editorDebugPresence(json)
+        #endif
+    }
+    func present(_ tap: (@MainActor (String?) -> Void)?) {
+        view?.editorPresent(tap.map { t in { id in MainActor.assumeIsolated { t(id) } } })
+    }
 
     /// Hands the chrome the canvas and has the canvas tell it when the document or selection may have changed.
     static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {
         handle.attach(CanvasEditing(view))
         view.onChange = { handle.changed() }
+        view.onContextSelect = { handle.reloadNow() }
     }
+}
+
+extension NSView {
+    /// The middle of the view, where the canvas is looking.
+    fileprivate var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
 }
 
 /// Gives Design its canvas (V3-02). The app links the engine; `Features` does not. A design gets its canvas over the
@@ -58,7 +118,7 @@ enum DesignCanvasHookup {
                         onReady: {
                             DesignMeasure.ready($0)
                             CanvasEditing.connect($0, to: input.editor)
-                        }))
+                        }, onFailed: { input.editor.failed() }))
             }
             return
         }
@@ -77,7 +137,7 @@ enum DesignCanvasHookup {
             return AnyView(
                 DesignCanvas(
                     doc: input.doc, system: input.system, channel: channel, assets: assets,
-                    onReady: { CanvasEditing.connect($0, to: input.editor) }))
+                    onReady: { CanvasEditing.connect($0, to: input.editor) }, onFailed: { input.editor.failed() }))
         }
     }
 }

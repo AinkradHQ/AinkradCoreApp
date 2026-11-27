@@ -11,6 +11,8 @@ struct DesignDoc: Identifiable, Equatable, Sendable {
     var aiPaused: Bool
     var createdBy: String
     var updatedAt: Date?
+    /// The Core keeps it, out of the lists (`state: archived`).
+    var archived = false
 }
 
 /// A file in the library. Only `ok` files are served; a font or Icon Composer file stays `pending` until the design helper
@@ -66,6 +68,9 @@ struct BrandKit: Identifiable, Equatable, Sendable {
     var items: [Item]
     var projects: [String]
     var updatedAt: Date?
+    /// A brand kit holds colours, fonts and logos; a folder only files.
+    enum Kind: String, Sendable { case brandKit = "brand_kit", folder }
+    var kind: Kind = .brandKit
 }
 
 /// One card of the home wall or a row of the project island.
@@ -113,7 +118,7 @@ enum DesignItem: Identifiable, Equatable, Sendable {
             case .system: .systems
             case .mockup: .mockups
             }
-        case .kit: .brand
+        case .kit(let k): k.kind == .folder ? .folders : .brand
         case .asset(let a):
             switch a.kind {
             case .logo: .brand
@@ -133,7 +138,7 @@ enum DesignItem: Identifiable, Equatable, Sendable {
             case .system: "design system"
             case .mockup: "HTML mockup"
             }
-        case .kit: "brand kit"
+        case .kit(let k): k.kind == .folder ? "folder" : "brand kit"
         case .asset(let a):
             switch a.kind {
             case .image: "image"
@@ -150,16 +155,16 @@ enum DesignItem: Identifiable, Equatable, Sendable {
     var symbol: String { category.symbol }
 }
 
-/// The rail of the home: what needs you, what AI is drawing, everything, then one row per kind.
+/// The rail of the home: everything, then one row per kind.
 enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
-    case needsYou, drawing, all, screens, brand, icons, illustrations, fonts, systems, mockups
+    case all, screens, brand, icons, illustrations, fonts, systems, mockups
     /// Every library file and kit at once: brand, icons, illustrations and fonts.
     case library
+    /// Folders (collections without colours), in the library; and the archived designs page.
+    case folders, archived
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .needsYou: "Needs you"
-        case .drawing: "Drawing now"
         case .all: "All designs"
         case .screens: "App screens"
         case .brand: "Brand & logos"
@@ -169,12 +174,12 @@ enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
         case .systems: "Design systems"
         case .mockups: "HTML mockups"
         case .library: "Library"
+        case .folders: "Folders"
+        case .archived: "Archived"
         }
     }
     var symbol: String {
         switch self {
-        case .needsYou: "tray"
-        case .drawing: "pencil"
         case .all: "square.grid.2x2"
         case .screens: "iphone"
         case .brand: "seal"
@@ -184,12 +189,14 @@ enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
         case .systems: "swatchpalette"
         case .mockups: "chevron.left.forwardslash.chevron.right"
         case .library: "photo.on.rectangle"
+        case .folders: "folder"
+        case .archived: "archivebox"
         }
     }
     /// The kinds, in the rail's order (the mockup's, with Fonts beside Illustrations).
     static let kinds: [DesignCategory] = [.screens, .brand, .icons, .illustrations, .fonts, .systems, .mockups]
     /// The library's own kinds, in the Library page's order.
-    static let libraryKinds: [DesignCategory] = [.brand, .icons, .illustrations, .fonts]
+    static let libraryKinds: [DesignCategory] = [.brand, .icons, .illustrations, .fonts, .folders]
     /// The header's pages, each with its key (⌘1…⌘5).
     static let pages: [DesignCategory] = [.all, .screens, .systems, .mockups, .library]
     /// The header page this category lives on: a library kind on Library.
@@ -230,6 +237,19 @@ enum Ago {
         if let d = f.date(from: s) { return d }
         f.formatOptions = [.withInternetDateTime]
         return f.date(from: s)
+    }
+}
+
+/// The Core's name rule (`name_ok`): 1 to 100 characters (200 for a library file), counted as Unicode scalars, no control
+/// characters (a newline included), nothing at either end.
+enum DesignName {
+    static func limit(_ item: DesignItem) -> Int { if case .asset = item { 200 } else { 100 } }
+    /// The name as it would be sent: surrounding spaces and newlines cut.
+    static func clean(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines) }
+    static func valid(_ s: String, limit: Int) -> Bool {
+        let n = clean(s)
+        return (1...limit).contains(n.unicodeScalars.count)
+            && !n.unicodeScalars.contains { $0.properties.generalCategory == .control }
     }
 }
 

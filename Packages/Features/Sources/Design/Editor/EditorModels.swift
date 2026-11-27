@@ -63,14 +63,23 @@ struct DesignLayer: Identifiable, Equatable, Sendable, Decodable {
     var order: String
     var name: String
     var hidden: Bool
+    /// Locked layers cannot be picked or moved on the canvas (the layers panel and inspector still reach them).
+    var locked: Bool
+    /// Degrees, clockwise.
+    var rotation: Double
 
-    init(id: String, type: String, parent: String?, order: String, name: String = "", hidden: Bool = false) {
+    init(
+        id: String, type: String, parent: String?, order: String, name: String = "", hidden: Bool = false,
+        locked: Bool = false, rotation: Double = 0
+    ) {
         self.id = id
         self.type = type
         self.parent = parent
         self.order = order
         self.name = name
         self.hidden = hidden
+        self.locked = locked
+        self.rotation = rotation
     }
 
     init(from decoder: any Decoder) throws {
@@ -81,8 +90,10 @@ struct DesignLayer: Identifiable, Equatable, Sendable, Decodable {
         order = try c.decodeIfPresent(String.self, forKey: .order) ?? "i"
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
         hidden = try c.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
+        locked = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
+        rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
     }
-    private enum Keys: String, CodingKey { case id, type, parent, order, name, hidden }
+    private enum Keys: String, CodingKey { case id, type, parent, order, name, hidden, locked, rotation }
 
     /// Frames, pages and components hold children (T1 `is_container`); an instance's children come from its component.
     var isContainer: Bool { ["page", "frame", "component"].contains(type) }
@@ -142,6 +153,15 @@ struct DesignPeer: Identifiable, Equatable, Sendable {
     /// `{"<client>": {label, selection, ai?, session?}}`. A malformed entry is skipped, never trusted: the peer is another
     /// device's text.
     static func decode(_ data: Data?) -> [DesignPeer] {
+        // The engine's list: `[{peer, label, kind: "person"|"ai", following}]`, oldest first.
+        if let data, let list = try? JSONDecoder().decode([DJSON].self, from: data) {
+            return list.compactMap { v in
+                guard let id = v["peer"]?.string else { return nil }
+                let ai = v["kind"]?.string == "ai"
+                let label = String((v["label"]?.string ?? "").prefix(40))
+                return DesignPeer(id: id, label: label.isEmpty ? (ai ? "An AI session" : "Someone") : label, isAI: ai, selection: [])
+            }
+        }
         guard let data, let all = try? JSONDecoder().decode([String: DJSON].self, from: data) else { return [] }
         return all.compactMap { id, v in
             guard v.object != nil else { return nil }
@@ -192,15 +212,73 @@ public protocol DesignEditBackend: AnyObject {
     func tokens() -> Data?
     /// An unsent edit can never go to the Core (it is over what one update takes): the design must be reopened.
     var syncStuck: Bool { get }
+    /// Remote updates no longer apply to this canvas's engine: only a new canvas (reopen) syncs again.
+    var syncHalted: Bool { get }
+    /// The Core could not be reached after a few tries.
+    var syncUnreachable: Bool { get }
+    /// The last undo/redo was refused as too large to send.
+    var lastUndoTooLarge: Bool { get }
+    /// How many images gave up loading; `retryAssets` asks again.
+    var assetFailures: Int { get }
+    func retryAssets()
+    /// Read only: the canvas selects but never edits.
+    func setReadOnly(_ on: Bool)
+    /// The first snapshot from the Core has reached the canvas.
+    var loaded: Bool { get }
+    /// The sync socket to the Core is open.
+    var syncConnected: Bool { get }
     /// The last `edit` was refused because the change is too large for one update.
     var lastEditTooLarge: Bool { get }
     /// The canvas tool (`CanvasTool`); it returns to select by itself after a shape is drawn.
     var tool: Int { get }
+    /// A design system's own tokens as JSON `[{name, kind, day, night}]`.
+    func docTokens() -> Data?
+    /// A node as a PNG at `scale` 1 to 4 in the day or night theme, drawn by the engine (transparent background).
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport
     func setTool(_ tool: Int)
     /// How document points show in the canvas view: `view = doc × zoom + pan`.
     func camera() -> CanvasCamera?
     /// Moves the camera so the document rect fits the view.
     func fit(_ rect: CGRect)
+    /// Presenting: clicks report the node under them (prototype links) and nothing is edited; nil ends it.
+    func present(_ tap: (@MainActor (String?) -> Void)?)
+    /// The people and AI sessions on the canvas (`[{peer, label, kind, following}]`, oldest first); nil while unknown.
+    func presenceList() -> Data?
+    /// Follows a peer's view (its `peer` id); an empty id stops.
+    func follow(_ peer: String)
+    /// Shows page `index` of the design, framed.
+    func setPage(_ index: Int)
+    /// Zooms about the middle of the canvas: by a factor, to a scale (1 = 100%), or to every artboard.
+    func zoom(by factor: Double)
+    func zoom(to scale: Double)
+    func fitAll()
+    /// Editor commands from the keyboard (copy, group, zoom…) are offered here first while the canvas has focus and no text
+    /// is being edited; true when taken.
+    func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?)
+    /// Debug only: a presence message as the Core relays it.
+    func debugPresence(_ json: String)
+    // The engine's own clipboard, group and component work: each is one undo step, selects what it made and says false when
+    // it could not (nothing selected, a page, a mix of parents…).
+    /// The clipboard JSON of the selection (`{"format": "ainkrad-design/1", …}`); nil when there is nothing to copy.
+    func copy() -> Data?
+    /// Pastes clipboard JSON (this design's or another's) into `parent` (nil: the page) with new ids; `atCenter` puts it
+    /// where the canvas is looking, else it keeps its place.
+    func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool
+    func duplicate() -> Bool
+    func group() -> Bool
+    func ungroup() -> Bool
+    func createComponent() -> Bool
+    /// An instance of a component (`"<design>/<node>"`) with its top-left at a view point (nil: where the canvas is looking).
+    func insertInstance(_ component: String, at: CGPoint?) -> Bool
+    func detachInstance() -> Bool
+}
+
+/// The engine's answer to a PNG export.
+public enum PNGExport: Sendable, Equatable {
+    case png(Data)
+    /// Over 16384 px a side or 64 million pixels.
+    case tooLarge
+    case failed
 }
 
 public struct CanvasCamera: Sendable, Equatable {
@@ -214,9 +292,49 @@ public struct CanvasCamera: Sendable, Equatable {
 
 extension DesignEditBackend {
     public var syncStuck: Bool { false }
+    public var syncHalted: Bool { false }
+    public var syncUnreachable: Bool { false }
+    public var lastUndoTooLarge: Bool { false }
+    public var assetFailures: Int { 0 }
+    public func retryAssets() {}
+    public func setReadOnly(_ on: Bool) {}
+    public var loaded: Bool { true }
+    public var syncConnected: Bool { true }
+    public func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport { .failed }
     public var lastEditTooLarge: Bool { false }
     public var tool: Int { 0 }
+    public func docTokens() -> Data? { nil }
     public func setTool(_ tool: Int) {}
     public func camera() -> CanvasCamera? { nil }
+    public func present(_ tap: (@MainActor (String?) -> Void)?) {}
     public func fit(_ rect: CGRect) {}
+    public func presenceList() -> Data? { nil }
+    public func follow(_ peer: String) {}
+    public func setPage(_ index: Int) {}
+    public func zoom(by factor: Double) {}
+    public func zoom(to scale: Double) {}
+    public func fitAll() {}
+    public func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?) {}
+    public func debugPresence(_ json: String) {}
+    public func copy() -> Data? { nil }
+    public func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool { false }
+    public func duplicate() -> Bool { false }
+    public func group() -> Bool { false }
+    public func ungroup() -> Bool { false }
+    public func createComponent() -> Bool { false }
+    public func insertInstance(_ component: String, at: CGPoint?) -> Bool { false }
+    public func detachInstance() -> Bool { false }
+}
+
+/// One token of a design system as the style guide edits it: a literal per theme.
+struct SystemToken: Identifiable, Equatable, Decodable, Sendable {
+    var id: String { name }
+    let name: String
+    let kind: String
+    let day: DJSON
+    let night: DJSON
+
+    /// The group it shows in: the part before the first dot (`color.primary` → `color`).
+    var group: String { String(name.split(separator: ".").first ?? "") }
+    var short: String { name.split(separator: ".").dropFirst().joined(separator: ".") }
 }
