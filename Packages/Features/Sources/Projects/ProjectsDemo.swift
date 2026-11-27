@@ -114,7 +114,7 @@ public final class ProjectsDemo {
         "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
         "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
         "dialog-branch-error", "gallery-crashed", "overview-crashed",
-    ]
+    ] + kindScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -123,7 +123,7 @@ public final class ProjectsDemo {
         "dialog-branch-error", "gallery-crashed", "overview-crashed",
     ]
 
-    private let model: ProjectsModel
+    let model: ProjectsModel
     public init(model: ProjectsModel) { self.model = model }
 
     private static func repo(_ id: Int64, _ name: String, fetched: Bool = true) -> RepoItem {
@@ -235,6 +235,7 @@ public final class ProjectsDemo {
         model.demoPreviewProblem = nil
         model.crashes = [:]
         model.core110 = Self.core110Scenes.contains(scene)
+        model.core111 = Self.core111Scenes.contains(scene)
         model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
         // Every scene starts from the standard Look; the look scenes change it below.
         let look = LookPrefs.shared
@@ -335,6 +336,7 @@ public final class ProjectsDemo {
             PreviewStore.shared.forget()
         default: break
         }
+        Self.kindSample(scene, &list)
         await model.useNow(Service(list))
         model.runService = DemoRunService()
         model.setRunnerSupported(true)
@@ -472,6 +474,7 @@ public final class ProjectsDemo {
             if let p = model.open { NewProjectDialogs.openAddRepos(model, p, picked: [Self.apiURL]) }
         default: break
         }
+        await showKind(scene)
     }
 }
 
