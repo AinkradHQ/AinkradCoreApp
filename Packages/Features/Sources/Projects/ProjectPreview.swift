@@ -72,7 +72,8 @@ struct PreviewIllustration: View {
     }
 }
 
-/// A project's picture: the last snapshot of its live view (greyed unless it is running), else the illustration.
+/// A project's picture: the last snapshot of its live view (kept in colour, a little quieter when it is not running), else a
+/// picture of its kind. The picture never sets the size of what holds it: it is laid over a clear base and clipped.
 struct ProjectPicture: View {
     let project: ProjectItem
     let colour: ProjectColour
@@ -80,13 +81,20 @@ struct ProjectPicture: View {
     var illustrate = true
     var body: some View {
         let running = project.tag == .running
+        let quiet = running || project.archived == false && project.tag == .starting
         if project.kind == .web, let img = PreviewStore.shared.image(project.id) {
-            Image(nsImage: img).resizable().scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .grayscale(running ? 0 : 1).opacity(running ? 1 : 0.45)
+            Color.clear
+                .overlay(alignment: .top) { Image(nsImage: img).resizable().scaledToFill() }
+                .grayscale(project.archived ? 1 : (running ? 0 : 0.6)).opacity(running ? 1 : 0.8)
                 .clipped().accessibilityHidden(true)
         } else if illustrate {
-            PreviewIllustration(name: project.name, colour: colour).opacity(running ? 1 : 0.7)
+            if project.kind == .web {
+                PreviewIllustration(name: project.name, colour: colour).opacity(quiet ? 1 : 0.8)
+            } else {
+                KindPicture(kind: project.kind, hue: colour.fill, animated: false).scaleEffect(1.45)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .grayscale(project.archived ? 1 : 0).opacity(quiet ? 1 : 0.8)
+            }
         }
     }
 }

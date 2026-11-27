@@ -35,6 +35,29 @@ enum ProjectKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// What the wizard's tile says in a few words.
+    var tagline: String {
+        switch self {
+        case .web: "A site or web app"
+        case .app: "Mac, iPhone or Android"
+        case .infra: "Servers and platforms"
+        case .other: "Docs, research, a book"
+        }
+    }
+
+    /// The tile's title in the wizard.
+    var tileTitle: String { self == .other ? "Anything else" : short }
+
+    /// "Looks like …": how the wizard names this kind in its one-line correction.
+    var lookWord: String {
+        switch self {
+        case .web: "a Web project"
+        case .app: "an App"
+        case .infra: "Infrastructure"
+        case .other: "a project that is not software"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .web: "globe"
@@ -53,6 +76,10 @@ enum ProjectKind: String, CaseIterable, Identifiable, Sendable {
 struct KindSuggestion: Equatable, Sendable {
     let kind: ProjectKind
     let why: String
+    /// What the repos say, short ("Swift, iOS"): the wizard's one-line correction.
+    var evidence = ""
+    /// The repos clearly say it. False for "no repos" and for the web fallback guess: those never change the kind.
+    var clear = false
 }
 
 extension ProjectKind {
@@ -116,13 +143,14 @@ extension ProjectKind {
             }
         }
         if docsOnly && score.isEmpty {
-            return KindSuggestion(kind: .other, why: "Your repos hold no code, only documents.")
+            return KindSuggestion(
+                kind: .other, why: "Your repos hold no code, only documents.", evidence: "only documents", clear: true)
         }
         guard let best = order.max(by: { (score[$0] ?? 0) < (score[$1] ?? 0) }), (score[best] ?? 0) >= 0.5 else {
             return KindSuggestion(kind: .web, why: "Nothing in your repos says what it is, so web is a guess.")
         }
-        return KindSuggestion(
-            kind: best, why: "Suggested from your repos: \((evidence[best] ?? []).prefix(3).joined(separator: ", "))")
+        let shown = (evidence[best] ?? []).prefix(3).joined(separator: ", ")
+        return KindSuggestion(kind: best, why: "Suggested from your repos: \(shown)", evidence: shown, clear: true)
     }
 
     /// The devices a project's repos are named for ("iOS, Android"); empty when the names say nothing.

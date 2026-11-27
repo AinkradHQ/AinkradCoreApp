@@ -4,13 +4,13 @@ import Foundation
 /// Debug only: the scenes of the project kinds (the wizard's "What is it?" step and each kind's Overview and Settings).
 extension ProjectsDemo {
     static let kindScenes = [
-        "new-kind", "new-kind-other", "new-kind-picked", "new-runs-app", "new-review-other", "gallery-kinds",
+        "gallery-kinds",
         "overview-app", "overview-app-running", "overview-infra", "overview-infra-stopped", "overview-other",
         "page-settings-kind", "page-settings-kind-old-core",
     ]
 
     /// The scenes that show a Core with API 111 (it holds the kind).
-    static let core111Scenes: Set<String> = ["page-settings-kind", "gallery-kinds", "overview-other"]
+    static let core111Scenes: Set<String> = ["page-settings-kind", "gallery-kinds", "gallery-kinds-hover", "overview-other"]
 
     static let iosURL = "https://github.com/tidepool-labs/tidepool-ios"
 
@@ -31,7 +31,7 @@ extension ProjectsDemo {
     /// The sample list for a kind scene: which of the four projects is which kind.
     static func kindSample(_ scene: String, _ list: inout [ProjectItem]) {
         switch scene {
-        case "gallery-kinds":
+        case "gallery-kinds", "gallery-kinds-hover":
             set(&list[1], .app, "Tidepool Mobile", ["tidepool-ios", "tidepool-android"], "Order tracking for couriers")
             set(&list[2], .infra, "Tidepool Platform", ["tidepool-infra", "tidepool-os"], "The servers behind it all")
             set(&list[3], .other, "Harbour Book", [], "Research for the book")
@@ -78,15 +78,6 @@ extension ProjectsDemo {
             await model.refreshLive(1)
         }
         switch scene {
-        case "new-kind", "new-kind-picked", "new-runs-app":
-            await model.loadCatalog()
-            NewProjectDialogs.openWizard(
-                model, name: "Tidepool Mobile", picked: [Self.iosURL],
-                step: scene == "new-runs-app" ? .runs : .kind)
-        case "new-kind-other":
-            NewProjectDialogs.openWizard(model, name: "Harbour Book", step: .kind)
-        case "new-review-other":
-            NewProjectDialogs.openWizard(model, name: "Harbour Book", step: .review)
         case "gallery-kinds": break
         case "overview-app", "overview-infra-stopped": model.openID = scene == "overview-app" ? 2 : 4
         case "overview-app-running", "overview-infra": model.openID = 1
