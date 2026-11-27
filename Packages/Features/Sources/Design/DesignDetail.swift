@@ -84,6 +84,7 @@ struct DesignDetail: View {
             .disabled(model.allProjects.isEmpty || model.readOnly)
             .help("Relate this to projects; it stays in the library either way")
             .accessibilityIdentifier("design-projects")
+            if case .doc(let d) = item { DesignCollabHeader(model: model, doc: d, editor: editor) }
             if editor != nil, case .doc(let d) = item {
                 AppActionTile(title: "Present", symbol: "play.rectangle", key: "", hue: GlassInk.accent(paneAccent)) {
                     model.present(d)
@@ -115,6 +116,10 @@ struct DesignDetail: View {
         if case .doc(let d) = item, d.kind == .mockup {
             MockupStage(model: model, doc: d)
                 .padding(Space.s2)
+                .coreWell(radius: Radius.pane)
+                .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .kit(let k) = item {
+            BrandKitEditor(model: model, kit: k)
                 .coreWell(radius: Radius.pane)
                 .contextMenu { DesignMenu(model: model, item: item) }
         } else if case .doc(let d) = item, d.kind == .system, let canvas = model.canvasView(d) {
@@ -225,7 +230,7 @@ struct AboutIsland: View {
         switch item {
         case .doc(let d):
             fact("Kind", item.kindWord.capitalizedFirst)
-            if d.kind == .design { fact("System", model.doc(d.system)?.name ?? "None") }
+            if d.kind == .design { DocSystemPicker(model: model, doc: d) }
             fact("Updated", Ago.words(d.updatedAt))
             fact("Made by", Self.who(d.createdBy))
             if d.aiPaused { fact("AI", "Paused") }
@@ -243,9 +248,9 @@ struct AboutIsland: View {
 
     @ViewBuilder private var extra: some View {
         switch item {
-        case .asset(let a) where !a.tags.isEmpty:
+        case .asset(let a):
             heading("Tags")
-            Text(a.tags.joined(separator: " · ")).fixedSize(horizontal: false, vertical: true)
+            AssetTagsEditor(model: model, asset: a)
         case .kit(let k):
             if !k.colors.isEmpty {
                 heading("Colours")

@@ -29,12 +29,16 @@ public final class DesignModel {
     /// Every item, newest first: sorted once when a list changes, not on every count and redraw.
     private(set) var items: [DesignItem] = []
     var load: DesignLoad = .notConnected
+    /// Sort, favourites, multi-select, uploads, archived designs and undoable deletes (`DesignLibrary.swift`).
+    let lib = DesignLibrary()
+    /// Comments and approvals of the designs on screen (`DesignCollab.swift`).
+    let collab = DesignCollab()
     /// The rail's pick.
     var category = DesignCategory.all
     /// The rail's project (by id), or nil for all projects.
     var project: String?
     /// The top bar's Filter field: names, kinds and tags.
-    var filter = ""
+    var filter = "" { didSet { if filter != oldValue { lib.searchChanged(filter) } } }
     /// The open item (a `DesignItem.id`), or nil for the home.
     var openID: String?
     /// The card the keyboard is on (a `DesignItem.id`), or nil.
@@ -50,7 +54,7 @@ public final class DesignModel {
     /// The pictures of loaded assets, by sha256.
     private(set) var images: [String: NSImage] = [:]
     @ObservationIgnored private var fetching: Set<String> = []
-    private(set) var readOnly = false
+    var readOnly = false
     /// The Core can draw three directions from a prompt (API minor 95, E11-4).
     private(set) var composeSupported = false
     /// The Core can write a whole design system with AI (API 108).
@@ -65,6 +69,10 @@ public final class DesignModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: the Comments panel shown open.
+    var debugCommentsOpen = false
+    /// Snapshots only: the style guide's Add token popover shown open.
+    var debugAddTokenOpen = false
     /// Snapshots only: the app's on-canvas probe (pointer and keys on the real canvas view), set by the app.
     @ObservationIgnored public var debugCanvasProbe: (@MainActor (@escaping @MainActor (String) -> Void) async -> Void)?
     #endif
@@ -72,6 +80,8 @@ public final class DesignModel {
     public init(host: any AdminHost, projects: ProjectsModel) {
         self.host = host
         projectsModel = projects
+        lib.model = self
+        collab.model = self
         projects.designsIsland = { [weak self] ref in
             guard let self else { return AnyView(EmptyView()) }
             return AnyView(DesignsIsland(model: self, project: ref))
@@ -107,13 +117,20 @@ public final class DesignModel {
         editors = [:]
         readOnly = false
         composeSupported = false
+        lib.reset()
+        collab.reset()
     }
 
     public var isConnected: Bool { service != nil }
     public func resync() { if service != nil { Task { await reload() } } }
 
     /// An event from the Core that may change what the screens show (ids only: `design.doc`, `design.asset`, …).
-    public func event(kind: String) { if kind.hasPrefix("design.") { resync() } }
+    public func event(kind: String) {
+        if kind.hasPrefix("design.") {
+            resync()
+            collab.refresh()
+        }
+    }
 
     func reload() async {
         guard let service else { return }
@@ -129,7 +146,9 @@ public final class DesignModel {
             if let connection {
                 composeSupported = await connection.serverSupports(minor: coreMinorV010)
                 systemAISupported = await connection.serverSupports(minor: 108)
+                lib.restoreSupported = await connection.serverSupports(minor: 109)
             }
+            if lib.archivedLoaded { await lib.loadArchived() }
         } catch let e as DesignFailure where e.status == 404 || e.status == 501 {
             load = .absent
         } catch {
@@ -140,9 +159,10 @@ public final class DesignModel {
     // MARK: derived
 
     /// Every item, newest first.
-    private func sortItems() {
-        items = (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
-            .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+    func sortItems() {
+        let all = (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
+            .filter { !lib.hidden.contains($0.id) }
+        items = DesignLibrary.order(all, sort: lib.sort, favourites: lib.favourites, favouritesFirst: lib.favouritesFirst)
     }
 
     /// The items after the rail's project and the Filter field.
@@ -150,7 +170,9 @@ public final class DesignModel {
 
     func visible(in project: String?) -> [DesignItem] {
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        return items.filter { item in
+        // What the Core found for the typed text beyond the lists' 500 joins them.
+        let pool = q.isEmpty || lib.extra.isEmpty ? items : items + lib.extra.map(DesignItem.asset)
+        return pool.filter { item in
             (project.map { item.projects.contains($0) } ?? true)
                 && (q.isEmpty || item.name.lowercased().contains(q) || item.kindWord.lowercased().contains(q)
                     || item.tags.contains { $0.lowercased().contains(q) })
@@ -163,6 +185,11 @@ public final class DesignModel {
         switch c {
         // TODO(V6-02): designs waiting for review or approval. TODO(V7-02): designs an AI session is drawing.
         case .needsYou, .drawing: []
+        case .archived:
+            lib.archived.map(DesignItem.doc).filter {
+                let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
+                return q.isEmpty || $0.name.lowercased().contains(q)
+            }
         case .all: visible(in: project)
         case .library: visible(in: project).filter { DesignCategory.libraryKinds.contains($0.category) }
         default: visible(in: project).filter { $0.category == c }
@@ -170,7 +197,7 @@ public final class DesignModel {
     }
 
     /// A category row's count: what picking it shows (a category is never scoped to a project).
-    func count(_ c: DesignCategory) -> Int { items(in: c, project: nil).count }
+    func count(_ c: DesignCategory) -> Int { c == .archived && !lib.archivedLoaded ? -1 : items(in: c, project: nil).count }
 
     /// The projects with something related to them, for the rail.
     var railProjects: [(ref: ProjectRef, count: Int)] {
@@ -295,7 +322,10 @@ public final class DesignModel {
     /// Makes the design and opens it. Returns the Core's refusal in words (the advanced sheet shows it inline), nil on
     /// success; the quick path toasts it.
     @discardableResult
-    func create(kind: DesignDoc.Kind, name: String, project: String?, toast: Bool = true) async -> String? {
+    func create(
+        kind: DesignDoc.Kind, name: String, project: String?, system: String? = nil,
+        starter: [[String: DJSON]]? = nil, toast: Bool = true
+    ) async -> String? {
         guard let service else { return "Not connected to a Core." }
         if readOnly || host.pausedReason != nil {
             let why = host.pausedReason ?? "This device can look at designs but not change them."
@@ -304,9 +334,9 @@ public final class DesignModel {
         }
         do {
             let d = try await service.create(
-                kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project)
+                kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project, system: system)
             docs.append(d)
-            if kind == .design { editor(for: d.id).starter = DesignOptions.starterOps(DesignOptions.canvas) }
+            if kind == .design { editor(for: d.id).starter = starter ?? DesignOptions.starterOps(DesignOptions.canvas) }
             host.shell.closeDialog()
             category = .all
             filter = ""
@@ -358,6 +388,8 @@ public final class DesignModel {
         selected = nil
         project = nil
         openID = nil
+        lib.clearSelection()
+        if c == .archived { Task { await lib.loadArchived() } }
     }
 
     func pickProject(_ id: String) {
