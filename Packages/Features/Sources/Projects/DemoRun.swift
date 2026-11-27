@@ -109,6 +109,8 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
 
     func touch(project: Int64) async throws {}
 
+    func metrics(project: Int64) async throws -> [String: ServiceSeries] { DemoLive.metrics() }
+
     func specVersions(project: Int64) async throws -> [SpecVersionSummary] {
         lock.withLock {
             history(project).reversed().map {

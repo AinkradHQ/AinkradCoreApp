@@ -334,7 +334,10 @@ struct LiveCoreService: CoreService {
                         if kind == "runner.tool_install" {
                             out.yield(.toolInstall(fields: p.compactMapValues { Self.text($0) }))
                         }
-                        if AccountNotice.kinds.contains(kind) || kind == "brain.inbox" || kind.hasPrefix("lore.note.") {
+                        if AccountNotice.kinds.contains(kind) || kind == "brain.inbox"
+                            || kind == "project.service_crashed"
+                            || kind.hasPrefix("lore.note.")
+                        {
                             out.yield(.notice(kind: kind, fields: p.compactMapValues { Self.text($0) }))
                         }
                     }

@@ -526,6 +526,8 @@ public final class AppModel {
         case .notice(let kind, let fields):
             if kind.hasPrefix("lore.note.") {
                 lore.remote(fields)
+            } else if kind == "project.service_crashed" {
+                projects.serviceCrashed(fields)
             } else if kind == "brain.inbox" {
                 brain.inboxNotice(
                     unsorted: Int(fields["unsorted"] ?? "") ?? 0, newRooms: Int(fields["new_rooms"] ?? "") ?? 0)

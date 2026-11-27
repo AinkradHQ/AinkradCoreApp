@@ -3,6 +3,9 @@ import CoreKit
 import Foundation
 import OpenAPIRuntime
 
+/// The API minor that brought the private preview, project colours, metrics, start steps, branch change and crash alerts.
+let coreMinorProjects: Int32 = 110
+
 /// The Core as the Projects screens use it (`/api/v1/projects`, AinkradCore PR #279). Reads need `read`; every write is
 /// `admin` and step-up, so the model runs them through the host's Touch ID. Tests and the demo bring their own.
 protocol ProjectsService: Sendable {
@@ -44,6 +47,8 @@ protocol ProjectsService: Sendable {
     /// The project's AI sessions (newest first). The Core has no project filter on the list yet, so a live service reads a page
     /// and keeps the ones whose `project_id` is this project.
     func sessions(project: Int64) async throws -> [ProjectLive.Session]
+    /// Makes a repo follow another branch of the Core's copy (`PATCH /projects/{id}/repos/{repo}`, API 110).
+    func setBranch(project: Int64, repo: Int64, branch: String) async throws
 }
 
 /// What a PATCH of a project changes: a nil field is left as it is.
@@ -57,6 +62,8 @@ struct ProjectPatch: Equatable, Sendable {
     var memLimitMb: Int64?
     var idleMinutes: Int64?
     var idleNever: Bool?
+    /// One of the accent names; "" clears it (API 110).
+    var colour: String?
 
     var isEmpty: Bool { self == ProjectPatch() }
 }
@@ -72,6 +79,9 @@ struct RunnerInfo: Equatable, Identifiable, Sendable {
 
 extension ProjectsService {
     func sessions(project: Int64) async throws -> [ProjectLive.Session] { [] }
+    func setBranch(project: Int64, repo: Int64, branch: String) async throws {
+        throw CoreError.protocolViolation("This Core cannot change a repo's branch.")
+    }
     // Stand-ins and tests that do not run projects need not answer these.
     func update(project: Int64, name: String, description: String) async throws {}
     func archive(project: Int64) async throws {}
@@ -113,8 +123,16 @@ struct LiveProjectsService: ProjectsService {
     let connection: CoreConnection
     private var client: Client { connection.client }
 
+    private var has110: Bool { get async { await connection.serverSupports(minor: coreMinorProjects) } }
+
     func projects() async throws -> [ProjectItem] {
-        try await run { try await client.listProjects().ok.body.json.filter { $0.state != "archived" }.map(Self.item) }
+        // From minor 110 the list carries each project's `color`, which the synced client does not know: read it raw.
+        if await has110 {
+            return try Self.decode(try await signed("GET", "/api/v1/projects")).filter { !$0.archived }
+        }
+        return try await run {
+            try await client.listProjects().ok.body.json.filter { $0.state != "archived" }.map(Self.item)
+        }
     }
 
     func create(slug: String, name: String) async throws -> ProjectItem {
@@ -155,6 +173,11 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func update(project: Int64, patch p: ProjectPatch) async throws {
+        // `color` is not in the synced client: a patch that sets it goes as raw JSON.
+        if p.colour != nil {
+            _ = try await signed("PATCH", "/api/v1/projects/\(project)", body: Self.patchBody(p))
+            return
+        }
         try await run {
             _ = try await client.updateProject(
                 path: .init(id: String(project)),
@@ -180,7 +203,29 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func project(id: Int64) async throws -> ProjectItem? {
-        try await run { Self.item(try await client.getProject(path: .init(id: String(id))).ok.body.json) }
+        if await has110 { return try Self.decode(try await signed("GET", "/api/v1/projects/\(id)")).first }
+        return try await run { Self.item(try await client.getProject(path: .init(id: String(id))).ok.body.json) }
+    }
+
+    func setBranch(project: Int64, repo: Int64, branch: String) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["branch": branch])
+        _ = try await signed("PATCH", "/api/v1/projects/\(project)/repos/\(repo)", body: body)
+    }
+
+    /// `PATCH /projects/{id}` as JSON: the fields the patch sets, by the Core's names.
+    static func patchBody(_ p: ProjectPatch) throws -> Data {
+        var o: [String: Any] = [:]
+        if let v = p.name { o["name"] = v }
+        if let v = p.description { o["description"] = v }
+        if let v = p.slug { o["slug"] = v }
+        if let v = p.expose { o["expose"] = v }
+        if let v = p.runner { o["runner"] = v }
+        if let v = p.cpuLimit { o["cpu_limit"] = v }
+        if let v = p.memLimitMb { o["mem_limit_mb"] = v }
+        if let v = p.idleMinutes { o["idle_minutes"] = v }
+        if let v = p.idleNever { o["idle_never"] = v }
+        if let v = p.colour { o["color"] = v }
+        return try JSONSerialization.data(withJSONObject: o)
     }
 
     func runners() async throws -> [RunnerInfo] {
@@ -243,7 +288,13 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func sessions(project: Int64) async throws -> [ProjectLive.Session] {
-        try await run {
+        // From minor 110 the Core filters by project itself.
+        if await has110 {
+            let data = try await signed("GET", "/api/v1/agent-sessions?project=\(project)&limit=200")
+            let list = try Self.decoder().decode([Components.Schemas.AgentSession].self, from: data)
+            return Self.rows(list, now: Date())
+        }
+        return try await run {
             let list = try await client.listAgentSessions(query: .init(limit: 200)).ok.body.json
             return Self.sessions(list, project: project, now: Date())
         }
@@ -251,7 +302,12 @@ struct LiveProjectsService: ProjectsService {
 
     /// The project's sessions as the Overview rows: waiting on a person, working, or done.
     static func sessions(_ all: [Components.Schemas.AgentSession], project: Int64, now: Date) -> [ProjectLive.Session] {
-        all.filter { $0.projectId == project }.map { s in
+        rows(all.filter { $0.projectId == project }, now: now)
+    }
+
+    /// Sessions as the Overview rows, newest first as the Core sent them.
+    static func rows(_ all: [Components.Schemas.AgentSession], now: Date) -> [ProjectLive.Session] {
+        all.map { s in
             let state: ProjectLive.Session.State =
                 s.waiting != nil ? .needsYou : ["starting", "running"].contains(s.state) ? .running : .done
             let micros = s.usage?.costUsdMicros
@@ -273,6 +329,12 @@ struct LiveProjectsService: ProjectsService {
     // `restartProjectRun` and `touchProjectRun`, all answering `ProjectRun`. They are not in the synced client until the epic's
     // regen, so this compiles at the epic build.
     func run(project: Int64) async throws -> ProjectRunState? {
+        // From minor 110 `GET /run` carries the start's steps, which the synced client does not know: read it raw.
+        if await has110 {
+            do {
+                return try Self.runState(try await signed("GET", "/api/v1/projects/\(project)/run"))
+            } catch CoreError.http(404, _, _) { return nil }
+        }
         do {
             return try await run {
                 Self.state(try await client.getProjectRun(path: .init(id: String(project))).ok.body.json)
@@ -314,6 +376,13 @@ struct LiveProjectsService: ProjectsService {
             runner: r.runner, lastActivityAt: r.lastActivityAt)
     }
 
+    /// `GET /run` as JSON: the generated type reads the run, the raw object adds the steps.
+    static func runState(_ data: Data) throws -> ProjectRunState {
+        var state = Self.state(try decoder().decode(Components.Schemas.ProjectRun.self, from: data))
+        state.steps = RunStep.read((try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["steps"])
+        return state
+    }
+
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
 
     /// Whatever the generated client threw, as the `CoreError` inside it.
@@ -335,14 +404,35 @@ struct LiveProjectsService: ProjectsService {
             source: p.source, createdAt: p.createdAt, archived: p.state == "archived")
     }
 
-    /// The Core's list as JSON (the shapes of `api/openapi.json`), for tests: dates read as the client reads them.
-    static func decode(_ data: Data) throws -> [ProjectItem] {
+    /// The decoder for the Core's JSON: dates read as the client reads them.
+    static func decoder() -> JSONDecoder {
         let transcoder = Configuration(dateTranscoder: .iso8601WithFractionalSeconds).dateTranscoder
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { d in
             try transcoder.decode(try d.singleValueContainer().decode(String.self))
         }
-        return try decoder.decode([Components.Schemas.ProjectInfo].self, from: data).map(item)
+        return decoder
+    }
+
+    /// The Core's list (or one project) as JSON (the shapes of `api/openapi.json`): the projects, each with the `color` the
+    /// Core holds (API 110), which the synced client does not know.
+    static func decode(_ data: Data) throws -> [ProjectItem] {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        var colours: [Int64: String] = [:]
+        for o in (json as? [[String: Any]]) ?? (json as? [String: Any]).map({ [$0] }) ?? [] {
+            if let id = (o["id"] as? NSNumber)?.int64Value, let c = o["color"] as? String, !c.isEmpty {
+                colours[id] = c
+            }
+        }
+        let infos: [Components.Schemas.ProjectInfo] =
+            json is [Any]
+            ? try decoder().decode([Components.Schemas.ProjectInfo].self, from: data)
+            : [try decoder().decode(Components.Schemas.ProjectInfo.self, from: data)]
+        return infos.map {
+            var p = item($0)
+            p.colourName = colours[$0.id]
+            return p
+        }
     }
 }
 

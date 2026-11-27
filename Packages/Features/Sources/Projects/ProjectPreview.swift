@@ -92,11 +92,13 @@ struct ProjectPicture: View {
 }
 
 extension ProjectsModel {
-    /// Where the running app can be seen from this Mac. Today that is its public link while it runs and the link is on.
-    /// A private link has no address the app can open: the Core's preview proxy (lane Q) will return one here, and nothing
-    /// else changes.
+    /// Where the running app can be seen from this Mac. On a Core with the preview route (API 110) that is the private preview,
+    /// served through the signed API from the app's own URL scheme, so a running project shows live with the public link off.
+    /// On an older Core it is the public link while it runs and the link is on, as before.
     func previewURL(for project: ProjectItem) -> URL? {
-        guard project.tag == .running, project.expose else { return nil }
+        guard project.tag == .running else { return nil }
+        if core110, previewFetch != nil { return PreviewProxy.url() }
+        guard project.expose else { return nil }
         return URL(string: "https://\(project.link)")
     }
 }
@@ -125,12 +127,21 @@ final class LiveWebModel {
 struct LiveWebView: NSViewRepresentable {
     let url: URL
     let model: LiveWebModel
+    /// The project's preview (the private one, when `url` is of the app's own scheme): its id, how to send a signed request and
+    /// the Core's host, for redirects.
+    var preview: (project: Int64, coreHost: String?, fetch: PreviewFetch)?
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model, host: url.host) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
+        if url.scheme == PreviewProxy.scheme, let p = preview {
+            let handler = PreviewSchemeHandler(project: p.project, coreHost: p.coreHost, fetch: p.fetch)
+            let model = model
+            handler.onProblem = { words in model.state = .failed(words) }
+            config.setURLSchemeHandler(handler, forURLScheme: PreviewProxy.scheme)
+        }
         let web = WKWebView(frame: .zero, configuration: config)
         web.navigationDelegate = context.coordinator
         web.setValue(false, forKey: "drawsBackground")
@@ -154,7 +165,11 @@ struct LiveWebView: NSViewRepresentable {
             self.host = host
         }
         func webView(_ w: WKWebView, didFinish navigation: WKNavigation!) {
-            Task { @MainActor in model.state = .live }
+            Task { @MainActor in
+                // A page the Core could not show already said why; the words stay until Try Again.
+                if case .failed = model.state { return }
+                model.state = .live
+            }
         }
         func webView(_ w: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }
         func webView(_ w: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -171,7 +186,7 @@ struct LiveWebView: NSViewRepresentable {
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
             if action.navigationType == .linkActivated, let url = action.request.url, url.host != host {
-                NSWorkspace.shared.open(url)
+                if url.scheme == "https" || url.scheme == "http" { NSWorkspace.shared.open(url) }
                 decisionHandler(.cancel)
             } else {
                 decisionHandler(.allow)

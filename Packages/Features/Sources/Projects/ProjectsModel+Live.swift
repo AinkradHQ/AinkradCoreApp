@@ -16,6 +16,7 @@ struct LiveParts: Equatable, Sendable {
     var room: ProjectLive.Room?
     var roomID: String?
     var crashLoop = false
+    var metrics: [String: ServiceSeries] = [:]
 }
 
 /// The Core is read for what the Overview shows, instead of the stand-in data the Debug demo fills.
@@ -49,8 +50,10 @@ extension ProjectsModel {
         var parts = liveParts[id] ?? LiveParts()
         if let state = project(id)?.run?.state, state == .running || state == .starting {
             if let s = try? await runService?.services(project: id) { parts.services = s }
+            if core110, let m = try? await runService?.metrics(project: id) { parts.metrics = m }
         } else {
             parts.services = []
+            parts.metrics = [:]
         }
         if let s = try? await service?.sessions(project: id) { parts.sessions = s }
         if let ins = insightsService, let t = try? await ins.tuning(project: id) {

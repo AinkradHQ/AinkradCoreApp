@@ -85,6 +85,8 @@ struct ProjectLive: Equatable, Sendable {
     var progress: Double? = nil
     var progressLine = ""
     var steps: [StartStep] = []
+    /// CPU and memory history per service (API 110), for the sparklines.
+    var metrics: [String: ServiceSeries] = [:]
     /// Why the last start failed, in words.
     var failure: String?
     /// What to do about it.
@@ -98,10 +100,12 @@ struct ProjectLive: Equatable, Sendable {
     var stale = false
 }
 
-/// One step of a start, as the Core will say them (lane Q); nothing fills these yet.
+/// One step of a start, as the Core says them (API 110, `ProjectRun.steps`).
 struct StartStep: Equatable, Sendable {
     let title: String
-    var done: Bool
+    var state: RunStep.State = .pending
+    var detail: String?
+    var done: Bool { state == .done }
 }
 
 /// The pages of a project's space. `⌘` + `key` opens one. The rail shows them in this order, Project Settings last at the

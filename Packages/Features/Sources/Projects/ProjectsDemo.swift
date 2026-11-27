@@ -1,5 +1,6 @@
 #if DEBUG
 import Brain
+import CoreKit
 import CoreUI
 import Foundation
 import Shell
@@ -57,6 +58,10 @@ public final class ProjectsDemo {
                 if let v = p.slug { list[i] = ProjectItem.renamed(list[i], slug: v) }
             }
         }
+        func setBranch(project: Int64, repo: Int64, branch: String) async throws {
+            guard branch != "nope" else { throw CoreError.badRequest(message: "no such branch") }
+            // The demo keeps the repo as it is: the branch dialog is what is shown.
+        }
         func archivedProjects() async throws -> [ProjectItem] {
             [
                 ProjectItem(
@@ -95,6 +100,17 @@ public final class ProjectsDemo {
         "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
         "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
         "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
+        // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
+        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+        "dialog-branch-error", "gallery-crashed", "overview-crashed",
+    ]
+
+    /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
+    static let core110Scenes: Set<String> = [
+        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+        "dialog-branch-error", "gallery-crashed", "overview-crashed",
     ]
 
     private let model: ProjectsModel
@@ -207,6 +223,10 @@ public final class ProjectsDemo {
         ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
         model.clearWriteError()
         model.demoPage = true
+        model.demoPreviewProblem = nil
+        model.crashes = [:]
+        model.core110 = Self.core110Scenes.contains(scene)
+        model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
         // Every scene starts from the standard Look; the look scenes change it below.
         let look = LookPrefs.shared
         (look.mode, look.opacity, look.blur) = (CoreLook.standard.mode, CoreLook.standard.opacity, 1)
@@ -270,6 +290,33 @@ public final class ProjectsDemo {
             list[3].live = nil
         case "overview-private":
             list[0].expose = false
+        case "overview-private-live", "overview-preview-busy":
+            list[0].expose = false
+        case "overview-starting-steps":
+            list[1].run = RunSummary(state: .starting, services: 5)
+            var l = DemoLive.make(.starting, progress: 0.4)
+            l.progressLine = "Starting on core-oracle · 2 of 5 services up"
+            l.steps = [
+                StartStep(title: "Getting the code", state: .done),
+                StartStep(title: "Building the images", state: .done),
+                StartStep(title: "Starting the services", state: .active, detail: "2 of 5 services up"),
+                StartStep(title: "Checking they are healthy", state: .pending),
+            ]
+            list[1].live = l
+        case "overview-failed-step":
+            var l = DemoLive.make(.failed)
+            l.failure = "The last start failed."
+            l.failureFix = "Check the run setup, then start it again."
+            l.steps = [
+                StartStep(title: "Getting the code", state: .done),
+                StartStep(title: "Building the images", state: .failed, detail: "web: npm ci exited with code 1"),
+                StartStep(title: "Starting the services", state: .pending),
+                StartStep(title: "Checking they are healthy", state: .pending),
+            ]
+            list[2].live = l
+        case "overview-metrics", "page-run-metrics":
+            list[0].live?.metrics = DemoLive.metrics()
+        case "page-settings-core-colour": list[0].colourName = "teal"
         case "overview-never-opened":
             PreviewStore.shared.forget()
         default: break
@@ -285,7 +332,9 @@ public final class ProjectsDemo {
             (look.mode, look.opacity, look.blur) = (.blurred, 0.12, 1)
             if scene == "overview-look" { model.openID = 1 }
         case "gallery-look-solid": (look.mode, look.opacity, look.blur) = (.solid, 1, 1)
-        case "overview-private", "overview-running": model.openID = 1
+        case "overview-private", "overview-running", "overview-private-live", "overview-preview-busy",
+            "overview-metrics", "overview-crashed":
+            model.openID = 1
         case "overview-never-opened": model.openID = 4
         default: break
         }
@@ -354,6 +403,31 @@ public final class ProjectsDemo {
             case "dialog-secret-file":
                 RunDialogs.openSecret(run, project: p, name: "service_account", replacing: true, kind: "file")
             default: model.openInstructions(p)
+            }
+        case "overview-preview-busy":
+            model.demoPreviewProblem = "The app is busy with other requests. Try again in a moment."
+        case "gallery-crashed", "overview-crashed":
+            model.serviceCrashed(
+                [
+                    "id": "1", "run": "r_demo", "service": "api", "exit_code": "1", "restarts": "3", "config": "web",
+                    "environment": "development",
+                ])
+        case "page-run-metrics":
+            model.openID = 1
+            model.section = .run
+        case "page-settings-core-colour":
+            model.openID = 1
+            model.section = .settings
+        case "page-repos-branch", "dialog-branch", "dialog-branch-error":
+            model.openID = 1
+            model.section = .repos
+            try? await Task.sleep(for: .milliseconds(500))
+            if scene != "page-repos-branch", let p = model.open, let r = p.repos.first {
+                RepoDialogs.openBranch(model, p, r)
+                if scene == "dialog-branch-error" {
+                    model.writeError = model.branchWords(
+                        CoreError.badRequest(message: "no such branch"), branch: "release/9", repo: r.name)
+                }
             }
         case "overview-stale":
             model.openID = 1
@@ -498,6 +572,24 @@ enum DemoLive {
             live.failureFix = "STRIPE_SECRET is not set. Set it in Run › Secrets, then start again."
         }
         return live
+    }
+}
+
+extension DemoLive {
+    /// A calm hour of readings for the demo's five services, 30 a service.
+    static func metrics() -> [String: ServiceSeries] {
+        let base: [(String, Double, Double)] = [
+            ("web", 18, 212), ("api", 9, 148), ("queue", 3, 96), ("mysql", 6, 402), ("redis", 1, 12),
+        ]
+        return Dictionary(
+            uniqueKeysWithValues: base.enumerated().map { i, b in
+                (
+                    b.0,
+                    ServiceSeries(
+                        cpu: (0..<30).map { max(0, b.1 * (1 + 0.6 * sin(Double($0 + i * 5) / 3))) },
+                        memory: (0..<30).map { (b.2 + Double($0) * b.2 / 120 + 4 * sin(Double($0 + i))) * 1_048_576 })
+                )
+            })
     }
 }
 

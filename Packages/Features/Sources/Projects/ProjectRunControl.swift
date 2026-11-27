@@ -24,8 +24,10 @@ extension ProjectsModel {
             live.sessions = parts.sessions
             live.room = parts.room
             live.roomID = parts.roomID
+            live.metrics = parts.metrics
         }
         live.stale = p.stale
+        p.crash = core110 ? crash(for: p.id, run: runStates[p.id]) : nil
         guard let r = runStates[p.id] else {
             if parts != nil { p.live = live }
             return p
@@ -38,7 +40,7 @@ extension ProjectsModel {
             r.summary.state == .running && !p.idleNever
             ? remaining.map { "idle \(max(0, p.idleMinutes - $0)) min of \(p.idleMinutes)" } : nil
         // No guessed easing: the bar is the services the Core reports up of the services the setup has, and nothing when it
-        // reports none yet. `live.steps` is where the Core's own start steps will go.
+        // reports none yet. `live.steps` are the Core's own start steps (API 110).
         let up = live.services.filter { $0.state == .up }.count
         let total = p.draft?.services.count ?? live.services.count
         live.progress = total > 0 && !live.services.isEmpty ? Double(up) / Double(total) : nil
@@ -46,6 +48,11 @@ extension ProjectsModel {
         live.progressLine =
             total > 0 && !live.services.isEmpty
             ? "Starting on \(where_) · \(up) of \(ProjectItem.count(total, "service")) up" : "Starting on \(where_)…"
+        live.steps = r.steps.map { StartStep(title: $0.title, state: $0.state, detail: $0.detail) }
+        // The step the Core says is under way names how far it is ("2 of 3 services up"): that is the honest line.
+        if let d = r.steps.first(where: { $0.state == .active })?.detail {
+            live.progressLine = "Starting on \(where_) · \(d)"
+        }
         live.runner = runnerName(r.runner)
         live.lastActivity = r.lastActivityAt
         live.stopWords = r.summary.state == .stopped ? Self.reason(r.stopReason) : nil
