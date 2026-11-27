@@ -160,6 +160,7 @@ public final class DesignDemo {
         "tools-follow", "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow",
         "system-replace-confirm", "tools-rotate", "tools-locked", "tools-effects", "tools-strokes",
         "tools-effects-look",
+        "editor-halted", "editor-offline", "editor-mixed", "editor-readonly",
     ]
 
     private let model: DesignModel
@@ -401,7 +402,7 @@ public final class DesignDemo {
             "tools-probe", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors", "tools-follow",
             "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow", "tools-rotate", "tools-locked",
             "tools-effects", "tools-strokes", "tools-effects-look", "save-reconnecting", "save-halted", "save-saving",
-            "present-empty":
+            "present-empty", "editor-halted", "editor-offline", "editor-mixed", "editor-readonly":
             model.openID = "doc:\(Self.did(1))"
         case "open-design-about", "comments", "approval": model.openID = "doc:\(Self.did(1))"
         case "open-system", "system-empty", "system-guide", "system-guide-night", "add-token", "system-replace-confirm":
@@ -485,6 +486,34 @@ public final class DesignDemo {
         if scene == "tools-probe" {
             try? await Task.sleep(for: .seconds(2))
             await model.debugCanvasProbe?({ FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
+        }
+        if scene.hasPrefix("editor-"), scene != "editor-selftest" {
+            try? await Task.sleep(for: .seconds(2))
+            if let e = model.editors[Self.did(1)] {
+                e.debugForce = []
+                e.readOnly = false
+                switch scene {
+                case "editor-halted": e.debugForce = ["halted"]
+                case "editor-offline": e.debugForce = ["offline"]
+                case "editor-readonly":
+                    e.readOnly = true
+                    if let f = e.layers.layers.first(where: { $0.type != "page" }) { e.select(f.id, quiet: true) }
+                default:
+                    // three rectangles that differ in size, radius and opacity: the inspector says Mixed, the layers
+                    // panel lights all three
+                    var ids: [String] = []
+                    for (i, r) in [(8.0, 0.5), (16.0, 1.0), (16.0, 0.8)].enumerated() {
+                        e.select("", quiet: true)
+                        guard e.insert(InsertPreset.shapes[0]), let id = e.selection.first else { continue }
+                        e.set("radius", .number(r.0 + Double(i)))
+                        e.set("opacity", .number(r.1))
+                        e.set("w", .number(120 + Double(i) * 40))
+                        ids.append(id)
+                    }
+                    e.select(ids)
+                }
+                e.reload()
+            }
         }
         if scene == "editor-selftest" {
             try? await Task.sleep(for: .seconds(2))

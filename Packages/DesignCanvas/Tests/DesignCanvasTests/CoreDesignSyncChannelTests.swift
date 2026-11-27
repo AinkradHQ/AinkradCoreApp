@@ -130,4 +130,21 @@ private final class Opens: @unchecked Sendable {
         opens.wires[0].push(.binary(Data([9])))
         await #expect(throws: DesignSyncFailure.badFrame) { for try await _ in stream {} }
     }
+
+    @Test func presenceTextFramesAreLabelledAndMineGoOutAsText() async throws {
+        let opens = Opens()
+        let channel = CoreDesignSyncChannel { _, seq in opens.make(seq) }
+        let stream = try await channel.open(doc: "dd_a")
+        opens.wires[0].push(.text(#"{"peer":"session:as_1","conn":2,"selection":[]}"#))
+        opens.wires[0].push(.text("not json"))  // hostile text is dropped, the socket stays up
+        opens.wires[0].push(.text(#"{"conn":2,"gone":true}"#))
+        var got: [String] = []
+        for try await m in stream {
+            if case .awareness(let a) = m { got.append(String(decoding: a, as: UTF8.self)) }
+            if got.count == 2 { break }
+        }
+        #expect(got[0].contains("An AI session") && !got[1].contains("label"))
+        try await channel.send(.awareness(Data(#"{"selection":[]}"#.utf8)), doc: "dd_a")
+        #expect(opens.wires[0].sent == [.text(#"{"selection":[]}"#)])
+    }
 }

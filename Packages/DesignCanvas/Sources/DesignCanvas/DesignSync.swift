@@ -41,8 +41,18 @@ public final class DesignSync {
     private(set) public var stuck = false
     /// Called once, when `stuck` turns on.
     var onStuck: () -> Void = {}
-    /// Reconnect backoff in seconds: 0.5, 1, 2 … 10.
-    var backoff: (Int) -> Double = { min(10, 0.5 * pow(2, Double($0))) }
+    /// Remote updates no longer apply to this engine (`DE_ERR_HALTED`): edits go nowhere until the design is reopened.
+    private(set) public var halted = false {
+        didSet { if halted != oldValue { onConnection() } }
+    }
+    /// Three connects in a row failed or were closed at once (a revoked key, no network): the Core cannot be reached.
+    private(set) public var unreachable = false {
+        didSet { if unreachable != oldValue { onConnection() } }
+    }
+    /// Reconnect backoff in seconds: 0.5, 1, 2 … 30.
+    var backoff: (Int) -> Double = { min(30, 0.5 * pow(2, Double($0))) }
+    private var presenceAt = Date.distantPast
+    private var presenceTask: Task<Void, Never>?
 
     public init(engine: Engine, doc: String, target: Engine.Target = .doc, channel: any DesignSyncChannel) {
         self.engine = engine
@@ -57,7 +67,13 @@ public final class DesignSync {
             var attempt = 0
             while !Task.isCancelled {
                 guard let self else { return }
-                if await self.session() { attempt = 0 } else { attempt += 1 }
+                if await self.session() {
+                    attempt = 0
+                    self.unreachable = false
+                } else {
+                    attempt += 1
+                    if attempt >= 3 { self.unreachable = true }
+                }
                 try? await Task.sleep(for: .seconds(self.backoff(attempt)))
             }
         }
@@ -68,20 +84,30 @@ public final class DesignSync {
     func probe() { flush() }
 
     public func stop() {
+        presenceTask?.cancel()
         task?.cancel()
         task = nil
         connected = false
     }
 
-    /// One connection: true when it opened.
+    /// One connection: true when it opened and carried something (a socket the Core closes at once, as it does for a
+    /// revoked device, counts as a failure, so the retries back off instead of hammering it every half second).
     private func session() async -> Bool {
         guard let stream = try? await channel.open(doc: doc) else { return false }
         connected = true
         defer { connected = false }
+        let opened = Date()
+        var gotMessage = false
         if let sv = engine.stateVector() { try? await channel.send(.stateVector(sv), doc: doc) }
         flush()
+        flushPresence()
+        func healthy() -> Bool { gotMessage || Date().timeIntervalSince(opened) > 3 }
         do {
             for try await m in stream {
+                if !gotMessage {
+                    gotMessage = true
+                    unreachable = false  // the Core answered
+                }
                 switch m {
                 case .stateVector(let sv):
                     if target == .doc, let d = engine.diff(sv) { try await channel.send(.update(d), doc: doc) }
@@ -105,24 +131,38 @@ public final class DesignSync {
                         if let sv = engine.stateVector() { try await channel.send(.stateVector(sv), doc: doc) }
                     case .halted:
                         // Remote updates no longer apply to this engine; reopening the design makes a new one.
+                        halted = true
                         task?.cancel()
                         task = nil
                         return true
                     }
                 case .awareness(let a):
-                    engine.presenceApply(a)
+                    engine.presenceRemote(a)
                     onRemote()
                 }
             }
         } catch {}
-        return true
+        return healthy()
     }
 
-    /// Sends this device's presence (awareness) after `Engine.presenceSet`.
+    /// Sends this device's presence (selection, cursor, view) when it changed. The engine knows it all.
     public func flushPresence() {
-        guard target == .doc, connected, let a = engine.presenceEncode(), !a.isEmpty else { return }
+        guard target == .doc, connected, let a = engine.presenceLocal(), !a.isEmpty else { return }
         let (channel, doc) = (channel, doc)
         Task { try? await channel.send(.awareness(a), doc: doc) }
+    }
+
+    /// `flushPresence` at most every 150 ms: pointer moves, pans and selections ask for it as often as they like.
+    public func schedulePresence() {
+        guard presenceTask == nil, target == .doc, connected else { return }
+        let wait = max(0, 0.15 - Date().timeIntervalSince(presenceAt))
+        presenceTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(wait))
+            guard let self else { return }
+            presenceTask = nil
+            presenceAt = Date()
+            flushPresence()
+        }
     }
 
     /// Sends local edits (after a gesture, a key, undo), in as many updates as the engine splits them into. Nothing while

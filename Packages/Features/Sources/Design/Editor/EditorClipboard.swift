@@ -163,6 +163,7 @@ extension DesignEditor {
     @discardableResult
     func selectMany(_ ids: [String]) -> Bool {
         guard let b = backend else { return false }
+        fromPanel = true  // a pick made in the panel does not scroll the panel
         let ok = b.select(ids)
         reload()
         return ok

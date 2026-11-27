@@ -39,8 +39,34 @@ final class DesignEditor {
     /// The design has its first content (the Core's first snapshot arrived, or layers are listed): until then the canvas is blank.
     private(set) var loaded = false
     private(set) var syncConnected = true
-    /// The sync stopped applying updates: nothing more is saved until the design is reopened.
+    /// The canvas's engine no longer takes remote updates: edits go nowhere until the canvas is rebuilt (`reopen`).
     private(set) var syncHalted = false
+    /// The Core could not be reached after a few tries.
+    private(set) var syncUnreachable = false
+    /// Images that gave up loading.
+    private(set) var assetFailures = 0
+    /// The canvas could not start (no Metal, a bad id).
+    var canvasFailed = false
+    /// Bumped by `reopen`: the stage rebuilds the canvas (a new engine) when it changes.
+    private(set) var generation = 0
+    /// A viewer: the canvas, layers and inspector show but never edit.
+    var readOnly = false {
+        didSet { backend?.setReadOnly(readOnly) }
+    }
+    /// The inspected node and the other selected nodes of its type (at most 64), for "Mixed" and per-field writes.
+    private(set) var selectedNodes: [EditorNode] = []
+    /// Counts selections made on the canvas (not in the panel): the layers panel scrolls to them.
+    private(set) var revealStamp = 0
+    @ObservationIgnored var fromPanel = false
+    @ObservationIgnored private var undoShown = false
+    /// The AI is drawing: the layers panel does not chase the selection meanwhile.
+    var revealPaused = false
+    #if DEBUG
+    /// Debug scenes: "halted" and "offline" show those states over a healthy canvas.
+    var debugForce: Set<String> = []
+    #endif
+    static let haltedSentence = "This design stopped syncing — Reopen"
+    static let readOnlySentence = "You can look at this design but not change it."
     static let stuckSentence = "This design stopped syncing — reopen it (unsent edits are lost)"
     var expanded: Set<String> = []
     var renaming: String?
@@ -53,7 +79,7 @@ final class DesignEditor {
     var askText = ""
     /// Answers the Ask… field (V7-02). Nil: no AI is wired yet, and the field says so.
     @ObservationIgnored var ask: (@MainActor (AskRequest) async -> Bool)?
-    @ObservationIgnored private let service: (any DesignService)?
+    @ObservationIgnored let service: (any DesignService)?
     /// Held strongly: the canvas hands over a fresh object and keeps none, so a weak hold dropped it at once and the
     /// chrome never saw the canvas (no layers, no selection). The object holds the canvas view weakly, so no cycle.
     private(set) var backend: (any DesignEditBackend)?
@@ -73,13 +99,23 @@ final class DesignEditor {
     /// Called by the app when the canvas is up (and with nil when it goes away).
     func attach(_ backend: (any DesignEditBackend)?) {
         self.backend = backend
+        backend?.setReadOnly(readOnly)
         backend?.setKeyHandler { [weak self] key in self?.handle(key) ?? false }
         reload()
-        if backend != nil, let ops = starter, layers.layers.isEmpty {
-            starter = nil
-            apply(ops)
-        }
     }
+
+    /// Rebuilds the canvas for this design: a new engine, a new socket, the Core's state again. Unsent edits are lost.
+    func reopen() {
+        backend = nil
+        syncHalted = false
+        syncStuck = false
+        loaded = false
+        canvasFailed = false
+        generation += 1
+        reload()
+    }
+
+    func retryAssets() { backend?.retryAssets() }
 
     var attached: Bool { backend != nil }
 
@@ -153,10 +189,18 @@ final class DesignEditor {
 
     func reload() {
         syncStuck = backend?.syncStuck ?? false
-        let conn = backend?.syncConnected ?? true
+        syncHalted = backend?.syncHalted ?? false
+        syncUnreachable = backend?.syncUnreachable ?? false
+        assetFailures = backend?.assetFailures ?? 0
+        let undoRefused = backend?.lastUndoTooLarge ?? false
+        if undoRefused, !undoShown { notice = "That undo is too large to send. Nothing was changed." }
+        undoShown = undoRefused
+        var conn = backend?.syncConnected ?? true
+        #if DEBUG
+        if debugForce.contains("halted") { syncHalted = true }
+        if debugForce.contains("offline") { conn = false }
+        #endif
         if conn != syncConnected { syncConnected = conn }
-        let halted = backend?.syncHalted ?? false
-        if halted != syncHalted { syncHalted = halted }
         if let d = backend?.docTokens(), let list = try? JSONDecoder().decode([SystemToken].self, from: d),
             list != systemTokens
         {
@@ -183,26 +227,45 @@ final class DesignEditor {
         if next != layers { layers = next }
         let isLoaded = b.loaded || !next.layers.isEmpty
         if isLoaded != loaded { loaded = isLoaded }
+        // A new design's page and starter frame go in only once the Core's state is here: before it, "empty" means "not
+        // loaded yet", and writing then made a second page.
+        if loaded, let ops = starter, next.layers.isEmpty, !readOnly {
+            starter = nil
+            apply(ops)
+            return
+        }
         let sel = b.selection()
         if sel != selection {
             selection = sel
             for id in sel { expanded.formUnion(next.ancestors(of: id)) }  // reveal what the canvas picked
+            if !fromPanel, !sel.isEmpty { revealStamp &+= 1 }
             publishPresence()
         }
+        fromPanel = false
         node = sel.first.flatMap { b.node($0) }.flatMap { EditorNode(json: $0) }
+        selectedNodes =
+            node.map { n in
+                [n]
+                    + sel.dropFirst().prefix(63).compactMap { id in
+                        b.node(id).flatMap { EditorNode(json: $0) }.flatMap { $0.type == n.type ? $0 : nil }
+                    }
+            } ?? []
         peers = DesignPeer.decode(b.peers())
         let people = Collaborator.decode(b.presenceList())
         if people != collaborators { collaborators = people }
         let pageCount = pages.count
         if pageIndex >= pageCount { pageIndex = max(0, pageCount - 1) }
-        if tokens.isEmpty {
-            tokens = b.tokens().flatMap { try? JSONDecoder().decode([DesignToken].self, from: $0) } ?? []
-        }
+        // Linked tokens follow the system doc: read again (cheap, a short list) so an edit there shows here.
+        let fresh = b.tokens().flatMap { try? JSONDecoder().decode([DesignToken].self, from: $0) } ?? []
+        if fresh != tokens { tokens = fresh }
     }
+
+    /// This device's name, as the Mac calls it (the Core, not the client, says who is who to the others).
+    static let deviceName = Host.current().localizedName ?? "This Mac"
 
     private func publishPresence() {
         let o: [String: DJSON] = [
-            "label": .string("You"), "selection": .array(selection.prefix(64).map { .string($0) }),
+            "label": .string(Self.deviceName), "selection": .array(selection.prefix(64).map { .string($0) }),
         ]
         guard let d = try? JSONEncoder().encode(DJSON.object(o)), let s = String(data: d, encoding: .utf8),
             s != lastPresence
@@ -216,6 +279,14 @@ final class DesignEditor {
     /// Applies ops as one undo step. A refusal leaves the document as it was and says so in `notice`.
     @discardableResult func apply(_ ops: [[String: DJSON]]?) -> Bool {
         guard let b = backend, let ops, let json = EditOps.json(ops) else { return false }
+        if readOnly {
+            notice = Self.readOnlySentence
+            return false
+        }
+        if syncHalted {
+            notice = Self.haltedSentence
+            return false
+        }
         if b.edit(json) {
             notice = nil
             reload()
@@ -233,6 +304,7 @@ final class DesignEditor {
     @discardableResult
     func select(_ id: String, quiet: Bool = false) -> Bool {
         guard let b = backend else { return false }
+        fromPanel = true
         if b.select([id]) {
             reload()
             return true
@@ -241,9 +313,24 @@ final class DesignEditor {
         return false
     }
 
+    /// Deletes every selected layer (never a page; a layer inside another selected one goes with it).
+    func deleteSelected() {
+        let ids = Set(selection.filter { layers[$0].map { $0.type != "page" } ?? false })
+        let tops = ids.filter { id in !layers.ancestors(of: id).contains { ids.contains($0) } }
+        apply(tops.sorted().map { EditOps.delete($0) })
+    }
+
+    /// Selects the parent of the first selected layer (never a page).
+    func selectParent() {
+        guard let id = selection.first, let p = layers[id]?.parent, layers[p]?.type != "page" else { return }
+        select(p, quiet: true)
+    }
+
     /// Selects several layers (a flow of screens).
     @discardableResult func select(_ ids: [String], quiet: Bool = false) -> Bool {
-        guard let b = backend, b.select(ids) else { return false }
+        guard let b = backend else { return false }
+        fromPanel = true
+        guard b.select(ids) else { return false }
         reload()
         return true
     }
@@ -257,6 +344,11 @@ final class DesignEditor {
 
     /// Hide or show (`visible: false`; showing removes the prop).
     func setHidden(_ id: String, _ hidden: Bool) { apply([EditOps.set(id, "visible", hidden ? .bool(false) : nil)]) }
+
+    /// Hide or show several layers in one undo step.
+    func setHidden(_ ids: [String], _ hidden: Bool) {
+        apply(ids.map { EditOps.set($0, "visible", hidden ? .bool(false) : nil) })
+    }
 
     func delete(_ id: String) { if layers[id]?.type != "page" { apply([EditOps.delete(id)]) } }
 
@@ -274,11 +366,56 @@ final class DesignEditor {
         apply(same.map { EditOps.set($0, key, value) })
     }
 
+    /// The write for a prop made of several fields (fill, type, layout, stroke, shadow): `value` gets each selected node, so
+    /// only the one field a person changed is written and every other field of that node stays its own.
+    func setEach(_ key: String, _ value: (EditorNode) -> DJSON?) {
+        apply(selectedNodes.map { EditOps.set($0.id, key, value($0)) })
+    }
+
+    /// True when the selected nodes of the inspected type disagree on a value (the inspector says "Mixed").
+    func mixed(_ value: (EditorNode) -> DJSON?) -> Bool {
+        let all = selectedNodes.map(value)
+        guard let first = all.first else { return false }
+        return all.dropFirst().contains { $0 != first }
+    }
+
+    // MARK: align
+
+    private func boxes() -> [EditorAlign.Box] {
+        selection.prefix(200).compactMap { id in
+            guard let n = node(of: id) else { return nil }
+            return .init(
+                id: id, x: n.props["x"]?.double ?? 0, y: n.props["y"]?.double ?? 0, w: n.props["w"]?.double ?? 0,
+                h: n.props["h"]?.double ?? 0)
+        }
+    }
+
+    /// Several layers: to the selection's bounds, each by its own size. One layer: to its parent.
+    func align(_ edge: EditorAlign.Edge) {
+        let list = boxes()
+        var within: (w: Double, h: Double)?
+        if list.count == 1 {
+            guard let p = node.flatMap({ $0.parent }).flatMap({ node(of: $0) }), let w = p.props["w"]?.double,
+                let h = p.props["h"]?.double
+            else { return }
+            within = (w, h)
+        }
+        write(EditorAlign.align(list, edge, in: within))
+    }
+
+    func distribute(horizontal: Bool) { write(EditorAlign.distribute(boxes(), horizontal: horizontal)) }
+
+    private func write(_ moves: [(String, String, Double)]) {
+        apply(moves.map { EditOps.set($0.0, $0.1, .number($0.2)) })
+    }
+
     func undo() {
+        guard !readOnly else { return }
         backend?.undo()
         reload()
     }
     func redo() {
+        guard !readOnly else { return }
         backend?.redo()
         reload()
     }

@@ -32,6 +32,10 @@ public struct DesignEditorHandle: Sendable {
     let editor: DesignEditor
     public func attach(_ backend: (any DesignEditBackend)?) { editor.attach(backend) }
     public func changed() { editor.changed() }
+    /// Reads the canvas now (a right-click just chose a layer, and the menu is about to open).
+    public func reloadNow() { editor.reload() }
+    /// The canvas could not start (no Metal, a bad id).
+    public func failed() { editor.canvasFailed = true }
 }
 
 extension DesignModel {

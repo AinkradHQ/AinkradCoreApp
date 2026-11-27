@@ -84,10 +84,12 @@ public final class Engine: Sendable {
         guard rc == DE_OK, let d, !d.isEmpty else { return .empty }
         return .update(d)
     }
-    func presenceApply(_ b: Data) {
-        _ = b.withUnsafeBytes { de_presence_apply(h, $0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
+    /// One presence message the Core relayed (JSON, the app has added a `label`).
+    func presenceRemote(_ json: Data) {
+        _ = json.withUnsafeBytes { de_presence_remote(h, $0.bindMemory(to: UInt8.self).baseAddress, $0.count) }
     }
-    func presenceEncode() -> Data? { read { de_presence_encode(h, $0, $1, $2) } }
+    /// This device's presence as the Core's text frame `{"cursor","selection","view"}`; empty when nothing changed.
+    func presenceLocal() -> Data? { read { de_presence_local(h, $0, $1, $2) } }
 
     // MARK: fonts + assets
 
@@ -130,13 +132,8 @@ public final class Engine: Sendable {
         else { return nil }
         return s
     }
-    /// This device's presence JSON (cursor, selection, label), at most 4 KiB.
-    @discardableResult func presenceSet(_ json: String) -> Bool {
-        let b = Array(json.utf8)
-        return de_presence_set(h, b, b.count) == DE_OK
-    }
-    /// Other peers' presence as JSON `{"<client>": {...}}`.
-    func presencePeers() -> Data? { read { de_presence_peers(h, $0, $1, $2) } }
+    /// The peers on the canvas as `[{peer, label, kind, following}]`, oldest first.
+    func presencePeers() -> Data? { read { de_presence_list(h, $0, $1, $2) } }
 
     // The editor chrome's reads and its select: the layers panel, the token pickers and click-to-select in the layers panel.
     /// The nodes as `[{id,type,parent,order,name,hidden}]` (`de_tree`).

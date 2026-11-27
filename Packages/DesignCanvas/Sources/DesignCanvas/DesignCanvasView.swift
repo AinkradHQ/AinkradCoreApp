@@ -35,6 +35,11 @@ public final class DesignCanvasNSView: NSView {
     var spaceRestore: Int32?
     private var fitted = false
     var lastEditTooLarge = false
+    var lastUndoTooLarge = false
+    /// Read only (a viewer scope): pointer presses select and nothing else runs.
+    var readOnly = false
+    /// Called right after a right-click chose what the context menu is about.
+    public var onContextSelect: (() -> Void)?
     var reduceMotion = false {
         didSet {
             let on = reduceMotion
@@ -184,11 +189,13 @@ public final class DesignCanvasNSView: NSView {
     func pan(_ dx: CGFloat, _ dy: CGFloat) {
         de_scroll(engine.h, Float(dx), Float(dy))
         loop.wake(input: true)
+        sync?.schedulePresence()
     }
 
     func zoom(by f: CGFloat, at p: CGPoint) {
         de_magnify(engine.h, Float(f), Float(p.x), Float(p.y))
         loop.wake(input: true)
+        sync?.schedulePresence()
     }
 
     // MARK: pointer
@@ -209,6 +216,11 @@ public final class DesignCanvasNSView: NSView {
             return
         }
         window?.makeFirstResponder(self)
+        if readOnly {
+            let p = point(e)
+            editorSelect(engine.hit(Float(p.x), Float(p.y)).map { [$0] } ?? [])
+            return
+        }
         // A double-click on a text node edits it (with the select tool; the text tool opens a session itself).
         if e.clickCount == 2, engine.tool == DE_TOOL_SELECT, !engine.textActive {
             let p = point(e)
@@ -219,10 +231,24 @@ public final class DesignCanvasNSView: NSView {
         }
         pointer(DE_POINTER_DOWN, e)
     }
-    public override func mouseDragged(with e: NSEvent) { if presentTap == nil { pointer(DE_POINTER_MOVE, e) } }
+    public override func mouseDragged(with e: NSEvent) { if presentTap == nil, !readOnly { pointer(DE_POINTER_MOVE, e) } }
+    /// A right-click picks the layer under it (unless it is already selected) so the menu is about that layer.
+    public override func rightMouseDown(with e: NSEvent) {
+        if presentTap == nil {
+            let p = point(e)
+            let hit = engine.hit(Float(p.x), Float(p.y))
+            if let hit {
+                if !engine.selection().contains(hit) { editorSelect([hit]) }
+            } else {
+                editorSelect([])
+            }
+            onContextSelect?()
+        }
+        super.rightMouseDown(with: e)
+    }
     public override func mouseMoved(with e: NSEvent) { if presentTap == nil { pointer(DE_POINTER_MOVE, e) } }
     public override func mouseUp(with e: NSEvent) {
-        if presentTap != nil { return }
+        if presentTap != nil || readOnly { return }
         pointer(DE_POINTER_UP, e)
         sync?.flush()
     }
@@ -234,6 +260,7 @@ public final class DesignCanvasNSView: NSView {
         de_pointer(engine.h, UInt32(phase), Float(p.x), Float(p.y), mods)
         updateCursor(p)
         loop.wake(input: true)
+        sync?.schedulePresence()
         if phase != DE_POINTER_MOVE { onChange?() }
     }
 
@@ -295,6 +322,7 @@ public final class DesignCanvasNSView: NSView {
     /// Delete, Escape and the arrows (nudge; Shift: 10 pt).
     public override func keyDown(with e: NSEvent) {
         // Editing text: every key goes through the input system (typing, the IME, the caret keys; Escape ends it).
+        if readOnly { return }
         if engine.textActive {
             interpretKeyEvents([e])
             return
@@ -349,6 +377,16 @@ public final class DesignCanvasNSView: NSView {
     public override func performKeyEquivalent(with e: NSEvent) -> Bool {
         guard window?.firstResponder === self else { return super.performKeyEquivalent(with: e) }
         let f = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if readOnly {
+            switch (e.charactersIgnoringModifiers?.lowercased(), f) {
+            case ("0", .command): fit()
+            case ("1", .command):
+                de_fit_selection(engine.h)
+                loop.wake()
+            default: return super.performKeyEquivalent(with: e)
+            }
+            return true
+        }
         if engine.textActive, f == .command, e.charactersIgnoringModifiers?.lowercased() == "a" {
             de_text_command(engine.h, UInt32(DE_TEXT_SELECT_ALL), 0)
             textChanged()
@@ -369,6 +407,7 @@ public final class DesignCanvasNSView: NSView {
     }
 
     func send(key: Int32, mods: UInt32) {
+        guard !readOnly else { return }
         de_key(engine.h, UInt32(key), mods)
         loop.wake(input: true)
         sync?.flush()
@@ -376,8 +415,10 @@ public final class DesignCanvasNSView: NSView {
     }
 
     func undo(redo: Bool) {
+        guard !readOnly else { return }
         let rc = redo ? de_redo(engine.h) : de_undo(engine.h)
-        if rc == DE_ERR_TOO_LARGE { sync?.probe() }
+        lastUndoTooLarge = rc == DE_ERR_TOO_LARGE
+        if lastUndoTooLarge { sync?.probe() }
         loop.wake(input: true)
         sync?.flush()
         onChange?()
@@ -414,13 +455,16 @@ public struct DesignCanvas: NSViewRepresentable {
     let assets: CanvasAssetSource
     /// Hands the view out (the Debug measurement drives it).
     var onReady: (@MainActor (DesignCanvasNSView) -> Void)?
+    /// Called when the canvas could not start (no Metal, a bad document id): the chrome says so instead of waiting forever.
+    var onFailed: (@MainActor () -> Void)?
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     public init(
         doc: String, system: String?, channel: any DesignSyncChannel, assets: CanvasAssetSource,
-        onReady: (@MainActor (DesignCanvasNSView) -> Void)? = nil
+        onReady: (@MainActor (DesignCanvasNSView) -> Void)? = nil, onFailed: (@MainActor () -> Void)? = nil
     ) {
+        self.onFailed = onFailed
         self.doc = doc
         self.system = system
         self.channel = channel
@@ -430,13 +474,17 @@ public struct DesignCanvas: NSViewRepresentable {
 
     public func makeNSView(context: Context) -> NSView {
         guard let engine = Engine(doc: doc), let v = DesignCanvasNSView(engine: engine) else {
-            return NSView()  // no Metal or a bad id: an empty well; the Design screen words the state
+            // no Metal or a bad id: an empty well, and the chrome words the state (after this update pass)
+            let failed = onFailed
+            DispatchQueue.main.async { MainActor.assumeIsolated { failed?() } }
+            return NSView()
         }
         v.setAccessibilityElement(true)
         v.setAccessibilityRole(.layoutArea)
         v.setAccessibilityLabel("Design canvas")
         let fetcher = AssetFetcher(engine: engine, source: assets)
         fetcher.onAdded = { [weak v] in v?.loop.wake() }
+        fetcher.onFailed = { [weak v] in v?.onChange?() }
         v.fetcher = fetcher
         v.loop.onMissing = { [weak fetcher] hashes in Task { @MainActor in fetcher?.fetch(hashes) } }
         let s = DesignSync(engine: engine, doc: doc, channel: channel)
@@ -446,7 +494,11 @@ public struct DesignCanvas: NSViewRepresentable {
         v.sync = s
         if let system {
             let y = DesignSync(engine: engine, doc: system, target: .system, channel: channel)
-            y.onRemote = { [weak v] in v?.loop.wake() }
+            // the style guide's tokens (and what links to them) may have changed: the chrome reads them again
+            y.onRemote = { [weak v] in
+                v?.loop.wake()
+                v?.onChange?()
+            }
             v.system = y
             y.start()
         }

@@ -101,6 +101,17 @@ extension DesignEditor {
     @discardableResult
     func perform(_ c: EditorCommand) -> Bool {
         guard attached else { return false }
+        // A viewer may look (copy, select, zoom) but not change anything.
+        switch c {
+        case .copy, .selectAll, .selectChildren, .selectParent, .zoomIn, .zoomOut, .zoom100, .fitAll, .fitSelection,
+            .shortcuts:
+            break
+        default:
+            if readOnly {
+                notice = Self.readOnlySentence
+                return true
+            }
+        }
         switch c {
         case .copy: return copy()
         case .cut:

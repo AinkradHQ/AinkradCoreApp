@@ -231,6 +231,8 @@ final class FakeBackend: DesignEditBackend {
     var refuse = false
     var canSelect = true
     var syncStuck = false
+    var syncHalted = false
+    var loaded = true
     var lastEditTooLarge = false
     var peerJSON: String?
     /// The engine calls the editor made (`group`, `paste into f`…), and whether the engine accepts them.

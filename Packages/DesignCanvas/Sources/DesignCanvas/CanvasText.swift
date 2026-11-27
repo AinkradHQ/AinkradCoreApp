@@ -57,6 +57,7 @@ extension DesignCanvasNSView: @preconcurrency NSTextInputClient {
 
     /// Picks a tool; ends a text edit first. The cursor and the chrome follow.
     public func editorSetTool(_ t: Int) {
+        if readOnly, t != Int(DE_TOOL_SELECT) { return }
         if engine.textActive { de_text_end(engine.h) }
         engine.setTool(Int32(t))
         textChanged()
