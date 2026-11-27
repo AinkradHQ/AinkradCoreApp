@@ -73,7 +73,7 @@ struct DesignDetail: View {
             Text(DesignCard.line(model, item)).foregroundStyle(GlassInk.secondary).lineLimit(1)
             if editor != nil { StateBadge("Saved", tone: .done, symbol: "checkmark.circle") }
         } actions: {
-            if let editor { PresenceStrip(peers: editor.peers) }
+            if let editor { PresenceStrip(peers: editor.peers, collaborators: editor.collaborators) { editor.follow($0) } }
             if let editor { EditorToolbar(editor: editor, aboutOpen: aboutOpen) }
             CoreDropdown(
                 items: projectItems,

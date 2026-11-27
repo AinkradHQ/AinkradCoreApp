@@ -209,6 +209,21 @@ public protocol DesignEditBackend: AnyObject {
     func fit(_ rect: CGRect)
     /// Presenting: clicks report the node under them (prototype links) and nothing is edited; nil ends it.
     func present(_ tap: (@MainActor (String?) -> Void)?)
+    /// The people and AI sessions on the canvas (`[{peer, label, kind, following}]`, oldest first); nil while unknown.
+    func presenceList() -> Data?
+    /// Follows a peer's view (its `peer` id); an empty id stops.
+    func follow(_ peer: String)
+    /// Shows page `index` of the design, framed.
+    func setPage(_ index: Int)
+    /// Zooms about the middle of the canvas: by a factor, to a scale (1 = 100%), or to every artboard.
+    func zoom(by factor: Double)
+    func zoom(to scale: Double)
+    func fitAll()
+    /// Editor commands from the keyboard (copy, group, zoom…) are offered here first while the canvas has focus and no text
+    /// is being edited; true when taken.
+    func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?)
+    /// Debug only: a presence message as the Core relays it.
+    func debugPresence(_ json: String)
 }
 
 public struct CanvasCamera: Sendable, Equatable {
@@ -231,6 +246,14 @@ extension DesignEditBackend {
     public func camera() -> CanvasCamera? { nil }
     public func present(_ tap: (@MainActor (String?) -> Void)?) {}
     public func fit(_ rect: CGRect) {}
+    public func presenceList() -> Data? { nil }
+    public func follow(_ peer: String) {}
+    public func setPage(_ index: Int) {}
+    public func zoom(by factor: Double) {}
+    public func zoom(to scale: Double) {}
+    public func fitAll() {}
+    public func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?) {}
+    public func debugPresence(_ json: String) {}
 }
 
 /// One token of a design system as the style guide edits it: a literal per theme.

@@ -18,6 +18,13 @@ final class DesignEditor {
     private(set) var selection: [String] = []
     private(set) var node: EditorNode?
     private(set) var peers: [DesignPeer] = []
+    /// Who is on the canvas, as the engine lists them (follow a person from the header).
+    private(set) var collaborators: [Collaborator] = []
+    /// The page shown, as its place among the design's pages.
+    var pageIndex = 0
+    var shortcutsOpen = false
+    /// Fonts in the library that the canvas can draw (set by the stage from the model's assets).
+    var libraryFonts: [DesignAsset] = []
     private(set) var tokens: [DesignToken] = []
     /// A design system's own tokens with their values (the style guide), name order.
     private(set) var systemTokens: [SystemToken] = []
@@ -43,7 +50,7 @@ final class DesignEditor {
     @ObservationIgnored private let service: (any DesignService)?
     /// Held strongly: the canvas hands over a fresh object and keeps none, so a weak hold dropped it at once and the
     /// chrome never saw the canvas (no layers, no selection). The object holds the canvas view weakly, so no cycle.
-    private var backend: (any DesignEditBackend)?
+    private(set) var backend: (any DesignEditBackend)?
     @ObservationIgnored private var pending = false
     /// What a brand-new design starts with (its page and a frame of the default canvas); written once, when the canvas is up
     /// and the design is still empty.
@@ -60,6 +67,7 @@ final class DesignEditor {
     /// Called by the app when the canvas is up (and with nil when it goes away).
     func attach(_ backend: (any DesignEditBackend)?) {
         self.backend = backend
+        backend?.setKeyHandler { [weak self] key in self?.handle(key) ?? false }
         reload()
         if backend != nil, let ops = starter, layers.layers.isEmpty {
             starter = nil
@@ -172,6 +180,10 @@ final class DesignEditor {
         }
         node = sel.first.flatMap { b.node($0) }.flatMap { EditorNode(json: $0) }
         peers = DesignPeer.decode(b.peers())
+        let people = Collaborator.decode(b.presenceList())
+        if people != collaborators { collaborators = people }
+        let pageCount = pages.count
+        if pageIndex >= pageCount { pageIndex = max(0, pageCount - 1) }
         if tokens.isEmpty {
             tokens = b.tokens().flatMap { try? JSONDecoder().decode([DesignToken].self, from: $0) } ?? []
         }
@@ -216,6 +228,13 @@ final class DesignEditor {
         }
         if !quiet { notice = "That layer is not on the canvas yet. Try again in a moment." }
         return false
+    }
+
+    /// Selects several layers (a flow of screens).
+    @discardableResult func select(_ ids: [String], quiet: Bool = false) -> Bool {
+        guard let b = backend, b.select(ids) else { return false }
+        reload()
+        return true
     }
 
     func rename(_ id: String, to name: String) {

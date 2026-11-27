@@ -50,14 +50,34 @@ struct InlineNumber: View {
     let commit: (Double?) -> Void
     @State private var text = ""
     @FocusState private var focused: Bool
+    @State private var scrubStart: Double?
+    @State private var overLabel = false
 
     var body: some View {
         HStack(spacing: Space.s2) {
             Text(label).coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.secondary)
                 .lineLimit(1).fixedSize()
+                .contentShape(Rectangle())
+                .onHover { inside in
+                    guard inside != overLabel else { return }
+                    overLabel = inside
+                    if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                }
+                .onDisappear {
+                    if overLabel {
+                        overLabel = false
+                        NSCursor.pop()
+                    }
+                }
+                .gesture(scrub)
+                .help("Drag to change the value. Shift drags by 10.")
             TextField("", text: $text, prompt: Text(clearable ? "–" : "0").foregroundStyle(GlassInk.secondary))
                 .textFieldStyle(.plain).monospacedDigit().focused($focused)
                 .onSubmit(write)
+                .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                    arrow(up: press.key == .upArrow, shift: press.modifiers.contains(.shift))
+                    return .handled
+                }
             if let suffix { Text(suffix).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary) }
         }
         .padding(.horizontal, Space.s2)
@@ -68,6 +88,32 @@ struct InlineNumber: View {
         .onChange(of: focused) { _, on in if !on { write() } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
+    }
+
+    /// Dragging the label scrubs the value: the field shows it as it moves and writes once, when the drag ends (one undo
+    /// step, not one per point).
+    private var scrub: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { g in
+                let start =
+                    scrubStart ?? (Double(text.replacingOccurrences(of: ",", with: ".")) ?? (value ?? 0) * scale)
+                scrubStart = start
+                text = Self.words(
+                    Scrub.value(start: start, dx: g.translation.width, shift: NSEvent.modifierFlags.contains(.shift)), 1
+                )
+            }
+            .onEnded { _ in
+                scrubStart = nil
+                write()
+            }
+    }
+
+    private func arrow(up: Bool, shift: Bool) {
+        let now =
+            Double(text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")) ?? (value ?? 0)
+            * scale
+        text = Self.words(Scrub.step(now, up: up, shift: shift), 1)
+        write()
     }
 
     private func write() {

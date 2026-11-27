@@ -69,7 +69,8 @@ public final class DesignDemo {
             lock.withLock {
                 approvalList[doc, default: []].removeAll { $0.screen == screen }
                 approvalList[doc, default: []].append(
-                    ScreenApproval(screen: screen, version: "dv_1", state: .approved, decidedBy: "d_you", decidedAt: Date()))
+                    ScreenApproval(
+                        screen: screen, version: "dv_1", state: .approved, decidedBy: "d_you", decidedAt: Date()))
             }
         }
         func withdrawApproval(doc: String, screen: String) async throws {
@@ -153,7 +154,9 @@ public final class DesignDemo {
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
         "system-guide", "system-guide-night", "comments", "approval", "ai-paused", "archived", "archived-old-core",
         "open-folder", "new-kit", "library-upload", "multi-select", "sort-favourites", "open-design-about",
-        "add-token", "delete-bulk",
+        "add-token", "delete-bulk", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors",
+        "tools-follow", "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow",
+        "system-replace-confirm",
     ]
 
     private let model: DesignModel
@@ -339,7 +342,8 @@ public final class DesignDemo {
             comments: [], approvals: [:],
             archived: [
                 DesignDoc(
-                    id: Self.did(20), kind: .design, name: "Old onboarding", system: nil, projects: ["2"], aiPaused: false,
+                    id: Self.did(20), kind: .design, name: "Old onboarding", system: nil, projects: ["2"],
+                    aiPaused: false,
                     createdBy: "d_you", updatedAt: Date().addingTimeInterval(-400 * 3600), archived: true),
                 DesignDoc(
                     id: Self.did(21), kind: .design, name: "Pricing experiment", system: nil, projects: ["1"],
@@ -347,6 +351,7 @@ public final class DesignDemo {
                     updatedAt: Date().addingTimeInterval(-900 * 3600), archived: true),
             ])
         await model.useNow(svc)
+        model.debugSystemAsk = false
         if scene.hasPrefix("project-island") {
             shell.closePane("design")
             await ProjectsDemo(model: model.projectsModel).show("overview-running")
@@ -375,10 +380,12 @@ public final class DesignDemo {
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
-            "tools-probe":
+            "tools-probe", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors", "tools-follow",
+            "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow":
             model.openID = "doc:\(Self.did(1))"
         case "open-design-about", "comments", "approval": model.openID = "doc:\(Self.did(1))"
-        case "open-system", "system-empty", "system-guide", "system-guide-night", "add-token": model.openID = "doc:\(Self.did(8))"
+        case "open-system", "system-empty", "system-guide", "system-guide-night", "add-token", "system-replace-confirm":
+            model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
         case "open-logo": model.openID = "asset:\(Self.sha("Lanterna mark"))"
         case "open-icon-composer": model.openID = "asset:\(Self.sha("Lanterna app icon"))"
@@ -409,7 +416,9 @@ public final class DesignDemo {
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
-        if scene == "new-kit" { model.host.shell.present(ShellDialog(id: "new-kit") { NewKitView(model: model, kind: .brandKit) }) }
+        if scene == "new-kit" {
+            model.host.shell.present(ShellDialog(id: "new-kit") { NewKitView(model: model, kind: .brandKit) })
+        }
         if scene == "delete-bulk" { model.askDelete(Array(model.shown.prefix(3))) }
         if scene == "open-design-about" {
             try? await Task.sleep(for: .seconds(2))
@@ -420,9 +429,12 @@ public final class DesignDemo {
             try? await Task.sleep(for: .seconds(2))
             if let e = model.editors[Self.did(1)], let screen = e.screens.first {
                 let now = Date()
-                func note(_ i: Int, _ body: String, by: String, parent: String? = nil, done: Bool = false) -> DesignComment {
+                func note(_ i: Int, _ body: String, by: String, parent: String? = nil, done: Bool = false)
+                    -> DesignComment
+                {
                     DesignComment(
-                        id: "dc_\(i)", screen: screen.id, body: body, author: by, createdAt: now.addingTimeInterval(Double(-i) * 1800),
+                        id: "dc_\(i)", screen: screen.id, body: body, author: by,
+                        createdAt: now.addingTimeInterval(Double(-i) * 1800),
                         node: nil, parent: parent, resolvedAt: done ? now : nil)
                 }
                 svc.seed(
@@ -472,6 +484,7 @@ public final class DesignDemo {
                 FileHandle.standardError.write(Data("PROBE no editor\n".utf8))
             }
         }
+        if scene.hasPrefix("tools-") { await tools(scene) }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
         if scene.hasPrefix("present-") {
             // Present on the real canvas (CORE_DESIGN_SCENE): the scene's frame in a phone, or as a desktop in a browser.
@@ -481,6 +494,17 @@ public final class DesignDemo {
                 if scene == "present-phone" { model.presenter?.device = .phone }
                 try? await Task.sleep(for: .seconds(2))
             }
+        }
+        if scene == "system-replace-confirm" {
+            // A system that already has tokens: Generate asks before replacing them.
+            try? await Task.sleep(for: .seconds(2))
+            model.editors[Self.did(8)]?.setTokens(SystemStarter.tokens)
+            try? await Task.sleep(for: .seconds(1))
+            model.debugSystemAsk = true
+            model.openID = nil
+            try? await Task.sleep(for: .milliseconds(300))
+            model.openID = "doc:\(Self.did(8))"
+            try? await Task.sleep(for: .seconds(2))
         }
         if scene == "system-guide" || scene == "system-guide-night" || scene == "add-token" {
             // The style guide on the real engine (CORE_DESIGN_SCENE): the default set written as token ops.
@@ -513,6 +537,18 @@ public final class DesignDemo {
                 ])
             switch scene {
             case "ai-new": c?.prompt = ""
+            case "ai-over-limit":
+                c?.target = nil
+                c?.prompt = String(repeating: "A calm sign-in screen with a big logo and a short welcome. ", count: 11)
+            case "ai-flow":
+                c?.target = nil
+                c?.prompt = "An onboarding flow"
+                let ids = (1...3).map { "n_flow\($0)" }
+                let flow = ComposeState(
+                    id: "dc_1", phase: .done, reason: "", session: nil,
+                    directions: [.init(name: "Onboarding", summary: "Three steps", frame: ids[0], screens: ids)],
+                    flow: true)
+                c?.debugShow(flow, phase: .done("3 screens are on the canvas."))
             case "ai-edit": c?.prompt = "Make the button green"
             case "ai-drawing":
                 c?.prompt = "Make the button green"
@@ -540,6 +576,64 @@ public final class DesignDemo {
             try? await Task.sleep(for: .milliseconds(300))
             model.projectsMenuOpen = true
         }
+    }
+}
+
+extension DesignDemo {
+    /// The editor tools on the real canvas (CORE_DESIGN_SCENE): zoom readout, pages, collaborators, shortcuts, paste.
+    func tools(_ scene: String) async {
+        try? await Task.sleep(for: .seconds(2))
+        guard let e = model.editors[Self.did(1)] else {
+            return FileHandle.standardError.write(Data("TOOLS no editor\n".utf8))
+        }
+        let frame = e.layers.layers.first { $0.type == "frame" }
+        func peer(_ n: Int, _ id: String, _ label: String, _ at: [Double]) -> String {
+            let sel = frame.map { ",\"selection\":[\"\($0.id)\"]" } ?? ""
+            return "{\"peer\":\"\(id)\",\"conn\":\(n),\"label\":\"\(label)\",\"cursor\":[\(at[0]),\(at[1])]\(sel)}"
+        }
+        switch scene {
+        case "tools-selftest":
+            EditorToolsSelfTest.run(e) { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }
+        case "tools-zoom":
+            e.backend?.zoom(to: 2)
+        case "tools-pages":
+            e.insert(InsertPreset.frames[0])
+            e.addPage()
+            e.insert(InsertPreset.frames[3])
+            e.insert(InsertPreset.shapes[0])
+            e.addPage()
+            e.showPage(1)
+        case "tools-cursors", "tools-follow":
+            e.backend?.debugPresence(peer(1, "person:d_maya", "Maya Ortiz", [180, 260]))
+            e.backend?.debugPresence(peer(2, "session:as_0a1b2c3d", "Claude", [90, 420]))
+            e.reload()
+            if scene == "tools-follow", let maya = e.collaborators.first { e.follow(maya) }
+        case "tools-shortcuts":
+            e.shortcutsOpen = true
+        case "tools-paste", "tools-text":
+            // A card of three layers is copied and pasted twice (the second time into another frame), grouped, and a
+            // line of plain text is pasted as a text layer.
+            guard let f = frame, e.select(f.id) else { return }
+            e.insert(InsertPreset.shapes[0])
+            e.insert(InsertPreset.shapes[1])
+            e.insert(InsertPreset.texts[1])
+            let three = e.layers.children(of: f.id).suffix(3).map(\.id)
+            e.selectMany(three)
+            e.copy()
+            e.paste()
+            if scene == "tools-paste" {
+                e.group()
+                e.selectMany(e.selection)
+            } else {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString("Pay now to finish the order", forType: .string)
+                e.select(f.id)
+                e.paste()
+            }
+        default: break
+        }
+        try? await Task.sleep(for: .seconds(1))
     }
 }
 

@@ -1,3 +1,4 @@
+import AppKit
 import CoreKit
 import Design
 import DesignCanvas
@@ -33,6 +34,25 @@ final class CanvasEditing: DesignEditBackend {
         view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }
     }
     func fit(_ rect: CGRect) { view?.editorFit(rect) }
+    func presenceList() -> Data? { view?.editorPresenceList() }
+    func follow(_ peer: String) { view?.editorFollow(peer) }
+    func setPage(_ index: Int) { view?.editorSetPage(index) }
+    func zoom(by factor: Double) { view?.editorZoom(by: factor) }
+    func zoom(to scale: Double) { view?.editorZoom(to: scale) }
+    func fitAll() { view?.editorFitAll() }
+    func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?) {
+        guard let view else { return }
+        guard let handler else {
+            view.keyHandler = nil
+            return
+        }
+        view.keyHandler = { @MainActor (e: NSEvent) -> Bool in handler(EditorKey(e)) }
+    }
+    func debugPresence(_ json: String) {
+        #if DEBUG
+        view?.editorDebugPresence(json)
+        #endif
+    }
     func present(_ tap: (@MainActor (String?) -> Void)?) {
         view?.editorPresent(tap.map { t in { id in MainActor.assumeIsolated { t(id) } } })
     }

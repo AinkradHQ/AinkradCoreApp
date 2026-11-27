@@ -28,6 +28,8 @@ protocol DesignService: DesignLibraryService {
     /// `count` 1 or 3; `size` the screen to draw (points). A Core from before these ignores them: three phone screens
     /// (the composer then keeps the best).
     func compose(doc: String, prompt: String, count: Int, size: CGSize) async throws -> ComposeState
+    /// Edit mode (API minor 109): the Core reads the frame's whole subtree itself, so only the change is sent.
+    func composeEdit(doc: String, prompt: String, frame: String, size: CGSize) async throws -> ComposeState
     /// Where that drawing is; the first read after the AI is done writes the three frames.
     func composeState(doc: String, id: String) async throws -> ComposeState
     /// Stops the AI session behind a drawing.
@@ -48,6 +50,8 @@ struct ComposeState: Equatable, Sendable {
         let summary: String
         /// The node id of its frame on the canvas.
         let frame: String?
+        /// A flow's screens (frame ids), when the Core says.
+        var screens: [String] = []
         var id: String { frame ?? name }
     }
     let id: String
@@ -55,6 +59,12 @@ struct ComposeState: Equatable, Sendable {
     let reason: String
     let session: String?
     let directions: [Direction]
+    /// What the Core is doing now, in its words (optional: an older Core says nothing).
+    var stage: String? = nil
+    /// The AI drew a multi-screen flow: every frame stays.
+    var flow: Bool? = nil
+    var elementsDone: Int? = nil
+    var elementsTotal: Int? = nil
 }
 
 /// A failure the screens can word. `code` is for hover help only.
@@ -77,6 +87,9 @@ extension DesignService {
     }
     func compose(doc: String, prompt: String, count: Int, size: CGSize) async throws -> ComposeState {
         throw Self.noCompose
+    }
+    func composeEdit(doc: String, prompt: String, frame: String, size: CGSize) async throws -> ComposeState {
+        try await compose(doc: doc, prompt: prompt, count: 1, size: size)
     }
     func composeState(doc: String, id: String) async throws -> ComposeState { throw Self.noCompose }
     func cancelCompose(session: String) async throws {}
@@ -192,6 +205,22 @@ struct LiveDesignService: DesignService {
         let body = try JSONEncoder().encode(Body(prompt: prompt, count: count, size: s))
         return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
     }
+    func composeEdit(doc: String, prompt: String, frame: String, size: CGSize) async throws -> ComposeState {
+        struct Size: Encodable {
+            let w: Int
+            let h: Int
+        }
+        struct Body: Encodable {
+            let prompt: String
+            let mode: String
+            let frame: String
+            let size: Size
+        }
+        let s = Size(
+            w: min(4000, max(200, Int(size.width.rounded()))), h: min(4000, max(200, Int(size.height.rounded()))))
+        let body = try JSONEncoder().encode(Body(prompt: prompt, mode: "edit", frame: frame, size: s))
+        return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
+    }
     func composeSystem(doc: String, prompt: String, brandName: String?, colors: [String]) async throws -> ComposeState {
         struct Brand: Encodable {
             let colors: [String]
@@ -276,17 +305,25 @@ struct ComposeWire: Decodable {
         let name: String
         let summary: String
         let frame: String?
+        let screens: [String]?
     }
     let id: String
     let state: String
     let reason: String
     let session: String?
     let directions: [DirectionWire]
+    let stage: String?
+    let flow: Bool?
+    let elementsDone: Int?
+    let elementsTotal: Int?
 
     var result: ComposeState {
         ComposeState(
             id: id, phase: .init(rawValue: state) ?? .failed, reason: reason, session: session,
-            directions: directions.map { .init(name: $0.name, summary: $0.summary, frame: $0.frame) })
+            directions: directions.map {
+                .init(name: $0.name, summary: $0.summary, frame: $0.frame, screens: $0.screens ?? [])
+            },
+            stage: stage, flow: flow, elementsDone: elementsDone, elementsTotal: elementsTotal)
     }
 }
 
