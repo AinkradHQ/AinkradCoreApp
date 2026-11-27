@@ -60,6 +60,8 @@ public final class ProjectsModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: Int64?
+    /// Snapshots only: a drawn page stands in for the web view of a running app (the demo's links go nowhere).
+    var demoPage = false
     #endif
 
     /// The notes of the Docs page (R6-06): the Lore routes of the same Core.

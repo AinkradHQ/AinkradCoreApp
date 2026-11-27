@@ -20,42 +20,30 @@ struct ProjectMark: View {
 /// shows its link where the others show their state.
 struct ProjectStateBadge: View {
     let project: ProjectItem
+    @State private var beat = false
     var body: some View {
         let b = project.badge
         StateBadge(project.tag == .running ? project.link : b.label, tone: b.tone, symbol: b.symbol)
+            .opacity(project.tag == .starting && !project.archived && beat ? 0.55 : 1)
+            .coreLoop(
+                project.tag == .starting ? .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true) : nil,
+                value: beat
+            )
+            .onAppear { if project.tag == .starting { beat = true } }
             .accessibilityLabel("State: \(b.label)")
     }
 }
 
-/// The sketch where the live preview goes: quiet bars in the shape of a page. Live previews of the running app replace it
-/// with the run engine; until then every project shows the same sketch.
-private struct ThumbnailPlaceholder: View {
-    var body: some View {
-        GeometryReader { g in
-            VStack(alignment: .leading, spacing: Space.s2) {
-                bar(g.size.width * 0.18, Space.s2)
-                bar(g.size.width * 0.62, Space.s6 + Space.s1).padding(.top, Space.s1)
-                HStack(spacing: Space.s2) {
-                    ForEach(0..<4, id: \.self) { _ in bar(nil, Space.s5) }
-                }
-                bar(g.size.width * 0.4, Space.s2)
-            }
-            .padding(Space.s4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .accessibilityHidden(true)
-    }
-    private func bar(_ width: CGFloat?, _ height: CGFloat) -> some View {
-        CoreSkeleton(coreShape(Radius.chip)).frame(width: width, height: height)
-            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
-    }
-}
-
 struct ProjectCard: View {
+    /// The mockup's picture height: 226, so a card is 300 tall.
+    static let thumbHeight: CGFloat = 226
     let model: ProjectsModel
     let project: ProjectItem
     let index: Int
     let settled: Bool
     @State private var hovering = false
+    @State private var pressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var lit: Bool {
         #if DEBUG
@@ -72,12 +60,18 @@ struct ProjectCard: View {
             info
         }
         .padding(Space.s2)
-        .coreWell(radius: Radius.pane, active: lit)
+        .projectCardSurface(lit: lit)
         .contentShape(coreShape(Radius.pane))
         .onTapGesture { model.openProject(project.id) }
-        .coreScaleEffect(lit ? 1.01 : 1)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0).onChanged { _ in pressed = true }.onEnded { _ in pressed = false }
+        )
+        // Hover lifts the card (not a scale); a press settles it back a touch.
+        .coreScaleEffect(pressed ? 0.99 : 1)
+        .offset(y: lit && !pressed && !reduce ? -3 : 0)
         .coreRise(settled, index)
         .animation(Motion.out(Motion.hover), value: lit)
+        .animation(Motion.out(Motion.press), value: pressed)
         .onHover { hovering = $0 }
         .contextMenu { Button("Open") { model.openProject(project.id) } }
         .accessibilityElement(children: .contain)
@@ -89,7 +83,7 @@ struct ProjectCard: View {
     private var thumbnail: some View {
         ZStack(alignment: .bottom) {
             Color.clear.coreCard(GlassInk.well, radius: Radius.control)
-            ThumbnailPlaceholder().opacity(project.tag == .running ? 1 : 0.6)
+            ProjectPicture(project: project, colour: model.colour(project))
             HStack(alignment: .bottom) {
                 ProjectStateBadge(project: project)
                     .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
@@ -99,7 +93,7 @@ struct ProjectCard: View {
             }
             .padding(Space.s2)
         }
-        .aspectRatio(1.6, contentMode: .fit)
+        .frame(height: ProjectCard.thumbHeight)
         .clipShape(coreShape(Radius.control))
     }
 
@@ -143,11 +137,12 @@ struct NewProjectCard: View {
     let index: Int
     let settled: Bool
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         // The same bones as a project card, so the grid stays one height; the content is centred.
         VStack(spacing: Space.s3) {
-            Color.clear.aspectRatio(1.6, contentMode: .fit)
+            Color.clear.frame(height: ProjectCard.thumbHeight)
             Color.clear.frame(height: MacSize.controlLg)
         }
         .padding(Space.s2)
@@ -162,10 +157,10 @@ struct NewProjectCard: View {
             }
             .accessibilityElement(children: .combine)
         }
-        .coreCard(hovering ? GlassInk.wellHover : GlassInk.well, radius: Radius.pane)
+        .projectCardSurface(lit: hovering)
         .contentShape(coreShape(Radius.pane))
         .onTapGesture { if !model.readOnly { model.newProject() } }
-        .coreScaleEffect(hovering ? 1.01 : 1)
+        .offset(y: hovering && !reduce ? -3 : 0)
         .coreRise(settled, index)
         .animation(Motion.out(Motion.hover), value: hovering)
         .onHover { hovering = $0 }
@@ -180,7 +175,7 @@ struct NewProjectCard: View {
 struct ProjectCardSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            CoreSkeleton(coreShape(Radius.control)).aspectRatio(1.6, contentMode: .fit)
+            CoreSkeleton(coreShape(Radius.control)).frame(height: ProjectCard.thumbHeight)
             HStack(spacing: Space.s3) {
                 CoreSkeleton(coreShape(Radius.control)).frame(width: MacSize.controlLg, height: MacSize.controlLg)
                 VStack(alignment: .leading, spacing: Space.s1) {
@@ -191,7 +186,7 @@ struct ProjectCardSkeleton: View {
             .padding(.horizontal, Space.s1).padding(.bottom, Space.s1)
         }
         .padding(Space.s2)
-        .coreWell(radius: Radius.pane)
+        .projectCardSurface()
         .accessibilityHidden(true)
     }
 }
