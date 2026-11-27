@@ -8,6 +8,7 @@ extension ProjectsModel {
     /// Why Start cannot be used on this project now, in words; nil when it can.
     func startBlock(_ p: ProjectItem) -> String? {
         if p.archived { return "Unarchive it first." }
+        if !p.kind.runs { return "\(p.name) is not software, so there is nothing to start." }
         if readOnly { return "This device can look at projects but not change them." }
         if p.repos.isEmpty { return "Add a repo first." }
         if service == nil { return "Connect this Mac to a Core first." }
@@ -21,6 +22,9 @@ extension ProjectsModel {
     func toggleRun(_ p: ProjectItem) {
         if isRunningOrStarting(p) { control(.stop, p) } else { control(.start, p) }
     }
+
+    /// Copy link is offered where there is a link to share: a public web project.
+    func canCopyLink(_ p: ProjectItem) -> Bool { p.kind.hasPublicLink && p.expose && !p.archived }
 
     func copyLink(_ p: ProjectItem) {
         NSPasteboard.general.clearContents()

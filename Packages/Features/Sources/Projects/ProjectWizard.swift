@@ -55,7 +55,7 @@ struct ProjectWizard: View {
 
     init(
         model: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name,
-        pasted: [PickRepo] = [], close: @escaping () -> Void
+        pasted: [PickRepo] = [], initialKind: ProjectKind? = nil, close: @escaping () -> Void
     ) {
         self.model = model
         self.close = close
@@ -64,6 +64,10 @@ struct ProjectWizard: View {
         _picked = State(initialValue: picked.union(pasted.map(\.id)))
         _name = State(initialValue: name)
         _colour = State(initialValue: .standard(for: ProjectRules.slug(from: name)))
+        if let initialKind {
+            _kind = State(initialValue: initialKind)
+            _kindPicked = State(initialValue: true)
+        }
     }
 
     private var slug: String { slugEdited ? slugText : ProjectRules.slug(from: name) }

@@ -10,7 +10,7 @@ extension ProjectsDemo {
     ]
 
     /// The scenes that show a Core with API 111 (it holds the kind).
-    static let core111Scenes: Set<String> = ["page-settings-kind", "gallery-kinds", "overview-other"]
+    static let core111Scenes: Set<String> = ["page-settings-kind", "gallery-kinds", "gallery-kinds-hover", "overview-other"]
 
     static let iosURL = "https://github.com/tidepool-labs/tidepool-ios"
 
@@ -31,7 +31,7 @@ extension ProjectsDemo {
     /// The sample list for a kind scene: which of the four projects is which kind.
     static func kindSample(_ scene: String, _ list: inout [ProjectItem]) {
         switch scene {
-        case "gallery-kinds":
+        case "gallery-kinds", "gallery-kinds-hover":
             set(&list[1], .app, "Tidepool Mobile", ["tidepool-ios", "tidepool-android"], "Order tracking for couriers")
             set(&list[2], .infra, "Tidepool Platform", ["tidepool-infra", "tidepool-os"], "The servers behind it all")
             set(&list[3], .other, "Harbour Book", [], "Research for the book")
