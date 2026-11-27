@@ -156,7 +156,8 @@ public final class DesignDemo {
         "open-folder", "new-kit", "library-upload", "multi-select", "sort-favourites", "open-design-about",
         "add-token", "delete-bulk", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors",
         "tools-follow", "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow",
-        "system-replace-confirm",
+        "system-replace-confirm", "tools-rotate", "tools-locked", "tools-effects", "tools-strokes",
+        "tools-effects-look",
     ]
 
     private let model: DesignModel
@@ -381,7 +382,8 @@ public final class DesignDemo {
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
             "tools-probe", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors", "tools-follow",
-            "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow":
+            "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow", "tools-rotate", "tools-locked",
+            "tools-effects", "tools-strokes", "tools-effects-look":
             model.openID = "doc:\(Self.did(1))"
         case "open-design-about", "comments", "approval": model.openID = "doc:\(Self.did(1))"
         case "open-system", "system-empty", "system-guide", "system-guide-night", "add-token", "system-replace-confirm":
@@ -610,6 +612,82 @@ extension DesignDemo {
             if scene == "tools-follow", let maya = e.collaborators.first { e.follow(maya) }
         case "tools-shortcuts":
             e.shortcutsOpen = true
+        case "tools-rotate":
+            // A layer turned 25 degrees, selected: the Rotate field shows it and the canvas draws the turned box.
+            guard let f = frame, e.select(f.id), e.insert(InsertPreset.shapes[0]) else { return }
+            e.set("rotation", .number(25))
+        case "tools-locked":
+            // Layers: one layer locked (its lock stays on the row) and one hidden; the locked one is selected, so the
+            // inspector header shows the lock too.
+            guard let f = frame, e.select(f.id), e.insert(InsertPreset.shapes[0]) else { return }
+            let first = e.selection.first ?? ""
+            e.insert(InsertPreset.shapes[1])
+            e.setHidden(e.selection.first ?? "", true)
+            e.setLocked([first], true)
+            e.select(first)
+        case "tools-effects", "tools-strokes":
+            // The inspector's Effects (drop and inner shadow, layer and background blur) and Stroke (two strokes with
+            // alignment and dash) on one rectangle.
+            guard let f = frame, e.select(f.id), e.insert(InsertPreset.shapes[0]) else { return }
+            let inner = DJSON.object(
+                [
+                    "x": .number(0), "y": .number(2), "blur": .number(6), "spread": .number(0),
+                    "color": .string("#ffffff40"), "inset": .bool(true),
+                ])
+            e.set("shadow", .array([InspectorIsland.shadow, inner]))
+            e.set("blur", .number(4))
+            e.set("backdrop_blur", .number(20))
+            e.set(
+                "stroke",
+                InspectorEdits.strokeValue([
+                    .object(["color": .string("#4f46e5"), "width": .number(2), "align": .string("outside")]),
+                    .object(
+                        [
+                            "color": .string("#ec4899"), "width": .number(1), "align": .string("center"),
+                            "dash": InspectorEdits.dash("dashed", width: 1) ?? .null,
+                        ]),
+                ]))
+            try? await Task.sleep(for: .milliseconds(600))
+            e.inspectorScroll = scene == "tools-effects" ? "Effects" : "Stroke"
+        case "tools-effects-look":
+            // What the effects draw, nothing selected and zoomed in: inner shadow and two strokes (one dashed) on a
+            // rectangle, a layer blur on an ellipse, a rotated card.
+            guard let f = frame, e.select(f.id), e.insert(InsertPreset.shapes[0]) else { return }
+            e.set("x", .number(40))
+            e.set("y", .number(40))
+            e.set("fill", .array([.object(["type": .string("solid"), "color": .string("#e0e7ff")])]))
+            e.set(
+                "shadow",
+                .array([
+                    .object([
+                        "x": .number(0), "y": .number(10), "blur": .number(10), "spread": .number(0),
+                        "color": .string("#4f46e5ff"), "inset": .bool(true),
+                    ])
+                ]))
+            e.set(
+                "stroke",
+                InspectorEdits.strokeValue([
+                    .object(["color": .string("#4f46e5"), "width": .number(6), "align": .string("outside")]),
+                    .object(
+                        [
+                            "color": .string("#ec4899"), "width": .number(3), "align": .string("inside"),
+                            "dash": InspectorEdits.dash("dashed", width: 3) ?? .null,
+                        ]),
+                ]))
+            e.select(f.id)
+            if e.insert(InsertPreset.shapes[1]) {
+                e.set("x", .number(300))
+                e.set("y", .number(40))
+                e.set("blur", .number(8))
+            }
+            e.select(f.id)
+            if e.insert(InsertPreset.shapes[0]) {
+                e.set("x", .number(560))
+                e.set("y", .number(60))
+                e.set("rotation", .number(-20))
+            }
+            e.selectMany([])
+            e.fit(CGRect(x: 0, y: 0, width: 800, height: 300))
         case "tools-paste", "tools-text":
             // A card of three layers is copied and pasted twice (the second time into another frame), grouped, and a
             // line of plain text is pasted as a text layer.

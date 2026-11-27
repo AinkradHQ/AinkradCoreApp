@@ -1,13 +1,5 @@
 import Foundation
 
-/// What the engine can hold today. Lane E adds `locked` and rotation to the model; until its engine is in the app these
-/// stay off, and the commands say so instead of failing (`validate::applies` refuses unknown props).
-enum EngineSupport {
-    static let locked = false
-    static let rotation = false
-    static let lockWhy = "Locking layers arrives with the next engine update."
-}
-
 extension DesignEditor {
     func notify(_ words: String) { notice = words }
 
@@ -27,8 +19,27 @@ extension DesignEditor {
 
     // MARK: arrange
 
-    func group() { run(Arrange.group(selection, layers: layers, box: { box($0) })) }
-    func ungroup() { run(Arrange.ungroup(selection, layers: layers, box: { box($0) })) }
+    func group() {
+        guard !selection.isEmpty else { return notify("Select the layers to group first.") }
+        guard backend?.group() == true else {
+            return notify("Layers inside different frames cannot be grouped. Select layers in one frame.")
+        }
+        notice = nil
+        reload()
+    }
+
+    func ungroup() {
+        guard selection.contains(where: { layers[$0]?.type == "frame" }) else {
+            return notify("Select a frame or group to ungroup it.")
+        }
+        guard backend?.ungroup() == true else {
+            return notify(
+                "A screen cannot be ungrouped, and an empty frame has nothing inside. Ungroup a frame with layers in it."
+            )
+        }
+        notice = nil
+        reload()
+    }
 
     func zOrder(_ move: Arrange.ZMove) {
         let ops = Arrange.zOrder(selection, move, layers: layers)
@@ -67,12 +78,15 @@ extension DesignEditor {
         apply(list.map { EditOps.set($0, "visible", hide ? .bool(false) : nil) })
     }
 
+    /// ⇧⌘L: lock the selection, or unlock it when it is all locked. A locked layer cannot be picked or moved on the canvas.
     func toggleLock() {
-        guard EngineSupport.locked else { return notify(EngineSupport.lockWhy) }
         let list = selection.filter { layers[$0]?.type != "page" }
         guard !list.isEmpty else { return notify("Select a layer first.") }
-        let on = !list.allSatisfy { node(of: $0)?.props["locked"]?.bool == true }
-        apply(list.map { EditOps.set($0, "locked", on ? .bool(true) : nil) })
+        setLocked(list, !list.allSatisfy { layers[$0]?.locked == true })
+    }
+
+    func setLocked(_ ids: [String], _ on: Bool) {
+        apply(ids.map { EditOps.set($0, "locked", on ? .bool(true) : nil) })
     }
 
     // MARK: commands
@@ -134,15 +148,14 @@ extension DesignEditor {
         let has = !selection.isEmpty
         switch c {
         case .copy, .cut, .duplicate, .group, .bringForward, .sendBackward, .bringToFront, .sendToBack, .toggleHidden,
-            .renameLayer:
+            .renameLayer, .toggleLock:
             return (has, "Select a layer first.")
         case .ungroup:
             return (selection.contains { layers[$0]?.type == "frame" }, "Select a frame or group first.")
         case .createComponent:
-            return (selection.first.flatMap { layers[$0]?.type } == "frame", "Select a frame first.")
+            return (selection.contains { layers[$0]?.type != "page" }, "Select a frame or layers first.")
         case .detachInstance:
             return (selection.contains { layers[$0]?.type == "instance" }, "Select an instance first.")
-        case .toggleLock: return (EngineSupport.locked && has, has ? EngineSupport.lockWhy : "Select a layer first.")
         case .autoLayout: return (has, "Select a frame or layers first.")
         default: return (true, "")
         }
