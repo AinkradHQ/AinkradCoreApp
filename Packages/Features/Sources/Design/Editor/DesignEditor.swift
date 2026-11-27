@@ -57,7 +57,7 @@ final class DesignEditor {
     private(set) var selectedNodes: [EditorNode] = []
     /// Counts selections made on the canvas (not in the panel): the layers panel scrolls to them.
     private(set) var revealStamp = 0
-    @ObservationIgnored private var fromPanel = false
+    @ObservationIgnored var fromPanel = false
     @ObservationIgnored private var undoShown = false
     /// The AI is drawing: the layers panel does not chase the selection meanwhile.
     var revealPaused = false
