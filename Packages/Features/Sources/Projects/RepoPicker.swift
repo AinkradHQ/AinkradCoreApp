@@ -114,7 +114,7 @@ struct RepoPicker: View {
                 }
                 ForEach(groups, id: \.org) { g in
                     Text(g.org).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
-                        .padding(.horizontal, Space.s2).padding(.top, Space.s2)
+                        .padding(.horizontal, Space.s3).padding(.top, Space.s3).padding(.bottom, Space.s1)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(g.repos) { r in row(r) }
                 }
@@ -144,21 +144,14 @@ struct RepoPicker: View {
     /// A checkbox and a row: either one toggles the repo. A repo the project already has is marked and cannot be picked.
     @ViewBuilder private func row(_ r: PickRepo) -> some View {
         if has(r) {
-            CoreRow(r.name, subtitle: "Already in this project", symbol: "checkmark").opacity(0.6)
-                .padding(.leading, Space.s8)
+            RepoPickRow(repo: r, detail: "Already in this project", on: true, run: nil).opacity(0.6)
         } else {
             pickRow(r)
         }
     }
 
     private func pickRow(_ r: PickRepo) -> some View {
-        let on = picked.contains(r.id)
-        return ZStack(alignment: .leading) {
-            CoreRow(r.name, subtitle: r.detail(now: now), selected: on) { toggle(r) }
-                .padding(.leading, Space.s8)
-            CoreCheckbox("", isOn: Binding(get: { on }, set: { _ in toggle(r) }))
-                .padding(.leading, Space.s3).accessibilityHidden(true)
-        }
+        RepoPickRow(repo: r, detail: r.detail(now: now), on: picked.contains(r.id)) { toggle(r) }
     }
 
     private func toggle(_ r: PickRepo) {
@@ -171,5 +164,51 @@ struct RepoPicker: View {
         pasted.append(link)
         picked.insert(link.id)
         query = ""
+    }
+}
+
+/// One repo in the picker: one compact line (two when it has a description), the check inside the row, and the whole row
+/// toggles it. Picked rows carry the accent; hover lifts the well.
+private struct RepoPickRow: View {
+    let repo: PickRepo
+    let detail: String
+    let on: Bool
+    let run: (() -> Void)?
+    @State private var hovering = false
+    @Environment(\.coreAccent) private var accent
+
+    var body: some View {
+        Button {
+            run?()
+        } label: {
+            HStack(spacing: Space.s3) {
+                Image(systemName: on ? "checkmark.square.fill" : "square")
+                    .coreFont(size: MacTextSize.title)
+                    .foregroundStyle(on ? GlassInk.accent(accent) : GlassInk.secondary)
+                    .contentTransition(.symbolEffect(.replace))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(repo.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                    if !detail.isEmpty {
+                        Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: Space.s2)
+            }
+            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+            .frame(maxWidth: .infinity, minHeight: MacSize.controlLg, alignment: .leading)
+            .background(
+                on ? GlassInk.accent(accent).opacity(0.16) : hovering ? GlassInk.wellHover : .clear,
+                in: coreShape(Radius.control)
+            )
+            .contentShape(coreShape(Radius.control))
+        }
+        .buttonStyle(CoreQuietPressStyle())
+        .disabled(run == nil)
+        .onHover { hovering = $0 }
+        .animation(Motion.out(Motion.hover), value: hovering)
+        .animation(Motion.out(Motion.ui), value: on)
+        .accessibilityLabel(repo.name)
+        .accessibilityValue(on ? "selected" : "not selected")
+        .accessibilityAddTraits(.isButton)
     }
 }

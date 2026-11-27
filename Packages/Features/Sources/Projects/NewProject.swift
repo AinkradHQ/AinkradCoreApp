@@ -59,7 +59,7 @@ struct AddReposSheet: View {
             VStack(alignment: .leading, spacing: Space.s4) {
                 DialogHead(title: "Add Repos", line: "The Core keeps a copy of each one and drafts how to run them.")
                 RepoPicker(
-                    model: model, picked: $picked, pasted: $pasted, height: Space.s8 * 5, existing: project.repos)
+                    model: model, picked: $picked, pasted: $pasted, height: Space.s8 * 10, existing: project.repos)
                 if let e = model.writeError { CoreFieldError(e) }
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),
