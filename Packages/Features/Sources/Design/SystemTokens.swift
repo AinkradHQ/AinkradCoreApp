@@ -8,19 +8,39 @@ import SwiftUI
 struct TokenEditor: View {
     let editor: DesignEditor
     let token: SystemToken
+    /// This device may look but not change: every field and Remove are off.
+    var readOnly = false
+    @State private var confirming = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack {
                 Text(token.name).coreFont(size: MacTextSize.headline, weight: .semibold).monospaced()
                 Spacer()
-                Button("Remove", role: .destructive) {
-                    editor.setToken(token.name, kind: token.kind, day: nil, night: nil)
+                if !confirming {
+                    Button("Remove", role: .destructive) { confirming = true }
+                        .buttonStyle(.coreQuietDanger)
+                        .disabled(readOnly)
+                        .help(readOnly ? "This device can look at designs but not change them" : "Remove this token")
                 }
-                .buttonStyle(.coreQuietDanger)
             }
-            row("Day", token.day) { set(day: $0) }
-            row("Night", token.night) { set(night: $0) }
+            if confirming {
+                Text("Remove \(token.name)? Anything that uses it loses its value.")
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Space.s2) {
+                    Button("Keep") { confirming = false }.buttonStyle(.coreSecondary)
+                    Button("Remove") {
+                        editor.setToken(token.name, kind: token.kind, day: nil, night: nil)
+                    }
+                    .buttonStyle(.coreQuietDanger)
+                }
+            } else {
+                Group {
+                    row("Day", token.day) { set(day: $0) }
+                    row("Night", token.night) { set(night: $0) }
+                }
+                .disabled(readOnly)
+            }
         }
         .padding(Space.s4).frame(width: Space.s8 * 11)
     }

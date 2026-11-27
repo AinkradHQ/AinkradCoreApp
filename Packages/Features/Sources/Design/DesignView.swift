@@ -54,6 +54,11 @@ struct DesignHome: View {
                 DesignSubRow(model: model).padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
                     .transition(.opacity)
             }
+            if let why = model.refreshFailure, model.load == .ready {
+                RefreshBanner(why: why) { model.resync() }
+                    .padding(.horizontal, Space.s4).padding(.bottom, Space.s2)
+                    .transition(.opacity)
+            }
             wall.frame(maxWidth: .infinity, maxHeight: .infinity)
             DesignFooter(model: model)
         }
@@ -130,7 +135,8 @@ private struct DesignHeader: View {
                 .accessibilityIdentifier("design-project-chip")
             }
             DesignFind(text: Binding(get: { model.filter }, set: { model.filter = $0 }), focus: findFocus)
-            if model.composeSupported && !model.readOnly {
+            // AI draws on designs, so the action lives on the pages that hold them (a system or mockup page has none to make).
+            if model.composeSupported && !model.readOnly && [.all, .screens].contains(model.category.page) {
                 AppActionTile(title: "Draw with AI", symbol: "sparkles", key: "", hue: GlassInk.accent(paneAccent)) {
                     Task { await model.drawWithAI() }
                 }
@@ -154,6 +160,26 @@ private struct DesignHeader: View {
             .disabled(model.readOnly)
             .accessibilityIdentifier("design-new")
         }
+    }
+}
+
+/// A refresh failed while the old lists are on screen: one quiet line, no dialog.
+private struct RefreshBanner: View {
+    let why: String
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            Text("Could not refresh, so this may be out of date. \(why)").foregroundStyle(GlassInk.secondary).lineLimit(
+                2)
+            Spacer(minLength: Space.s2)
+            Button("Try again", action: retry).buttonStyle(.coreSecondary)
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
+        .coreWell(radius: Radius.control)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("design-refresh-failed")
     }
 }
 
@@ -223,6 +249,13 @@ private struct DesignFooter: View {
                         "photo.on.rectangle", Words.count(model.assets.count + model.kits.count, "library item"),
                         GlassInk.slate)
                 }
+            }
+            if model.load == .ready, model.docsCapped {
+                Text("Showing the first \(DesignModel.listMax) designs by name")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    .help(
+                        "The Core lists at most \(DesignModel.listMax) designs at a time, by name. The rest need a Core update."
+                    )
             }
             Spacer(minLength: 0)
             if model.load == .ready, !model.items.isEmpty {

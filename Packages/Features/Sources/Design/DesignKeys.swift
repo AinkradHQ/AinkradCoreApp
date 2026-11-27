@@ -6,7 +6,12 @@ import SwiftUI
 /// open item: Esc goes back, ⌘I shows or hides About.
 extension DesignModel {
     /// What the wall shows now, in its order.
-    var shown: [DesignItem] { items(in: category) }
+    /// On Library's Everything the wall groups by kind, so the keys follow that grouped order, not the newest-first one.
+    var shown: [DesignItem] {
+        let list = items(in: category)
+        guard category == .library, filter.isEmpty else { return list }
+        return DesignCategory.libraryKinds.flatMap { k in list.filter { $0.category == k } }
+    }
 
     /// Moves the keyboard's card by `step` (±1 across, ±columns down and up). The first press lands on the first card.
     @discardableResult

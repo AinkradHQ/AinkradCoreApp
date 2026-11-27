@@ -1,5 +1,6 @@
 import CoreKit
 import Foundation
+import os
 
 /// What the Design screens ask of the Core. The real one calls the module's routes under `/modules/design/v1` through the
 /// paired connection (`CoreConnection.signedRequest`), the way Leyline and the Brain do; the Debug demo and the tests bring
@@ -103,12 +104,13 @@ struct LiveDesignService: DesignService {
     let connection: CoreConnection
     static let base = "/modules/design/v1"
 
-    func docs() async throws -> [DesignDoc] { try await call("GET", "/docs", as: [DocWire].self).map(\.doc) }
+    // The lists skip a row this app cannot read (logged) rather than failing the whole screen.
+    func docs() async throws -> [DesignDoc] { try await rows("GET", "/docs", as: DocWire.self).map(\.doc) }
     func assets() async throws -> [DesignAsset] {
-        try await call("GET", "/assets", as: [AssetWire].self).filter(\.library).map(\.asset)
+        try await rows("GET", "/assets", as: AssetWire.self).filter(\.library).map(\.asset)
     }
     func kits() async throws -> [BrandKit] {
-        try await call("GET", "/collections", as: [CollectionWire].self).filter { $0.kind == "brand_kit" }.map(\.kit)
+        try await rows("GET", "/collections", as: CollectionWire.self).filter { $0.kind == "brand_kit" }.map(\.kit)
     }
     func asset(_ sha: String) async throws -> DesignAsset {
         try await call("GET", "/assets/\(Self.seg(sha))", as: AssetWire.self).asset
@@ -143,9 +145,8 @@ struct LiveDesignService: DesignService {
         _ = try await raw(on ? "PUT" : "DELETE", "\(path)/projects/\(Self.seg(project))")
     }
 
-    // TODO(V1-04): the versions routes are the plan's T14 shape, not yet in the Core's contract: GET/POST
-    // `/docs/{d}/versions` (`{id, kind, name, created_by, created_at}`, POST body `{"name"}`) and POST
-    // `/docs/{d}/versions/{id}/restore`. Check them against `openapi.json` when V1-04 lands.
+    // The versions routes as the Core's openapi has them: GET/POST `/docs/{d}/versions` answer `VersionView`
+    // `{id, kind, name?, origin, created_at, bytes}` (POST body `{"name"}`); POST `.../versions/{id}/restore`.
     func versions(doc: String) async throws -> [DesignVersion] {
         try await call("GET", "/docs/\(Self.seg(doc))/versions", as: [VersionWire].self).map(\.version)
     }
@@ -225,6 +226,27 @@ struct LiveDesignService: DesignService {
         }
     }
 
+    private func rows<T: Decodable>(_ method: String, _ path: String, as: T.Type) async throws -> [T] {
+        let data = try await raw(method, path)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        do { return try Self.lossy(T.self, from: data, decoder: decoder) } catch {
+            throw DesignFailure(sentence: "The Core answered something this app does not know.", code: "bad_answer")
+        }
+    }
+
+    /// Decodes a JSON array row by row: a row that does not decode is logged and left out.
+    static func lossy<T: Decodable>(_ type: T.Type, from data: Data, decoder: JSONDecoder) throws -> [T] {
+        let rows = try decoder.decode([LossyRow<T>].self, from: data)
+        let good = rows.compactMap(\.value)
+        if good.count < rows.count {
+            Logger(subsystem: "app.ainkrad.core", category: "design").error(
+                "skipped \(rows.count - good.count, privacy: .public) unreadable \(String(describing: T.self), privacy: .public) rows"
+            )
+        }
+        return good
+    }
+
     /// One path segment, escaped so an id can never add a slash or a query.
     static func seg(_ s: String) -> String {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#")))
@@ -232,8 +254,13 @@ struct LiveDesignService: DesignService {
     }
 
     static func failure(status: Int, code: String, message: String) -> DesignFailure {
+        // Only the module's own absence says "no Design" (the library list's 404, see `DesignModel.reload`); every other
+        // 404 is about the thing that call named.
         switch status {
-        case 404, 501: DesignFailure(sentence: "This Core does not have Design yet.", code: code, status: status)
+        case 404:
+            DesignFailure(
+                sentence: message.isEmpty ? "The Core does not have that." : message, code: code, status: status)
+        case 501: DesignFailure(sentence: "This Core cannot do that yet.", code: code, status: status)
         default:
             DesignFailure(sentence: message.isEmpty ? "The Core refused that." : message, code: code, status: status)
         }
@@ -241,6 +268,12 @@ struct LiveDesignService: DesignService {
 }
 
 // MARK: wire
+
+/// One row of a list that may fail to decode without failing the rest.
+struct LossyRow<R: Decodable>: Decodable {
+    let value: R?
+    init(from decoder: any Decoder) throws { value = try? R(from: decoder) }
+}
 
 struct DocWire: Decodable {
     let id: String
@@ -278,16 +311,32 @@ struct ComposeWire: Decodable {
     }
 }
 
+/// The Core's `VersionView`: `name` only on a named version; `origin` is `person:d_…`, `session:as_…` or `system`.
 struct VersionWire: Decodable {
     let id: String
     let kind: String
-    let name: String
-    let createdBy: String
+    let name: String?
+    let origin: String
     let createdAt: String
+    let bytes: Int64?
     var version: DesignVersion {
-        DesignVersion(
-            id: id, kind: DesignVersion.Kind(rawValue: kind) ?? .auto, name: name, createdBy: createdBy,
-            createdAt: Ago.iso(createdAt))
+        let kind = DesignVersion.Kind(rawValue: kind) ?? .auto
+        let at = Ago.iso(createdAt)
+        return DesignVersion(
+            id: id, kind: kind, name: Self.title(name, kind: kind, at: at), createdBy: origin, createdAt: at)
+    }
+
+    /// The name, or for an unnamed one what it is and when: "Automatic · 26 Nov, 14:32".
+    static func title(_ name: String?, kind: DesignVersion.Kind, at: Date?) -> String {
+        if let n = name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty { return n }
+        let what =
+            switch kind {
+            case .auto: "Automatic save"
+            case .named: "Saved version"
+            case .approval: "Approved version"
+            }
+        guard let at else { return what }
+        return "\(what) · \(at.formatted(.dateTime.day().month(.abbreviated).hour().minute()))"
     }
 }
 

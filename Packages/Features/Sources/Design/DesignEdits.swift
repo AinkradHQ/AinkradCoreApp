@@ -68,8 +68,8 @@ struct RenameDesignView: View {
         _name = State(initialValue: item.name)
     }
 
-    private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
-    private var valid: Bool { (1...100).contains(trimmed.count) && trimmed != item.name }
+    private var trimmed: String { DesignName.clean(name) }
+    private var valid: Bool { DesignName.valid(name, limit: DesignName.limit(item)) && trimmed != item.name }
 
     var body: some View {
         CoreDialogPanel("Rename", width: Space.s8 * 12) {
@@ -107,11 +107,17 @@ struct DeleteDesignView: View {
 
     private var line: String {
         switch item {
-        case .doc:
-            "It leaves Design and every project it is related to. The Core keeps it archived, so it is not lost."
+        case .doc(let d):
+            let n = d.kind == .system ? model.usedBy(d).count : 0
+            let kept = "The Core keeps it archived, so it is not lost."
+            if n > 0 {
+                return "Used by \(Words.count(n, "design")): they stay, but are left without this system. \(kept)"
+            }
+            return "It leaves Design and every project it is related to. \(kept)"
         case .asset:
-            "The file leaves the library and every project. A design or mockup that still uses it keeps it from going."
-        case .kit: "The kit leaves the library. Its logos and fonts stay in the library."
+            return
+                "The file leaves the library and every project. A design or mockup that still uses it keeps it from going."
+        case .kit: return "The kit leaves the library. Its logos and fonts stay in the library."
         }
     }
 

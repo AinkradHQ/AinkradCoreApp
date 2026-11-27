@@ -146,29 +146,37 @@ struct SystemStyleGuide: View {
             VStack(alignment: .leading, spacing: Space.s8) {
                 section("Colours") {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Space.s3)], spacing: Space.s3) {
-                        ForEach(group("color")) { t in TokenEditButton(editor: editor, token: t) { colorCard(t) } }
+                        ForEach(group("color")) { t in
+                            TokenEditButton(editor: editor, token: t, readOnly: model.readOnly) { colorCard(t) }
+                        }
                     }
                 }
                 section("Type") {
                     VStack(alignment: .leading, spacing: Space.s3) {
-                        ForEach(group("type")) { t in TokenEditButton(editor: editor, token: t) { typeRow(t) } }
+                        ForEach(group("type")) { t in
+                            TokenEditButton(editor: editor, token: t, readOnly: model.readOnly) { typeRow(t) }
+                        }
                     }
                 }
                 HStack(alignment: .top, spacing: Space.s8) {
                     section("Spacing") {
                         VStack(alignment: .leading, spacing: Space.s2) {
-                            ForEach(group("space")) { t in TokenEditButton(editor: editor, token: t) { spaceRow(t) } }
+                            ForEach(group("space")) { t in
+                                TokenEditButton(editor: editor, token: t, readOnly: model.readOnly) { spaceRow(t) }
+                            }
                         }
                     }
                     section("Radius") {
                         HStack(spacing: Space.s3) {
-                            ForEach(group("radius")) { t in TokenEditButton(editor: editor, token: t) { radiusTile(t) }
+                            ForEach(group("radius")) { t in
+                                TokenEditButton(editor: editor, token: t, readOnly: model.readOnly) { radiusTile(t) }
                             }
                         }
                     }
                     section("Shadow") {
                         HStack(spacing: Space.s4) {
-                            ForEach(group("shadow")) { t in TokenEditButton(editor: editor, token: t) { shadowTile(t) }
+                            ForEach(group("shadow")) { t in
+                                TokenEditButton(editor: editor, token: t, readOnly: model.readOnly) { shadowTile(t) }
                             }
                         }
                     }
@@ -258,6 +266,7 @@ struct SystemStyleGuide: View {
 private struct TokenEditButton<Label: View>: View {
     let editor: DesignEditor
     let token: SystemToken
+    var readOnly = false
     @ViewBuilder let label: Label
     @State private var open = false
     @State private var hovering = false
@@ -272,7 +281,9 @@ private struct TokenEditButton<Label: View>: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Edit \(token.name)")
-        .popover(isPresented: $open, arrowEdge: .bottom) { TokenEditor(editor: editor, token: token) }
+        .help(readOnly ? "\(token.name) (this device cannot change designs)" : "Edit \(token.name)")
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            TokenEditor(editor: editor, token: token, readOnly: readOnly)
+        }
     }
 }

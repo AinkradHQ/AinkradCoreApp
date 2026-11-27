@@ -150,16 +150,14 @@ enum DesignItem: Identifiable, Equatable, Sendable {
     var symbol: String { category.symbol }
 }
 
-/// The rail of the home: what needs you, what AI is drawing, everything, then one row per kind.
+/// The rail of the home: everything, then one row per kind.
 enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
-    case needsYou, drawing, all, screens, brand, icons, illustrations, fonts, systems, mockups
+    case all, screens, brand, icons, illustrations, fonts, systems, mockups
     /// Every library file and kit at once: brand, icons, illustrations and fonts.
     case library
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .needsYou: "Needs you"
-        case .drawing: "Drawing now"
         case .all: "All designs"
         case .screens: "App screens"
         case .brand: "Brand & logos"
@@ -173,8 +171,6 @@ enum DesignCategory: String, CaseIterable, Identifiable, Sendable {
     }
     var symbol: String {
         switch self {
-        case .needsYou: "tray"
-        case .drawing: "pencil"
         case .all: "square.grid.2x2"
         case .screens: "iphone"
         case .brand: "seal"
@@ -230,6 +226,19 @@ enum Ago {
         if let d = f.date(from: s) { return d }
         f.formatOptions = [.withInternetDateTime]
         return f.date(from: s)
+    }
+}
+
+/// The Core's name rule (`name_ok`): 1 to 100 characters (200 for a library file), counted as Unicode scalars, no control
+/// characters (a newline included), nothing at either end.
+enum DesignName {
+    static func limit(_ item: DesignItem) -> Int { if case .asset = item { 200 } else { 100 } }
+    /// The name as it would be sent: surrounding spaces and newlines cut.
+    static func clean(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines) }
+    static func valid(_ s: String, limit: Int) -> Bool {
+        let n = clean(s)
+        return (1...limit).contains(n.unicodeScalars.count)
+            && !n.unicodeScalars.contains { $0.properties.generalCategory == .control }
     }
 }
 

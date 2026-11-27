@@ -145,11 +145,22 @@ struct AssetPicture: View {
                     symbol: asset.kind == .iconComposer ? "app.dashed" : "hourglass", line: "Checking…", large: large)
             } else if asset.check == .refused {
                 Waiting(symbol: "exclamationmark.triangle", line: "Refused by the Core’s check", large: large)
-            } else if let img = model.images[asset.sha] {
+            } else if let img = model.image(asset.sha) {
                 Image(nsImage: img).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
                     .padding(large ? Space.s8 : Space.s4)
                     .frame(maxWidth: large ? Space.s8 * 12 : nil, maxHeight: large ? Space.s8 * 12 : nil)
                     .accessibilityLabel(asset.name)
+            } else if model.failedImages.contains(asset.sha) {
+                VStack(spacing: Space.s2) {
+                    Image(systemName: "exclamationmark.triangle").coreFont(
+                        size: large ? MacTextSize.large * 2 : MacTextSize.large
+                    )
+                    .foregroundStyle(GlassInk.secondary)
+                    if large { Text("The picture did not load.").foregroundStyle(GlassInk.secondary) }
+                    Button("Retry") { model.retryImage(asset) }.buttonStyle(.coreSecondary)
+                        .help("Fetch the picture again")
+                }
+                .accessibilityElement(children: .contain)
             } else {
                 CoreSkeleton(coreShape(Radius.control)).frame(width: Space.s8 * 2, height: Space.s8 * 2)
             }
