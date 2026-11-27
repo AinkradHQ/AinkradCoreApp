@@ -40,51 +40,77 @@ struct KindRunningStage: View {
         if project.kind == .infra { health } else { appRunning }
     }
 
+    /// The latest build: where it runs and its steps. Build files (version, size, Download, Reveal) are not reported by the
+    /// Core yet, so those wait with their reason.
     private var appRunning: some View {
-        VStack(spacing: Space.s2) {
+        VStack(spacing: Space.s3) {
             Text("\(project.name) is running").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
-            Text("On \(project.live?.runner ?? model.coreName)\(project.live?.idle.map { " · \($0)" } ?? "")")
-                .foregroundStyle(GlassInk.secondary)
+            Text(
+                "Latest build on \(project.live?.runner ?? model.coreName)\(project.live?.idle.map { " · \($0)" } ?? "")"
+            )
+            .foregroundStyle(GlassInk.secondary)
             StartStepsList(steps: project.live?.steps ?? [])
-        }
-    }
-
-    private var health: some View {
-        let services = project.live?.services ?? []
-        let up = services.filter { $0.state == .up }.count
-        return VStack(alignment: .leading, spacing: Space.s2) {
-            if services.isEmpty {
-                Text("Waiting for the Core to list the services…").foregroundStyle(GlassInk.secondary)
-            } else {
-                Text("\(up) of \(ProjectItem.count(services.count, "service")) up")
-                    .coreFont(size: MacTextSize.large, weight: .semibold)
-                CoreMeter(Double(up) / Double(services.count), label: "Services up")
-                ForEach(Array(services.enumerated()), id: \.offset) { _, s in
-                    HStack(spacing: Space.s3) {
-                        StatusDot(
-                            colour: s.state == .up
-                                ? GlassInk.green : s.state == .exited ? GlassInk.red : GlassInk.secondary)
-                        Text(s.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                        Spacer(minLength: 0)
-                        if s.state == .exited {
-                            StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
-                        } else if s.state == .up {
-                            StateBadge(
-                                s.health == "unhealthy" ? "Unhealthy" : "Healthy",
-                                tone: s.health == "unhealthy" ? .warn : .run,
-                                symbol: s.health == "unhealthy" ? "exclamationmark.triangle" : "checkmark.circle")
-                            Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit()
-                        } else {
-                            Text("Down").foregroundStyle(GlassInk.secondary)
-                        }
-                    }
-                    .frame(minHeight: MacSize.controlLg)
-                    .accessibilityElement(children: .combine)
+            Text("No build file yet. The Core does not report the app it built.")
+                .foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
+            HStack(spacing: Space.s2) {
+                Soon(prominent: false, help: "Available when the Core reports the build file") {
+                    Label("Reveal", systemImage: "folder")
+                }
+                Soon(prominent: false, help: "Available when the Core reports the build file") {
+                    Label("Download", systemImage: "arrow.down.to.line")
                 }
             }
         }
-        .frame(maxWidth: Space.s8 * 16)
+    }
+
+    /// The services as a grid of tiles: state, health, memory. A tile opens the Runs page. Hosts are not listed by the Core yet.
+    private var health: some View {
+        let services = project.live?.services ?? []
+        let up = services.filter { $0.state == .up }.count
+        return VStack(alignment: .leading, spacing: Space.s3) {
+            if services.isEmpty {
+                Text("Waiting for the Core to list the services…").foregroundStyle(GlassInk.secondary)
+            } else {
+                HStack(spacing: Space.s3) {
+                    Text("\(up) of \(ProjectItem.count(services.count, "service")) up")
+                        .coreFont(size: MacTextSize.large, weight: .semibold)
+                        .contentTransition(.numericText())
+                    CoreMeter(Double(up) / Double(services.count), label: "Services up").frame(maxWidth: Space.s8 * 6)
+                }
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: Space.s8 * 5), spacing: Space.s2)], spacing: Space.s2
+                ) {
+                    ForEach(Array(services.enumerated()), id: \.offset) { _, s in
+                        Button {
+                            model.section = .run
+                        } label: {
+                            VStack(alignment: .leading, spacing: Space.s1) {
+                                HStack(spacing: Space.s2) {
+                                    StatusDot(
+                                        colour: s.state == .up
+                                            ? GlassInk.green : s.state == .exited ? GlassInk.red : GlassInk.secondary)
+                                    Text(s.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                                    Spacer(minLength: 0)
+                                }
+                                Text(Overview.serviceLine(s)).foregroundStyle(
+                                    s.state == .exited ? GlassInk.redInk : GlassInk.secondary)
+                                if s.state == .up {
+                                    Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                                }
+                            }
+                            .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
+                            .coreCard(GlassInk.well, radius: Radius.row)
+                        }
+                        .buttonStyle(.plain).help("Open the runs of \(project.name)")
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                Text("Hosts and their topology appear once the Core lists them.")
+                    .foregroundStyle(GlassInk.secondary)
+            }
+        }
+        .frame(maxWidth: Space.s8 * 20)
     }
 }
 

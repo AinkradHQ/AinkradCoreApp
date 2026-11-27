@@ -73,6 +73,10 @@ public final class ProjectsDemo {
             ]
         }
         func unarchive(project: Int64) async throws {}
+        /// The sessions the sample project carries, so the Overview, the card and the Sessions page say the same.
+        func sessions(project: Int64) async throws -> [ProjectLive.Session] {
+            lock.withLock { list.first { $0.id == project }?.live?.sessions ?? [] }
+        }
         func places() async throws -> [BrainPlace]? {
             [
                 BrainPlace(id: "r1", name: "Tidepool research"), BrainPlace(id: "r2", name: "Client notes"),
@@ -95,26 +99,30 @@ public final class ProjectsDemo {
         }
     }
 
-    public static let scenes = [
-        "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
-        "gallery-failed", "new-empty", "new-name", "new-code", "new-review", "new-setting-up", "new-brain", "new-runs",
-        "new-advanced", "space-no-repos",
-        "space-add-repos", "space-copying", "space-many-repos", "space-setting-up", "space-ready", "overview-running",
-        "overview-starting",
-        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
-        "page-settings-stopped", "page-repos", "page-sessions",
-        "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
-        // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
-        "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
-        "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
-        "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
-        "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
-        "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
-        // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
-        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
-        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
-        "dialog-branch-error", "gallery-crashed", "overview-crashed",
-    ] + kindScenes
+    public static let scenes =
+        [
+            "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
+            "gallery-failed", "new-empty", "new-name", "new-code", "new-review", "new-setting-up", "new-brain",
+            "new-runs",
+            "new-advanced", "space-no-repos",
+            "space-add-repos", "space-copying", "space-many-repos", "space-setting-up", "space-ready",
+            "overview-running",
+            "overview-starting",
+            "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
+            "page-settings-stopped", "page-repos", "page-sessions",
+            "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
+            // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
+            "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
+            "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
+            "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
+            "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop",
+            "overview-stopped-real",
+            "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
+            // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
+            "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+            "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+            "dialog-branch-error", "gallery-crashed", "overview-crashed",
+        ] + kindScenes + spaceScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -234,6 +242,9 @@ public final class ProjectsDemo {
         model.demoPage = true
         model.demoPreviewProblem = nil
         model.crashes = [:]
+        model.setupStates = [:]
+        model.liveParts = [:]
+        model.runStates = [:]
         model.core110 = Self.core110Scenes.contains(scene)
         model.core111 = Self.core111Scenes.contains(scene)
         model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
@@ -337,8 +348,13 @@ public final class ProjectsDemo {
         default: break
         }
         Self.kindSample(scene, &list)
+        Self.spaceSample(scene, &list)
         await model.useNow(Service(list))
         model.runService = DemoRunService()
+        Self.configureRun(scene, model.runService as? DemoRunService)
+        // The list was read with the last scene's run service: forget what it said of each project's setup.
+        model.setupStates = [:]
+        for p in model.projects { model.reapply(p.id) }
         model.setRunnerSupported(true)
         await model.loadRunners()
         model.show()
@@ -475,6 +491,7 @@ public final class ProjectsDemo {
         default: break
         }
         await showKind(scene)
+        await showSpace(scene)
     }
 }
 
@@ -564,7 +581,7 @@ enum DemoLive {
                     state: .written,
                     overview: OverviewBody(
                         summary:
-                            "Lanterna is an online shop for handmade lighting. A Laravel API handles catalogue, orders and payments; a Next.js storefront sells to customers and a small admin manages stock.",
+                            "What this project is, how its parts fit together, and the rules an AI session follows here. Written from the repos, the docs and past sessions.",
                         facts: OverviewFacts(stack: "Laravel 11, Next.js 15, MySQL, Redis"),
                         rules: OverviewRules(
                             workflow: [

@@ -25,6 +25,11 @@ extension ProjectsModel {
             live.sessions = parts.sessions
             live.room = parts.room
             live.roomID = parts.roomID
+            #if DEBUG
+            // The demo's stand-in room stays when the stand-in Core serves none.
+            if demoPage, parts.room == nil { live.room = p.live?.room }
+            if demoPage, parts.roomID == nil { live.roomID = p.live?.roomID }
+            #endif
             live.metrics = parts.metrics
         }
         live.stale = p.stale

@@ -7,15 +7,20 @@ struct SettingUp: View {
     let project: ProjectItem
     private enum Step { case done, active, failed, waiting }
 
+    /// Driven by what the Core says: copying, then reading the setup, then the drafted run and the Brain room.
     private var steps: [(String, Step)] {
         let failed = project.repos.contains { $0.fetchError != nil }
         let copied = project.repos.allSatisfy { $0.fetchedAt != nil }
         let copy: Step = failed ? .failed : copied ? .done : .active
+        var reading: Step = .waiting
+        if copy == .done { reading = project.setupChecked || project.draft != nil ? .done : .active }
+        let drafted: Step = reading == .done ? (project.draft != nil ? .done : .active) : .waiting
+        let room: Step = project.live?.roomID != nil || project.roomID != nil ? .done : .waiting
         return [
             ("Copy \(ProjectItem.count(project.repos.count, "repo")) to the Core", copy),
-            ("Read the repos", copy == .done ? .done : .waiting),
-            ("Draft the run from the repos", copy == .done ? .active : .waiting),
-            ("Create the Brain room “\(project.name)”", .waiting),
+            ("Read the repos", reading),
+            ("Draft the run from the repos", drafted),
+            ("Create the Brain room “\(project.name)”", room),
         ]
     }
 
@@ -25,7 +30,7 @@ struct SettingUp: View {
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: Space.s1) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { _, s in
-                    CoreRow(s.0) { badge(s.1) }
+                    CoreRow(s.0) { badge(s.1).breathing(s.1 == .active) }
                         .coreCard(s.1 == .active ? GlassInk.wellHover : .clear, radius: Radius.row)
                 }
             }
@@ -73,7 +78,7 @@ struct NeedsSetup: View {
             } label: {
                 Label("Set Up…", systemImage: "wand.and.stars")
             }
-            .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.readOnly)
+            .buttonStyle(CoreButtonStyle(.secondary)).disabled(model.readOnly)
             .help("Draft the setup from the repo, or write it by hand")
         }
         .task { await run.load() }
@@ -128,17 +133,21 @@ struct ReadyToStart: View {
                     Button {
                         RunDialogs.openSecret(run, project: project, name: draft.secrets.first, replacing: false)
                     } label: {
-                        Label("Set Secrets…", systemImage: "key")
+                        Label(
+                            draft.secrets.count > 1 ? "Set Secrets… (\(draft.secrets.count))" : "Set Secret…",
+                            systemImage: "key")
                     }
                     .buttonStyle(CoreButtonStyle(.secondary)).disabled(model.readOnly)
-                    .help("Set \(draft.secrets.first ?? "") first; the others follow")
+                    .help(
+                        "Set \(draft.secrets.first ?? "") now\(draft.secrets.count > 1 ? "; the button stays until every secret is set" : "")"
+                    )
                 }
                 Button {
                     model.control(.start, project)
                 } label: {
                     Label("Start", systemImage: "play")
                 }
-                .buttonStyle(CoreButtonStyle(.prominent))
+                .buttonStyle(CoreButtonStyle(.secondary))
                 .disabled(!model.canControl(project) || project.startBlock != nil)
                 .help(project.startBlock ?? "Start \(project.name)")
             }
