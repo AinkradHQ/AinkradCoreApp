@@ -91,7 +91,7 @@ private struct TopBar: View {
             .help(model.sessionBlock(project)).accessibilityIdentifier("project-new-session")
         }
         .frame(maxWidth: .infinity)
-        .coreFrame(radius: Radius.pane, rim: Space.s1)
+        .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
     }
 
@@ -153,7 +153,7 @@ private struct Rail: View {
         }
         .padding(Space.s1)
         .frame(maxHeight: .infinity)
-        .coreFrame(radius: Radius.pane, rim: Space.s1)
+        .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
     }
     private func tile(_ s: ProjectSection) -> some View {
@@ -181,7 +181,9 @@ struct ProjectPaneView: View {
                 Text("This project is not in the list any more.").foregroundStyle(GlassInk.secondary)
             }
         }
-        .appLook(AppLookPrefs.shared("projects"))
+        // Like every app: the pane draws Settings › Appearance (blur, transparency), or the Projects own Look.
+        .paneLook(AppLookPrefs.shared("projects").look)
+        .appLookTheme(AppLookPrefs.shared("projects"))
         .clipShape(coreShape(Radius.cardMac))
     }
 }

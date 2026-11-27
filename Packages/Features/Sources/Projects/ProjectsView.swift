@@ -16,7 +16,9 @@ struct ProjectsView: View {
                 GalleryView(model: model).transition(.opacity)
             }
         }
-        .appLook(AppLookPrefs.shared("projects"))
+        // Like every app: the pane draws Settings › Appearance (blur, transparency), or the Projects own Look.
+        .paneLook(AppLookPrefs.shared("projects").look)
+        .appLookTheme(AppLookPrefs.shared("projects"))
         .clipShape(coreShape(Radius.cardMac))
         .focusable()
         .focused($paneFocus)

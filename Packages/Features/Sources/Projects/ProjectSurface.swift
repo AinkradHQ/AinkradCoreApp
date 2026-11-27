@@ -2,15 +2,12 @@ import CoreUI
 import SwiftUI
 
 extension View {
-    /// A gallery card's surface: the same fill as `coreFrame` (it follows Settings, Appearance and the app's own Look), with
-    /// a hover tint on top. The shadow is cast by the fill alone, not by the card's content, so a long gallery scrolls as
-    /// smoothly as it did on plain wells.
+    /// A gallery card's surface: a plain well inside the pane (which follows Settings › Appearance), with a hover tint.
     func projectCardSurface(radius: CGFloat = Radius.pane, lit: Bool = false) -> some View {
-        background {
-            LookFill(radius: radius).shadow(color: GlassInk.shade(0.22), radius: 18, y: 6)
-        }
-        .overlay { coreShape(radius).fill(GlassInk.wellHover).opacity(lit ? 1 : 0).allowsHitTesting(false) }
-        .clipShape(coreShape(radius))
+        // An inner surface of the pane (the pane carries the Look): a plain well, as Design's cards are.
+        coreWell(radius: radius)
+            .overlay { coreShape(radius).fill(GlassInk.wellHover).opacity(lit ? 1 : 0).allowsHitTesting(false) }
+            .clipShape(coreShape(radius))
     }
 }
 
