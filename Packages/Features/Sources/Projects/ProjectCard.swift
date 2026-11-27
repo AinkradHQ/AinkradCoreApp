@@ -16,23 +16,30 @@ struct ProjectMark: View {
     }
 }
 
-/// A project's state as the design system's badge, on the card's thumbnail and in the space's top bar. A running project
-/// shows its link where the others show their state.
+/// A project's state as the design system's badge: always the state word (the link lives in the space's stage header).
+/// `starting` is a Start that was asked for and has not shown yet: the word says so before the Core does.
 struct ProjectStateBadge: View {
     let project: ProjectItem
+    var starting = false
     @State private var beat = false
+
+    private var isStarting: Bool { starting || (project.tag == .starting && !project.archived) }
+
     var body: some View {
-        let b = project.badge
-        StateBadge(
-            project.tag == .running && project.kind == .web ? project.link : b.label, tone: b.tone, symbol: b.symbol
-        )
-        .opacity(project.tag == .starting && !project.archived && beat ? 0.55 : 1)
-        .coreLoop(
-            project.tag == .starting ? .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true) : nil,
-            value: beat
-        )
-        .onAppear { if project.tag == .starting { beat = true } }
-        .accessibilityLabel("State: \(b.label)")
+        let b = starting ? ("Starting…", Tone.warn, "gearshape") : project.badge
+        StateBadge(b.0, tone: b.1, symbol: b.2)
+            // Starting breathes between full and 0.7 opacity (also under Reduce Motion: it is only a fade).
+            .opacity(isStarting && beat ? 0.7 : 1)
+            .animation(isStarting ? .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true) : .default, value: beat)
+            .task(id: isStarting) {
+                beat = false
+                if isStarting {
+                    try? await Task.sleep(for: .milliseconds(30))
+                    beat = true
+                }
+            }
+            .contentTransition(.opacity)
+            .accessibilityLabel("State: \(b.0)")
     }
 }
 
@@ -56,6 +63,10 @@ struct ProjectCard: View {
         return hovering || model.cursor == project.id || forced
     }
 
+    /// A Start was asked for and the project has not started yet.
+    private var startPending: Bool { model.controlling.contains(project.id) && project.tag != .running }
+    private var starting: Bool { startPending || project.tag == .starting }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             thumbnail
@@ -72,6 +83,7 @@ struct ProjectCard: View {
         .coreScaleEffect(pressed ? 0.99 : 1)
         .offset(y: lit && !pressed && !reduce ? -3 : 0)
         .coreRise(settled, index)
+        .transition(reduce ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
         .animation(Motion.out(Motion.hover), value: lit)
         .animation(Motion.out(Motion.press), value: pressed)
         .onHover { hovering = $0 }
@@ -86,17 +98,19 @@ struct ProjectCard: View {
         ZStack(alignment: .bottom) {
             Color.clear.coreCard(GlassInk.well, radius: Radius.control)
             ProjectPicture(project: project, colour: model.colour(project))
+            // A soft floor under the hover buttons so they read on a light page.
+            LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
+                .frame(height: Space.s8 * 2).opacity(lit ? 1 : 0).allowsHitTesting(false)
             HStack(alignment: .bottom) {
-                ProjectStateBadge(project: project)
-                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
-                    .coreCard(GlassInk.card, radius: Radius.control)
                 Spacer(minLength: Space.s2)
                 if lit { hoverActions.transition(.opacity) }
             }
             .padding(Space.s2)
+            if starting { StartingLine().padding(.horizontal, Space.s2).padding(.bottom, Space.s1).transition(.opacity) }
         }
         .frame(height: ProjectCard.thumbHeight)
         .clipShape(coreShape(Radius.control))
+        .animation(Motion.out(Motion.ui), value: starting)
     }
 
     private var hoverActions: some View { CardHoverActions(model: model, project: project) }
@@ -105,17 +119,37 @@ struct ProjectCard: View {
         HStack(spacing: Space.s3) {
             ProjectMark(name: project.name, colour: model.colour(project))
             VStack(alignment: .leading, spacing: 0) {
-                Text(project.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                HStack(spacing: Space.s2) {
+                    Text(project.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
+                    Spacer(minLength: 0)
+                    ProjectStateBadge(project: project, starting: startPending && project.tag != .starting)
+                }
                 Text(project.subtitle).foregroundStyle(GlassInk.secondary).lineLimit(1)
-            }
-            Spacer(minLength: 0)
-            if project.kind != .web {
-                Image(systemName: project.kind.symbol).foregroundStyle(GlassInk.secondary)
-                    .help(project.kind.title).accessibilityLabel(project.kind.title)
             }
         }
         .padding(.horizontal, Space.s1).padding(.bottom, Space.s1)
-        .help(project.name)
+        .help(project.kind == .web ? project.name : "\(project.name) · \(project.kind.title)")
+    }
+}
+
+/// A thin line along the foot of a card's picture while the project starts: a block runs along it; under Reduce Motion the
+/// whole line breathes instead.
+struct StartingLine: View {
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var on = false
+    var body: some View {
+        GeometryReader { g in
+            coreShape(2).fill(GlassInk.wellHover)
+                .overlay(alignment: .leading) {
+                    coreShape(2).fill(Color.white.opacity(0.9)).frame(width: reduce ? g.size.width : g.size.width * 0.3)
+                        .offset(x: reduce || !on ? 0 : g.size.width * 0.7)
+                        .opacity(reduce ? (on ? 1 : 0.5) : 1)
+                }
+        }
+        .frame(height: 3).clipShape(coreShape(2))
+        .animation(.easeInOut(duration: reduce ? Motion.tick : 1.2).repeatForever(autoreverses: true), value: on)
+        .onAppear { on = true }
+        .accessibilityHidden(true)
     }
 }
 
@@ -150,6 +184,7 @@ struct NewProjectCard: View {
         .onTapGesture { if !model.readOnly { model.newProject() } }
         .offset(y: hovering && !reduce ? -3 : 0)
         .coreRise(settled, index)
+        .transition(.opacity)
         .animation(Motion.out(Motion.hover), value: hovering)
         .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)

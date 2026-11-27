@@ -6,13 +6,14 @@ import SwiftUI
 @MainActor
 enum NewProjectDialogs {
     static func openWizard(
-        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name, pasted: [PickRepo] = []
+        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name, pasted: [PickRepo] = [],
+        kind: ProjectKind? = nil
     ) {
         m.clearWriteError()
         let shell = m.host.shell
         shell.present(
             ShellDialog(id: "project-new", onClose: { [weak m] in m?.clearWriteError() }) {
-                ProjectWizard(model: m, name: name, picked: picked, step: step, pasted: pasted) { shell.closeDialog() }
+                ProjectWizard(model: m, name: name, picked: picked, step: step, pasted: pasted, initialKind: kind) { shell.closeDialog() }
             })
     }
 
