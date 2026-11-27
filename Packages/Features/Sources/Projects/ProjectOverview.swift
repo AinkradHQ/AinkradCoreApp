@@ -120,7 +120,7 @@ struct Overview: View {
         let u = insights.usage
         let known = insights.knowledge?.count
         return HStack(spacing: Space.s2) {
-            InsightTile(title: "Health", value: s.health, line: s.healthLine, meter: s.healthFraction)
+            InsightTile(title: "Code", value: s.health, line: s.healthLine, meter: s.healthFraction)
             InsightTile(
                 title: "Runs this week", value: "\(s.runsThisWeek)",
                 line: s.runningNow > 0 ? "\(s.runningNow) running now" : "None running")
