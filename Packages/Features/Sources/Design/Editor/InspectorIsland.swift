@@ -11,24 +11,33 @@ struct InspectorIsland: View {
     var body: some View {
         Group {
             if let n = editor.node {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        header(n)
-                        if n.type != "page" { position(n) }
-                        if n.type != "page" { layout(n) }
-                        if n.type != "page" { appearance(n) }
-                        fill(n)
-                        if n.type != "page" { stroke(n) }
-                        if n.type != "page" { effects(n) }
-                        if n.type == "text" { typography(n) }
-                        if n.type == "instance" { overrides(n) }
-                        if n.type != "page" { PrototypeBlock(editor: editor, node: n) }
+                ScrollViewReader { reader in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            header(n)
+                            if n.type != "page" { position(n) }
+                            if n.type != "page" { layout(n) }
+                            if n.type != "page" { appearance(n) }
+                            fill(n)
+                            if n.type != "page" { stroke(n) }
+                            if n.type != "page" { effects(n) }
+                            if n.type == "text" { typography(n) }
+                            if n.type == "instance" { overrides(n) }
+                            if n.type != "page" { PrototypeBlock(editor: editor, node: n) }
+                            ApprovalBlock(editor: editor, node: n)
+                        }
+                        // A new selection fades its sections in; edits to the same node change in place.
+                        .id(n.id)
+                        .transition(.opacity)
                     }
-                    // A new selection fades its sections in; edits to the same node change in place.
-                    .id(n.id)
-                    .transition(.opacity)
+                    .scrollIndicators(.never)
+                    #if DEBUG
+                    // Debug only: the snapshot walk scrolls to a section (`DesignEditor.inspectorScroll`).
+                    .onChange(of: editor.inspectorScroll) { _, section in
+                        if let section { reader.scrollTo(section, anchor: .top) }
+                    }
+                    #endif
                 }
-                .scrollIndicators(.never)
             } else {
                 VStack(alignment: .leading, spacing: Space.s1) {
                     Text("Nothing selected").coreFont(size: MacTextSize.body, weight: .semibold)
@@ -68,6 +77,11 @@ struct InspectorIsland: View {
             }
             Spacer(minLength: 0)
             if n.type != "page" {
+                let locked = n.props["locked"]?.bool == true
+                InspectorIcon(symbol: locked ? "lock.fill" : "lock.open", label: locked ? "Unlock Layer" : "Lock Layer")
+                {
+                    editor.setLocked(editor.selection.filter { editor.layers[$0]?.type != "page" }, !locked)
+                }
                 let hidden = n.props["visible"]?.bool == false
                 InspectorIcon(symbol: hidden ? "eye.slash" : "eye", label: hidden ? "Show Layer" : "Hide Layer") {
                     editor.setHidden(n.id, !hidden)
@@ -113,6 +127,13 @@ struct InspectorIsland: View {
                 InlineNumber(label: "Y", value: num(n, "y")) {
                     editor.set("y", DesignOptions.snap($0).map { .number($0) })
                 })
+            pair(
+                InlineNumber(label: "Rotate", value: num(n, "rotation") ?? 0, suffix: "°") {
+                    // 0 is "not rotated": the prop goes away, like every other default.
+                    let deg = min(360, max(-360, $0 ?? 0))
+                    editor.set("rotation", deg == 0 ? nil : .number(deg))
+                },
+                Color.clear.frame(maxWidth: .infinity, maxHeight: 1))
         }
     }
 
@@ -312,33 +333,40 @@ struct InspectorIsland: View {
     // MARK: stroke
 
     @ViewBuilder private func stroke(_ n: EditorNode) -> some View {
-        let s = n.props["stroke"]
+        let list = InspectorEdits.strokes(n)
+        let write = { (next: [DJSON]) in editor.set("stroke", InspectorEdits.strokeValue(next)) }
         InspectorBlock("Stroke") {
-            if s == nil {
-                InspectorIcon(symbol: "plus", label: "Add a stroke") {
-                    editor.set(
-                        "stroke", .object(["color": .string("#111111"), "width": .number(1)]))
-                }
+            if list.count < InspectorEdits.maxStrokes {
+                InspectorIcon(symbol: "plus", label: "Add a stroke") { write(list + [InspectorEdits.newStroke]) }
             }
         } content: {
-            if let s {
-                HStack(spacing: Space.s1) {
-                    if s["color"]?.tokenName == nil {
-                        ColorField(hex: s["color"]?.string) {
-                            editor.set("stroke", InspectorEdits.stroke(n, "color", .string($0)))
+            ForEach(list.indices, id: \.self) { i in
+                let s = list[i]
+                let put = { (k: String, v: DJSON?) in write(InspectorEdits.stroking(list, i, k, v)) }
+                VStack(spacing: Space.s1) {
+                    HStack(spacing: Space.s1) {
+                        if s["color"]?.tokenName == nil {
+                            ColorField(hex: s["color"]?.string) { put("color", .string($0)) }
+                        }
+                        InlineNumber(label: "W", value: s["width"]?.double) { put("width", .number(max(0, $0 ?? 1))) }
+                            .frame(width: Space.s8 * 2 + Space.s2)
+                        InspectorIcon(symbol: "minus", label: "Remove this stroke") {
+                            var rest = list
+                            rest.remove(at: i)
+                            write(rest)
                         }
                     }
-                    InlineNumber(label: "W", value: s["width"]?.double) {
-                        editor.set("stroke", InspectorEdits.stroke(n, "width", .number(max(0, $0 ?? 1))))
+                    pair(
+                        InlineMenu(
+                            label: "Align", value: s["align"]?.string ?? "inside",
+                            choices: ["inside", "center", "outside"]
+                        ) { put("align", .string($0)) },
+                        InlineMenu(
+                            label: "Dash", value: InspectorEdits.dashName(s), choices: ["solid", "dashed", "dotted"]
+                        ) { put("dash", InspectorEdits.dash($0, width: s["width"]?.double ?? 1)) })
+                    TokenSelect(label: "Colour token", kind: "color", current: s["color"], tokens: editor.tokens) {
+                        put("color", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "color"))
                     }
-                    .frame(width: Space.s8 * 2 + Space.s2)
-                    InspectorIcon(symbol: "minus", label: "Remove the stroke") { editor.set("stroke", nil) }
-                }
-                TokenSelect(label: "Colour token", kind: "color", current: s["color"], tokens: editor.tokens) {
-                    editor.set(
-                        "stroke",
-                        InspectorEdits.stroke(n, "color", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "color"))
-                    )
                 }
             }
         }
@@ -349,23 +377,35 @@ struct InspectorIsland: View {
     @ViewBuilder private func effects(_ n: EditorNode) -> some View {
         let list = n.props["shadow"]?.tokenName == nil ? (n.props["shadow"]?.array ?? []) : []
         InspectorBlock("Effects") {
-            InspectorIcon(symbol: "plus", label: "Add a drop shadow") {
-                editor.set("shadow", .array(list + [Self.shadow]))
+            Menu {
+                Button("Drop shadow") { editor.set("shadow", .array(list + [Self.shadow])) }
+                Button("Inner shadow") {
+                    editor.set(
+                        "shadow", .array(list + [Self.merging(Self.shadow, ["inset": .bool(true), "y": .number(2)])]))
+                }
+                Button("Layer blur") { editor.set("blur", .number(8)) }.disabled(n.props["blur"] != nil)
+                Button("Background blur") { editor.set("backdrop_blur", .number(16)) }
+                    .disabled(n.props["backdrop_blur"] != nil)
+            } label: {
+                Image(systemName: "plus")
             }
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .help("Add an effect").accessibilityLabel("Add an effect")
         } content: {
             if let name = n.props["shadow"]?.tokenName {
                 Label(name, systemImage: "swatchpalette")
             }
             ForEach(list.indices, id: \.self) { i in
                 let sh = list[i]
-                let put = { (k: String, v: DJSON) in
+                let inset = InspectorEdits.isInset(sh)
+                let put = { (k: String, v: DJSON?) in
                     var o = sh.object ?? [:]
                     o[k] = v
                     editor.set("shadow", .array(Self.replacing(list, i, .object(o))))
                 }
                 VStack(spacing: Space.s1) {
                     HStack(spacing: Space.s1) {
-                        Text("Drop shadow").coreFont(size: MacTextSize.meta, weight: .medium)
+                        Text(inset ? "Inner shadow" : "Drop shadow").coreFont(size: MacTextSize.meta, weight: .medium)
                         Spacer(minLength: 0)
                         InspectorIcon(symbol: "minus", label: "Remove this shadow") {
                             var rest = list
@@ -382,9 +422,27 @@ struct InspectorIsland: View {
                         },
                         InlineNumber(label: "Spread", value: sh["spread"]?.double) { put("spread", .number($0 ?? 0)) })
                     ColorField(hex: sh["color"]?.string) { put("color", .string($0)) }
+                    Toggle("Inner shadow", isOn: Binding(get: { inset }, set: { put("inset", $0 ? .bool(true) : nil) }))
+                        .toggleStyle(.checkbox).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            blurRow(n, key: "blur", label: "Layer blur", help: "Blurs the layer itself")
+            blurRow(n, key: "backdrop_blur", label: "Background blur", help: "Blurs what is behind the layer")
         }
+    }
+
+    @ViewBuilder private func blurRow(_ n: EditorNode, key: String, label: String, help: String) -> some View {
+        if let v = num(n, key) {
+            HStack(spacing: Space.s1) {
+                InlineNumber(label: label, value: v) { editor.set(key, .number(min(1000, max(0, $0 ?? 0)))) }
+                    .help(help)
+                InspectorIcon(symbol: "minus", label: "Remove \(label.lowercased())") { editor.set(key, nil) }
+            }
+        }
+    }
+
+    private static func merging(_ base: DJSON, _ extra: [String: DJSON]) -> DJSON {
+        .object((base.object ?? [:]).merging(extra) { _, new in new })
     }
 
     static let shadow = DJSON.object([
@@ -400,6 +458,7 @@ struct InspectorIsland: View {
                 editor.set("type", $0.map(DJSON.token) ?? InspectorEdits.literal(kind: "type"))
             }
             if t?.tokenName == nil {
+                FontRow(editor: editor, node: n)
                 pair(
                     InlineNumber(label: "Size", value: t?["size"]?.double) {
                         if let v = $0 { editor.set("type", InspectorEdits.type(n, "size", .number(max(1, v)))) }

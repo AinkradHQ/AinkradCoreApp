@@ -49,6 +49,10 @@ extension DesignModel {
                 closeItem()
                 return .handled
             }
+            if !lib.multi.isEmpty {
+                lib.clearSelection()
+                return .handled
+            }
             if !filter.isEmpty {
                 filter = ""
                 return .handled
@@ -70,6 +74,10 @@ extension DesignModel {
                 find.wrappedValue = true
                 return .handled
             }
+            if c == "a", !find.wrappedValue {
+                selectAll()
+                return .handled
+            }
             if let n = Int(c), (1...DesignCategory.pages.count).contains(n) {
                 pick(DesignCategory.pages[n - 1])
                 return .handled
@@ -77,10 +85,14 @@ extension DesignModel {
             return .ignored
         }
         if find.wrappedValue { return press.key == .return ? openSelectedOrFirst() : .ignored }
+        if press.key == .delete, !lib.multi.isEmpty {
+            askDelete(items.filter { lib.multi.contains($0.id) })
+            return .handled
+        }
         if press.key == .delete, press.modifiers.contains(.command) || press.modifiers.isEmpty,
             let item = item(selected)
         {
-            askDelete(item)
+            askDelete(lib.multi.count > 1 ? targets(item) : [item])
             return .handled
         }
         switch press.key {

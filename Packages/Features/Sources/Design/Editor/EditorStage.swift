@@ -1,5 +1,6 @@
 import CoreUI
 import Projects
+import Shell
 import SwiftUI
 
 /// An open design with its canvas (V3-04): layers at the left, the canvas in the middle with the Ask… field floating over
@@ -59,6 +60,17 @@ struct EditorStage: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .coreWell(radius: Radius.pane)
             Island("Inspector") { InspectorIsland(editor: editor) }.frame(width: Space.s8 * 10)
+        }
+        .environment(model.collab)
+        .onChange(of: model.assets, initial: true) { _, list in
+            editor.libraryFonts = list.filter { $0.kind == .font && $0.check == .ok }
+        }
+        // A trigger: the app's own dialog shows the list (like every other Design dialog), then it resets.
+        .onChange(of: editor.shortcutsOpen) { _, open in
+            guard open else { return }
+            editor.shortcutsOpen = false
+            model.host.shell.present(
+                ShellDialog(id: "design-shortcuts") { ShortcutsSheet { model.host.shell.closeDialog() } })
         }
     }
 }

@@ -8,6 +8,8 @@ struct NewDesignView: View {
     @State private var name = DesignModel.defaultName(.design)
     @State private var kind = DesignDoc.Kind.design.rawValue
     @State private var project: String
+    /// The design system a new design follows (designs only); empty for none.
+    @State private var system = ""
     @State private var busy = false
     /// Mockup: the design to present.
     @State private var source = ""
@@ -29,6 +31,7 @@ struct NewDesignView: View {
 
     private var trimmed: String { DesignName.clean(name) }
     private var designs: [DesignDoc] { model.docs.filter { $0.kind == .design } }
+    private var systems: [DesignDoc] { model.docs.filter { $0.kind == .system } }
     private var mockup: Bool { kind == DesignDoc.Kind.mockup.rawValue }
     private var valid: Bool { mockup ? designs.contains { $0.id == source } : DesignName.valid(name, limit: 100) }
 
@@ -86,6 +89,11 @@ struct NewDesignView: View {
                     options: [CoreSelectOption("", "No project")]
                         + model.allProjects.map { CoreSelectOption($0.id, $0.name) })
             }
+            if kind == DesignDoc.Kind.design.rawValue, !systems.isEmpty {
+                CoreSelect(
+                    "Design system", selection: $system,
+                    options: [CoreSelectOption("", "None")] + systems.map { CoreSelectOption($0.id, $0.name) })
+            }
             if let error { CoreFieldError(error) }
             HStack(spacing: Space.s2) {
                 Button("Cancel") { model.host.shell.closeDialog() }
@@ -119,7 +127,9 @@ struct NewDesignView: View {
         busy = true
         error = nil
         Task {
-            error = await model.create(kind: k, name: trimmed, project: project.isEmpty ? nil : project, toast: false)
+            error = await model.create(
+                kind: k, name: trimmed, project: project.isEmpty ? nil : project,
+                system: k == .design && !system.isEmpty ? system : nil, toast: false)
             busy = false
         }
     }

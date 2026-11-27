@@ -29,12 +29,16 @@ public final class DesignModel {
     /// Every item, newest first: sorted once when a list changes, not on every count and redraw.
     private(set) var items: [DesignItem] = []
     var load: DesignLoad = .notConnected
+    /// Sort, favourites, multi-select, uploads, archived designs and undoable deletes (`DesignLibrary.swift`).
+    let lib = DesignLibrary()
+    /// Comments and approvals of the designs on screen (`DesignCollab.swift`).
+    let collab = DesignCollab()
     /// The rail's pick.
     var category = DesignCategory.all
     /// The rail's project (by id), or nil for all projects.
     var project: String?
     /// The top bar's Filter field: names, kinds and tags.
-    var filter = ""
+    var filter = "" { didSet { if filter != oldValue { lib.searchChanged(filter) } } }
     /// The open item (a `DesignItem.id`), or nil for the home.
     var openID: String?
     /// The card the keyboard is on (a `DesignItem.id`), or nil.
@@ -62,11 +66,13 @@ public final class DesignModel {
     /// The Core returns at most this many rows of a list (docs, library files), by name.
     static let listMax = 500
     var docsCapped = false
-    private(set) var readOnly = false
+    var readOnly = false
     /// The Core can draw three directions from a prompt (API minor 95, E11-4).
     private(set) var composeSupported = false
     /// The Core can write a whole design system with AI (API 108).
     private(set) var systemAISupported = false
+    /// The Core's edit mode reads a frame itself (API 109).
+    private(set) var editSupported = false
     /// The open item's Projects menu.
     var projectsMenuOpen = false
     /// The editor chrome of each design whose canvas was built (V3-04), by doc id.
@@ -79,6 +85,12 @@ public final class DesignModel {
     var debugHover: String?
     /// Snapshots only: shows the Saved badge in this state.
     var debugSave: SaveState?
+    /// Snapshots only: the Comments panel shown open.
+    var debugCommentsOpen = false
+    /// Snapshots only: the style guide's Add token popover shown open.
+    var debugAddTokenOpen = false
+    /// Snapshots only: opens the style guide's Generate popover on its replace confirmation.
+    var debugSystemAsk = false
     /// Snapshots only: the app's on-canvas probe (pointer and keys on the real canvas view), set by the app.
     @ObservationIgnored public var debugCanvasProbe: (@MainActor (@escaping @MainActor (String) -> Void) async -> Void)?
     #endif
@@ -86,6 +98,8 @@ public final class DesignModel {
     public init(host: any AdminHost, projects: ProjectsModel) {
         self.host = host
         projectsModel = projects
+        lib.model = self
+        collab.model = self
         projects.designsIsland = { [weak self] ref in
             guard let self else { return AnyView(EmptyView()) }
             return AnyView(DesignsIsland(model: self, project: ref))
@@ -127,6 +141,9 @@ public final class DesignModel {
         readOnly = false
         composeSupported = false
         systemAISupported = false
+        lib.reset()
+        collab.reset()
+        editSupported = false
     }
 
     public var isConnected: Bool { service != nil }
@@ -136,6 +153,7 @@ public final class DesignModel {
     /// list it is about is read again; comments, approvals and versions change none of the lists.
     public func event(kind: String) {
         guard kind.hasPrefix("design."), service != nil else { return }
+        collab.refresh()
         switch kind {
         case _ where kind.hasPrefix("design.doc"): Task { await reload(.docs) }
         case _ where kind.hasPrefix("design.asset"): Task { await reload(.assets) }
@@ -174,7 +192,10 @@ public final class DesignModel {
             if let connection {
                 composeSupported = await connection.serverSupports(minor: coreMinorV010)
                 systemAISupported = await connection.serverSupports(minor: 108)
+                lib.restoreSupported = await connection.serverSupports(minor: 109)
+                editSupported = await connection.serverSupports(minor: 109)
             }
+            if lib.archivedLoaded { await lib.loadArchived() }
         } catch {
             if docs.isEmpty, assets.isEmpty, kits.isEmpty {
                 load = .failed(words(error))
@@ -187,9 +208,11 @@ public final class DesignModel {
     // MARK: derived
 
     /// Every item, newest first.
-    private func sortItems() {
-        items = (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
-            .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+    func sortItems() {
+        let all = (docs.map(DesignItem.doc) + kits.map(DesignItem.kit) + assets.map(DesignItem.asset))
+            .filter { !lib.hidden.contains($0.id) }
+        items = DesignLibrary.order(
+            all, sort: lib.sort, favourites: lib.favourites, favouritesFirst: lib.favouritesFirst)
     }
 
     /// The items after the rail's project and the Filter field.
@@ -197,7 +220,9 @@ public final class DesignModel {
 
     func visible(in project: String?) -> [DesignItem] {
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        return items.filter { item in
+        // What the Core found for the typed text beyond the lists' 500 joins them.
+        let pool = q.isEmpty || lib.extra.isEmpty ? items : items + lib.extra.map(DesignItem.asset)
+        return pool.filter { item in
             (project.map { item.projects.contains($0) } ?? true)
                 && (q.isEmpty || item.name.lowercased().contains(q) || item.kindWord.lowercased().contains(q)
                     || item.tags.contains { $0.lowercased().contains(q) })
@@ -208,6 +233,11 @@ public final class DesignModel {
 
     func items(in c: DesignCategory, project: String?) -> [DesignItem] {
         switch c {
+        case .archived:
+            lib.archived.map(DesignItem.doc).filter {
+                let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
+                return q.isEmpty || $0.name.lowercased().contains(q)
+            }
         case .all: visible(in: project)
         case .library: visible(in: project).filter { DesignCategory.libraryKinds.contains($0.category) }
         default: visible(in: project).filter { $0.category == c }
@@ -215,7 +245,9 @@ public final class DesignModel {
     }
 
     /// A category row's count: what picking it shows, so it follows the project chip.
-    func count(_ c: DesignCategory) -> Int { items(in: c).count }
+    func count(_ c: DesignCategory) -> Int {
+        c == .archived && !lib.archivedLoaded ? -1 : items(in: c).count
+    }
 
     /// The projects with something related to them, for the rail.
     var railProjects: [(ref: ProjectRef, count: Int)] {
@@ -345,11 +377,11 @@ public final class DesignModel {
     }
 
     /// New design, quick: made at once with the defaults (named for the category being looked at) and opened.
-    func quickNew() async {
+    func quickNew(starter: Bool = true) async {
         // A mockup is not an empty document: it shows one of the designs, so New there asks which (Present).
         if category.page == .mockups { return openNew(kind: .mockup) }
         let kind: DesignDoc.Kind = category.page == .systems ? .system : .design
-        await create(kind: kind, name: Self.defaultName(kind), project: project)
+        await create(kind: kind, name: Self.defaultName(kind), project: project, starter: starter ? nil : [])
     }
 
     static func defaultName(_ kind: DesignDoc.Kind) -> String {
@@ -363,7 +395,11 @@ public final class DesignModel {
     /// Makes the design and opens it. Returns the Core's refusal in words (the advanced sheet shows it inline), nil on
     /// success; the quick path toasts it.
     @discardableResult
-    func create(kind: DesignDoc.Kind, name: String, project: String?, toast: Bool = true) async -> String? {
+    /// `starter`: the new design's first ops; nil gives the default frame, `[]` none (the AI draws instead).
+    func create(
+        kind: DesignDoc.Kind, name: String, project: String?, system: String? = nil,
+        starter: [[String: DJSON]]? = nil, toast: Bool = true
+    ) async -> String? {
         guard let service else { return "Not connected to a Core." }
         if readOnly || host.pausedReason != nil {
             let why = host.pausedReason ?? "This device can look at designs but not change them."
@@ -372,9 +408,12 @@ public final class DesignModel {
         }
         do {
             let d = try await service.create(
-                kind: kind, name: DesignName.clean(name), project: project)
+                kind: kind, name: DesignName.clean(name), project: project, system: system)
             docs.append(d)
-            if kind == .design { editor(for: d.id).starter = DesignOptions.starterOps(DesignOptions.canvas) }
+            if kind == .design {
+                let ops = starter ?? DesignOptions.starterOps(DesignOptions.canvas)
+                if !ops.isEmpty { editor(for: d.id).starter = ops }
+            }
             host.shell.closeDialog()
             category = .all
             filter = ""
@@ -394,7 +433,9 @@ public final class DesignModel {
     /// frame; with `prompt` (the Ask… field) it starts at once.
     func drawWithAI(prompt: String = "") async {
         // AI draws on designs only: from the home it makes a design (never a system or mockup, whatever page is open).
-        if openID == nil {
+        // The new design has no starter frame of its own to keep: the AI's frame replaces it.
+        let fromHome = openID == nil
+        if fromHome {
             guard await create(kind: .design, name: Self.defaultName(.design), project: project) == nil else { return }
         }
         guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else {
@@ -403,6 +444,8 @@ public final class DesignModel {
         }
         let target = editors[d.id]?.targetFrame().map { DesignComposer.Target(id: $0.id, name: $0.title) }
         let c = DesignComposer(model: self, doc: d.id, prompt: prompt, target: target)
+        if fromHome { c.starterFrame = editors[d.id]?.starter?.last?["id"]?.string }
+        composer?.shutdown()  // one run at a time
         withAnimation(Motion.out(Motion.ui)) { composer = c }
         if !prompt.isEmpty { c.draw() }
     }
@@ -415,6 +458,10 @@ public final class DesignModel {
     // MARK: navigation
 
     func openItem(_ id: String) {
+        if let c = composer, "doc:\(c.doc)" != id {  // another design: its run ends with its panel
+            c.shutdown()
+            composer = nil
+        }
         withAnimation(Motion.out(Motion.move)) { openID = id }
     }
 
@@ -423,6 +470,7 @@ public final class DesignModel {
         presenter?.viewer.present(nil)
         editors = [:]
         aboutOpen = false
+        composer?.shutdown()
         composer = nil
         presenter = nil
     }
@@ -438,6 +486,8 @@ public final class DesignModel {
         selected = nil
         project = nil
         closeItem()
+        lib.clearSelection()
+        if c == .archived { Task { await lib.loadArchived() } }
     }
 
     func pickProject(_ id: String) {

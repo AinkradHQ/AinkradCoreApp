@@ -1,3 +1,4 @@
+import AppKit
 import CoreKit
 import Design
 import DesignCanvas
@@ -41,6 +42,39 @@ final class CanvasEditing: DesignEditBackend {
         view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }
     }
     func fit(_ rect: CGRect) { view?.editorFit(rect) }
+    func presenceList() -> Data? { view?.editorPresenceList() }
+    func follow(_ peer: String) { view?.editorFollow(peer) }
+    func setPage(_ index: Int) { view?.editorSetPage(index) }
+    func zoom(by factor: Double) { view?.editorZoom(by: factor) }
+    func zoom(to scale: Double) { view?.editorZoom(to: scale) }
+    func fitAll() { view?.editorFitAll() }
+    func copy() -> Data? { view?.editorCopy() }
+    func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool {
+        guard let view else { return false }
+        return view.editorPaste(json, parent: parent, at: atCenter ? view.center : nil)
+    }
+    func duplicate() -> Bool { view?.editorDuplicate() ?? false }
+    func group() -> Bool { view?.editorGroup() ?? false }
+    func ungroup() -> Bool { view?.editorUngroup() ?? false }
+    func createComponent() -> Bool { view?.editorComponentCreate() ?? false }
+    func insertInstance(_ component: String, at: CGPoint?) -> Bool {
+        guard let view else { return false }
+        return view.editorInstanceInsert(component, at: at ?? view.center)
+    }
+    func detachInstance() -> Bool { view?.editorInstanceDetach() ?? false }
+    func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?) {
+        guard let view else { return }
+        guard let handler else {
+            view.keyHandler = nil
+            return
+        }
+        view.keyHandler = { @MainActor (e: NSEvent) -> Bool in handler(EditorKey(e)) }
+    }
+    func debugPresence(_ json: String) {
+        #if DEBUG
+        view?.editorDebugPresence(json)
+        #endif
+    }
     func present(_ tap: (@MainActor (String?) -> Void)?) {
         view?.editorPresent(tap.map { t in { id in MainActor.assumeIsolated { t(id) } } })
     }
@@ -50,6 +84,11 @@ final class CanvasEditing: DesignEditBackend {
         handle.attach(CanvasEditing(view))
         view.onChange = { handle.changed() }
     }
+}
+
+extension NSView {
+    /// The middle of the view, where the canvas is looking.
+    fileprivate var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
 }
 
 /// Gives Design its canvas (V3-02). The app links the engine; `Features` does not. A design gets its canvas over the

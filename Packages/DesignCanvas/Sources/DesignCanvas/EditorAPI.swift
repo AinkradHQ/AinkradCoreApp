@@ -76,7 +76,7 @@ extension DesignCanvasNSView {
     /// The design system's tokens as a JSON array of `{name, kind}`; nil while the engine cannot list them.
     public func editorTokens() -> Data? { engine.tokens() }
 
-    private func changed() {
+    func changed() {
         loop.wake(input: true)
         sync?.flush()
         onChange?()

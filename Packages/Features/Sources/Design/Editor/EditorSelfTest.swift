@@ -36,6 +36,7 @@ enum EditorSelfTest {
             ("fill", .array([InsertPreset.grey.array![0], InspectorIsland.gradient])),
             ("stroke", .object(["color": .string("#111111"), "width": .number(2)])),
             ("shadow", .array([InspectorIsland.shadow])),
+            ("rotation", .number(30)), ("blur", .number(6)), ("backdrop_blur", .number(20)),
             ("sizing", .object(["w": .string("fill"), "h": .string("hug")])),
         ]
         for (k, v) in writes {
@@ -43,6 +44,23 @@ enum EditorSelfTest {
             e.reload()
             check("rect set \(k)", prop(k) == v, "got \(String(describing: prop(k)))")
         }
+        // An inner shadow and a list of strokes (alignment, dash) are what the engine now takes.
+        let inner = DJSON.object([
+            "x": .number(0), "y": .number(2), "blur": .number(6), "color": .string("#00000040"), "inset": .bool(true),
+        ])
+        e.set("shadow", .array([InspectorIsland.shadow, inner]))
+        e.reload()
+        check("rect inner shadow", prop("shadow")?.array?.last == inner, "got \(String(describing: prop("shadow")))")
+        let strokes: [DJSON] = [
+            .object(["color": .string("#111111"), "width": .number(2), "align": .string("outside")]),
+            .object([
+                "color": .string("#ff0000"), "width": .number(1), "align": .string("center"),
+                "dash": .array([.number(4), .number(2)]),
+            ]),
+        ]
+        e.set("stroke", InspectorEdits.strokeValue(strokes))
+        e.reload()
+        check("rect two strokes", prop("stroke") == .array(strokes), "got \(String(describing: prop("stroke")))")
         e.set("blend", nil)
         e.reload()
         check("rect clear blend", prop("blend") == nil)

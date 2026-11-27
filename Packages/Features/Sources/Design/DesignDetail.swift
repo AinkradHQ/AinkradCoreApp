@@ -79,7 +79,7 @@ struct DesignDetail: View {
                 #endif
             }
         } actions: {
-            if let editor { PresenceStrip(peers: editor.peers) }
+            if let editor { PresenceStrip(peers: editor.peers, collaborators: editor.collaborators) { editor.follow($0) } }
             if let editor { EditorToolbar(editor: editor, aboutOpen: aboutOpen) }
             CoreDropdown(
                 items: projectItems,
@@ -90,6 +90,7 @@ struct DesignDetail: View {
             .disabled(model.allProjects.isEmpty || model.readOnly)
             .help("Relate this to projects; it stays in the library either way")
             .accessibilityIdentifier("design-projects")
+            if case .doc(let d) = item { DesignCollabHeader(model: model, doc: d, editor: editor) }
             if let editor, case .doc(let d) = item {
                 let screens = !DesignPresenter.screens(in: editor).isEmpty
                 AppActionTile(title: "Present", symbol: "play.rectangle", key: "", hue: GlassInk.accent(paneAccent)) {
@@ -128,6 +129,10 @@ struct DesignDetail: View {
         if case .doc(let d) = item, d.kind == .mockup {
             MockupStage(model: model, doc: d)
                 .padding(Space.s2)
+                .coreWell(radius: Radius.pane)
+                .contextMenu { DesignMenu(model: model, item: item) }
+        } else if case .kit(let k) = item {
+            BrandKitEditor(model: model, kit: k)
                 .coreWell(radius: Radius.pane)
                 .contextMenu { DesignMenu(model: model, item: item) }
         } else if case .doc(let d) = item, d.kind == .system, let canvas = model.canvasView(d) {
@@ -248,7 +253,7 @@ struct AboutIsland: View {
         switch item {
         case .doc(let d):
             fact("Kind", item.kindWord.capitalizedFirst)
-            if d.kind == .design { fact("System", systemWords(d)) }
+            if d.kind == .design { DocSystemPicker(model: model, doc: d) }
             fact("Updated", Ago.words(d.updatedAt))
             fact("Made by", Self.who(d.createdBy))
             if d.aiPaused { fact("AI", "Paused") }
@@ -264,17 +269,11 @@ struct AboutIsland: View {
         }
     }
 
-    /// The design system a design follows: its name; "Archived or removed" when it names one the list no longer has.
-    private func systemWords(_ d: DesignDoc) -> String {
-        guard let id = d.system else { return "None" }
-        return model.doc(id)?.name ?? "Archived or removed"
-    }
-
     @ViewBuilder private var extra: some View {
         switch item {
-        case .asset(let a) where !a.tags.isEmpty:
+        case .asset(let a):
             heading("Tags")
-            Text(a.tags.joined(separator: " · ")).fixedSize(horizontal: false, vertical: true)
+            AssetTagsEditor(model: model, asset: a)
         case .kit(let k):
             if !k.colors.isEmpty {
                 heading("Colours")

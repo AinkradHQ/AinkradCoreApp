@@ -12,6 +12,7 @@ struct EditorToolbar: View {
             CoreIconButton(symbol: "arrow.uturn.backward", label: "Undo the last change (⌘Z)") { editor.undo() }
             CoreIconButton(symbol: "arrow.uturn.forward", label: "Redo the change you undid (⇧⌘Z)") { editor.redo() }
             CoreIconButton(symbol: "scope", label: "Zoom to the selection (⌘1)") { editor.fitSelection() }
+            CoreIconButton(symbol: "keyboard", label: "Keyboard shortcuts (?)") { editor.shortcutsOpen = true }
             CoreIconButton(
                 symbol: "clock.arrow.circlepath", label: "Show this design's versions and go back to one",
                 selected: editor.versionsOpen
@@ -32,10 +33,15 @@ struct EditorToolbar: View {
 /// is never stored, so an empty strip simply means you are alone.
 struct PresenceStrip: View {
     let peers: [DesignPeer]
+    /// People the engine lists on the canvas: shown instead of `peers` when there are any, each one followable.
+    var collaborators: [Collaborator] = []
+    var follow: (Collaborator) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: Space.s1) {
-            if peers.isEmpty {
+            if !collaborators.isEmpty {
+                CollaboratorChips(people: collaborators, follow: follow)
+            } else if peers.isEmpty {
                 Text("Only you").foregroundStyle(GlassInk.secondary)
             } else {
                 ForEach(peers.prefix(4)) { p in

@@ -1,7 +1,7 @@
 # DesignEngine.xcframework pin (V3-02, plan T6). Built by `scripts/design-engine.sh build` (make engine) in AinkradCore at
-# CORE_COMMIT below (feat/design-systems, AinkradCore #526: token ops, de_doc_tokens, de_export_png). The rest is its SHA256SUMS.
-CORE_COMMIT=b2e4bda0984c80c9e701f963e0fc1ff551ebc2a6
+# CORE_COMMIT below (feat/design-systems, AinkradCore #526+#527+#528: tokens, rotate/lock/inset/blur/multi-stroke, copy/paste/group/components). The rest is its SHA256SUMS.
+CORE_COMMIT=1f56c3914f77d099d3c591d96c414ca26ae59b67
 1b96ae3314c14ce5662cacd4f4ce2fa35237e41fe022cf8e7f471556be0115b2  DesignEngine.xcframework/Info.plist
-2f59a8f313316ca8e6834f0631379174bda1bbc608776af3c123d64208eda900  DesignEngine.xcframework/macos-arm64_x86_64/Headers/DesignEngine.h
+0ae2387e92e5b2cfa602963bf99b8f286dca61a0137b6bcec3bdd1a7bad9bc23  DesignEngine.xcframework/macos-arm64_x86_64/Headers/DesignEngine.h
 0586d0369f947adc4016922175451fa9f3fd10bb49bf47a3c6aa0a3dc2a38b0d  DesignEngine.xcframework/macos-arm64_x86_64/Headers/module.modulemap
-87977c4f9d65be962b4b50905a8bf9e3678c078cc90d33eb4c0eb1b381f61502  DesignEngine.xcframework/macos-arm64_x86_64/libDesignEngine.a
+fabac83768d09eeca95ccb8e1ea78ee467755b1cf778b6f42e731c82365ad726  DesignEngine.xcframework/macos-arm64_x86_64/libDesignEngine.a
