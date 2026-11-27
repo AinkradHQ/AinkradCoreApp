@@ -1,5 +1,6 @@
 import CoreUI
 import Projects
+import Shell
 import SwiftUI
 
 /// An open design with its canvas (V3-04): layers at the left, the canvas in the middle with the Ask… field floating over
@@ -64,8 +65,12 @@ struct EditorStage: View {
         .onChange(of: model.assets, initial: true) { _, list in
             editor.libraryFonts = list.filter { $0.kind == .font && $0.check == .ok }
         }
-        .sheet(isPresented: Binding(get: { editor.shortcutsOpen }, set: { editor.shortcutsOpen = $0 })) {
-            ShortcutsSheet(editor: editor)
+        // A trigger: the app's own dialog shows the list (like every other Design dialog), then it resets.
+        .onChange(of: editor.shortcutsOpen) { _, open in
+            guard open else { return }
+            editor.shortcutsOpen = false
+            model.host.shell.present(
+                ShellDialog(id: "design-shortcuts") { ShortcutsSheet { model.host.shell.closeDialog() } })
         }
     }
 }

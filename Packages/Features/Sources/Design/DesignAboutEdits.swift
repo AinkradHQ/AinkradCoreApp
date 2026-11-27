@@ -53,12 +53,14 @@ struct AssetTagsEditor: View {
                 Text("No tags yet.").foregroundStyle(GlassInk.secondary)
             } else {
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Space.s8 * 2), spacing: Space.s1)], alignment: .leading,
+                    columns: [GridItem(.adaptive(minimum: Space.s8 * 4), spacing: Space.s1)], alignment: .leading,
                     spacing: Space.s1
                 ) {
                     ForEach(asset.tags, id: \.self) { t in
                         HStack(spacing: Space.s1) {
-                            Text(t).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1)
+                            Text(t).coreFont(size: MacTextSize.meta, weight: .medium).lineLimit(1).truncationMode(
+                                .middle
+                            ).help(t)
                             Spacer(minLength: 0)
                             if !model.readOnly {
                                 CoreIconButton(symbol: "xmark", label: "Remove the tag \(t)") {

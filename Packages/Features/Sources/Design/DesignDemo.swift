@@ -352,6 +352,10 @@ public final class DesignDemo {
             ])
         await model.useNow(svc)
         model.debugSystemAsk = false
+        // Scenes share one run: nothing from the scene before (AI panel, dialog) may stay open.
+        model.composer?.shutdown()
+        model.composer = nil
+        model.host.shell.closeDialog()
         if scene.hasPrefix("project-island") {
             shell.closePane("design")
             await ProjectsDemo(model: model.projectsModel).show("overview-running")
@@ -497,13 +501,13 @@ public final class DesignDemo {
         }
         if scene == "system-replace-confirm" {
             // A system that already has tokens: Generate asks before replacing them.
-            try? await Task.sleep(for: .seconds(2))
-            model.editors[Self.did(8)]?.setTokens(SystemStarter.tokens)
-            try? await Task.sleep(for: .seconds(1))
+            // The guide opens with the confirmation armed, then the system gets its tokens (the label counts them live).
             model.debugSystemAsk = true
             model.openID = nil
             try? await Task.sleep(for: .milliseconds(300))
             model.openID = "doc:\(Self.did(8))"
+            try? await Task.sleep(for: .seconds(2))
+            model.editors[Self.did(8)]?.setTokens(SystemStarter.tokens)
             try? await Task.sleep(for: .seconds(2))
         }
         if scene == "system-guide" || scene == "system-guide-night" || scene == "add-token" {

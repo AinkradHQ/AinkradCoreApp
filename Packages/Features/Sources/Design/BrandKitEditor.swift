@@ -56,13 +56,13 @@ struct BrandKitEditor: View {
     private var colours: some View {
         section("Colours", "\(Words.count(kit.colors.count, "colour")). Each is #rrggbb.") {
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: Space.s8 * 3), spacing: Space.s2)], alignment: .leading,
+                columns: [GridItem(.adaptive(minimum: Space.s8 * 5), spacing: Space.s2)], alignment: .leading,
                 spacing: Space.s2
             ) {
                 ForEach(kit.colors, id: \.self) { hex in
                     HStack(spacing: Space.s2) {
                         Swatch(hex: hex).frame(width: Space.s6, height: Space.s5)
-                        Text(hex.uppercased()).coreFont(size: MacTextSize.meta).monospaced()
+                        Text(hex.uppercased()).coreFont(size: MacTextSize.meta).monospaced().lineLimit(1).fixedSize()
                         Spacer(minLength: 0)
                         if !locked {
                             CoreIconButton(symbol: "xmark", label: "Remove \(hex)") {
