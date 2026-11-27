@@ -135,13 +135,14 @@ private struct ServicesIsland: View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s5, verticalSpacing: Space.s3) {
             GridRow {
                 ForEach(["Service", "Image", "Port", "Health", "CPU", "Memory", "Restarts"], id: \.self) {
-                    Text($0).foregroundStyle(GlassInk.secondary)
+                    Text($0).foregroundStyle(GlassInk.secondary).frame(
+                        maxWidth: $0 == "Image" ? .infinity : nil, alignment: .leading)
                 }
             }
             ForEach(rows) { r in
                 GridRow {
                     Text(r.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    mono(r.image)
+                    mono(r.image).frame(maxWidth: .infinity, alignment: .leading)
                     mono(r.port)
                     health(r)
                     cpu(r)
@@ -174,8 +175,9 @@ private struct ServicesIsland: View {
     @ViewBuilder private func cpu(_ r: Row) -> some View {
         if r.state == .up, let cpu = r.cpu {
             HStack(spacing: Space.s2) {
-                CoreMeter(Double(cpu) / 100, low: cpu >= 90, label: "\(r.name) CPU").frame(width: Space.s8 * 3)
-                Text("\(cpu)%").monospacedDigit()
+                CoreMeter(Double(cpu) / 100, low: cpu >= 90, height: Space.s2, label: "\(r.name) CPU")
+                    .frame(width: Space.s8 * 3)
+                Text("\(cpu)%").monospacedDigit().lineLimit(1).fixedSize()
             }
         } else {
             Text("–").foregroundStyle(GlassInk.secondary)
@@ -302,22 +304,26 @@ private struct SecretsIsland: View {
                 ScrollView {
                     VStack(spacing: Space.s1) {
                         ForEach(rows) { r in
-                            CoreRow(r.name, symbol: "key") {
-                                HStack(spacing: Space.s2) {
-                                    if let at = r.item?.updatedAt {
-                                        Text("Set \(PickRepo.ago(at, model.now()))").foregroundStyle(
-                                            GlassInk.secondary)
-                                    } else if r.item == nil {
-                                        Text("Not set").foregroundStyle(GlassInk.redInk)
-                                    }
-                                    Button(r.item == nil ? "Set…" : "Replace…") {
-                                        RunDialogs.openSecret(
-                                            run, project: project, name: r.name, replacing: r.item != nil)
-                                    }
-                                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
-                                    .accessibilityLabel("\(r.item == nil ? "Set" : "Replace") \(r.name)")
+                            HStack(spacing: Space.s3) {
+                                Image(systemName: "key").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                                Text(r.name).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer(minLength: 0)
+                                if let at = r.item?.updatedAt {
+                                    Text("Set \(PickRepo.ago(at, model.now()))").foregroundStyle(GlassInk.secondary)
+                                        .lineLimit(1).fixedSize()
+                                } else if r.item == nil {
+                                    Text("Not set").foregroundStyle(GlassInk.redInk).lineLimit(1).fixedSize()
                                 }
+                                Button(r.item == nil ? "Set…" : "Replace…") {
+                                    RunDialogs.openSecret(
+                                        run, project: project, name: r.name, replacing: r.item != nil)
+                                }
+                                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
+                                .fixedSize()
+                                .accessibilityLabel("\(r.item == nil ? "Set" : "Replace") \(r.name)")
                             }
+                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlLg)
                         }
                     }
                 }
