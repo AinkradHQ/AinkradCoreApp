@@ -13,6 +13,7 @@ struct SystemStyleGuide: View {
     @State private var night = false
     @State private var ai = SystemAI()
     @State private var asking = false
+    @State private var adding = false
     /// The second press: a system that already has tokens asks before the AI replaces them.
     @State private var confirming = false
     @Environment(\.coreAccent) private var paneAccent
@@ -49,6 +50,7 @@ struct SystemStyleGuide: View {
         .accessibilityIdentifier("design-system-guide")
         #if DEBUG
         .onAppear {
+            if model.debugAddTokenOpen { adding = true }
             if model.debugSystemAsk {
                 asking = true
                 confirming = true
@@ -81,6 +83,20 @@ struct SystemStyleGuide: View {
                 segments: [CoreSegment(false, "Day", symbol: "sun.max"), CoreSegment(true, "Night", symbol: "moon")],
                 selection: $night)
             Button {
+                adding = true
+            } label: {
+                Label("Add token", systemImage: "plus")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary))
+            .disabled(!editor.attached || model.readOnly)
+            .help(
+                model.readOnly
+                    ? "This device can look at designs but not change them."
+                    : "Add a colour, type, spacing, radius or shadow token"
+            )
+            .popover(isPresented: $adding, arrowEdge: .bottom) { AddTokenSheet(editor: editor) { adding = false } }
+            .accessibilityIdentifier("design-add-token-button")
+            Button {
                 asking = true
             } label: {
                 Label("Generate with AI", systemImage: "sparkles")
@@ -107,7 +123,8 @@ struct SystemStyleGuide: View {
             if !model.kits.isEmpty {
                 CoreSelect(
                     "Brand kit", selection: $ai.kit,
-                    options: [CoreSelectOption("", "None")] + model.kits.map { CoreSelectOption($0.id, $0.name) })
+                    options: [CoreSelectOption("", "None")]
+                        + model.kits.filter { $0.kind == .brandKit }.map { CoreSelectOption($0.id, $0.name) })
             }
             if ai.overLimit {
                 Text(

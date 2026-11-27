@@ -23,6 +23,7 @@ struct InspectorIsland: View {
                         if n.type == "text" { typography(n) }
                         if n.type == "instance" { overrides(n) }
                         if n.type != "page" { PrototypeBlock(editor: editor, node: n) }
+                        ApprovalBlock(editor: editor, node: n)
                     }
                     // A new selection fades its sections in; edits to the same node change in place.
                     .id(n.id)

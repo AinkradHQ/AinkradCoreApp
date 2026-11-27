@@ -8,6 +8,14 @@ import SwiftUI
 struct TokenEditor: View {
     let editor: DesignEditor
     let token: SystemToken
+    @State private var newName = ""
+
+    private var shortName: String { token.short }
+    private var problem: String? {
+        TokenRules.problem(
+            short: newName, group: TokenGroup(rawValue: token.group) ?? .color, existing: editor.systemTokens,
+            renaming: token.name)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -21,8 +29,18 @@ struct TokenEditor: View {
             }
             row("Day", token.day) { set(day: $0) }
             row("Night", token.night) { set(night: $0) }
+            if TokenGroup(rawValue: token.group) != nil {
+                CoreTextField("Rename", placeholder: shortName, text: $newName, error: problem, mono: true) { rename() }
+                    .help("Designs that use the old name keep pointing at it")
+            }
         }
         .padding(Space.s4).frame(width: Space.s8 * 11)
+    }
+
+    private func rename() {
+        let t = newName.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, problem == nil, t != shortName else { return }
+        editor.renameToken(token, to: "\(token.group).\(t)")
     }
 
     private func set(day: DJSON? = nil, night: DJSON? = nil) {
