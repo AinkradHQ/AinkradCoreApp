@@ -23,6 +23,101 @@ public final class DesignDemo {
             kitList = kits
             self.bytes = bytes
         }
+        // Collaboration and library writes, in memory.
+        private var commentList: [DesignComment] = []
+        private var approvalList: [String: [ScreenApproval]] = [:]
+        private var archivedList: [DesignDoc] = []
+        func seed(comments: [DesignComment], approvals: [String: [ScreenApproval]], archived: [DesignDoc]) {
+            lock.withLock {
+                commentList = comments
+                approvalList = approvals
+                archivedList = archived
+            }
+        }
+        func archivedDocs() async throws -> [DesignDoc] { lock.withLock { archivedList } }
+        func unarchive(doc: String) async throws {
+            lock.withLock {
+                if let i = archivedList.firstIndex(where: { $0.id == doc }) {
+                    var d = archivedList.remove(at: i)
+                    d.archived = false
+                    docList.append(d)
+                }
+            }
+        }
+        func comments(doc: String) async throws -> [DesignComment] { lock.withLock { commentList } }
+        func postComment(doc: String, _ new: NewDesignComment) async throws -> DesignComment {
+            lock.withLock {
+                let c = DesignComment(
+                    id: "dc_\(commentList.count + 1)", screen: new.screen, body: new.body, author: "d_you",
+                    createdAt: Date(), node: new.node, parent: new.parent, resolvedAt: nil)
+                commentList.append(c)
+                return c
+            }
+        }
+        func resolveComment(doc: String, id: String, resolved: Bool) async throws {
+            lock.withLock {
+                if let i = commentList.firstIndex(where: { $0.id == id }) {
+                    let c = commentList[i]
+                    commentList[i] = DesignComment(
+                        id: c.id, screen: c.screen, body: c.body, author: c.author, createdAt: c.createdAt,
+                        node: c.node, parent: c.parent, resolvedAt: resolved ? Date() : nil)
+                }
+            }
+        }
+        func approvals(doc: String) async throws -> [ScreenApproval] { lock.withLock { approvalList[doc] ?? [] } }
+        func approve(doc: String, screen: String) async throws {
+            lock.withLock {
+                approvalList[doc, default: []].removeAll { $0.screen == screen }
+                approvalList[doc, default: []].append(
+                    ScreenApproval(screen: screen, version: "dv_1", state: .approved, decidedBy: "d_you", decidedAt: Date()))
+            }
+        }
+        func withdrawApproval(doc: String, screen: String) async throws {
+            lock.withLock { approvalList[doc, default: []].removeAll { $0.screen == screen } }
+        }
+        func setTags(sha: String, tags: [String]) async throws -> DesignAsset {
+            lock.withLock {
+                let i = assetList.firstIndex { $0.sha == sha }!
+                assetList[i].tags = tags
+                return assetList[i]
+            }
+        }
+        func setSystem(doc: String, system: String?) async throws -> DesignDoc {
+            lock.withLock {
+                let i = docList.firstIndex { $0.id == doc }!
+                docList[i].system = system
+                return docList[i]
+            }
+        }
+        func pauseAI(doc: String) async throws -> DesignDoc { try await ai(doc, true) }
+        func takeOver(doc: String) async throws -> DesignDoc { try await ai(doc, true) }
+        func resumeAI(doc: String) async throws -> DesignDoc { try await ai(doc, false) }
+        private func ai(_ doc: String, _ paused: Bool) async throws -> DesignDoc {
+            lock.withLock {
+                let i = docList.firstIndex { $0.id == doc }!
+                docList[i].aiPaused = paused
+                return docList[i]
+            }
+        }
+        func patchKit(id: String, name: String?, colors: [String]?, fonts: [String]?) async throws -> BrandKit {
+            lock.withLock {
+                let i = kitList.firstIndex { $0.id == id }!
+                if let name { kitList[i].name = name }
+                if let colors { kitList[i].colors = colors }
+                if let fonts { kitList[i].fonts = fonts }
+                return kitList[i]
+            }
+        }
+        func putKitItem(id: String, sha: String, role: String?) async throws {
+            lock.withLock {
+                let i = kitList.firstIndex { $0.id == id }!
+                kitList[i].items.removeAll { $0.sha == sha }
+                kitList[i].items.append(.init(sha: sha, role: role))
+            }
+        }
+        func removeKitItem(id: String, sha: String) async throws {
+            lock.withLock { kitList[kitList.firstIndex { $0.id == id }!].items.removeAll { $0.sha == sha } }
+        }
         func docs() async throws -> [DesignDoc] { lock.withLock { docList } }
         func assets() async throws -> [DesignAsset] { lock.withLock { assetList } }
         func kits() async throws -> [BrandKit] { lock.withLock { kitList } }
@@ -56,7 +151,9 @@ public final class DesignDemo {
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
-        "system-guide", "system-guide-night",
+        "system-guide", "system-guide-night", "comments", "approval", "ai-paused", "archived", "archived-old-core",
+        "open-folder", "new-kit", "library-upload", "multi-select", "sort-favourites", "open-design-about",
+        "add-token", "delete-bulk",
     ]
 
     private let model: DesignModel
@@ -140,6 +237,12 @@ public final class DesignDemo {
         let now = Date()
         return [
             BrandKit(
+                id: "dc_\(String(format: "%016x", 3))", name: "Illustrations",
+                colors: [], fonts: [],
+                items: [
+                    .init(sha: sha("Empty cart scene"), role: nil), .init(sha: sha("Reading nook"), role: nil),
+                ], projects: ["1"], updatedAt: now.addingTimeInterval(-10 * 3600), kind: .folder),
+            BrandKit(
                 id: "dc_\(String(format: "%016x", 1))", name: "Lanterna brand kit",
                 colors: ["#2b2520", "#e3a857", "#e9dfcf", "#f7f2ea", "#8c8174"],
                 fonts: [sha("Lanterna Serif Bold")],
@@ -219,14 +322,31 @@ public final class DesignDemo {
         model.category = .all
         model.openID = nil
         model.debugHover = nil
+        model.debugCommentsOpen = false
+        model.debugAddTokenOpen = false
+        model.lib.reset()
+        model.lib.sort = .recent
+        model.lib.favouritesFirst = false
+        model.lib.favourites = []
         model.projectsMenuOpen = false
         await ProjectsDemo(model: model.projectsModel).loadSample()
         let s = Self.sample()
         let empty = scene == "empty" || scene == "project-island-empty"
-        await model.useNow(
-            Service(
-                docs: empty ? [] : Self.docs(), assets: empty ? [] : s.assets, kits: empty ? [] : Self.kits(),
-                bytes: s.bytes))
+        let svc = Service(
+            docs: empty ? [] : Self.docs(), assets: empty ? [] : s.assets, kits: empty ? [] : Self.kits(),
+            bytes: s.bytes)
+        svc.seed(
+            comments: [], approvals: [:],
+            archived: [
+                DesignDoc(
+                    id: Self.did(20), kind: .design, name: "Old onboarding", system: nil, projects: ["2"], aiPaused: false,
+                    createdBy: "d_you", updatedAt: Date().addingTimeInterval(-400 * 3600), archived: true),
+                DesignDoc(
+                    id: Self.did(21), kind: .design, name: "Pricing experiment", system: nil, projects: ["1"],
+                    aiPaused: false, createdBy: "session:as_00000021",
+                    updatedAt: Date().addingTimeInterval(-900 * 3600), archived: true),
+            ])
+        await model.useNow(svc)
         if scene.hasPrefix("project-island") {
             shell.closePane("design")
             await ProjectsDemo(model: model.projectsModel).show("overview-running")
@@ -235,6 +355,7 @@ public final class DesignDemo {
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
         model.presenter = nil  // scenes share one run: Present from the scene before must not stay open
+        if scene == "add-token" { model.debugAddTokenOpen = true }
         switch scene {
         case "home-hover": model.debugHover = DesignItem.doc(Self.docs()[0]).id
         case "screens": model.category = .screens
@@ -256,15 +377,72 @@ public final class DesignDemo {
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
             "tools-probe":
             model.openID = "doc:\(Self.did(1))"
-        case "open-system", "system-empty", "system-guide", "system-guide-night": model.openID = "doc:\(Self.did(8))"
+        case "open-design-about", "comments", "approval": model.openID = "doc:\(Self.did(1))"
+        case "open-system", "system-empty", "system-guide", "system-guide-night", "add-token": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
         case "open-logo": model.openID = "asset:\(Self.sha("Lanterna mark"))"
         case "open-icon-composer": model.openID = "asset:\(Self.sha("Lanterna app icon"))"
+        case "ai-paused": model.openID = "doc:\(Self.did(2))"
+        case "archived", "archived-old-core":
+            model.lib.restoreSupported = scene == "archived"
+            model.pick(.archived)
+            await model.lib.loadArchived()
+        case "open-folder": model.openID = "kit:dc_\(String(format: "%016x", 3))"
+        case "library-upload":
+            model.category = .illustrations
+            model.lib.uploads = [
+                .init(name: "Hero.png", state: .uploading), .init(name: "Logo.svg", state: .done(duplicate: false)),
+                .init(name: "Cart.png", state: .done(duplicate: true)),
+                .init(name: "notes.exe", state: .failed("Only images, SVG, PDF and fonts can be added.")),
+            ]
+        case "multi-select":
+            let list = model.shown
+            model.lib.multi = Set(list.prefix(3).map(\.id))
+            model.lib.favourites = [list[1].id]
+        case "sort-favourites":
+            model.lib.sort = .name
+            model.lib.favouritesFirst = true
+            model.lib.favourites = [DesignItem.doc(Self.docs()[3]).id]
+        case "delete-bulk": break
         case "open-kit": model.openID = "kit:dc_\(String(format: "%016x", 1))"
         case "open-font": model.openID = "asset:\(Self.sha("Lanterna Serif Bold"))"
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
+        if scene == "new-kit" { model.host.shell.present(ShellDialog(id: "new-kit") { NewKitView(model: model, kind: .brandKit) }) }
+        if scene == "delete-bulk" { model.askDelete(Array(model.shown.prefix(3))) }
+        if scene == "open-design-about" {
+            try? await Task.sleep(for: .seconds(2))
+            model.aboutOpen = true
+        }
+        if scene == "comments" || scene == "approval" {
+            // On the real canvas (CORE_DESIGN_SCENE): the screens' ids are the engine's, so the notes are written then.
+            try? await Task.sleep(for: .seconds(2))
+            if let e = model.editors[Self.did(1)], let screen = e.screens.first {
+                let now = Date()
+                func note(_ i: Int, _ body: String, by: String, parent: String? = nil, done: Bool = false) -> DesignComment {
+                    DesignComment(
+                        id: "dc_\(i)", screen: screen.id, body: body, author: by, createdAt: now.addingTimeInterval(Double(-i) * 1800),
+                        node: nil, parent: parent, resolvedAt: done ? now : nil)
+                }
+                svc.seed(
+                    comments: [
+                        note(1, "The primary button is too close to the total. Can it have more air?", by: "d_you"),
+                        note(2, "Moved it 16 pt down.", by: "session:as_00000001", parent: "dc_1"),
+                        note(3, "Use the system's warning colour for the stock note.", by: "d_ada"),
+                        note(4, "Title is fine now.", by: "d_you", done: true),
+                    ],
+                    approvals: [
+                        Self.did(1): [
+                            ScreenApproval(
+                                screen: screen.id, version: "dv_1", state: scene == "approval" ? .changed : .approved,
+                                decidedBy: "d_you", decidedAt: now.addingTimeInterval(-7200))
+                        ]
+                    ], archived: [])
+                await model.collab.load(Self.did(1))
+                if scene == "approval" { e.select(screen.id) } else { model.debugCommentsOpen = true }
+            }
+        }
         if scene == "tools-probe" {
             try? await Task.sleep(for: .seconds(2))
             await model.debugCanvasProbe?({ FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
@@ -304,7 +482,7 @@ public final class DesignDemo {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
-        if scene == "system-guide" || scene == "system-guide-night" {
+        if scene == "system-guide" || scene == "system-guide-night" || scene == "add-token" {
             // The style guide on the real engine (CORE_DESIGN_SCENE): the default set written as token ops.
             try? await Task.sleep(for: .seconds(2))
             model.editors[Self.did(8)]?.setTokens(SystemStarter.tokens)
