@@ -142,6 +142,15 @@ struct DesignPeer: Identifiable, Equatable, Sendable {
     /// `{"<client>": {label, selection, ai?, session?}}`. A malformed entry is skipped, never trusted: the peer is another
     /// device's text.
     static func decode(_ data: Data?) -> [DesignPeer] {
+        // The engine's list: `[{peer, label, kind: "person"|"ai", following}]`, oldest first.
+        if let data, let list = try? JSONDecoder().decode([DJSON].self, from: data) {
+            return list.compactMap { v in
+                guard let id = v["peer"]?.string else { return nil }
+                let ai = v["kind"]?.string == "ai"
+                let label = String((v["label"]?.string ?? "").prefix(40))
+                return DesignPeer(id: id, label: label.isEmpty ? (ai ? "An AI session" : "Someone") : label, isAI: ai, selection: [])
+            }
+        }
         guard let data, let all = try? JSONDecoder().decode([String: DJSON].self, from: data) else { return [] }
         return all.compactMap { id, v in
             guard v.object != nil else { return nil }
@@ -192,6 +201,19 @@ public protocol DesignEditBackend: AnyObject {
     func tokens() -> Data?
     /// An unsent edit can never go to the Core (it is over what one update takes): the design must be reopened.
     var syncStuck: Bool { get }
+    /// Remote updates no longer apply to this canvas's engine: only a new canvas (reopen) syncs again.
+    var syncHalted: Bool { get }
+    /// The Core could not be reached after a few tries.
+    var syncUnreachable: Bool { get }
+    /// The last undo/redo was refused as too large to send.
+    var lastUndoTooLarge: Bool { get }
+    /// How many images gave up loading; `retryAssets` asks again.
+    var assetFailures: Int { get }
+    func retryAssets()
+    /// Read only: the canvas selects but never edits.
+    func setReadOnly(_ on: Bool)
+    /// ⌘D on the selection.
+    func duplicate()
     /// The first snapshot from the Core has reached the canvas.
     var loaded: Bool { get }
     /// The sync socket to the Core is open.
@@ -222,6 +244,13 @@ public struct CanvasCamera: Sendable, Equatable {
 
 extension DesignEditBackend {
     public var syncStuck: Bool { false }
+    public var syncHalted: Bool { false }
+    public var syncUnreachable: Bool { false }
+    public var lastUndoTooLarge: Bool { false }
+    public var assetFailures: Int { 0 }
+    public func retryAssets() {}
+    public func setReadOnly(_ on: Bool) {}
+    public func duplicate() {}
     public var loaded: Bool { true }
     public var syncConnected: Bool { true }
     public var lastEditTooLarge: Bool { false }

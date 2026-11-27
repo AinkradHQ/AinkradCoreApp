@@ -20,7 +20,14 @@ final class CanvasEditing: DesignEditBackend {
     func redo() { view?.editorRedo() }
     func fitSelection() { view?.editorFitSelection() }
     func peers() -> Data? { view?.editorPeers() }
-    func setPresence(_ json: String) { view?.editorSetPresence(json) }
+    func setPresence(_ json: String) { view?.editorSetPresence() }
+    var syncHalted: Bool { view?.editorSyncHalted ?? false }
+    var syncUnreachable: Bool { view?.editorSyncUnreachable ?? false }
+    var lastUndoTooLarge: Bool { view?.editorLastUndoTooLarge ?? false }
+    var assetFailures: Int { view?.editorAssetFailures ?? 0 }
+    func retryAssets() { view?.editorRetryAssets() }
+    func setReadOnly(_ on: Bool) { view?.editorSetReadOnly(on) }
+    func duplicate() { view?.editorDuplicate() }
     func tokens() -> Data? { view?.editorTokens() }
     var syncStuck: Bool { view?.editorSyncStuck ?? false }
     var loaded: Bool { view?.editorLoaded ?? false }
@@ -41,6 +48,7 @@ final class CanvasEditing: DesignEditBackend {
     static func connect(_ view: DesignCanvasNSView, to handle: DesignEditorHandle) {
         handle.attach(CanvasEditing(view))
         view.onChange = { handle.changed() }
+        view.onContextSelect = { handle.reloadNow() }
     }
 }
 
@@ -64,7 +72,7 @@ enum DesignCanvasHookup {
                         onReady: {
                             DesignMeasure.ready($0)
                             CanvasEditing.connect($0, to: input.editor)
-                        }))
+                        }, onFailed: { input.editor.failed() }))
             }
             return
         }
@@ -83,7 +91,7 @@ enum DesignCanvasHookup {
             return AnyView(
                 DesignCanvas(
                     doc: input.doc, system: input.system, channel: channel, assets: assets,
-                    onReady: { CanvasEditing.connect($0, to: input.editor) }))
+                    onReady: { CanvasEditing.connect($0, to: input.editor) }, onFailed: { input.editor.failed() }))
         }
     }
 }

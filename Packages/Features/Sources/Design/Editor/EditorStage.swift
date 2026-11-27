@@ -16,6 +16,8 @@ struct EditorStage: View {
             LayersIsland(editor: editor).frame(width: Space.s8 * 9)
             ZStack(alignment: .bottom) {
                 canvas
+                    // Reopen: a new id builds a new canvas, so a new engine and socket.
+                    .id(editor.generation)
                     .overlay {
                         // Mounted for the panel's life and faded by `active`: a removal transition over the canvas
                         // never finished (the timeline kept it alive), so the shimmer stayed after Done.
@@ -27,16 +29,44 @@ struct EditorStage: View {
                     .overlay {
                         if !editor.loaded { CanvasLoading(editor: editor).transition(.opacity) }
                     }
+                    .overlay(alignment: .top) {
+                        if editor.loaded, !editor.syncConnected, !editor.syncHalted {
+                            CanvasReconnecting(editor: editor).padding(Space.s3).transition(.opacity)
+                        }
+                    }
+                    .animation(Motion.out(Motion.ui), value: editor.syncConnected)
                     .animation(Motion.out(Motion.ui), value: editor.loaded)
                     .clipShape(coreShape(Radius.pane))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contextMenu { DesignMenu(model: model, item: item) }
+                    .contextMenu {
+                        if editor.selection.isEmpty {
+                            DesignMenu(model: model, item: item)
+                        } else {
+                            CanvasLayerMenu(editor: editor)
+                        }
+                    }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("design-canvas")
                 VStack(spacing: Space.s2) {
-                    if editor.syncStuck {
-                        CoreNotice(symbol: "exclamationmark.triangle", title: DesignEditor.stuckSentence, tone: .warn)
-                            .frame(maxWidth: Space.s8 * 14)
+                    if editor.syncHalted || editor.syncStuck {
+                        CoreNotice(
+                            symbol: "exclamationmark.triangle",
+                            title: editor.syncHalted ? DesignEditor.haltedSentence : DesignEditor.stuckSentence, tone: .warn
+                        ) {
+                            Button("Reopen") { editor.reopen() }.buttonStyle(.coreSecondary)
+                                .help("Build the canvas again from the Core's copy. Edits that were not sent are lost.")
+                        }
+                        .frame(maxWidth: Space.s8 * 14)
+                    } else if editor.assetFailures > 0 {
+                        CoreNotice(
+                            symbol: "photo.badge.exclamationmark",
+                            title: editor.assetFailures == 1
+                                ? "An image could not load." : "\(editor.assetFailures) images could not load.",
+                            tone: .warn
+                        ) {
+                            Button("Try Again") { editor.retryAssets() }.buttonStyle(.corePlain)
+                        }
+                        .frame(maxWidth: Space.s8 * 14)
                     } else if let note = editor.notice {
                         CoreNotice(symbol: "exclamationmark.triangle", title: note, tone: .warn) {
                             Button("Dismiss") { editor.notice = nil }.buttonStyle(.corePlain)
@@ -53,12 +83,22 @@ struct EditorStage: View {
                     CanvasToolbar(model: model, editor: editor)
                 }
                 .animation(Motion.out(Motion.ui), value: editor.notice)
+                .animation(Motion.out(Motion.ui), value: editor.syncHalted)
                 .animation(Motion.out(Motion.ui), value: model.composer == nil)
                 .padding(Space.s4)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .coreWell(radius: Radius.pane)
+            .onAppear { sync() }
+            .onChange(of: model.readOnly) { sync() }
+            .onChange(of: model.composer?.phase == .drawing) { sync() }
             Island("Inspector") { InspectorIsland(editor: editor) }.frame(width: Space.s8 * 10)
         }
+    }
+
+    /// What the model knows that the editor needs: a viewer cannot edit; the layers panel rests while the AI draws.
+    private func sync() {
+        editor.readOnly = model.readOnly
+        editor.revealPaused = model.composer?.phase == .drawing
     }
 }

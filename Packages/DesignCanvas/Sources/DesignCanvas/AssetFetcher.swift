@@ -47,8 +47,17 @@ final class AssetFetcher {
     let engine: Engine
     let source: CanvasAssetSource
     var onAdded: () -> Void = {}
+    /// Called when the set of images that gave up changes.
+    var onFailed: () -> Void = {}
     private var seen: Set<String> = []
+    private var tries: [String: Int] = [:]
+    /// Hashes that failed every retry (or the Core refused): the chrome says "image could not load" and offers Retry.
+    private(set) var failed: Set<String> = [] {
+        didSet { if failed != oldValue { onFailed() } }
+    }
     static let retryPending: Duration = .seconds(10)
+    /// Waits before each retry of a fetch that failed: 2, 5, 15, 30 s, then it gives up.
+    static let retryDelays: [Duration] = [.seconds(2), .seconds(5), .seconds(15), .seconds(30)]
 
     init(engine: Engine, source: CanvasAssetSource) {
         self.engine = engine
@@ -63,18 +72,39 @@ final class AssetFetcher {
     }
 
     private func load(_ sha: String) async {
-        guard let info = await source.info(sha) else { return }
+        guard let info = await source.info(sha) else { return await retry(sha) }
         switch info.check {
-        case .refused: return
+        case .refused: failed.insert(sha)
         case .pending:
             try? await Task.sleep(for: Self.retryPending)
             seen.remove(sha)
             return
         case .ok:
             let route = info.route
-            guard route != .none, let bytes = try? await source.data(sha) else { return }  // never fetched, never fed
+            guard route != .none else { return }  // never fetched, never fed
+            guard let bytes = try? await source.data(sha) else { return await retry(sha) }
             let added = route == .font ? engine.addFont(sha, bytes) : engine.addAsset(sha, bytes)
-            if added { onAdded() }
+            if added { onAdded() } else { failed.insert(sha) }
         }
+    }
+
+    /// A failed fetch is tried again after a growing wait (the next render asks for it again); after the last, it is failed.
+    private func retry(_ sha: String) async {
+        let n = tries[sha, default: 0]
+        guard n < Self.retryDelays.count else { return _ = failed.insert(sha) }
+        tries[sha] = n + 1
+        try? await Task.sleep(for: Self.retryDelays[n])
+        seen.remove(sha)
+    }
+
+    /// "Retry" in the chrome: everything that gave up is asked for again from the start.
+    func retryFailed() {
+        let list = failed
+        failed = []
+        for sha in list {
+            tries[sha] = 0
+            seen.remove(sha)
+        }
+        onAdded()  // wakes the loop, which asks for what is missing
     }
 }

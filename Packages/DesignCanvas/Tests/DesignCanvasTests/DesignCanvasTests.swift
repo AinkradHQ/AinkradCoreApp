@@ -77,6 +77,20 @@ struct DesignSyncTests {
         rb.stop()
     }
 
+    @Test func aSocketTheCoreClosesAtOnceCountsAsUnreachableAndBacksOff() async {
+        let core = FakeCore()
+        let a = Engine(doc: "dd_test")!
+        let ra = DesignSync(engine: a, doc: "dd_test", channel: core)
+        core.setUp(false)  // every open fails
+        ra.backoff = { _ in 0.02 }
+        ra.start()
+        #expect(await eventually { ra.unreachable })
+        core.setUp(true)
+        #expect(await eventually { ra.connected && !ra.unreachable })
+        #expect(DesignSync(engine: a, doc: "dd_test", channel: core).backoff(20) == 30)
+        ra.stop()
+    }
+
     @Test func reconnectResyncsBothWays() async {
         let core = FakeCore()
         let (a, b) = (Engine(doc: "dd_test")!, Engine(doc: "dd_test")!)

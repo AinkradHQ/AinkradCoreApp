@@ -18,6 +18,8 @@ extension DesignCanvasNSView {
     }
     /// A JSON array of ops, applied all or nothing as one undo step; false when the engine refused it.
     @discardableResult public func editorEdit(_ json: String) -> Bool {
+        guard !readOnly else { return false }
+        lastUndoTooLarge = false
         let r = engine.editResult(json)
         lastEditTooLarge = r == .tooLarge
         if r == .applied {
@@ -32,6 +34,22 @@ extension DesignCanvasNSView {
     public var editorLastEditTooLarge: Bool { lastEditTooLarge }
     /// An unsent edit can never go out: "This design stopped syncing — reopen it (unsent edits are lost)".
     public var editorSyncStuck: Bool { sync?.stuck ?? false }
+    /// Remote updates no longer apply to this engine: the design must be reopened (a new canvas and engine).
+    public var editorSyncHalted: Bool { sync?.halted ?? false }
+    /// The Core could not be reached after a few tries.
+    public var editorSyncUnreachable: Bool { sync?.unreachable ?? false }
+    /// The last undo or redo was refused as too large to send.
+    public var editorLastUndoTooLarge: Bool { lastUndoTooLarge }
+    /// Images the Core would not give (or refused) after the retries.
+    public var editorAssetFailures: Int { fetcher?.failed.count ?? 0 }
+    public func editorRetryAssets() { fetcher?.retryFailed() }
+    /// Read only: the pointer selects, nothing is edited (no tool, drag, key, undo or edit op).
+    public func editorSetReadOnly(_ on: Bool) {
+        readOnly = on
+        if on { editorSetTool(Int(DE_TOOL_SELECT)) }
+    }
+    /// ⌘D on the selection.
+    public func editorDuplicate() { if !readOnly { send(key: DE_KEY_DUPLICATE, mods: 0) } }
     /// The first snapshot from the Core has been applied.
     public var editorLoaded: Bool { sync?.received ?? false }
     /// The sync socket is open.
@@ -44,11 +62,8 @@ extension DesignCanvasNSView {
     }
     /// Other peers' presence as JSON `{"<client>": {...}}`.
     public func editorPeers() -> Data? { engine.presencePeers() }
-    /// This device's presence (a JSON object, at most 4 KiB), sent to the Core's relay with the next update.
-    public func editorSetPresence(_ json: String) {
-        guard engine.presenceSet(json) else { return }
-        sync?.flushPresence()
-    }
+    /// The selection (and cursor and view) are the engine's own; this asks the relay to send what changed.
+    public func editorSetPresence() { sync?.schedulePresence() }
     /// How document points show in this view: `view = doc × zoom + (panX, panY)`.
     public var editorCamera: (zoom: Double, panX: Double, panY: Double)? {
         guard let c = engine.camera(), c.pan.count == 2 else { return nil }
@@ -73,6 +88,7 @@ extension DesignCanvasNSView {
     public func editorTokens() -> Data? { engine.tokens() }
 
     private func changed() {
+        sync?.schedulePresence()
         loop.wake(input: true)
         sync?.flush()
         onChange?()

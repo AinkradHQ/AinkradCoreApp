@@ -56,7 +56,7 @@ public final class DesignDemo {
         "project-island", "project-island-empty", "new-advanced", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
-        "system-guide", "system-guide-night",
+        "system-guide", "system-guide-night", "editor-halted", "editor-offline", "editor-mixed", "editor-readonly",
     ]
 
     private let model: DesignModel
@@ -254,7 +254,7 @@ public final class DesignDemo {
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
-            "tools-probe":
+            "tools-probe", "editor-halted", "editor-offline", "editor-mixed", "editor-readonly":
             model.openID = "doc:\(Self.did(1))"
         case "open-system", "system-empty", "system-guide", "system-guide-night": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
@@ -268,6 +268,23 @@ public final class DesignDemo {
         if scene == "tools-probe" {
             try? await Task.sleep(for: .seconds(2))
             await model.debugCanvasProbe?({ FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
+        }
+        if scene.hasPrefix("editor-"), scene != "editor-selftest" {
+            try? await Task.sleep(for: .seconds(2))
+            if let e = model.editors[Self.did(1)] {
+                switch scene {
+                case "editor-halted": e.debugForce = ["halted"]
+                case "editor-offline": e.debugForce = ["offline"]
+                case "editor-readonly": e.readOnly = true
+                default:
+                    // two layers of one kind that differ: the inspector says Mixed, the layers panel lights both
+                    let byType = Dictionary(grouping: e.layers.layers.filter { $0.type != "page" }, by: \.type)
+                    if let pair = byType.values.first(where: { $0.count >= 2 }) {
+                        e.selectMany(pair.prefix(3).map(\.id))
+                    }
+                }
+                e.reload()
+            }
         }
         if scene == "editor-selftest" {
             try? await Task.sleep(for: .seconds(2))

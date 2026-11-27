@@ -1,4 +1,5 @@
 import CoreUI
+import ImageIO
 import SwiftUI
 
 /// One thing the toolbar can add: a node type with its starting size and props. Shapes the engine has no type for (line,
@@ -62,12 +63,14 @@ struct InsertPreset: Identifiable, Equatable {
         text("caption", "Caption", size: 12, weight: 500, "Caption"),
     ]
 
-    /// A library picture as an image node.
-    static func image(_ a: DesignAsset) -> InsertPreset {
+    /// A library picture as an image node, `w` × `h` (its own size when it is known), shrunk to fit its frame on insert.
+    static func image(_ a: DesignAsset, w: Double = 200, h: Double = 200) -> InsertPreset {
         InsertPreset(
-            id: "image-\(a.sha)", title: a.name, symbol: "photo", type: "image", w: 200, h: 200,
-            props: ["asset": .string(a.sha), "fit": .string("fit")])
+            id: "image-\(a.sha)", title: a.name, symbol: "photo", type: "image", w: w, h: h,
+            props: ["asset": .string(a.sha), "fit": .string("fit")], capToParent: true)
     }
+    /// The picture is not larger than the frame it lands in (it keeps its proportions).
+    var capToParent = false
 }
 
 extension DesignEditor {
@@ -76,7 +79,7 @@ extension DesignEditor {
     /// undo step. False when the canvas is not up or the engine refused it (`notice` says why).
     @discardableResult
     func insert(_ p: InsertPreset) -> Bool {
-        guard attached else { return false }
+        guard attached, loaded, !readOnly else { return false }
         if layers.layers.isEmpty {
             apply(DesignOptions.starterOps(DesignOptions.canvas))
             reload()
@@ -106,10 +109,17 @@ extension DesignEditor {
         }
         let id = DesignOptions.nodeID()
         var props = p.props
+        var (w, h) = (p.w, p.h)
+        if p.capToParent, let pw = node(of: parent.id)?.props["w"]?.double,
+            let ph = node(of: parent.id)?.props["h"]?.double, pw > 0, ph > 0
+        {
+            let k = min(1, pw / w, ph / h)
+            (w, h) = ((w * k).rounded(), (h * k).rounded())
+        }
         props["x"] = .number(at.0)
         props["y"] = .number(at.1)
-        props["w"] = .number(p.w)
-        props["h"] = .number(p.h)
+        props["w"] = .number(w)
+        props["h"] = .number(h)
         var op: [String: DJSON] = [
             "op": .string("add"), "id": .string(id), "type": .string(p.type), "parent": .string(parent.id),
             "order": .string(order), "name": .string(p.title), "props": .object(props),
@@ -120,6 +130,22 @@ extension DesignEditor {
         select(id, quiet: true)
         if isFrame { fitSelection() }
         return true
+    }
+}
+
+extension DesignEditor {
+    /// Places a library picture at its natural size (capped to its frame). Falls back to 200 × 200 when its size is unknown
+    /// (a vector file, or the bytes did not come).
+    func insertImage(_ a: DesignAsset) async {
+        var (w, h) = (200.0, 200.0)
+        if let data = try? await service?.data(a.sha), let src = CGImageSourceCreateWithData(data as CFData, nil),
+            let pr = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+            let pw = pr[kCGImagePropertyPixelWidth] as? Double, let ph = pr[kCGImagePropertyPixelHeight] as? Double,
+            pw > 0, ph > 0
+        {
+            (w, h) = (pw, ph)
+        }
+        insert(.image(a, w: w, h: h))
     }
 }
 
@@ -226,7 +252,8 @@ struct CanvasToolbar: View {
         .background(GlassInk.adaptive(Color(white: 0.15), day: .white), in: coreShape(Radius.cardMac + 2))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .animation(Motion.out(Motion.hover), value: editor.tool)
-        .disabled(!editor.attached || model.readOnly)
+        .disabled(!editor.attached || !editor.loaded || model.readOnly || editor.syncHalted)
+        .help(editor.loaded ? "" : "The tools work once the design has opened.")
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tools")
     }
@@ -318,7 +345,7 @@ struct CanvasToolbar: View {
             }
             ForEach(pictures.prefix(30)) { a in
                 Button {
-                    editor.insert(.image(a))
+                    Task { await editor.insertImage(a) }
                 } label: {
                     Label(a.name, systemImage: "photo")
                 }

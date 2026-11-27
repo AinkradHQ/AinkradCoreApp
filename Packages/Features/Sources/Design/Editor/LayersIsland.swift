@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Projects
 import SwiftUI
@@ -14,6 +15,7 @@ struct LayersIsland: View {
     @State private var finding = false
     @FocusState private var findFocus: Bool
     @FocusState private var listFocus: Bool
+    @State private var reveal: Task<Void, Never>?
 
     private var rows: [LayerRow] {
         let q = find.trimmingCharacters(in: .whitespaces).lowercased()
@@ -70,13 +72,27 @@ struct LayersIsland: View {
                         ScrollView {
                             LazyVStack(spacing: 1) {
                                 ForEach(rows) {
-                                    LayerRowView(editor: editor, row: $0).lineLimit(1).id($0.id)
+                                    LayerRowView(editor: editor, row: $0, pick: { pick($0, rows, $1) }).lineLimit(1)
+                                        .id($0.id)
                                         .transition(.opacity.combined(with: .move(edge: .top)))
                                 }
                             }
                             .animation(Motion.out(Motion.ui), value: rows.map(\.id))
                         }
                         .scrollIndicators(.never)
+                        // Only a pick made on the canvas scrolls the list, and only after it has settled: never inside a
+                        // layout pass, and not while the AI draws (a scroll then froze the window once).
+                        .onChange(of: editor.revealStamp) {
+                            reveal?.cancel()
+                            guard !editor.revealPaused, editor.dragging == nil else { return }
+                            reveal = Task {
+                                try? await Task.sleep(for: .milliseconds(200))
+                                guard !Task.isCancelled, !editor.revealPaused, let id = editor.selection.first else {
+                                    return
+                                }
+                                reader.scrollTo(id)
+                            }
+                        }
                     }
                     // Focusable only by a click: focus that wandered in on its own (when the AI panel's field went away) froze
                     // the window.
@@ -86,6 +102,22 @@ struct LayersIsland: View {
             }
         }
         .accessibilityIdentifier("design-layers")
+    }
+
+    /// A click on a row: ⌘ adds or removes it, ⇧ takes everything from the first selected layer to it, plain selects it.
+    private func pick(_ id: String, _ rows: [LayerRow], _ mods: NSEvent.ModifierFlags) {
+        let ids = rows.filter { $0.layer.type != "page" }.map(\.id)
+        if mods.contains(.command) {
+            var sel = editor.selection
+            if let i = sel.firstIndex(of: id) { sel.remove(at: i) } else { sel.append(id) }
+            editor.selectMany(sel)
+        } else if mods.contains(.shift), let anchor = editor.selection.first, let a = ids.firstIndex(of: anchor),
+            let b = ids.firstIndex(of: id)
+        {
+            editor.selectMany([anchor] + ids[min(a, b)...max(a, b)].filter { $0 != anchor })
+        } else {
+            editor.select(id)
+        }
     }
 
     /// Nothing drawn yet: how to start, with the keys.
@@ -136,11 +168,11 @@ struct LayersIsland: View {
                 editor.select(p, quiet: true)
             }
         case .return:
-            guard let r = current, r.layer.type != "page" else { return .ignored }
+            guard let r = current, r.layer.type != "page", !editor.readOnly else { return .ignored }
             editor.renaming = r.id
         case .delete, .deleteForward:
-            guard let r = current else { return .ignored }
-            editor.delete(r.id)
+            guard current != nil else { return .ignored }
+            editor.deleteSelected()
         default: return .ignored
         }
         return .handled
@@ -152,6 +184,7 @@ private struct LayerRowView: View {
     @Environment(\.corePalette) private var palette
     let editor: DesignEditor
     let row: LayerRow
+    let pick: (String, NSEvent.ModifierFlags) -> Void
     @State private var height: CGFloat = 28
     @State private var hint: LayerDrop?
     @State private var draft = ""
@@ -199,8 +232,9 @@ private struct LayerRowView: View {
         )
         .contentShape(coreShape(Radius.control))
         .opacity(layer.hidden ? 0.5 : 1)
-        .onTapGesture(count: 2) { beginRename() }
-        .onTapGesture { editor.select(layer.id) }
+        // The single click acts at once; the double click is read beside it, so a click is never held back for it.
+        .onTapGesture { pick(layer.id, NSEvent.modifierFlags) }
+        .simultaneousGesture(TapGesture(count: 2).onEnded { beginRename() })
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .animation(Motion.out(Motion.hover), value: selected)
@@ -275,6 +309,8 @@ private struct LayerRowView: View {
             .focused($focused)
             .onSubmit { editor.rename(layer.id, to: draft) }
             .onExitCommand { editor.renaming = nil }
+            // Leaving the field (a click elsewhere) keeps what was typed, like Return.
+            .onChange(of: focused) { _, on in if !on, editor.renaming == layer.id { editor.rename(layer.id, to: draft) } }
             .onAppear {
                 draft = layer.name
                 focused = true
@@ -282,17 +318,21 @@ private struct LayerRowView: View {
             .accessibilityLabel("Layer name")
     }
 
-    private func beginRename() { if !page { editor.renaming = layer.id } }
+    private func beginRename() { if !page, !editor.readOnly { editor.renaming = layer.id } }
 
     @ViewBuilder private var menu: some View {
         if !page {
-            Button("Rename") { beginRename() }
+            Button("Rename") { beginRename() }.disabled(editor.readOnly)
             Button(layer.hidden ? "Show Layer" : "Hide Layer") { editor.setHidden(layer.id, !layer.hidden) }
+                .disabled(editor.readOnly)
             Divider()
-            Button("Move Forward") { editor.step(layer.id, up: true) }
-            Button("Move Backward") { editor.step(layer.id, up: false) }
+            Button("Move Forward") { editor.step(layer.id, up: true) }.disabled(editor.readOnly)
+            Button("Move Backward") { editor.step(layer.id, up: false) }.disabled(editor.readOnly)
             Divider()
-            Button("Delete", role: .destructive) { editor.delete(layer.id) }
+            Button("Delete", role: .destructive) {
+                if selected, editor.selection.count > 1 { editor.deleteSelected() } else { editor.delete(layer.id) }
+            }
+            .disabled(editor.readOnly)
         }
     }
 }
