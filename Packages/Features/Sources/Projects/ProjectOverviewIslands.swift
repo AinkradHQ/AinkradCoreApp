@@ -35,7 +35,7 @@ extension Overview {
                     // Sessions that need you come first.
                     let ordered = list.filter { $0.state == .needsYou } + list.filter { $0.state != .needsYou }
                     VStack(alignment: .leading, spacing: Space.s1) {
-                        ForEach(Array(ordered.prefix(4).enumerated()), id: \.offset) { _, s in
+                        ForEach(Array(ordered.prefix(3).enumerated()), id: \.offset) { _, s in
                             CoreRow(
                                 s.title, subtitle: "\(s.harness) · \(s.when)",
                                 action: s.id.map { id in { model.sessionOpener?(id) } }

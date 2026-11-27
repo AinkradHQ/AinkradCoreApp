@@ -84,8 +84,10 @@ struct Overview: View {
         GeometryReader { g in
             ScrollView {
                 VStack(spacing: Space.s2) {
-                    sessions.frame(height: Space.s8 * 9 + Space.s3).coreRise(settled, 1)
-                    brain.frame(minHeight: max(g.size.height - (Space.s8 * 9 + Space.s3) - Space.s2, 180))
+                    // AI Sessions is up to 300 tall but gives way (56 %) when the stat row takes room, so Brain is never cut.
+                    let top = min(Space.s8 * 9 + Space.s3, (g.size.height - Space.s2) * 0.56)
+                    sessions.frame(height: top).coreRise(settled, 1)
+                    brain.frame(minHeight: max(g.size.height - top - Space.s2, 120))
                         .coreRise(settled, 2)
                     if project.kind == .infra { changesPlanIsland.coreRise(settled, 2) }
                     if project.kind == .app { testsIsland.coreRise(settled, 2) }

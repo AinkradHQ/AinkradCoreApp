@@ -141,7 +141,7 @@ struct LiveApp: View {
 
     private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
-    private func start() -> some View {
+    @ViewBuilder private func start() -> some View {
         let title = project.mainAction().title
         Button {
             model.control(.start, project)
