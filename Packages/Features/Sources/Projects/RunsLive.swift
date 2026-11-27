@@ -10,52 +10,20 @@ struct LiveRunsTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Space.s2) {
-                if runs.liveRuns.isEmpty { idle } else { ForEach(runs.liveRuns) { live($0) } }
+                if runs.liveRuns.isEmpty {
+                    idle
+                } else {
+                    ForEach(runs.liveRuns) { r in
+                        LiveRunCard(
+                            runs: runs, project: project, run: r, stream: (runs.liveRuns.firstIndex(of: r) ?? 0) < 3)
+                    }
+                }
                 if !runs.liveRuns.isEmpty, !notRunning.isEmpty { others }
             }
         }
     }
 
     private var notRunning: [RunConfigItem] { runs.configs.filter { !runs.isLive($0) } }
-
-    private func live(_ r: RunRecord) -> some View {
-        let c = runs.configs.first { $0.id == r.configID }
-        return Island(
-            title: runs.name(of: r.configID),
-            sub: "\(label(r.state)) on \(runs.runnerName(r.runner)) · started \(runsAgo(r.startedAt))",
-            accessory: {
-                // The port is on the runner that runs it, not on this Mac.
-                if let p = c?.port {
-                    StateBadge("\(runs.runnerName(r.runner)) · port \(p)", tone: .queue, symbol: "globe")
-                }
-                if let c {
-                    Button {
-                        Task { await runs.start(c, project: project) }
-                    } label: {
-                        Label("Restart", systemImage: "arrow.clockwise")
-                    }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                    .disabled(runs.busy || !runs.model.canControl(project))
-                }
-                Button {
-                    Task { await runs.stop(r, project: project) }
-                } label: {
-                    Label("Stop", systemImage: "power")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                .disabled(runs.busy || !runs.model.canControl(project))
-            }
-        ) {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                if r.state == "failed", let e = r.error {
-                    CoreNotice(symbol: "exclamationmark.triangle", title: "It failed to start.", text: e, tone: .fail)
-                }
-                if let e = r.environment { Text("Environment: \(e)").foregroundStyle(GlassInk.secondary) }
-                RunLogBox(runs: runs, run: r, stream: (runs.liveRuns.firstIndex(of: r) ?? 0) < 3)
-            }
-        }
-        .frame(minHeight: Space.s8 * 6)
-    }
 
     private var idle: some View {
         Island("Nothing is running") {
@@ -66,7 +34,7 @@ struct LiveRunsTab: View {
                         text: "Read the log of its last run in History, fix what stops it, then start it again.",
                         tone: .fail)
                 }
-                Text("Start a configuration:").foregroundStyle(GlassInk.secondary)
+                Text("Start one:").foregroundStyle(GlassInk.secondary)
                 starters
             }
         }
@@ -80,6 +48,15 @@ struct LiveRunsTab: View {
 
     private var starters: some View {
         HStack(spacing: Space.s2) {
+            if runs.defaultRun == nil {
+                Button {
+                    Task { await runs.startDefault(project) }
+                } label: {
+                    Label(RunConfigsModel.defaultName, systemImage: "play")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .disabled(runs.busy || !runs.model.canControl(project) || runs.setup.spec == nil)
+            }
             ForEach(notRunning) { c in
                 Button {
                     Task { await runs.start(c, project: project) }
@@ -91,8 +68,81 @@ struct LiveRunsTab: View {
             }
         }
     }
+}
 
-    private func label(_ state: String) -> String {
+/// One live run: its state, port, Restart and Stop and, in the same header, its log's controls; under it the log. The log is
+/// the Core's stream while the device has sockets to spare, else a page every 3 s.
+private struct LiveRunCard: View {
+    let runs: RunConfigsModel
+    let project: ProjectItem
+    let run: RunRecord
+    let stream: Bool
+    @State private var logs: RunLogsModel?
+
+    private var config: RunConfigItem? { runs.configs.first { $0.id == run.configID } }
+
+    var body: some View {
+        Island(
+            title: runs.name(of: run.configID),
+            sub: "\(Self.label(run.state)) on \(runs.runnerName(run.runner)) · started \(runsAgo(run.startedAt))",
+            accessory: {
+                if let logs {
+                    RunLogToolbar(logs: logs, toast: { runs.model.host.shell.showToast($0) })
+                        .frame(maxWidth: Space.s8 * 12)
+                }
+                // The port is on the runner that runs it, not on this Mac.
+                if let p = config?.port {
+                    StateBadge("\(runs.runnerName(run.runner)) · port \(p)", tone: .queue, symbol: "globe")
+                }
+                Button {
+                    Task {
+                        if let config {
+                            await runs.start(config, project: project)
+                        } else {
+                            await runs.startDefault(project)
+                        }
+                    }
+                } label: {
+                    Label("Restart", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .disabled(runs.busy || !runs.model.canControl(project))
+                Button {
+                    Task { await runs.stop(run, project: project) }
+                } label: {
+                    Label("Stop", systemImage: "power")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                .disabled(runs.busy || !runs.model.canControl(project))
+            }
+        ) {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                if run.state == "failed", let e = run.error {
+                    CoreNotice(symbol: "exclamationmark.triangle", title: "It failed to start.", text: e, tone: .fail)
+                }
+                // Only a configuration has an environment laid over it; the Default runs the setup as saved.
+                if let e = run.environment, run.configID != nil {
+                    Text("Environment: \(e)").foregroundStyle(GlassInk.secondary)
+                }
+                Group {
+                    if let logs {
+                        RunLogView(logs: logs, toolbar: false)
+                    } else {
+                        Text("No log lines yet.").foregroundStyle(GlassInk.secondary)
+                    }
+                }
+                .frame(height: Space.s8 * 6)
+            }
+        }
+        .frame(minHeight: Space.s8 * 6)
+        .task(id: "\(run.id) \(runs.model.runTick)") {
+            guard let m = runs.logs(of: run, stream: stream) else { return }
+            logs = m
+            await m.run()
+        }
+    }
+
+    static func label(_ state: String) -> String {
         switch state {
         case "starting": "Starting"
         case "running": "Running"
@@ -100,30 +150,6 @@ struct LiveRunsTab: View {
         case "failed": "Failed"
         case "stopped": "Stopped"
         default: state.isEmpty ? "In an unknown state" : "\(state.capitalized) (a state this app does not know)"
-        }
-    }
-}
-
-/// One live run's log: the Core's stream while the device has sockets to spare (it holds four), else a page every 3 s.
-private struct RunLogBox: View {
-    let runs: RunConfigsModel
-    let run: RunRecord
-    let stream: Bool
-    @State private var logs: RunLogsModel?
-
-    var body: some View {
-        Group {
-            if let logs {
-                RunLogView(logs: logs, toast: { runs.model.host.shell.showToast($0) })
-            } else {
-                Text("No log lines yet.").foregroundStyle(GlassInk.secondary)
-            }
-        }
-        .frame(height: Space.s8 * 6)
-        .task(id: "\(run.id) \(runs.model.runTick)") {
-            guard let m = runs.logs(of: run, stream: stream) else { return }
-            logs = m
-            await m.run()
         }
     }
 }
@@ -149,9 +175,15 @@ struct HistoryTab: View {
                             selected: open == r.id, action: { open = open == r.id ? nil : r.id }
                         ) {
                             StateBadge(badge(r).0, tone: badge(r).1, symbol: "circle")
-                            if let c = runs.configs.first(where: { $0.id == r.configID }) {
+                            if r.configID == nil || runs.configs.contains(where: { $0.id == r.configID }) {
                                 Button {
-                                    Task { await runs.start(c, project: project) }
+                                    Task {
+                                        if let c = runs.configs.first(where: { $0.id == r.configID }) {
+                                            await runs.start(c, project: project)
+                                        } else {
+                                            await runs.startDefault(project)
+                                        }
+                                    }
                                 } label: {
                                     Label("Run again", systemImage: "arrow.clockwise")
                                 }

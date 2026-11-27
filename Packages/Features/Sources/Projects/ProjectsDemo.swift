@@ -114,6 +114,9 @@ public final class ProjectsDemo {
         "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
         "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
         "dialog-branch-error", "gallery-crashed", "overview-crashed",
+        // Lane D: one run model (the Default and its configurations), Environment with secrets, Repos, Settings.
+        "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
+        "page-repos-many", "page-repos-failed", "page-settings-limits-edit", "page-settings-colour-more",
     ] + kindScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
@@ -252,7 +255,7 @@ public final class ProjectsDemo {
         switch scene {
         case "gallery-empty": list = []
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
-        case "gallery-copy-failed", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
+        case "gallery-copy-failed", "new-failed-repos", "page-repos-failed": list.insert(Self.copyFailed(), at: 0)
         case "gallery-archived": ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, true)
         case "new-paste-link", "new-paste-link-ssh": model.catalog = NoRepoCatalog()
         case "settings-runner", "settings-limits":
@@ -262,7 +265,7 @@ public final class ProjectsDemo {
             list[0].idleNever = scene == "settings-limits"
             list[0].source = "github"
             list[0].createdAt = Date().addingTimeInterval(-86_400 * 12)
-        case "space-many-repos":
+        case "space-many-repos", "page-repos-many":
             list[0].repos = (0..<14).map {
                 Self.lanternaRepo(
                     Int64($0), "lanterna-\($0)", branch: "main", head: "4e1c9a2", minutes: 4, failing: $0 == 9)
@@ -339,6 +342,13 @@ public final class ProjectsDemo {
         Self.kindSample(scene, &list)
         await model.useNow(Service(list))
         model.runService = DemoRunService()
+        model.configsService = scene == "page-run-old-core" ? nil : DemoConfigsService()
+        model.logSources = { _, _ in DemoLogSource() }
+        model.demoRunTab = nil
+        model.demoRunSelected = nil
+        // The running Lanterna reports its services, as a Core with the run engine does.
+        (model.runService as? DemoRunService)?.services[1] = DemoLive.make(.running).services
+        model.demoLimitsDraft = nil
         model.setRunnerSupported(true)
         await model.loadRunners()
         model.show()
@@ -408,9 +418,39 @@ public final class ProjectsDemo {
         case "page-run-draft":
             model.openID = 2
             model.section = .run
-        case "page-run-logs":
+        case "page-run-logs", "page-run-live":
             model.openID = 1
             model.section = .run
+            model.demoRunTab = .live
+        case "page-run-config":
+            model.openID = 1
+            model.section = .run
+            model.demoRunSelected = 1
+        case "page-run-env":
+            model.openID = 1
+            model.section = .run
+            model.demoRunTab = .environment
+        case "page-run-history":
+            model.openID = 1
+            model.section = .run
+            model.demoRunTab = .history
+        case "page-run-old-core":
+            model.openID = 1
+            model.section = .run
+        case "page-repos-many", "page-repos-failed":
+            model.openID = scene == "page-repos-many" ? 1 : 7
+            model.section = .repos
+        case "page-settings-limits-edit":
+            model.openID = 4
+            model.section = .settings
+            var l = ProjectLimits.standard
+            l.cpus = 4
+            l.memoryMb = 8192
+            model.demoLimitsDraft = l
+        case "page-settings-colour-more":
+            model.openID = 1
+            model.section = .settings
+            model.setColour(.orange, for: model.open ?? list[0])
         case "dialog-history", "dialog-secret-file", "dialog-instructions":
             model.openID = 1
             model.section = scene == "dialog-instructions" ? .brain : .run

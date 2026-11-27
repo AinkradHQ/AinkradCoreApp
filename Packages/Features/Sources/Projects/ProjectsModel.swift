@@ -115,6 +115,10 @@ public final class ProjectsModel {
     var demoPage = false
     /// Snapshots only: the words of a live view the Core could not show.
     var demoPreviewProblem: String?
+    /// Snapshots only: the Runs tab and the configuration the page opens on (nil is the Default), and Settings' unsaved limits.
+    var demoRunTab: RunConfigsModel.Tab?
+    var demoRunSelected: Int64?
+    var demoLimitsDraft: ProjectLimits?
     #endif
 
     /// The notes of the Docs page (R6-06): the Lore routes of the same Core.
@@ -732,14 +736,19 @@ public final class ProjectsModel {
 
     /// What this project may use; a value out of the Core's range is refused with the Core's words.
     func setLimits(_ project: ProjectItem, _ l: ProjectLimits) async {
-        let old = project.limits
-        guard l != old else { return }
+        let p = Self.limitsPatch(from: project.limits, to: l)
+        _ = await change(project, p, why: "Change what \(project.name) may use while it runs.")
+    }
+
+    /// One change with every limit that differs (CPU, memory, idle stop), so they save together behind one Touch ID. Empty
+    /// when nothing differs.
+    static func limitsPatch(from old: ProjectLimits, to l: ProjectLimits) -> ProjectPatch {
         var p = ProjectPatch()
         if l.cpus != old.cpus { p.cpuLimit = l.cpus }
         if l.memoryMb != old.memoryMb { p.memLimitMb = l.memoryMb }
         if l.idleMinutes != old.idleMinutes { p.idleMinutes = Int64(l.idleMinutes) }
         if l.idleNever != old.idleNever { p.idleNever = l.idleNever }
-        _ = await change(project, p, why: "Change what \(project.name) may use while it runs.")
+        return p
     }
 
     /// Make a repo the primary one of its project.

@@ -2,12 +2,10 @@ import AppKit
 import CoreUI
 import SwiftUI
 
-/// Project Settings, laid out as in the approved mockup (`21-projects.html`): Name and colour, the public link, keeping copies
-/// fresh, where it runs by default and Delete this project (a few seconds to undo).
-///
-/// What the Core lets change today decides what is editable: `PATCH /projects/{id}` takes the name and description only, so
-/// the link name and the limits are shown, not edited (TODO(core): link and limit fields on `UpdateProject`). The colour is a
-/// choice of this Mac (`ProjectColours`). TODO(design-system): proposal CoreSwatch for the colour row.
+/// Project Settings: two equal columns of cards, each row as tall as its taller card. Name and colour, where it runs by default
+/// (CPU, memory and idle stop are one Save, so one Touch ID), what it is, the public link, keeping copies fresh and Archive
+/// (a few seconds to undo). The Core has no permanent delete, so there is none here. The link name cannot change while the project
+/// runs. TODO(design-system): proposal CoreSwatch for the colour row.
 struct SettingsPage: View {
     let model: ProjectsModel
     let project: ProjectItem
@@ -16,6 +14,8 @@ struct SettingsPage: View {
     @State private var slug: String
     @State private var settled = false
     @State private var insights: ProjectInsightsModel
+    /// CPU, memory and idle stop as edited and not saved yet; nil while they match the Core.
+    @State private var limitsDraft: ProjectLimits?
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
@@ -24,26 +24,43 @@ struct SettingsPage: View {
         _name = State(initialValue: project.name)
         _description = State(initialValue: project.description)
         _slug = State(initialValue: project.slug)
+        #if DEBUG
+        _limitsDraft = State(initialValue: model.demoLimitsDraft)
+        #endif
     }
 
     private var changed: Bool {
         name.trimmingCharacters(in: .whitespaces) != project.name || description != project.description
             || slug != project.slug
     }
+    /// The Core refuses a new link name while the project runs.
+    private var linkLocked: Bool { project.tag == .running || project.tag == .starting }
     private var nameProblem: String? { ProjectRules.nameProblem(name) }
     private var slugProblem: String? { slug == project.slug ? nil : ProjectRules.slugProblem(slug) }
 
+    /// The cards in reading order; they pair up two to a row.
+    private var cards: [AnyView] {
+        var out = [AnyView(general)]
+        if project.kind.runs { out.append(AnyView(limits)) }
+        out.append(AnyView(KindSettings(model: model, project: project)))
+        if project.kind.hasPublicLink { out.append(AnyView(publicLink)) }
+        if insights.supported { out.append(AnyView(keepFresh)) }
+        out.append(AnyView(archiveCard))
+        return out
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s2) {
+        let rows = stride(from: 0, to: cards.count, by: 2).map { Array(cards[$0..<min($0 + 2, cards.count)]) }
+        ScrollView {
             VStack(spacing: Space.s2) {
-                general.coreRise(settled, 0)
-                KindSettings(model: model, project: project).coreRise(settled, 1)
-                if project.kind.hasPublicLink { publicLink.coreRise(settled, 1) }
-            }
-            VStack(spacing: Space.s2) {
-                if insights.supported { keepFresh.coreRise(settled, 2) }
-                if project.kind.runs { limits.coreRise(settled, 3) }
-                deleteCard.coreRise(settled, 4)
+                ForEach(rows.indices, id: \.self) { i in
+                    HStack(alignment: .top, spacing: Space.s2) {
+                        ForEach(rows[i].indices, id: \.self) { rows[i][$0] }
+                        if rows[i].count == 1 { Color.clear.frame(maxWidth: .infinity) }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .coreRise(settled, i)
+                }
             }
         }
         .onAppear { settled = true }
@@ -59,7 +76,7 @@ struct SettingsPage: View {
     // MARK: General
 
     private var general: some View {
-        Island("Name and colour") {
+        Island("Name and colour", sub: origin) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 CoreTextField(
                     "Name", placeholder: "Project name", text: $name, error: changed ? nameProblem : nil, onSubmit: save
@@ -69,9 +86,10 @@ struct SettingsPage: View {
                     CoreTextField(
                         "Link name", placeholder: "atlas-notes", text: $slug, error: slugProblem, onSubmit: save
                     )
-                    .disabled(model.readOnly)
+                    .disabled(model.readOnly || linkLocked)
+                    .help(linkLocked ? "Stop the project to change its link name." : "")
                     Text(
-                        project.tag == .running || project.tag == .starting
+                        linkLocked
                             ? "Stop the project to change its link name."
                             : project.kind.hasPublicLink
                                 ? "Public link: \(ProjectRules.host(slug)). It can change while the project is stopped and holds no secrets."
@@ -79,12 +97,12 @@ struct SettingsPage: View {
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                Text(origin).foregroundStyle(GlassInk.secondary)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Colour")
                     ColourSwatches(
                         selection: Binding(
-                            get: { model.colour(project) }, set: { model.setColour($0, for: project) }))
+                            get: { model.colour(project) }, set: { model.setColour($0, for: project) }),
+                        compact: true)
                 }
                 if let e = model.writeError { CoreFieldError(e) }
                 if changed {
@@ -202,10 +220,10 @@ struct SettingsPage: View {
                     GridRow {
                         label("CPU")
                         limitSelect(
-                            ProjectsOptions.coreChoice(project.limits),
+                            ProjectsOptions.coreChoice(limitsNow),
                             ProjectsOptions.cores.map { CoreSelectOption($0, $0 == 1 ? "1 core" : "\($0) cores") }
                         ) { n in
-                            var l = project.limits
+                            var l = limitsNow
                             l.cpus = Double(n)
                             return l
                         }
@@ -213,10 +231,10 @@ struct SettingsPage: View {
                     GridRow {
                         label("Memory")
                         limitSelect(
-                            ProjectsOptions.memoryChoice(project.limits),
+                            ProjectsOptions.memoryChoice(limitsNow),
                             ProjectsOptions.memoryGB.map { CoreSelectOption($0, "\($0) GB") }
                         ) { g in
-                            var l = project.limits
+                            var l = limitsNow
                             l.memoryMb = Int64(g) * 1024
                             return l
                         }
@@ -225,28 +243,46 @@ struct SettingsPage: View {
                         label("Idle stop")
                         HStack(spacing: Space.s2) {
                             limitSelect(
-                                ProjectsOptions.idleChoice(project.limits),
+                                ProjectsOptions.idleChoice(limitsNow),
                                 ProjectsOptions.idleChoices.map { CoreSelectOption($0.minutes, $0.title) }
-                            ) { m in ProjectsOptions.setIdle(project.limits, minutes: m) }
+                            ) { m in ProjectsOptions.setIdle(limitsNow, minutes: m) }
                             if let idle = project.live?.idle, project.tag == .running {
                                 Text("· \(idle)").foregroundStyle(GlassInk.secondary).monospacedDigit()
                             }
                         }
                     }
                 }
+                if let draft = limitsDraft, draft != project.limits {
+                    HStack(spacing: Space.s2) {
+                        Spacer(minLength: 0)
+                        Button("Revert") { limitsDraft = nil }.buttonStyle(CoreButtonStyle(.secondary))
+                        Button("Save") {
+                            Task {
+                                await model.setLimits(project, draft)
+                                limitsDraft = nil
+                            }
+                        }
+                        .buttonStyle(CoreButtonStyle(.prominent, busy: model.busy))
+                        .disabled(model.busy || model.readOnly)
+                        .help("Saves CPU, memory and idle stop together, with one Touch ID")
+                    }
+                    .transition(.opacity)
+                }
             }
+            .animation(Motion.out(Motion.ui), value: limitsDraft != nil && limitsDraft != project.limits)
         }
+        .onChange(of: project.limits) { _, new in if limitsDraft == new { limitsDraft = nil } }
     }
 
-    /// One of this project's own limits: saved behind Touch ID, and the select shows what the Core holds.
+    /// CPU, memory and idle stop as the page shows them: the edit in hand, else what the Core holds.
+    private var limitsNow: ProjectLimits { limitsDraft ?? project.limits }
+
+    /// One of this project's own limits: it joins the edit in hand, which Save sends as one change.
     private func limitSelect(
         _ current: Int, _ options: [CoreSelectOption<Int>], _ make: @escaping (Int) -> ProjectLimits
     ) -> some View {
-        CoreSelect(
-            nil, selection: Binding(get: { current }, set: { v in Task { await model.setLimits(project, make(v)) } }),
-            options: options
-        )
-        .disabled(model.readOnly || model.busy).frame(width: Space.s8 * 5)
+        CoreSelect(nil, selection: Binding(get: { current }, set: { v in limitsDraft = make(v) }), options: options)
+            .disabled(model.readOnly || model.busy).frame(width: Space.s8 * 5)
     }
 
     /// Where the project prefers to run, with what the Core has paired (Mac runners serve This Mac, Linux ones Home server).
@@ -269,17 +305,17 @@ struct SettingsPage: View {
         }
     }
 
-    // MARK: Delete
+    // MARK: Archive
 
-    /// Delete this project: the Core archives it (nothing is erased) and the toast offers Undo for a few seconds. A Core without
-    /// the unarchive route (older than minor 95) asks first instead, since it cannot undo.
-    private var deleteCard: some View {
-        Island("Delete this project") {
+    /// Archive this project: it leaves the list, its run stops, and the toast offers Undo for a few seconds. A Core without
+    /// the unarchive route (older than minor 95) asks first instead, since it cannot undo. The Core has no permanent delete.
+    private var archiveCard: some View {
+        Island("Archive this project") {
             VStack(alignment: .leading, spacing: Space.s3) {
                 Text(
                     model.insightsService == nil
-                        ? "Removes it from the list after one question. Your repos stay on GitHub. This Core cannot bring it back from here."
-                        : "Removes it from Core. Your repos stay on GitHub, and you can undo for a few seconds."
+                        ? "Takes it off the list after one question and stops its run. Repos, secrets and the Brain room are kept, and your repos stay on GitHub. This Core cannot bring it back from here."
+                        : "Takes it off the list and stops its run. Repos, secrets and the Brain room are kept, your repos stay on GitHub, and you can undo for a few seconds."
                 )
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 Button {
@@ -289,10 +325,10 @@ struct SettingsPage: View {
                         Task { await model.archive(project) }
                     }
                 } label: {
-                    Label("Delete project", systemImage: "trash")
+                    Label("Archive Project", systemImage: "archivebox")
                 }
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(model.readOnly || model.busy)
-                .accessibilityIdentifier("project-delete")
+                .accessibilityIdentifier("project-archive")
             }
         }
     }
