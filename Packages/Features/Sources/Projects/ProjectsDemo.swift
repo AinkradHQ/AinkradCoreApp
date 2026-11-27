@@ -91,7 +91,7 @@ public final class ProjectsDemo {
 
     public static let scenes = [
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
-        "gallery-failed", "new-quick-empty", "new-quick", "new-quick-error", "new-advanced", "space-no-repos",
+        "gallery-failed", "new-empty", "new-name", "new-runs", "new-advanced", "space-no-repos",
         "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
@@ -211,8 +211,6 @@ public final class ProjectsDemo {
         shell.coreLink = .live
         shell.home.coreName = "core-oracle"
         model.host.clearElevationNotice()
-        model.quickOpen = false
-        model.quickName = ""
         model.filter = ""
         model.cursor = nil
         model.openID = nil
@@ -344,13 +342,13 @@ public final class ProjectsDemo {
         case "gallery-hover": model.debugHover = 1
         case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
         case "new-link-name":
-            NewProjectDialogs.openAdvanced(model, name: "2048 game")
+            NewProjectDialogs.openWizard(model, name: "2048 game")
         case "new-paste-link":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
+            NewProjectDialogs.openWizard(model, name: "Tidepool", step: .code)
         case "new-paste-link-ssh":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
+            NewProjectDialogs.openWizard(model, name: "Tidepool", step: .code)
         case "new-failed-repos":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .review)
+            NewProjectDialogs.openWizard(model, name: "Tidepool", step: .review)
             try? await Task.sleep(for: .milliseconds(300))
             model.wizardMissed = [
                 MissedRepo(name: "tidepool-docs", why: "This project already has that repo."),
@@ -370,15 +368,11 @@ public final class ProjectsDemo {
         case "gallery-loading": model.setLoad(.loading)
         case "gallery-offline": model.setLoad(.notConnected)
         case "gallery-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
-        case "new-quick-empty": model.quickOpen = true
-        case "new-quick":
-            model.quickName = "Tidepool"
-            model.quickOpen = true
-        case "new-quick-error":
-            model.quickName = "7 seas"
-            model.quickOpen = true
+        case "new-empty": model.newProject()
+        case "new-name": NewProjectDialogs.openWizard(model, name: "Tidepool")
+        case "new-runs": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .runs)
         case "new-advanced":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
+            NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
         case "space-no-repos", "space-copying", "space-setting-up", "space-ready", "space-needs-setup": model.openID = 7
         case "overview-running": model.openID = 1
         case "page-run":

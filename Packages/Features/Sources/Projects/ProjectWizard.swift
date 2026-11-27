@@ -16,72 +16,7 @@ enum WizardStep: Int, CaseIterable {
     }
 }
 
-/// Where a project may run: the value the Core keeps (`ProjectInfo.runner`), its words and its one line.
-enum WizardRunner: String, CaseIterable {
-    case auto, this_mac, home_server
-
-    var title: String {
-        switch self {
-        case .auto: "Automatic"
-        case .this_mac: "This Mac"
-        case .home_server: "Home server"
-        }
-    }
-    /// The line with what the Core has: "Runs here… · online" / "no Mac runner is online".
-    func line(_ runners: [RunnerInfo]) -> String {
-        guard self != .auto, !runners.isEmpty else { return line }
-        let os = self == .this_mac ? "macos" : "linux"
-        let mine = runners.filter { $0.os == os }
-        let on = mine.filter(\.online)
-        let kind = self == .this_mac ? "Mac" : "Linux"
-        if let r = on.first { return "\(line) \(r.name) is online." }
-        return mine.isEmpty ? "\(line) No \(kind) runner is paired yet." : "\(line) \(mine[0].name) is offline."
-    }
-    var line: String {
-        switch self {
-        case .auto: "Core picks the best runner each time."
-        case .this_mac: "Runs here. Stops when the Mac sleeps."
-        case .home_server: "Keeps running while you are away."
-        }
-    }
-    var symbol: String {
-        switch self {
-        case .auto: "arrow.triangle.branch"
-        case .this_mac: "laptopcomputer"
-        case .home_server: "server.rack"
-        }
-    }
-}
-
-/// What the review step says while the Core copies the repos: one answer from the repos' own copy states.
-struct WizardProgress: Equatable {
-    var ready = 0
-    var copying = 0
-    var failed = 0
-    /// Repos the Core has no copy of and is not making one: they wait for Fetch Now.
-    var waiting = 0
-
-    init(_ repos: [RepoItem]) {
-        for r in repos {
-            switch r.copy {
-            case .ready: ready += 1
-            case .fetching: copying += 1
-            case .failed: failed += 1
-            case .unknown: waiting += 1
-            }
-        }
-    }
-
-    /// Nothing is still copying: the project can be opened.
-    var settled: Bool { copying == 0 }
-
-    func title(name: String) -> String {
-        if !settled { return "Creating \(name)" }
-        return failed > 0 || waiting > 0 ? "Almost there" : "Your project is ready"
-    }
-}
-
-/// ⌘N → Advanced…: the GitHub-first wizard. Copy and structure follow screens/21-projects.html.
+/// Every New Project: the guided wizard. The steps sit on the left; on the right the project's card builds as you go.
 struct ProjectWizard: View {
     let model: ProjectsModel
     let close: () -> Void
@@ -103,7 +38,12 @@ struct ProjectWizard: View {
     /// "Start with no code": the code step is passed with nothing picked.
     @State private var noCode = false
     @State private var creating = false
+    /// Which way the last step change went, so the next page slides in from that side.
+    @State private var forward = true
+    /// Link name and description: folded away until asked for (or until the name needs a link name typed).
+    @State private var moreOptions = false
     @Environment(\.corePalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     init(
         model: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name,
@@ -133,27 +73,48 @@ struct ProjectWizard: View {
     }
 
     var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 20) {
+        CoreDialogPanel("", width: Space.s8 * 28) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 header
-                Group {
-                    switch step {
-                    case .name: nameStep
-                    case .code: codeStep
-                    case .runs: runsStep
-                    case .review: reviewStep
+                HStack(alignment: .top, spacing: Space.s6) {
+                    VStack(alignment: .leading, spacing: Space.s4) {
+                        Group {
+                            switch step {
+                            case .name: nameStep
+                            case .code: codeStep
+                            case .runs: runsStep
+                            case .review: reviewStep
+                            }
+                        }
+                        .id(step)
+                        .transition(
+                            .asymmetric(
+                                insertion: .offset(x: coreMove(reduce, forward ? 24 : -24)).combined(with: .opacity),
+                                removal: .opacity))
+                        Spacer(minLength: 0)
                     }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    WizardPreviewCard(
+                        name: name, colour: colour,
+                        host: name.isEmpty || slugProblem != nil ? nil : ProjectRules.host(slug),
+                        repos: (made?.repos.map(\.name)) ?? chosen.map(\.name), runner: runner, publicLink: publicLink,
+                        step: step, progress: made.map { WizardProgress($0.repos) })
                 }
-                .id(step)
-                .transition(.opacity)
+                .frame(height: Space.s8 * 14 + Space.s4)
                 footer
             }
         }
         .animation(Motion.out(Motion.move), value: step)
+        .animation(Motion.out(Motion.ui), value: moreOptions)
         .onChange(of: name) { _, _ in model.clearWriteError() }
         .onChange(of: slugText) { _, _ in model.clearWriteError() }
         .task { model.wizardProjectID = nil }
         .accessibilityIdentifier("project-new")
+    }
+
+    private func go(_ s: WizardStep) {
+        forward = s.rawValue > step.rawValue
+        step = s
     }
 
     // MARK: header
@@ -162,12 +123,13 @@ struct ProjectWizard: View {
         HStack(spacing: Space.s3) {
             HStack(spacing: Space.s1) {
                 ForEach(WizardStep.allCases, id: \.self) { s in
-                    coreShape(2).fill(s.rawValue <= step.rawValue ? palette.primary : palette.track)
-                        .frame(width: Space.s5, height: Space.s1)
+                    coreShape(Radius.chip / 3).fill(s.rawValue <= step.rawValue ? palette.primary : palette.track)
+                        .frame(width: Space.s8 + Space.s3, height: Space.s1)
                 }
             }
             .accessibilityHidden(true)
             Text("Step \(step.rawValue) of 4 · \(step.title)").foregroundStyle(palette.text2)
+                .contentTransition(.opacity)
             Spacer()
             Button(action: close) { Image(systemName: "xmark") }
                 .buttonStyle(CoreButtonStyle(.plain, size: .small)).help("Close (Esc)")
@@ -178,28 +140,11 @@ struct ProjectWizard: View {
     // MARK: 1 · name
 
     private var nameStep: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            DialogHead(
-                title: "Name your project", line: "A project keeps your code, notes and AI sessions in one place.")
+        VStack(alignment: .leading, spacing: Space.s4) {
+            DialogHead(title: "Name your project", line: "Short and clear. You can rename it later.")
             CoreTextField(
                 "Name", placeholder: "Atlas notes", text: $name, error: nameProblem, autofocus: true,
-                onSubmit: { if nameReady { step = .code } })
-            CoreTextField(
-                "Link name", placeholder: "atlas-notes",
-                text: Binding(
-                    get: { slug },
-                    set: {
-                        slugText = $0
-                        slugEdited = true
-                    }), error: slugProblem ?? model.writeError, onSubmit: { if nameReady { step = .code } }
-            )
-            .accessibilityIdentifier("project-new-link")
-            Text(
-                slugProblem == nil && !name.isEmpty
-                    ? "Public link: \(ProjectRules.host(slug))" : "Made from the name; you can change it."
-            )
-            .foregroundStyle(palette.text2)
-            CoreTextField("Description", placeholder: "What it is, in a line (optional)", text: $description)
+                onSubmit: { if nameReady { go(.code) } })
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("Colour")
                 ColourSwatches(
@@ -212,6 +157,27 @@ struct ProjectWizard: View {
             }
             .onChange(of: name) { _, new in
                 if !colourPicked { colour = .standard(for: ProjectRules.slug(from: new)) }
+            }
+            if moreOptions || slugProblem != nil {
+                VStack(alignment: .leading, spacing: Space.s3) {
+                    CoreTextField(
+                        "Link name", placeholder: "atlas-notes",
+                        text: Binding(
+                            get: { slug },
+                            set: {
+                                slugText = $0
+                                slugEdited = true
+                            }), error: slugProblem ?? model.writeError, onSubmit: { if nameReady { go(.code) } }
+                    )
+                    .accessibilityIdentifier("project-new-link")
+                    CoreTextField("Description", placeholder: "What it is, in a line (optional)", text: $description)
+                }
+                .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -6))))
+            } else {
+                Button("More options…") { moreOptions = true }
+                    .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                    .help("Change the link name or add a description")
+                    .accessibilityIdentifier("project-new-more")
             }
         }
     }
@@ -283,14 +249,16 @@ struct ProjectWizard: View {
     private var runsStep: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             DialogHead(title: "Where should it run?", line: "You can change this later.")
-            VStack(spacing: Space.s1) {
+            HStack(spacing: Space.s2) {
                 ForEach(WizardRunner.allCases, id: \.self) { r in
-                    CoreRow(
-                        r == .auto ? "\(r.title) · Best" : r.title, subtitle: r.line(model.runners), symbol: r.symbol,
+                    WizardChoiceTile(
+                        symbol: r.symbol, title: r == .auto ? "\(r.title) · Best" : r.title,
+                        line: r.line(model.runners),
                         selected: runner == r
                     ) { runner = r }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             if !model.runnerSupported {
                 Text("This Core keeps one place for now. The choice is remembered when it can.")
                     .foregroundStyle(palette.text2)
@@ -319,7 +287,7 @@ struct ProjectWizard: View {
             DialogHead(
                 title: made == nil ? "Ready to create \(name)?" : progress.title(name: name),
                 line:
-                    "\(ProjectItem.count(chosen.count, "repo")) · Runs on \(runner.title) · "
+                    "\(ProjectItem.count(made?.repos.count ?? chosen.count, "repo")) · Runs on \(runner.title) · "
                     + (publicLink ? "Public link on" : "Private"))
             VStack(spacing: Space.s1) {
                 if let made, !made.repos.isEmpty {
@@ -386,25 +354,25 @@ struct ProjectWizard: View {
         case .name:
             CoreDialogFooter(
                 cancel: CoreAction("Cancel", key: .cancel, run: close),
-                primary: CoreAction("Next", key: .primary) { step = .code }, enabled: nameReady)
+                primary: CoreAction("Next", key: .primary) { go(.code) }, enabled: nameReady)
         case .code:
             CoreDialogFooter(
-                cancel: CoreAction("Back") { step = .name },
-                primary: CoreAction("Next", key: .primary) { step = .runs },
+                cancel: CoreAction("Back") { go(.name) },
+                primary: CoreAction("Next", key: .primary) { go(.runs) },
                 alternate: needsGithub
                     ? CoreAction("Start with no code") {
                         noCode = true
-                        step = .runs
+                        go(.runs)
                     } : nil,
                 enabled: !needsGithub)
         case .runs:
             CoreDialogFooter(
-                cancel: CoreAction("Back") { step = .code },
-                primary: CoreAction("Next", key: .primary) { step = .review })
+                cancel: CoreAction("Back") { go(.code) },
+                primary: CoreAction("Next", key: .primary) { go(.review) })
         case .review:
             if made == nil {
                 CoreDialogFooter(
-                    cancel: CoreAction("Back") { step = .runs },
+                    cancel: CoreAction("Back") { go(.runs) },
                     primary: CoreAction("Create project", key: .primary, run: create), busy: model.busy)
             } else {
                 CoreDialogFooter(
@@ -422,8 +390,4 @@ struct ProjectWizard: View {
                 description: description.trimmingCharacters(in: .whitespaces), autoSuffix: !slugEdited, wizard: true)
         }
     }
-}
-
-extension RepoCopy {
-    var isFailed: Bool { if case .failed = self { true } else { false } }
 }

@@ -26,10 +26,6 @@ struct ProjectsView: View {
         .onAppear { paneFocus = true }
         .retakeFocus(after: model.host.shell, pane: "projects") { paneFocus = true }
         .onKeyPress(.escape) {
-            if model.quickOpen {
-                model.quickOpen = false
-                return .handled
-            }
             if model.openID != nil {
                 model.closeProject()
                 return .handled
@@ -40,7 +36,7 @@ struct ProjectsView: View {
         .onKeyPress(.upArrow) { move(-1) }
         .onKeyPress(.downArrow) { move(1) }
         .onKeyPress(.return) {
-            guard model.openID == nil, !model.quickOpen, let id = model.cursor else { return .ignored }
+            guard model.openID == nil, let id = model.cursor else { return .ignored }
             model.openProject(id)
             return .handled
         }
@@ -50,7 +46,7 @@ struct ProjectsView: View {
 
     /// Arrow keys step the cursor through the gallery's cards in reading order.
     private func move(_ step: Int) -> KeyPress.Result {
-        guard model.openID == nil, !model.quickOpen else { return .ignored }
+        guard model.openID == nil else { return .ignored }
         let ids = model.shown.map(\.id)
         guard !ids.isEmpty else { return .ignored }
         let at = model.cursor.flatMap { ids.firstIndex(of: $0) }
@@ -63,6 +59,7 @@ struct ProjectsView: View {
 /// The gallery: a header with Filter and New Project, then the cards and one card to start another.
 struct GalleryView: View {
     let model: ProjectsModel
+    @Environment(\.coreAccent) private var paneAccent
     @State private var settled = false
 
     var body: some View {
@@ -72,12 +69,9 @@ struct GalleryView: View {
                     .accessibilityAddTraits(.isHeader)
             } actions: {
                 FilterField(text: Binding(get: { model.filter }, set: { model.filter = $0 }))
-                Button {
-                    model.newProject()
-                } label: {
-                    Label("New Project", systemImage: "plus")
-                }
-                .buttonStyle(CoreButtonStyle(.prominent))
+                AppActionTile(
+                    title: "New Project", symbol: "plus", key: "⌘N", hue: GlassInk.accent(paneAccent), prominent: true
+                ) { model.newProject() }
                 .disabled(model.newProjectBlock != nil)
                 .help(model.newProjectBlock ?? "New Project  ⌘N")
                 .accessibilityIdentifier("projects-new")
@@ -90,21 +84,7 @@ struct GalleryView: View {
         .frame(maxWidth: .infinity)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
-        .overlay(alignment: .topTrailing) { quick }
         .onAppear { settled = true }
-        .animation(Motion.out(Motion.ui), value: model.quickOpen)
-    }
-
-    @ViewBuilder private var quick: some View {
-        if model.quickOpen {
-            ZStack(alignment: .topTrailing) {
-                // A click anywhere else closes it, like any pop-over.
-                Color.clear.contentShape(Rectangle()).onTapGesture { model.quickOpen = false }
-                QuickNewProject(model: model)
-                    .padding(.trailing, Space.s4).padding(.top, Space.s8 + Space.s5)
-                    .transition(.opacity)
-            }
-        }
     }
 
     /// The list on screen is the last one the Core gave: said, with a way to ask again.
@@ -139,11 +119,7 @@ struct GalleryView: View {
                     symbol: "exclamationmark.triangle", title: "Projects did not load", line: why,
                     primary: CoreAction("Try again") { model.resync() }))
         case .ready where model.projects.isEmpty:
-            centered(
-                CoreStateCard(
-                    symbol: "square.grid.2x2", title: "No projects yet",
-                    line: "A project keeps your code, notes and AI sessions in one place.",
-                    primary: model.readOnly ? nil : CoreAction("New Project") { model.newProject() }))
+            ProjectsEmptyHero(model: model)
         case .ready:
             ScrollView {
                 LazyVGrid(columns: Self.columns, spacing: Space.s6) {

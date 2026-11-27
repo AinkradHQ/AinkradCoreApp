@@ -55,9 +55,6 @@ public final class ProjectsModel {
     var section = ProjectSection.overview
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
-    /// ⌘N and the New Project button: the quick pop-over under the button.
-    var quickOpen = false
-    var quickName = ""
     /// What a run gets unless a project says otherwise (Settings > Projects > Options); nil until read, or on a Core without it.
     internal(set) var limits: ProjectLimits?
     internal(set) var limitsState = LimitsState.loading
@@ -199,7 +196,6 @@ public final class ProjectsModel {
         load = .notConnected
         openID = nil
         cursor = nil
-        quickOpen = false
         readOnly = false
     }
 
@@ -564,8 +560,6 @@ public final class ProjectsModel {
         }
         guard let made else { return false }
         colours.set(colour, for: made.slug)
-        quickOpen = false
-        quickName = ""
         pollAttempt = 0
         await reload()
         if made.slug != slug { issues.append("The link is \(ProjectRules.host(made.slug)): \(slug) was taken.") }
@@ -803,9 +797,7 @@ public final class ProjectsModel {
             return
         }
         show()
-        quickName = ""
-        writeError = nil
-        quickOpen = true
+        NewProjectDialogs.openWizard(self, name: "")
     }
 
     /// ⌘N while the gallery is up: the same as the New Project button.
@@ -863,7 +855,7 @@ public final class ProjectsModel {
             ["create", "project", "repo", "github"], action: true
         ) {
             $0.show()
-            NewProjectDialogs.openAdvanced($0, name: "")
+            NewProjectDialogs.openWizard($0, name: "")
         }
     }
 }

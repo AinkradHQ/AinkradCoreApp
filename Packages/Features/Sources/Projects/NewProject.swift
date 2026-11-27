@@ -5,10 +5,9 @@ import SwiftUI
 /// The dialogs of Projects, shown over the shell like the other apps' dialogs.
 @MainActor
 enum NewProjectDialogs {
-    static func openAdvanced(
+    static func openWizard(
         _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name, pasted: [PickRepo] = []
     ) {
-        m.quickOpen = false
         m.clearWriteError()
         let shell = m.host.shell
         shell.present(
@@ -37,65 +36,6 @@ struct DialogHead: View {
             Text(title).coreFont(size: MacTextSize.title, weight: .semibold).accessibilityAddTraits(.isHeader)
             if let line { Text(line).foregroundStyle(palette.text2) }
         }
-    }
-}
-
-/// What a new project will make, in one line each: the Brain room and the link.
-private func promise(_ name: String, _ link: String?) -> AttributedString {
-    let t = name.trimmingCharacters(in: .whitespaces)
-    guard !t.isEmpty, let link else {
-        return AttributedString("Creates a Brain room and a link from the name. Add repos next.")
-    }
-    var out = AttributedString("Creates the Brain room “\(t)” and the link ")
-    var l = AttributedString(link)
-    l.font = .system(size: MacTextSize.body, design: .monospaced)
-    out += l
-    out += AttributedString(". Add repos next.")
-    return out
-}
-
-/// ⌘N: a small pop-over under the New Project button. A name and Return is all it asks; it says what it will create.
-struct QuickNewProject: View {
-    let model: ProjectsModel
-    @Environment(\.corePalette) private var palette
-
-    private var slug: String { ProjectRules.slug(from: model.quickName) }
-    private var typed: Bool { !model.quickName.trimmingCharacters(in: .whitespaces).isEmpty }
-    /// The problem to show: the Core's refusal, else what is wrong with the name (only once something is typed).
-    private var problem: String? {
-        if let e = model.writeError { return e }
-        guard typed else { return nil }
-        return ProjectRules.nameProblem(model.quickName) ?? ProjectRules.slugProblem(slug)
-    }
-    private var ready: Bool {
-        typed && ProjectRules.nameProblem(model.quickName) == nil && ProjectRules.slugProblem(slug) == nil
-    }
-
-    var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 12) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                DialogHead(title: "New Project", line: nil)
-                CoreTextField(
-                    "Name", placeholder: "Project name",
-                    text: Binding(get: { model.quickName }, set: { model.quickName = $0 }), error: problem,
-                    autofocus: true, onSubmit: create
-                )
-                .accessibilityIdentifier("project-quick-name")
-                Text(promise(model.quickName, ready ? ProjectRules.host(slug) : nil))
-                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                CoreDialogFooter(
-                    cancel: CoreAction("Advanced…") { NewProjectDialogs.openAdvanced(model, name: model.quickName) },
-                    primary: CoreAction("Create", key: .primary, run: create), busy: model.busy, enabled: ready)
-            }
-        }
-        .onChange(of: model.quickName) { _, _ in model.clearWriteError() }
-        .onExitCommand { model.quickOpen = false }
-        .accessibilityIdentifier("project-quick")
-    }
-
-    private func create() {
-        guard ready, !model.busy else { return }
-        Task { await model.create(name: model.quickName, slug: slug, colour: .standard(for: slug), autoSuffix: true) }
     }
 }
 
