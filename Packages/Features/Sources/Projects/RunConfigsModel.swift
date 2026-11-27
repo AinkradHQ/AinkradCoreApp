@@ -27,8 +27,11 @@ final class RunConfigsModel {
 
     var tab = Tab.configs
     private(set) var configs: [RunConfigItem] = []
-    /// The configuration open in the Configurations tab.
+    /// The configuration open in the Configurations tab; nil is the Default, the project's own run setup.
     var selected: Int64?
+    /// The Default's setup (the newest run spec, what the header Start runs) and the project's secrets: Edit Setup and the
+    /// Secrets list of the Environment tab write through this one (secrets belong to the project, not to one environment).
+    let setup: RunPageModel
     private(set) var envs: [String] = []
     /// The environment the Environment tab edits, and the configuration whose variables it shows.
     var env = ""
@@ -38,7 +41,7 @@ final class RunConfigsModel {
     var comparing = false
     var compareWith = ""
     private(set) var diff: [EnvDiffItem] = []
-    private(set) var secretNames: [String] = []
+    var secretNames: [String] { setup.secrets.map(\.name).sorted() }
     private(set) var history: [RunRecord] = []
     private(set) var runnerOptions: [RunnerOption] = []
     private(set) var loaded = false
@@ -63,19 +66,30 @@ final class RunConfigsModel {
     init(model: ProjectsModel, projectID: Int64) {
         self.model = model
         self.projectID = projectID
+        setup = RunPageModel(model: model, projectID: projectID)
     }
 
     private var service: (any RunConfigsService)? { model.configsService }
 
     // MARK: derived
 
-    var selectedConfig: RunConfigItem? { configs.first { $0.id == selected } ?? configs.first }
+    var selectedConfig: RunConfigItem? { configs.first { $0.id == selected } }
     var envConfigItem: RunConfigItem? { configs.first { $0.id == envConfig } ?? configs.first }
     /// Every live run, newest first: a project has one live run per configuration.
     var liveRuns: [RunRecord] { history.filter(\.live) }
     func liveRun(of config: RunConfigItem) -> RunRecord? { liveRuns.first { $0.configID == config.id } }
     func isLive(_ config: RunConfigItem) -> Bool { liveRun(of: config) != nil }
-    func name(of config: Int64?) -> String { configs.first { $0.id == config }?.name ?? "Setup" }
+    /// The live run of the Default: a run the project's own setup started, with no configuration.
+    var defaultRun: RunRecord? { liveRuns.first { $0.configID == nil } }
+    func name(of config: Int64?) -> String {
+        config == nil ? Self.defaultName : configs.first { $0.id == config }?.name ?? "A deleted configuration"
+    }
+    static let defaultName = "Default"
+    /// Under the Default's name in the list: what its setup runs.
+    var defaultLine: String {
+        guard let spec = setup.spec, !spec.services.isEmpty else { return setup.loaded ? "Not set up yet" : "" }
+        return ProjectItem.count(spec.services.count, "service")
+    }
 
     /// "3 variables · values are hidden", for the Environment tab.
     var varsLine: String {
@@ -92,8 +106,8 @@ final class RunConfigsModel {
         do {
             configs = try await service.configs(project: projectID)
             envs = try await service.environments(project: projectID)
-            secretNames = ((try? await model.runService?.secrets(project: projectID)) ?? []).map(\.name).sorted()
-            if selected == nil || !configs.contains(where: { $0.id == selected }) { selected = configs.first?.id }
+            if let s = selected, !configs.contains(where: { $0.id == s }) { selected = nil }
+            await setup.load()
             if envConfig == nil || !configs.contains(where: { $0.id == envConfig }) { envConfig = configs.first?.id }
             defaultEnv = (try? await model.insightsService?.tuning(project: projectID))?.defaultEnvironment
             if env.isEmpty || !envs.contains(env) { env = runEnv }
@@ -269,6 +283,19 @@ final class RunConfigsModel {
             writeError = model.runWords(error)
             model.host.shell.showToast(writeError ?? "", kind: .warn)
         }
+    }
+
+    /// Starts the Default: the project's own setup, which is what the header Start runs (the Core's `run/start`; a live Default is
+    /// restarted). The Core lays no environment over it, only a configuration gets one.
+    func startDefault(_ project: ProjectItem) async {
+        let action: RunAction = defaultRun == nil ? .start : .restart
+        #if DEBUG
+        if model.demoPage { model.control(action, project) } else { await model.runControl(action, project) }
+        #else
+        await model.runControl(action, project)
+        #endif
+        tab = .live
+        await load()
     }
 
     /// Stops one live run by id, behind Touch ID.

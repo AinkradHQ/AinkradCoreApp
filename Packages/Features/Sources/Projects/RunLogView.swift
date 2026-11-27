@@ -10,11 +10,13 @@ struct RunLogView: View {
     var services: [String] = []
     /// Show only the newest lines in a short box (the Overview), without the toolbar.
     var compact = false
+    /// False when the page puts `RunLogToolbar` in its island header instead of above the lines.
+    var toolbar = true
     var toast: (String) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            if !compact { toolbar }
+            if !compact && toolbar { RunLogToolbar(logs: logs, services: services, toast: toast) }
             if let f = logs.failure { CoreFieldError(f) }
             ZStack(alignment: .bottomTrailing) {
                 list
@@ -32,40 +34,6 @@ struct RunLogView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Run log")
-    }
-
-    private var toolbar: some View {
-        HStack(spacing: Space.s2) {
-            if !services.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    CoreSegmented(
-                        "Log service", segments: [CoreSegment("", "All")] + services.map { CoreSegment($0, $0) },
-                        selection: Binding(
-                            get: { logs.service ?? "" }, set: { logs.setService($0.isEmpty ? nil : $0) })
-                    )
-                }
-                .frame(maxWidth: Space.s8 * 14)
-            }
-            Spacer(minLength: 0)
-            if let m = logs.matchLine { Text(m).foregroundStyle(GlassInk.secondary).monospacedDigit() }
-            CoreTextField(
-                "", placeholder: "Search the log", text: Binding(get: { logs.search }, set: { logs.search = $0 })
-            )
-            .frame(width: Space.s8 * 6)
-            .accessibilityLabel("Search the log")
-            CoreIconButton(
-                symbol: "clock", label: logs.showTimes ? "Hide the time of each line" : "Show the time of each line",
-                selected: logs.showTimes
-            ) {
-                logs.showTimes.toggle()
-            }
-            CoreIconButton(symbol: "doc.on.doc", label: "Copy the log") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(logs.copyText, forType: .string)
-                toast("Log copied")
-            }
-            .disabled(logs.entries.isEmpty)
-        }
     }
 
     private var list: some View {
@@ -109,6 +77,49 @@ struct RunLogView: View {
             Label(RunLogsModel.gapWords(n), systemImage: "ellipsis")
                 .font(.system(size: MacTextSize.meta)).foregroundStyle(GlassInk.secondary)
                 .help("The runner could not keep up and dropped these lines before they were read")
+        }
+    }
+}
+
+
+/// A log's controls: the service filter, the search with its match count, the time of each line and Copy. It sits in the header
+/// of the island that holds the log, so no band of its own stands empty above the lines.
+struct RunLogToolbar: View {
+    let logs: RunLogsModel
+    var services: [String] = []
+    var toast: (String) -> Void = { _ in }
+
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            if !services.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    CoreSegmented(
+                        "Log service", segments: [CoreSegment("", "All")] + services.map { CoreSegment($0, $0) },
+                        selection: Binding(
+                            get: { logs.service ?? "" }, set: { logs.setService($0.isEmpty ? nil : $0) })
+                    )
+                }
+                .frame(maxWidth: Space.s8 * 14)
+            }
+            Spacer(minLength: 0)
+            if let m = logs.matchLine { Text(m).foregroundStyle(GlassInk.secondary).monospacedDigit() }
+            CoreTextField(
+                "", placeholder: "Search the log", text: Binding(get: { logs.search }, set: { logs.search = $0 })
+            )
+            .frame(width: Space.s8 * 6)
+            .accessibilityLabel("Search the log")
+            CoreIconButton(
+                symbol: "clock", label: logs.showTimes ? "Hide the time of each line" : "Show the time of each line",
+                selected: logs.showTimes
+            ) {
+                logs.showTimes.toggle()
+            }
+            CoreIconButton(symbol: "doc.on.doc", label: "Copy the log") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(logs.copyText, forType: .string)
+                toast("Log copied")
+            }
+            .disabled(logs.entries.isEmpty)
         }
     }
 }

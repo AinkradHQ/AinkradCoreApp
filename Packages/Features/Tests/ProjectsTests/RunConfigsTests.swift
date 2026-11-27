@@ -176,10 +176,19 @@ struct RunConfigsModelTests {
         return (r, svc, host)
     }
 
-    @Test func loadPicksTheFirstConfigurationAndEnvironment() async {
+    @Test func loadOpensTheDefaultAndPicksTheFirstEnvironment() async {
         let (r, _, _) = await make()
-        #expect(r.loaded && r.selectedConfig?.id == 1 && r.env == "Development" && r.envs.count == 2)
-        #expect(r.vars.count == 2)
+        #expect(r.loaded && r.selected == nil && r.selectedConfig == nil && r.env == "Development" && r.envs.count == 2)
+        #expect(r.envConfigItem?.id == 1 && r.vars.count == 2)
+    }
+
+    @Test func aDeletedSelectionFallsBackToTheDefault() async {
+        let (r, svc, _) = await make()
+        r.selected = 1
+        #expect(r.selectedConfig?.id == 1)
+        svc.items.removeAll()
+        await r.load()
+        #expect(r.selected == nil)
     }
 
     @Test func aRevealedValueIsReadOnRequestAndDroppedWhenHidden() async {
