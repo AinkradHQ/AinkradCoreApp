@@ -255,9 +255,29 @@ public final class DesignCanvasNSView: NSView {
         case DE_CURSOR_GRAB: return .openHand
         case DE_CURSOR_GRABBING: return .closedHand
         case DE_CURSOR_TEXT: return .iBeam
+        case DE_CURSOR_ROTATE: return rotateCursor
         default: return .arrow
         }
     }
+
+    /// The engine's rotate cursor (outside a corner): AppKit has no public one, so a curved arrow, dark with a light halo.
+    private static let rotateCursor: NSCursor = {
+        func symbol(_ c: NSColor, _ w: NSFont.Weight) -> NSImage? {
+            NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 14, weight: w).applying(.init(paletteColors: [c])))
+        }
+        let size = NSSize(width: 22, height: 22)
+        let image = NSImage(size: size, flipped: false) { r in
+            let halo = symbol(.white, .black)
+            let ink = symbol(.black, .medium)
+            for d in [(-1.0, 0.0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)] {
+                halo?.draw(in: r.offsetBy(dx: d.0, dy: d.1).insetBy(dx: 3, dy: 3))
+            }
+            ink?.draw(in: r.insetBy(dx: 3, dy: 3))
+            return true
+        }
+        return NSCursor(image: image, hotSpot: NSPoint(x: 11, y: 11))
+    }()
 
     static func mods(_ f: NSEvent.ModifierFlags) -> UInt32 {
         var m: Int32 = 0
