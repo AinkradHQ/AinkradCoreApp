@@ -371,7 +371,7 @@ struct Overview: View {
                         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
                             Text(l.service).foregroundStyle(GlassInk.secondary).frame(
                                 width: Space.s8 * 2, alignment: .leading)
-                            Text(l.text).lineLimit(1)
+                            Text(LogText.plain(l.text)).lineLimit(1)
                         }
                         .font(.system(size: MacTextSize.body, design: .monospaced))
                     }
