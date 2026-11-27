@@ -10,7 +10,7 @@ import SwiftUI
 struct BrainPage: View {
     let model: ProjectsModel
     let project: ProjectItem
-    @State private var settled = false
+    @Environment(\.spaceSettled) private var settled
     @State private var insights: ProjectInsightsModel
 
     init(model: ProjectsModel, project: ProjectItem) {
@@ -20,6 +20,7 @@ struct BrainPage: View {
     }
 
     private var room: ProjectLive.Room? { project.live?.room }
+    private var linked: Bool { project.live?.roomID != nil || project.roomID != nil || room != nil }
 
     /// Nothing known yet, and nothing still loading: the page is one calm card with the way forward.
     private var empty: Bool {
@@ -42,11 +43,20 @@ struct BrainPage: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             if empty {
-                CoreStateCard(
-                    symbol: "brain", title: "\(project.name) room is empty", line: emptyLine,
-                    primary: CoreAction("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Island("\(project.name) room", sub: linked ? nil : "No room yet") {
+                    VStack(spacing: Space.s3) {
+                        CoreStateCard(
+                            symbol: "brain", title: linked ? "\(project.name) room is empty" : "No room yet",
+                            line: emptyLine,
+                            primary: linked
+                                ? CoreAction("Open Room in Brain") { model.host.shell.launcher.entry("brain")?.run() }
+                                : nil
+                        )
+                        if !linked { NoRoomActions(model: model, project: project) }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .coreRise(settled, 0)
             } else {
                 HStack(alignment: .top, spacing: Space.s2) {
                     if let room {
@@ -65,7 +75,6 @@ struct BrainPage: View {
                 if insights.supported { remembered.coreRise(settled, 2) }
             }
         }
-        .onAppear { settled = true }
         .task(id: project.id) {
             await model.refreshLive(project.id)
             await insights.loadKnowledge()

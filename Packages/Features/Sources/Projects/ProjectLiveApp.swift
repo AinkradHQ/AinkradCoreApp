@@ -11,6 +11,7 @@ struct LiveApp: View {
 
     private var running: Bool { project.tag == .running }
     @State private var web = LiveWebModel()
+    @Environment(\.accessibilityReduceMotion) private var reduce
     /// A project with a run has a picture behind its words: the live app, or its last snapshot greyed.
     private var hasPicture: Bool { !project.repos.isEmpty && project.run != nil }
     private var previewURL: URL? { model.previewURL(for: project) }
@@ -39,9 +40,20 @@ struct LiveApp: View {
                     Text(project.link).lineLimit(1)
                     Text(note).foregroundStyle(GlassInk.secondary).lineLimit(1)
                     Spacer(minLength: 0)
-                    CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { copyLink() }
+                    Text("Public link").foregroundStyle(GlassInk.secondary)
+                    CoreSwitch(
+                        "",
+                        isOn: Binding(
+                            get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
+                    )
+                    .disabled(model.readOnly).accessibilityLabel("Public link")
+                    .help("While this project runs, anyone with \(project.link) can open it")
+                    if project.expose { CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { copyLink() } }
                     CoreIconButton(symbol: "arrow.up.forward.square", label: "Open in the browser") { openLink() }
-                        .disabled(!running)
+                        .disabled(!running || !project.expose)
+                        .help(
+                            project.expose
+                                ? "Open the public link" : "Turn the public link on to open it in the browser")
                 }
                 .padding(.leading, Space.s2)
             }
@@ -51,18 +63,46 @@ struct LiveApp: View {
                     text: "This is how \(project.name) looked when it last did. It will update once the Core is back.",
                     tone: .warn)
             }
-            ZStack {
-                Color.clear.coreCard(GlassInk.well, radius: Radius.cardMac)
-                if hasPicture, project.kind == .web { picture }
-                overlay
-            }
-            .clipShape(coreShape(Radius.cardMac))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The picture and the words are overlays of a plain well, so neither can change the size of the stage: the
+            // bottom row of the page stays where it is in every state.
+            Color.clear.coreCard(GlassInk.well, radius: Radius.cardMac)
+                .overlay {
+                    if hasPicture, project.kind == .web {
+                        picture.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // Not running: the picture is only a hint of the page, so the words over it read clean.
+                            .opacity(running ? 1 : 0.65).blur(radius: running ? 0 : Space.s2).clipped()
+                    }
+                }
+                .overlay { stageLayer }
+                .clipShape(coreShape(Radius.cardMac))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(Space.s2)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The words of the state; a change of state crossfades (and scales 0.98, but not with Reduce Motion).
+    private var stageLayer: some View {
+        ZStack {
+            overlay.id(stageKey)
+                .transition(.opacity.combined(with: reduce ? .identity : .scale(scale: 0.98)))
+        }
+        .animation(Motion.out(Motion.ui), value: stageKey)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var stageKey: String {
+        let setup: String =
+            switch project.setup {
+            case .noRepos: "none"
+            case .copying, .checking, .copyFailed: "setting"
+            case .needsSetup: "needs"
+            case .ready: "ready"
+            case .ran: "ran"
+            }
+        return "\(setup) \(project.run?.state ?? .stopped) \(web.state == .live) \(problem != nil) \(previewURL == nil)"
     }
 
     /// "· public · idle 4 min of 30", "· public while running", "· only your devices".
@@ -101,13 +141,14 @@ struct LiveApp: View {
 
     private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
-    private func start(_ title: String) -> some View {
+    @ViewBuilder private func start() -> some View {
+        let title = project.mainAction().title
         Button {
             model.control(.start, project)
         } label: {
             Label(title, systemImage: "play")
         }
-        .buttonStyle(CoreButtonStyle(.prominent)).disabled(!can)
+        .buttonStyle(CoreButtonStyle(.secondary)).disabled(!can)
         .help(
             can
                 ? "Start \(project.name)"
@@ -125,7 +166,7 @@ struct LiveApp: View {
             } label: {
                 Label("Add Repos…", systemImage: "plus")
             }
-            .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.readOnly)
+            .buttonStyle(CoreButtonStyle(.secondary)).disabled(model.readOnly)
             .padding(.top, Space.s1).accessibilityIdentifier("project-add-repos-button")
         }
     }
@@ -160,19 +201,25 @@ struct LiveApp: View {
         }
     }
 
+    /// Is there a picture behind the words (the live page, its last snapshot, or the demo page)?
+    private var pictured: Bool {
+        guard hasPicture, project.kind == .web else { return false }
+        return isDemo || PreviewStore.shared.image(project.id) != nil || previewURL != nil
+    }
+
     /// What sits over the picture: the state in words. A running app needs none, unless it cannot be opened from here.
     @ViewBuilder private var overlay: some View {
         if running, project.kind != .web {
             KindRunningStage(model: model, project: project).padding(Space.s5)
         } else if running {
             if previewURL == nil {
-                note(
+                notice(
                     symbol: "eye.slash", title: "\(project.name) is running",
                     line: "Turn on the public link to see it live here.",
                     button: model.readOnly ? nil : "Turn On Public Link"
                 ) { Task { await model.setExpose(project, true) } }
             } else if let why = problem {
-                note(
+                notice(
                     symbol: "exclamationmark.triangle", title: "Could not open \(project.name)", line: why,
                     button: "Try Again"
                 ) {
@@ -180,15 +227,51 @@ struct LiveApp: View {
                     web.web?.reload()
                 }
             } else if web.state == .loading, !isDemo {
-                Text("Opening \(project.link)…").foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3)
-                    .frame(height: MacSize.controlMd).background(.regularMaterial, in: coreShape(Radius.control))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading).padding(Space.s2)
+                corner(Text("Opening \(project.link)…").foregroundStyle(GlassInk.secondary))
             }
         } else if hasPicture, project.kind == .web {
-            stage.padding(Space.s5).background(.regularMaterial, in: coreShape(Radius.cardMac)).padding(Space.s5)
+            stageCard
         } else {
             stage.padding(Space.s5)
         }
+    }
+
+    /// One state card over the dimmed picture: a plain well, no material.
+    private var stageCard: some View {
+        ZStack {
+            Rectangle().fill(GlassInk.shade(0.4))
+            // A failed start is already one card (the notice); a second one around it would be a card in a card.
+            if project.run?.state == .failed {
+                stage.padding(Space.s5)
+            } else {
+                stage.padding(Space.s5).coreWell(radius: Radius.cardMac).padding(Space.s5)
+            }
+        }
+    }
+
+    /// With a picture behind it, a note is small and sits in the corner; the page stays visible. Without one it is the card.
+    @ViewBuilder
+    private func notice(symbol: String, title: String, line text: String, button: String?, action: @escaping () -> Void)
+        -> some View
+    {
+        if pictured {
+            corner(
+                HStack(spacing: Space.s2) {
+                    Image(systemName: symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                    Text(text).foregroundStyle(GlassInk.secondary).lineLimit(2)
+                    if let button {
+                        Button(button, action: action).buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    }
+                })
+        } else {
+            note(symbol: symbol, title: title, line: text, button: button, action: action)
+        }
+    }
+
+    private func corner<V: View>(_ content: V) -> some View {
+        content.padding(.horizontal, Space.s3).frame(minHeight: MacSize.controlMd)
+            .background(coreShape(Radius.control).fill(.background)).coreWell(radius: Radius.control)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading).padding(Space.s2)
     }
 
     private func note(
@@ -203,7 +286,7 @@ struct LiveApp: View {
                 Button(button, action: action).buttonStyle(CoreButtonStyle(.secondary)).padding(.top, Space.s1)
             }
         }
-        .padding(Space.s5).background(.regularMaterial, in: coreShape(Radius.cardMac))
+        .padding(Space.s5).coreWell(radius: Radius.cardMac)
     }
 
     /// Honest progress: a bar only when the Core reports services up of the setup's; else a moving bar with the words and how long.
@@ -240,7 +323,7 @@ struct LiveApp: View {
                         : n > 0
                             ? "Start it to run \(ProjectItem.count(n, "service")) on \(where_) and open it at \(project.link)."
                             : "Start it to run it on \(where_) and open it at \(project.link).")
-            start(kind == .app ? "Build and Run" : "Start").padding(.top, Space.s1)
+            start().padding(.top, Space.s1)
         }
     }
 
@@ -252,7 +335,24 @@ struct LiveApp: View {
             )
             .frame(maxWidth: Space.s8 * 14)
             StartStepsList(steps: project.live?.steps ?? [])
-            start("Start Again")
+            // Each fix is a button: read why, set what is missing, then try again.
+            HStack(spacing: Space.s2) {
+                Button {
+                    model.section = .run
+                } label: {
+                    Label("Show Log", systemImage: "text.alignleft")
+                }
+                .buttonStyle(CoreButtonStyle(.secondary)).help("Open the log of the last run")
+                if let secret = project.failedSecret {
+                    Button {
+                        model.section = .run
+                    } label: {
+                        Label("Set \(secret)…", systemImage: "key")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary)).help("Set the secret the setup is missing")
+                }
+                start()
+            }
         }
     }
 
@@ -271,7 +371,7 @@ struct StartStepsList: View {
                 ForEach(Array(steps.enumerated()), id: \.offset) { _, s in
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                         Image(systemName: symbol(s)).foregroundStyle(tint(s)).frame(width: Space.s4)
-                            .accessibilityHidden(true)
+                            .breathing(s.state == .active).accessibilityHidden(true)
                         Text(s.title).foregroundStyle(s.state == .pending ? GlassInk.secondary : GlassInk.primary)
                         if let d = s.detail { Text(d).foregroundStyle(GlassInk.secondary).lineLimit(2) }
                     }
@@ -284,10 +384,10 @@ struct StartStepsList: View {
 
     private func symbol(_ s: StartStep) -> String {
         switch s.state {
-        case .done: "checkmark.circle"
-        case .active: "circle.dotted"
-        case .pending: "circle"
-        case .failed: "xmark.circle"
+        case .done: "checkmark.square"
+        case .active: "square.dotted"
+        case .pending: "square"
+        case .failed: "xmark.square"
         }
     }
 

@@ -18,12 +18,14 @@ public struct Island<Content: View, Accessory: View>: View {
     }
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
+            // One header height whether or not there is an accessory, so every island's title sits on one line.
             HStack(alignment: .center, spacing: Space.s2) {
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).accessibilityAddTraits(.isHeader)
                 if let sub { Text(sub).foregroundStyle(GlassInk.secondary).lineLimit(1) }
                 Spacer(minLength: 0)
                 accessory
             }
+            .frame(minHeight: MacSize.controlMd)
             content
             Spacer(minLength: 0)
         }

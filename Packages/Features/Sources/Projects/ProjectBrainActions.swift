@@ -46,6 +46,24 @@ extension ProjectsModel {
         return nil
     }
 
+    /// Link Room…: an existing Brain place becomes this project's room. The Brain makes a place of its own for a new project a
+    /// few seconds after it is made, so there is no "create" here.
+    func linkRoom(_ project: ProjectItem, _ place: BrainPlace) async {
+        guard let service, mayWrite() else { return }
+        do {
+            try await host.elevated(
+                "Link the Brain place \(place.name) to \(project.name).", done: "linked", keepsEdit: false
+            ) { try await service.linkPlace(project: project.id, room: place.id) }
+        } catch is AdminDeclined {
+            return
+        } catch {
+            host.shell.showToast(runWords(error), kind: .warn)
+            return
+        }
+        await reload()
+        await refreshLive(project.id)
+    }
+
     func openInstructions(_ project: ProjectItem) {
         guard let room = project.live?.room else { return }
         let shell = host.shell
@@ -101,5 +119,31 @@ struct InstructionsSheet: View {
             busy = false
             if why == nil { close() } else if let why, !why.isEmpty { error = why }
         }
+    }
+}
+
+/// "No room yet": the way forward in one place, shared by the Overview's Brain island and the Brain page.
+struct NoRoomActions: View {
+    let model: ProjectsModel
+    let project: ProjectItem
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            Menu {
+                ForEach(model.places ?? []) { place in
+                    Button(place.name) { Task { await model.linkRoom(project, place) } }
+                }
+            } label: {
+                Label("Link Room…", systemImage: "link")
+            }
+            .menuStyle(.button).buttonStyle(CoreButtonStyle(.secondary)).fixedSize()
+            .disabled(model.readOnly || (model.places ?? []).isEmpty)
+            .help(
+                (model.places ?? []).isEmpty
+                    ? "There is no free Brain room to link. The Brain makes one for a new project by itself."
+                    : "Link an existing Brain room to \(project.name)")
+            Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
+                .buttonStyle(CoreButtonStyle(.secondary))
+        }
+        .task { await model.loadPlaces() }
     }
 }

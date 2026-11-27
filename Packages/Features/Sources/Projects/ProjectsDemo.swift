@@ -78,6 +78,10 @@ public final class ProjectsDemo {
             ]
         }
         func unarchive(project: Int64) async throws {}
+        /// The sessions the sample project carries, so the Overview, the card and the Sessions page say the same.
+        func sessions(project: Int64) async throws -> [ProjectLive.Session] {
+            lock.withLock { list.first { $0.id == project }?.live?.sessions ?? [] }
+        }
         func places() async throws -> [BrainPlace]? {
             [
                 BrainPlace(id: "r1", name: "Tidepool research"), BrainPlace(id: "r2", name: "Client notes"),
@@ -113,7 +117,8 @@ public final class ProjectsDemo {
             // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
             "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
             "gallery-stale", "gallery-archived", "gallery-running", "gallery-no-match", "gallery-starting",
-            "gallery-cursor", "gallery-copy-failed-hover", "gallery-kinds-hover", "new-from-tile", "gallery-copy-failed", "settings-runner", "settings-limits",
+            "gallery-cursor", "gallery-copy-failed-hover", "gallery-kinds-hover", "new-from-tile",
+            "gallery-copy-failed", "settings-runner", "settings-limits",
             "repo-menu",
             "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop",
             "overview-stopped-real",
@@ -125,7 +130,7 @@ public final class ProjectsDemo {
             // One run model (the Default and its configurations), Environment with secrets, Repos, Settings.
             "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
             "page-repos-many", "page-repos-failed", "page-settings-limits-edit", "page-settings-colour-more",
-        ] + kindScenes + wizardScenes
+        ] + kindScenes + wizardScenes + spaceScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -250,6 +255,9 @@ public final class ProjectsDemo {
         model.demoPage = true
         model.demoPreviewProblem = nil
         model.crashes = [:]
+        model.setupStates = [:]
+        model.liveParts = [:]
+        model.runStates = [:]
         model.core110 = Self.core110Scenes.contains(scene)
         model.core111 = Self.core111Scenes.contains(scene)
         model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
@@ -268,7 +276,8 @@ public final class ProjectsDemo {
         switch scene {
         case "gallery-empty": list = []
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
-        case "gallery-copy-failed", "gallery-copy-failed-hover", "new-failed-repos", "page-repos-failed": list.insert(Self.copyFailed(), at: 0)
+        case "gallery-copy-failed", "gallery-copy-failed-hover", "new-failed-repos", "page-repos-failed":
+            list.insert(Self.copyFailed(), at: 0)
         case "gallery-starting": list[1].run = RunSummary(state: .starting, services: 5)
         case "new-paste-link", "new-paste-link-ssh", "new-code-no-github": model.catalog = NoRepoCatalog()
         case "new-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
@@ -355,6 +364,7 @@ public final class ProjectsDemo {
         default: break
         }
         Self.kindSample(scene, &list)
+        Self.spaceSample(scene, &list)
         await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
         model.configsService = scene == "page-run-old-core" ? nil : DemoConfigsService()
@@ -364,6 +374,10 @@ public final class ProjectsDemo {
         // The running Lanterna reports its services, as a Core with the run engine does.
         (model.runService as? DemoRunService)?.services[1] = DemoLive.make(.running).services
         model.demoLimitsDraft = nil
+        Self.configureRun(scene, model.runService as? DemoRunService)
+        // The list was read with the last scene's run service: forget what it said of each project's setup.
+        model.setupStates = [:]
+        for p in model.projects { model.reapply(p.id) }
         model.setRunnerSupported(true)
         await model.loadRunners()
         model.show()
@@ -512,6 +526,7 @@ public final class ProjectsDemo {
         }
         await showKind(scene)
         await showWizard(scene)
+        await showSpace(scene)
     }
 }
 
@@ -601,7 +616,7 @@ enum DemoLive {
                     state: .written,
                     overview: OverviewBody(
                         summary:
-                            "Lanterna is an online shop for handmade lighting. A Laravel API handles catalogue, orders and payments; a Next.js storefront sells to customers and a small admin manages stock.",
+                            "What this project is, how its parts fit together, and the rules an AI session follows here. Written from the repos, the docs and past sessions.",
                         facts: OverviewFacts(stack: "Laravel 11, Next.js 15, MySQL, Redis"),
                         rules: OverviewRules(
                             workflow: [

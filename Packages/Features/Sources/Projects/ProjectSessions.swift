@@ -9,7 +9,7 @@ struct SessionsPage: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var filter = Filter.all
-    @State private var settled = false
+    @Environment(\.spaceSettled) private var settled
     @State private var insights: ProjectInsightsModel
 
     init(model: ProjectsModel, project: ProjectItem) {
@@ -68,13 +68,6 @@ struct SessionsPage: View {
                         "Show", segments: Filter.allCases.map { CoreSegment($0, $0.rawValue) },
                         selection: $filter)
                 }
-                Button {
-                    model.newSession(in: project)
-                } label: {
-                    Label("New AI Session", systemImage: "plus")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary)).disabled(!model.canStartSession(project))
-                .help(model.sessionBlock(project))
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -86,7 +79,7 @@ struct SessionsPage: View {
                             ) {
                                 CoreSpark(r.spark, tone: r.running ? .run : .queue).frame(
                                     width: Space.s8 * 2, height: Space.s4)
-                                StateBadge(CostWords.money(r.cost), tone: .queue, symbol: "circle")
+                                StateBadge(CostWords.money(r.cost), tone: .queue, symbol: "square")
                             }
                         }
                     }
@@ -97,20 +90,21 @@ struct SessionsPage: View {
                         primary: model.canStartSession(project)
                             ? CoreAction("New AI Session") { model.newSession(in: project) } : nil
                     )
-                    .frame(maxWidth: .infinity, minHeight: Space.s8 * 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if shown.isEmpty {
                     Text("No \(filter.rawValue.lowercased()) sessions.").foregroundStyle(GlassInk.secondary)
                 } else {
                     table
                 }
-                Text(
-                    "New sessions start in their own clone of this project’s repos, with the \(project.name) room’s approved instructions."
-                )
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                if !all.isEmpty {
+                    Text(
+                        "New sessions start in their own clone of this project’s repos, with the \(project.name) room’s approved instructions."
+                    )
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .coreRise(settled, 0)
-        .onAppear { settled = true }
         .accessibilityIdentifier("project-page-AI Sessions")
     }
 
@@ -145,11 +139,5 @@ struct SessionsPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func badge(_ s: ProjectLive.Session.State) -> StateBadge {
-        switch s {
-        case .needsYou: StateBadge("Needs you", tone: .warn, symbol: "hand.raised")
-        case .running: StateBadge("Running", tone: .run, symbol: "play.circle")
-        case .done: StateBadge("Done", tone: .queue, symbol: "checkmark.circle")
-        }
-    }
+    private func badge(_ s: ProjectLive.Session.State) -> StateBadge { SessionBadge.badge(s) }
 }
