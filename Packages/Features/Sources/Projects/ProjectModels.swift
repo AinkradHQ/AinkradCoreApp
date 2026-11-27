@@ -127,8 +127,6 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var createdAt: Date?
     /// Set aside with Archive: it keeps its repos, secrets and notes but does not run.
     var archived = false
-    /// The project never stops for being idle (`idle_never`).
-    var idleNever = false
     /// The Core has been asked whether the project has a run setup (its spec); `draft` is that setup when it has one.
     var setupChecked = false
     /// The Core could not be reached just now: the run state shown is how it last looked.
