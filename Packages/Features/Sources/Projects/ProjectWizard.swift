@@ -27,6 +27,16 @@ enum WizardRunner: String, CaseIterable {
         case .home_server: "Home server"
         }
     }
+    /// The line with what the Core has: "Runs here… · online" / "no Mac runner is online".
+    func line(_ runners: [RunnerInfo]) -> String {
+        guard self != .auto, !runners.isEmpty else { return line }
+        let os = self == .this_mac ? "macos" : "linux"
+        let mine = runners.filter { $0.os == os }
+        let on = mine.filter(\.online)
+        let kind = self == .this_mac ? "Mac" : "Linux"
+        if let r = on.first { return "\(line) \(r.name) is online." }
+        return mine.isEmpty ? "\(line) No \(kind) runner is paired yet." : "\(line) \(mine[0].name) is offline."
+    }
     var line: String {
         switch self {
         case .auto: "Core picks the best runner each time."
@@ -48,6 +58,8 @@ struct WizardProgress: Equatable {
     var ready = 0
     var copying = 0
     var failed = 0
+    /// Repos the Core has no copy of and is not making one: they wait for Fetch Now.
+    var waiting = 0
 
     init(_ repos: [RepoItem]) {
         for r in repos {
@@ -55,6 +67,7 @@ struct WizardProgress: Equatable {
             case .ready: ready += 1
             case .fetching: copying += 1
             case .failed: failed += 1
+            case .unknown: waiting += 1
             }
         }
     }
@@ -64,7 +77,7 @@ struct WizardProgress: Equatable {
 
     func title(name: String) -> String {
         if !settled { return "Creating \(name)" }
-        return failed > 0 ? "Almost there" : "Your project is ready"
+        return failed > 0 || waiting > 0 ? "Almost there" : "Your project is ready"
     }
 }
 
@@ -74,6 +87,14 @@ struct ProjectWizard: View {
     let close: () -> Void
     @State private var step = WizardStep.name
     @State private var name: String
+    @State private var description = ""
+    /// The link name once the person edits it; until then it follows the name.
+    @State private var slugText = ""
+    @State private var slugEdited = false
+    /// The colour once the person picks one; until then it follows the name.
+    @State private var colourPicked = false
+    @State private var linkText = ""
+    @State private var linkError: String?
     @State private var colour: ProjectColour
     @State private var picked: Set<String>
     @State private var pasted: [PickRepo] = []
@@ -84,25 +105,31 @@ struct ProjectWizard: View {
     @State private var creating = false
     @Environment(\.corePalette) private var palette
 
-    init(model: ProjectsModel, name: String, picked: Set<String> = [], close: @escaping () -> Void) {
+    init(
+        model: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name,
+        pasted: [PickRepo] = [], close: @escaping () -> Void
+    ) {
         self.model = model
         self.close = close
-        _picked = State(initialValue: picked)
+        _step = State(initialValue: step)
+        _pasted = State(initialValue: pasted)
+        _picked = State(initialValue: picked.union(pasted.map(\.id)))
         _name = State(initialValue: name)
         _colour = State(initialValue: .standard(for: ProjectRules.slug(from: name)))
     }
 
-    private var slug: String { ProjectRules.slug(from: name) }
-    private var problem: String? {
-        name.isEmpty ? nil : ProjectRules.nameProblem(name) ?? ProjectRules.slugProblem(slug)
-    }
+    private var slug: String { slugEdited ? slugText : ProjectRules.slug(from: name) }
+    private var nameProblem: String? { name.isEmpty ? nil : ProjectRules.nameProblem(name) }
+    private var slugProblem: String? { name.isEmpty ? nil : ProjectRules.slugProblem(slug) }
     private var nameReady: Bool { ProjectRules.nameProblem(name) == nil && ProjectRules.slugProblem(slug) == nil }
     private var made: ProjectItem? { model.project(model.wizardProjectID) }
     private var chosen: [PickRepo] { model.chosen(picked, pasted: pasted) }
     /// GitHub is not connected and nothing was pasted: the code step asks to connect first.
     private var needsGithub: Bool {
-        if case .unavailable = model.catalogState { return pasted.isEmpty && !noCode }
-        return false
+        switch model.catalogState {
+        case .unavailable, .failed: return pasted.isEmpty && !noCode
+        default: return false
+        }
     }
 
     var body: some View {
@@ -124,6 +151,7 @@ struct ProjectWizard: View {
         }
         .animation(Motion.out(Motion.move), value: step)
         .onChange(of: name) { _, _ in model.clearWriteError() }
+        .onChange(of: slugText) { _, _ in model.clearWriteError() }
         .task { model.wizardProjectID = nil }
         .accessibilityIdentifier("project-new")
     }
@@ -154,16 +182,40 @@ struct ProjectWizard: View {
             DialogHead(
                 title: "Name your project", line: "A project keeps your code, notes and AI sessions in one place.")
             CoreTextField(
-                "Name", placeholder: "Atlas notes", text: $name, error: problem ?? model.writeError, autofocus: true,
+                "Name", placeholder: "Atlas notes", text: $name, error: nameProblem, autofocus: true,
                 onSubmit: { if nameReady { step = .code } })
+            CoreTextField(
+                "Link name", placeholder: "atlas-notes",
+                text: Binding(
+                    get: { slug },
+                    set: {
+                        slugText = $0
+                        slugEdited = true
+                    }), error: slugProblem ?? model.writeError, onSubmit: { if nameReady { step = .code } }
+            )
+            .accessibilityIdentifier("project-new-link")
+            Text(
+                slugProblem == nil && !name.isEmpty
+                    ? "Public link: \(ProjectRules.host(slug))" : "Made from the name; you can change it."
+            )
+            .foregroundStyle(palette.text2)
+            CoreTextField("Description", placeholder: "What it is, in a line (optional)", text: $description)
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("Colour")
                 CoreSegmented(
-                    "Colour", segments: ProjectColour.allCases.map { CoreSegment($0, $0.title) }, selection: $colour
+                    "Colour", segments: ProjectColour.allCases.map { CoreSegment($0, $0.title) },
+                    selection: Binding(
+                        get: { colour },
+                        set: {
+                            colour = $0
+                            colourPicked = true
+                        })
                 )
                 .fixedSize()
             }
-            .onChange(of: name) { _, new in colour = .standard(for: ProjectRules.slug(from: new)) }
+            .onChange(of: name) { _, new in
+                if !colourPicked { colour = .standard(for: ProjectRules.slug(from: new)) }
+            }
         }
     }
 
@@ -174,11 +226,23 @@ struct ProjectWizard: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 DialogHead(title: "Add your code", line: "Connect GitHub so Core can copy your repos.")
                 VStack(alignment: .leading, spacing: Space.s2) {
-                    Text("Core only reads the repos you pick. You can disconnect any time in Settings.")
-                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                    Button("Connect GitHub") { model.connectGithub() }.buttonStyle(.coreProminent)
-                    Text("You will come straight back here. You can also paste a repo link instead.")
-                        .foregroundStyle(palette.text2)
+                    Text(githubWords).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: Space.s2) {
+                        if githubFailed, !githubNeedsConnection {
+                            Button("Try again") { Task { await model.loadCatalog() } }
+                                .buttonStyle(CoreButtonStyle(.secondary))
+                        } else {
+                            Button("Connect GitHub") { model.connectGithub() }.buttonStyle(.coreProminent)
+                        }
+                    }
+                    Text("Or paste the https link of a repo.").foregroundStyle(palette.text2)
+                    CoreTextField(
+                        "Repo link", placeholder: "https://github.com/owner/name", text: $linkText, error: linkError,
+                        onSubmit: addLink
+                    )
+                    .accessibilityIdentifier("project-new-paste")
+                    Button("Add link", action: addLink).buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .disabled(linkText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 .padding(Space.s4).frame(maxWidth: .infinity, alignment: .leading)
                 .coreCard(GlassInk.well, radius: Radius.cardMac)
@@ -192,6 +256,31 @@ struct ProjectWizard: View {
         }
     }
 
+    private var githubFailed: Bool { if case .failed = model.catalogState { true } else { false } }
+    private var githubNeedsConnection: Bool {
+        if case .failed(let p) = model.catalogState { return p.needsConnection }
+        return true
+    }
+    private var githubWords: String {
+        if case .failed(let p) = model.catalogState { return p.words }
+        return "Core only reads the repos you pick. You can disconnect any time in Settings."
+    }
+
+    /// A pasted link becomes a picked repo; one the Core would refuse is said here, before any Touch ID.
+    private func addLink() {
+        let t = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        guard let r = ProjectRules.repo(fromLink: t) else {
+            linkError = ProjectRules.repoLinkProblem(t)
+            return
+        }
+        linkError = nil
+        let repo = PickRepo(org: "Pasted links", name: r.name, url: r.url)
+        if !pasted.contains(where: { ProjectRules.same($0.url, repo.url) }) { pasted.append(repo) }
+        picked.insert(pasted.first { ProjectRules.same($0.url, repo.url) }?.id ?? repo.id)
+        linkText = ""
+    }
+
     // MARK: 3 · where it runs
 
     private var runsStep: some View {
@@ -200,7 +289,7 @@ struct ProjectWizard: View {
             VStack(spacing: Space.s1) {
                 ForEach(WizardRunner.allCases, id: \.self) { r in
                     CoreRow(
-                        r == .auto ? "\(r.title) · Best" : r.title, subtitle: r.line, symbol: r.symbol,
+                        r == .auto ? "\(r.title) · Best" : r.title, subtitle: r.line(model.runners), symbol: r.symbol,
                         selected: runner == r
                     ) { runner = r }
                 }
@@ -252,6 +341,14 @@ struct ProjectWizard: View {
                 )
                 .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
+            ForEach(model.wizardMissed) { m in
+                CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
+                    Text("Not added").foregroundStyle(palette.error)
+                }
+            }
+            ForEach(model.wizardIssues, id: \.self) {
+                Text($0).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            }
             if let e = model.writeError { CoreFieldError(e) }
         }
     }
@@ -261,6 +358,8 @@ struct ProjectWizard: View {
             switch r.copy {
             case .ready: Text("Ready").foregroundStyle(palette.success)
             case .fetching: Text("Copying…").foregroundStyle(palette.text2)
+            case .unknown:
+                Button("Fetch now") { model.fetchRepo(p, r) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
             case .failed(let why, _):
                 HStack(spacing: Space.s1) {
                     if why.needsConnection {
@@ -278,6 +377,7 @@ struct ProjectWizard: View {
         switch r.copy {
         case .failed(let why, let text): why.needsConnection ? "This repo is private. Connect GitHub to copy it." : text
         case .fetching(let since): RepoCopy.elapsed(since: since, now: model.now())
+        case .unknown: "The Core has not copied this repo yet."
         case .ready: nil
         }
     }
@@ -312,8 +412,7 @@ struct ProjectWizard: View {
             } else {
                 CoreDialogFooter(
                     cancel: nil,
-                    primary: CoreAction("Open project", key: .primary) { model.openWizardProject() },
-                    enabled: WizardProgress(made?.repos ?? []).settled)
+                    primary: CoreAction("Open project", key: .primary) { model.openWizardProject() })
             }
         }
     }
@@ -323,7 +422,7 @@ struct ProjectWizard: View {
         Task {
             await model.create(
                 name: name, slug: slug, colour: colour, repos: chosen, expose: publicLink, runner: runner.rawValue,
-                wizard: true)
+                description: description.trimmingCharacters(in: .whitespaces), autoSuffix: !slugEdited, wizard: true)
         }
     }
 }

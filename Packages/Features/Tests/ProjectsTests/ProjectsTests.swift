@@ -1,5 +1,6 @@
 import Admin
 import Brain
+import CoreKit
 import Foundation
 import Shell
 import Testing
@@ -30,11 +31,28 @@ final class FakeService: ProjectsService, @unchecked Sendable {
     private(set) var calls: [String] = []
     var refuseSlug: String?
     var refuseRepo: String?
-    func projects() async throws -> [ProjectItem] { lock.withLock { list } }
+    var refusePatch: (any Error)?
+    /// Slugs that already exist: a create of one is a 409 `conflict` like the Core's.
+    var takenSlugs: Set<String> = []
+    var fetchError: (any Error)?
+    var projectReads = 0
+    private(set) var branches: [String] = []
+    var failList: (any Error)?
+    private(set) var listReads = 0
+    func projects() async throws -> [ProjectItem] {
+        try lock.withLock {
+            listReads += 1
+            if let failList { throw failList }
+            return list
+        }
+    }
     func create(slug: String, name: String) async throws -> ProjectItem {
         try lock.withLock {
             calls.append("create \(slug)")
             if slug == refuseSlug { throw CocoaError(.fileWriteFileExists) }
+            if takenSlugs.contains(slug) {
+                throw CoreError.http(status: 409, code: "conflict", message: "a project of that slug exists")
+            }
             let p = ProjectItem(
                 id: Int64(list.count + 1), slug: slug, name: name, description: "", expose: true, repos: [],
                 updatedAt: Date())
@@ -53,7 +71,52 @@ final class FakeService: ProjectsService, @unchecked Sendable {
                     fetchedAt: nil, fetchError: nil))
         }
     }
-    func setExpose(project: Int64, _ on: Bool) async throws { lock.withLock { calls.append("expose \(on)") } }
+    func setExpose(project: Int64, _ on: Bool) async throws {
+        try lock.withLock {
+            if let refusePatch { throw refusePatch }
+            calls.append("expose \(on)")
+        }
+    }
+    func update(project: Int64, patch: ProjectPatch) async throws {
+        try lock.withLock {
+            if let refusePatch { throw refusePatch }
+            if let v = patch.expose { calls.append("expose \(v)") }
+            if let v = patch.runner { calls.append("runner \(v)") }
+            if let v = patch.slug { calls.append("slug \(v)") }
+            if patch.cpuLimit != nil || patch.memLimitMb != nil || patch.idleMinutes != nil || patch.idleNever != nil {
+                calls.append(
+                    "limits \(patch.cpuLimit ?? 0) \(patch.memLimitMb ?? 0) \(patch.idleMinutes ?? 0) \(patch.idleNever.map(String.init) ?? "-")"
+                )
+            }
+            if let v = patch.description { calls.append("description \(v)") }
+        }
+    }
+    func fetch(project: Int64, repo: Int64) async throws {
+        try lock.withLock {
+            calls.append("fetch \(repo)")
+            if let fetchError { throw fetchError }
+        }
+    }
+    func project(id: Int64) async throws -> ProjectItem? {
+        lock.withLock {
+            projectReads += 1
+            return list.first { $0.id == id }
+        }
+    }
+    func addRepo(project: Int64, name: String, url: String, branch: String, primary: Bool) async throws {
+        lock.withLock { branches.append("\(name) \(branch)") }
+        try await addRepo(project: project, name: name, url: url, primary: primary)
+    }
+    func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem {
+        let p = try await create(slug: slug, name: name)
+        lock.withLock { calls.append("github \(repos.joined(separator: ","))") }
+        return p
+    }
+    func removeRepo(project: Int64, repo: Int64) async throws { lock.withLock { calls.append("remove \(repo)") } }
+    func setPrimary(project: Int64, repo: Int64) async throws { lock.withLock { calls.append("primary \(repo)") } }
+    func setRepos(_ id: Int64, _ repos: [RepoItem]) {
+        lock.withLock { if let i = list.firstIndex(where: { $0.id == id }) { list[i].repos = repos } }
+    }
     var runState: ProjectRunState?
     func update(project: Int64, name: String, description: String) async throws {
         lock.withLock {
@@ -114,7 +177,10 @@ struct RulesTests {
     @Test func repoLinks() {
         #expect(
             ProjectRules.repo(fromLink: "https://github.com/tidepool-labs/tidepool-api.git")?.name == "tidepool-api")
-        #expect(ProjectRules.repo(fromLink: "ssh://git@host/x/y.git")?.name == "y")
+        #expect(ProjectRules.repo(fromLink: "https://github.com/x/y/")?.url == "https://github.com/x/y")
+        // The Core holds no SSH key: ssh and scp links are refused here, in words, before Touch ID.
+        #expect(ProjectRules.repo(fromLink: "ssh://git@host/x/y.git") == nil)
+        #expect(ProjectRules.repo(fromLink: "git@github.com:x/y.git") == nil)
         // A password in the link never leaves this Mac; neither does anything that is not a link.
         #expect(ProjectRules.repo(fromLink: "https://user:secret@github.com/x/y") == nil)
         #expect(ProjectRules.repo(fromLink: "tidepool") == nil)

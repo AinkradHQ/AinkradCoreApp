@@ -293,6 +293,7 @@ struct Overview: View {
         case .failed(_, let e): return "\(r.branch) · \(e)"
         case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
         case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
+        case .unknown: return "\(r.branch) · not copied yet"
         }
     }
 

@@ -6,6 +6,8 @@ enum RepoCatalogState: Equatable {
     case loading
     case ready([PickRepo])
     case unavailable
+    /// The Core could not read GitHub (refused, unreachable, rate limited); the words say which.
+    case failed(CatalogProblem)
 }
 
 /// The repo picker of the Advanced sheet and of Add Repos: a search field over the repos grouped by org, each a checkbox row.
@@ -15,6 +17,8 @@ struct RepoPicker: View {
     @Binding var picked: Set<String>
     @Binding var pasted: [PickRepo]
     var height: CGFloat = Space.s8 * 7
+    /// The repos the project already has: shown as such and left out of the picks.
+    var existing: [RepoItem] = []
     @State private var query = ""
 
     var body: some View {
@@ -25,6 +29,20 @@ struct RepoPicker: View {
             list
         }
         .task { await model.loadCatalog() }
+        // The Core searches all of GitHub's repos for what is typed, once typing pauses.
+        .task(id: query) {
+            try? await Task.sleep(for: .milliseconds(300))
+            if !Task.isCancelled { await model.searchCatalog(query) }
+        }
+    }
+
+    private func has(_ r: PickRepo) -> Bool { existing.contains { ProjectRules.same($0.remoteURL, r.url) } }
+
+    /// What is wrong with the typed text when it was meant as a link (ssh, a password…); nil for a plain search.
+    private var linkProblem: String? {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard ProjectRules.looksLikeLink(q), ProjectRules.repo(fromLink: q) == nil else { return nil }
+        return ProjectRules.repoLinkProblem(q)
     }
 
     private var catalogState: RepoCatalogState { model.catalogState }
@@ -60,7 +78,8 @@ struct RepoPicker: View {
     private var list: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s1) {
-                if let link = typedLink {
+                if let why = linkProblem { CoreFieldError(why).padding(Space.s2) }
+                if let link = typedLink, !has(link) {
                     CoreRow("Add link: \(link.name)", subtitle: link.url, symbol: "plus", action: addTypedLink)
                 }
                 switch catalogState {
@@ -76,7 +95,19 @@ struct RepoPicker: View {
                             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     }
                     .padding(Space.s2)
-                case .ready where groups.isEmpty && typedLink == nil:
+                case .failed(let why):
+                    VStack(alignment: .leading, spacing: Space.s2) {
+                        Text(why.words).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                        if why.needsConnection {
+                            Button("Connect GitHub") { model.connectGithub() }
+                                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        } else {
+                            Button("Try again") { Task { await model.loadCatalog() } }
+                                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        }
+                    }
+                    .padding(Space.s2)
+                case .ready where groups.isEmpty && typedLink == nil && !model.catalogBusy:
                     Text("No repo matches “\(query)”.").foregroundStyle(GlassInk.secondary).padding(Space.s2)
                 default: EmptyView()
                 }
@@ -86,6 +117,7 @@ struct RepoPicker: View {
                         .accessibilityAddTraits(.isHeader)
                     ForEach(g.repos) { r in row(r) }
                 }
+                more
             }
             .padding(Space.s1)
         }
@@ -95,8 +127,30 @@ struct RepoPicker: View {
         .clipShape(coreShape(Radius.cardMac))
     }
 
-    /// A checkbox and a row: either one toggles the repo.
-    private func row(_ r: PickRepo) -> some View {
+    /// "Show more" for the next page, and the word that GitHub holds more than the Core reads.
+    @ViewBuilder private var more: some View {
+        if model.catalogHasMore {
+            Button("Show more") { Task { await model.moreCatalog() } }
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.catalogBusy)
+                .padding(Space.s2)
+        }
+        if model.catalogTruncated {
+            Text("GitHub has more repos than Core reads. Search to find more.")
+                .foregroundStyle(GlassInk.secondary).padding(Space.s2)
+        }
+    }
+
+    /// A checkbox and a row: either one toggles the repo. A repo the project already has is marked and cannot be picked.
+    @ViewBuilder private func row(_ r: PickRepo) -> some View {
+        if has(r) {
+            CoreRow(r.name, subtitle: "Already in this project", symbol: "checkmark").opacity(0.6)
+                .padding(.leading, Space.s8)
+        } else {
+            pickRow(r)
+        }
+    }
+
+    private func pickRow(_ r: PickRepo) -> some View {
         let on = picked.contains(r.id)
         return ZStack(alignment: .leading) {
             CoreRow(r.name, subtitle: r.detail(now: now), selected: on) { toggle(r) }
