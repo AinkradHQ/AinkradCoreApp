@@ -130,7 +130,7 @@ struct KindSettings: View {
                 .help(model.readOnly ? "This device can look at projects but not change them." : "")
                 Text(project.kind.line).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 if !model.core111 {
-                    Text("This Core does not keep the kind yet, so it is remembered on this Mac.")
+                    Text("Saved on this Mac only.")
                         .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }

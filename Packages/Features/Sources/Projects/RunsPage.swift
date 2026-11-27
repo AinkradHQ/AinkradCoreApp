@@ -2,49 +2,55 @@ import CoreUI
 import SwiftUI
 
 /// The Runs page (Core 0.10, E11-3), as in `Designs/core/0-10/screens/21-projects.html`: configurations, their environments,
-/// the live run with its log, and the history. A Core older than minor 95 has no run configurations, so it keeps the earlier
-/// Run page; "Setup and secrets" reaches that page (the run spec and the project's secrets) from here.
+/// the live run with its log, and the history. One run model: the project's own setup is the first configuration, the
+/// "Default" (the header Start runs it, Edit Setup changes it), and its secrets are in the Environment tab. A Core older than
+/// minor 95 has no run configurations, so it keeps the earlier Run page.
 struct RunsPage: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var runs: RunConfigsModel
-    @State private var setup = false
     @State private var settled = false
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
         self.project = project
-        _runs = State(initialValue: RunConfigsModel(model: model, projectID: project.id))
+        let runs = RunConfigsModel(model: model, projectID: project.id)
+        #if DEBUG
+        if let t = model.demoRunTab { runs.tab = t }
+        runs.selected = model.demoRunSelected
+        #endif
+        _runs = State(initialValue: runs)
     }
 
     var body: some View {
-        if model.configsService == nil || setup {
-            VStack(alignment: .leading, spacing: Space.s2) {
-                if setup {
-                    HStack {
-                        BackButton("Runs") { setup = false }
-                        Spacer(minLength: 0)
-                    }
-                }
-                RunPage(model: model, project: project)
-            }
+        if model.configsService == nil {
+            RunPage(model: model, project: project)
         } else {
             VStack(spacing: Space.s2) {
                 head
+                // The tabs cross-fade; nothing slides, so the page never moves under the pointer.
                 Group {
                     switch runs.tab {
                     case .configs: ConfigurationsTab(runs: runs, project: project)
-                    case .environment: EnvironmentTab(runs: runs)
+                    case .environment: EnvironmentTab(runs: runs, project: project)
                     case .live: LiveRunsTab(runs: runs, project: project)
                     case .history: HistoryTab(runs: runs, project: project)
                     }
                 }
+                .id(runs.tab)
+                .transition(.opacity)
+                .animation(Motion.out(Motion.ui), value: runs.tab)
                 .coreRise(settled, 0)
             }
             .onAppear { settled = true }
             .task(id: project.id) { await runs.load() }
             // The Core says a run changed: the runs are read again now.
-            .task(id: model.runTick) { if runs.loaded { await runs.refreshHistory() } }
+            .task(id: model.runTick) {
+                if runs.loaded {
+                    await runs.refreshHistory()
+                    await runs.setup.refreshRun()
+                }
+            }
             .task(id: runs.tab) {
                 if runs.tab == .live || runs.tab == .history { await runs.watchLive() }
             }
@@ -63,9 +69,6 @@ struct RunsPage: View {
             CoreSegmented(
                 "Runs view", segments: RunConfigsModel.Tab.allCases.map { CoreSegment($0, $0.title) },
                 selection: Binding(get: { runs.tab }, set: { runs.tab = $0 }))
-            Button("Setup and secrets") { setup = true }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                .help("The run spec and the project's secrets")
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
@@ -114,7 +117,7 @@ struct ConfigurationsTab: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
-            list.frame(width: Space.s8 * 9)
+            list.frame(width: Space.s8 * 11)
             detail
         }
         .frame(maxHeight: .infinity)
@@ -144,14 +147,15 @@ struct ConfigurationsTab: View {
                     Button("Try Again") { Task { await runs.load() } }.buttonStyle(
                         CoreButtonStyle(.secondary, size: .small))
                 }
-            } else if runs.configs.isEmpty && runs.loaded {
-                Text(
-                    "No configurations yet. Add one to start this project's code with its own command and environment."
-                )
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 ScrollView {
                     VStack(spacing: Space.s1) {
+                        CoreRow(
+                            RunConfigsModel.defaultName, subtitle: runs.defaultLine, symbol: "square.stack.3d.up",
+                            selected: runs.selected == nil, action: { runs.selected = nil }
+                        ) {
+                            if runs.defaultRun != nil { StateBadge("Running", tone: .run, symbol: "bolt") }
+                        }
                         ForEach(runs.configs) { c in
                             CoreRow(
                                 c.name, subtitle: c.command, symbol: "bolt", selected: runs.selectedConfig?.id == c.id,
@@ -159,8 +163,15 @@ struct ConfigurationsTab: View {
                             ) {
                                 if runs.isLive(c) { StateBadge("Running", tone: .run, symbol: "bolt") }
                             }
+                            .transition(.opacity)
+                        }
+                        if runs.configs.isEmpty && runs.loaded {
+                            Text("Add a configuration to start this project's code with its own command and environment.")
+                                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, Space.s2)
                         }
                     }
+                    .animation(Motion.out(Motion.ui), value: runs.configs.map(\.id))
                 }
             }
         }
@@ -190,7 +201,7 @@ struct ConfigurationsTab: View {
                                 CoreSelectOption($0, $0, note: $0 == runs.defaultEnv ? "Default" : nil)
                             }
                         )
-                        .frame(width: Space.s8 * 4).help("The environment Run starts in")
+                        .frame(width: Space.s8 * 5).help("The environment Run starts in")
                     }
                     Button {
                         Task { await runs.start(c, project: project) }
@@ -211,9 +222,7 @@ struct ConfigurationsTab: View {
                 }
             }
         } else {
-            Island("Configuration") {
-                Text("Pick a configuration, or add one.").foregroundStyle(GlassInk.secondary)
-            }
+            DefaultDetail(runs: runs, project: project)
         }
     }
 

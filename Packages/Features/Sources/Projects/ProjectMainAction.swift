@@ -22,7 +22,8 @@ extension ProjectItem {
         if kind == .other { return MainAction(kind: .newDoc, title: "New Doc…", symbol: "square.and.pencil") }
         let start = MainAction(
             kind: .start,
-            title: tag == .failed ? (kind == .app ? "Build Again" : "Start Again") : kind == .app ? "Build and Run" : "Start",
+            title: tag == .failed
+                ? (kind == .app ? "Build Again" : "Start Again") : kind == .app ? "Build and Run" : "Start",
             symbol: "play")
         let busyStart = MainAction(kind: .starting, title: "Starting…", symbol: "play", busy: true)
         switch setup {
