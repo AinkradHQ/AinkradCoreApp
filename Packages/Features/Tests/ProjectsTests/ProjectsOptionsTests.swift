@@ -124,4 +124,33 @@ struct ProjectsOptionsTests {
         m.openProject(1)
         #expect(m.openID == nil && host.shell.panes.contains { $0.id == "project-1" })
     }
+
+    @Test func theGallerySegmentsCountAndFilterByMoreThanTheName() async {
+        let (m, _, _) = await make()
+        #expect(m.count(.all) == 1 && m.count(.archived) == 1 && m.count(.running) == 0)
+        m.segment = .archived
+        #expect(m.shown.map(\.slug) == ["old"])
+        m.segment = .all
+        m.filter = "web"
+        #expect(m.shown.map(\.slug) == ["live"], "the kind (Web) matches")
+        m.filter = "zzz"
+        #expect(m.shown.isEmpty && m.clearGalleryState() && m.filter.isEmpty)
+    }
+
+    @Test func aProjectThatIsNotSoftwareCannotBeStartedAndHasNoLinkToCopy() async {
+        let (m, _, _) = await make()
+        var p = m.projects[0]
+        p.kind = .other
+        #expect(m.startBlock(p)?.contains("not software") == true)
+        #expect(!m.canCopyLink(p))
+        p.kind = .web
+        #expect(m.canCopyLink(p))
+    }
+
+    @Test func theCursorMovesByARowAndStaysOnACard() async {
+        let (m, _, _) = await make()
+        m.segment = .all
+        m.moveCursor(by: 3)
+        #expect(m.cursor == m.shown.last?.id)
+    }
 }

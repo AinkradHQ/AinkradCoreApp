@@ -16,7 +16,11 @@ public final class ProjectsDemo {
         private let lock = NSLock()
         private var list: [ProjectItem]
         private var next: Int64 = 100
-        init(_ list: [ProjectItem]) { self.list = list }
+        private let hasArchived: Bool
+        init(_ list: [ProjectItem], archived: Bool = true) {
+            self.list = list
+            hasArchived = archived
+        }
         func projects() async throws -> [ProjectItem] { lock.withLock { list } }
         func create(slug: String, name: String) async throws -> ProjectItem {
             lock.withLock {
@@ -65,7 +69,8 @@ public final class ProjectsDemo {
             // The demo keeps the repo as it is: the branch dialog is what is shown.
         }
         func archivedProjects() async throws -> [ProjectItem] {
-            [
+            guard hasArchived else { return [] }
+            return [
                 ProjectItem(
                     id: 90, slug: "old-quill", name: "Old Quill", description: "", expose: false,
                     repos: [DemoRepo.make(900, "old-quill-web", "old-quill-co")],
@@ -107,7 +112,8 @@ public final class ProjectsDemo {
             "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
             // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
             "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
-            "gallery-stale", "gallery-archived", "gallery-copy-failed", "settings-runner", "settings-limits",
+            "gallery-stale", "gallery-archived", "gallery-running", "gallery-no-match", "gallery-starting",
+            "gallery-cursor", "gallery-copy-failed-hover", "gallery-kinds-hover", "new-from-tile", "gallery-copy-failed", "settings-runner", "settings-limits",
             "repo-menu",
             "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop",
             "overview-stopped-real",
@@ -222,6 +228,9 @@ public final class ProjectsDemo {
         shell.home.coreName = "core-oracle"
         model.host.clearElevationNotice()
         model.filter = ""
+        model.segment = .all
+        model.galleryRisen = true
+        model.loadedAt = Date()
         model.cursor = nil
         model.openID = nil
         model.section = .overview
@@ -256,8 +265,8 @@ public final class ProjectsDemo {
         switch scene {
         case "gallery-empty": list = []
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
-        case "gallery-copy-failed", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
-        case "gallery-archived": ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, true)
+        case "gallery-copy-failed", "gallery-copy-failed-hover", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
+        case "gallery-starting": list[1].run = RunSummary(state: .starting, services: 5)
         case "new-paste-link", "new-paste-link-ssh", "new-code-no-github": model.catalog = NoRepoCatalog()
         case "new-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "new-finished": list.insert(Self.tidepool(repos: 2), at: 0)
@@ -343,7 +352,7 @@ public final class ProjectsDemo {
         default: break
         }
         Self.kindSample(scene, &list)
-        await model.useNow(Service(list))
+        await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
         model.setRunnerSupported(true)
         await model.loadRunners()
@@ -363,7 +372,16 @@ public final class ProjectsDemo {
         }
         switch scene {
         case "gallery-hover": model.debugHover = 1
-        case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
+        case "gallery-archived": model.segment = .archived
+        case "gallery-running": model.segment = .running
+        case "gallery-no-match": model.filter = "xyzzy"
+        case "gallery-cursor": model.cursor = 2
+        case "gallery-copy-failed-hover": model.debugHover = 7
+        case "gallery-kinds-hover": model.debugHover = 4
+        case "new-from-tile": NewProjectDialogs.openWizard(model, name: "", kind: .app)
+        case "gallery-stale":
+            model.stale = "The Core did not answer in time (timeout)."
+            model.loadedAt = Date().addingTimeInterval(-240)
         case "settings-runner", "settings-limits":
             model.openID = 1
             model.section = .settings
