@@ -5,15 +5,29 @@ import SwiftUI
 /// The dialogs of Projects, shown over the shell like the other apps' dialogs.
 @MainActor
 enum NewProjectDialogs {
+    /// Opens the New Project wizard. With nothing preset it picks up the draft the last one left (or the project it made,
+    /// not opened yet); anything preset starts a new one. `kind` preselects that kind's tile; `editing` opens a review row.
     static func openWizard(
-        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name, pasted: [PickRepo] = [],
-        kind: ProjectKind? = nil
+        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .what, pasted: [PickRepo] = [],
+        kind: ProjectKind? = nil, editing: WizardRow? = nil
     ) {
         m.clearWriteError()
+        let fresh = name.isEmpty && picked.isEmpty && pasted.isEmpty && kind == nil && step == .what
+        var draft: WizardDraft
+        if fresh, let kept = m.wizardDraft {
+            draft = kept
+        } else {
+            draft = WizardDraft(name: name, picked: picked, pasted: pasted, kind: kind)
+            draft.step = step
+            draft.wantsCode = step == .code
+            m.wizardDraft = nil
+            m.wizardProjectID = nil
+        }
         let shell = m.host.shell
+        // Not dismissible by the shell: the wizard owns Esc and the close, and gives neither while it is making the project.
         shell.present(
-            ShellDialog(id: "project-new", onClose: { [weak m] in m?.clearWriteError() }) {
-                ProjectWizard(model: m, name: name, picked: picked, step: step, pasted: pasted, initialKind: kind) { shell.closeDialog() }
+            ShellDialog(id: "project-new", dismissible: false, onClose: { [weak m] in m?.clearWriteError() }) {
+                ProjectWizard(model: m, draft: draft, editing: editing) { shell.closeDialog() }
             })
     }
 

@@ -443,6 +443,6 @@ struct WizardChoiceTests {
                 id: 1, name: "r", remoteURL: "x", branch: "main", primary: true, fetchedAt: nil, fetchError: nil,
                 hasMirror: false)
         ])
-        #expect(p.settled && p.waiting == 1 && p.title(name: "A") == "Almost there")
+        #expect(p.settled && p.waiting == 1 && p.title(name: "A") == "A is ready, 1 repo needs you")
     }
 }

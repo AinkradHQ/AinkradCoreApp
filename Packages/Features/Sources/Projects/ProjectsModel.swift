@@ -44,6 +44,8 @@ public final class ProjectsModel {
     internal(set) var runnerSupported = false
     /// The project the New Project wizard just made: its review step shows that project's repos copying.
     internal(set) var wizardProjectID: Int64?
+    /// What the wizard held when its dialog closed, so New Project opens where it stopped (nil: nothing to keep).
+    internal(set) var wizardDraft: WizardDraft?
     /// What a create in progress has done, for the wizard's setup list; nil when none runs.
     internal(set) var creating: CreateProgress?
     /// What the wizard's Brain step offers (`loadPlaces`).
@@ -513,6 +515,9 @@ public final class ProjectsModel {
         host.shell.closeDialog()
         if let id = wizardProjectID { openProject(id) }
         wizardProjectID = nil
+        wizardDraft = nil
+        wizardMissed = []
+        wizardIssues = []
     }
 
     // MARK: writes
