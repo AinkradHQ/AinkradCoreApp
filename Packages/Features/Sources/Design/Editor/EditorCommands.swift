@@ -199,7 +199,7 @@ enum ShortcutList {
 
 /// "Keyboard shortcuts" (the ? key, or the toolbar's keyboard button): every key the editor answers, in groups.
 struct ShortcutsSheet: View {
-    let editor: DesignEditor
+    let close: () -> Void
 
     var body: some View {
         CoreSheet("Keyboard shortcuts") {
@@ -224,7 +224,7 @@ struct ShortcutsSheet: View {
             }
             .frame(maxHeight: Space.s8 * 11)
         } footer: {
-            Button("Done") { editor.shortcutsOpen = false }.buttonStyle(.coreProminent)
+            Button("Done") { close() }.buttonStyle(.coreProminent)
                 .keyboardShortcut(.cancelAction)
         }
         .accessibilityIdentifier("design-shortcuts")
