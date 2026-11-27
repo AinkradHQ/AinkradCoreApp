@@ -39,6 +39,8 @@ final class DesignEditor {
     /// The design has its first content (the Core's first snapshot arrived, or layers are listed): until then the canvas is blank.
     private(set) var loaded = false
     private(set) var syncConnected = true
+    /// The sync stopped applying updates: nothing more is saved until the design is reopened.
+    private(set) var syncHalted = false
     static let stuckSentence = "This design stopped syncing — reopen it (unsent edits are lost)"
     var expanded: Set<String> = []
     var renaming: String?
@@ -100,6 +102,9 @@ final class DesignEditor {
 
     /// The canvas camera now (not observed: the AI overlay reads it every display frame).
     func camera() -> CanvasCamera? { backend?.camera() }
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport {
+        backend?.exportPNG(node: node, scale: scale, night: night) ?? .failed
+    }
     func fit(_ rect: CGRect) { backend?.fit(rect) }
     /// Presenting: clicks report the node under them; nil goes back to editing.
     func present(_ tap: (@MainActor (String?) -> Void)?) { backend?.present(tap) }
@@ -150,6 +155,8 @@ final class DesignEditor {
         syncStuck = backend?.syncStuck ?? false
         let conn = backend?.syncConnected ?? true
         if conn != syncConnected { syncConnected = conn }
+        let halted = backend?.syncHalted ?? false
+        if halted != syncHalted { syncHalted = halted }
         if let d = backend?.docTokens(), let list = try? JSONDecoder().decode([SystemToken].self, from: d),
             list != systemTokens
         {

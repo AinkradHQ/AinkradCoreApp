@@ -11,9 +11,10 @@ struct MockupPin: Identifiable, Equatable, Sendable {
     var resolved = false
 }
 
-/// The review of one mockup package: pins per screen and an approval per screen. Approving is a person's act only (never an AI
-/// session's), so it lives in the UI and nowhere else.
-/// TODO(V3-05): the Core's pin and approval routes (V6-02/V6-03) do not exist yet; `onChange` is where this is saved to them.
+/// The review of one mockup package: pins per screen and a "reviewed" mark per screen, for the time the mockup is open.
+/// The Core's comment and approval routes are keyed by a design's frame ids (`is_node_id`, 422 otherwise), and a mockup
+/// package's screens are file paths, so nothing here can be saved to the Core: the viewer says "not saved" in its words.
+/// `onChange` is the seam for when a mockup route exists.
 @MainActor @Observable
 final class MockupReview {
     private(set) var pins: [MockupPin] = []

@@ -51,9 +51,21 @@ public final class DesignModel {
     var composer: DesignComposer?
     /// Present (the mockup and prototype view) over the open design, or nil.
     var presenter: DesignPresenter?
-    /// The pictures of loaded assets, by sha256.
-    private(set) var images: [String: NSImage] = [:]
+    /// The pictures of loaded assets, by sha256: a bounded cache (`image(_:)` reads `imageTick` so views redraw as pictures land).
+    @ObservationIgnored private let imageCache: NSCache<NSString, NSImage> = {
+        let c = NSCache<NSString, NSImage>()
+        c.countLimit = 160
+        return c
+    }()
+    private(set) var imageTick = 0
+    /// Assets whose picture could not be loaded (the card shows an error and Retry).
+    var failedImages: Set<String> = []
     @ObservationIgnored private var fetching: Set<String> = []
+    /// A refresh failed while lists were already on screen: a quiet note over the wall, the old lists kept.
+    var refreshFailure: String?
+    /// The Core returns at most this many rows of a list (docs, library files), by name.
+    static let listMax = 500
+    var docsCapped = false
     var readOnly = false
     /// The Core can draw three directions from a prompt (API minor 95, E11-4).
     private(set) var composeSupported = false
@@ -71,6 +83,13 @@ public final class DesignModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: forgets every loaded picture, so a card shows its failed state.
+    func debugForgetImages() {
+        imageCache.removeAllObjects()
+        imageTick += 1
+    }
+    /// Snapshots only: shows the Saved badge in this state.
+    var debugSave: SaveState?
     /// Snapshots only: the Comments panel shown open.
     var debugCommentsOpen = false
     /// Snapshots only: the style guide's Add token popover shown open.
@@ -97,6 +116,7 @@ public final class DesignModel {
     public func attach(connection: CoreConnection) {
         mockups = LiveMockupSource(connection: connection)
         self.connection = connection
+        AboutIsland.me = connection.identity.deviceID
         Task { composeSupported = await connection.serverSupports(minor: coreMinorV010) }
         use(LiveDesignService(connection: connection))
     }
@@ -114,13 +134,18 @@ public final class DesignModel {
         docs = []
         assets = []
         kits = []
-        images = [:]
+        imageCache.removeAllObjects()
+        failedImages = []
         fetching = []
+        refreshFailure = nil
         load = .notConnected
-        openID = nil
-        editors = [:]
+        // Nothing of the open item may outlive the Core: its keys, composer and canvases go with it.
+        clearOpen()
+        withAnimation(Motion.out(Motion.move)) { openID = nil }
+        selected = nil
         readOnly = false
         composeSupported = false
+        systemAISupported = false
         lib.reset()
         collab.reset()
         editSupported = false
@@ -129,23 +154,44 @@ public final class DesignModel {
     public var isConnected: Bool { service != nil }
     public func resync() { if service != nil { Task { await reload() } } }
 
-    /// An event from the Core that may change what the screens show (ids only: `design.doc`, `design.asset`, …).
+    /// An event from the Core that may change what the screens show (ids only: `design.doc`, `design.asset`, …). Only the
+    /// list it is about is read again; comments, approvals and versions change none of the lists.
     public func event(kind: String) {
-        if kind.hasPrefix("design.") {
-            resync()
-            collab.refresh()
+        guard kind.hasPrefix("design."), service != nil else { return }
+        collab.refresh()
+        switch kind {
+        case _ where kind.hasPrefix("design.doc"): Task { await reload(.docs) }
+        case _ where kind.hasPrefix("design.asset"): Task { await reload(.assets) }
+        case _ where kind.hasPrefix("design.collection"): Task { await reload(.kits) }
+        case _ where ["design.comment", "design.approval", "design.version"].contains { kind.hasPrefix($0) }: break
+        default: resync()
         }
     }
 
-    func reload() async {
+    struct Lists: OptionSet {
+        let rawValue: Int
+        static let docs = Lists(rawValue: 1)
+        static let assets = Lists(rawValue: 2)
+        static let kits = Lists(rawValue: 4)
+        static let all: Lists = [.docs, .assets, .kits]
+    }
+
+    func reload(_ which: Lists = .all) async {
         guard let service else { return }
         do {
-            async let d = service.docs()
-            async let a = service.assets()
-            async let k = service.kits()
-            docs = try await d
-            assets = try await a
-            kits = try await k
+            // The module's own absence is the docs list answering 404; a 404 on another call is about that call.
+            if which.contains(.docs) {
+                do { docs = try await service.docs() } catch let e as DesignFailure
+                    where e.status == 404 || e.status == 501
+                {
+                    load = .absent
+                    return
+                }
+                docsCapped = docs.count >= Self.listMax
+            }
+            if which.contains(.assets) { assets = try await service.assets() }
+            if which.contains(.kits) { kits = try await service.kits() }
+            refreshFailure = nil
             load = .ready
             // The handshake that proves the Core's minors happens on the first request, so ask after a load.
             if let connection {
@@ -155,10 +201,12 @@ public final class DesignModel {
                 editSupported = await connection.serverSupports(minor: 109)
             }
             if lib.archivedLoaded { await lib.loadArchived() }
-        } catch let e as DesignFailure where e.status == 404 || e.status == 501 {
-            load = .absent
         } catch {
-            if docs.isEmpty, assets.isEmpty, kits.isEmpty { load = .failed(words(error)) }
+            if docs.isEmpty, assets.isEmpty, kits.isEmpty {
+                load = .failed(words(error))
+            } else {
+                refreshFailure = words(error)
+            }
         }
     }
 
@@ -190,8 +238,6 @@ public final class DesignModel {
 
     func items(in c: DesignCategory, project: String?) -> [DesignItem] {
         switch c {
-        // TODO(V6-02): designs waiting for review or approval. TODO(V7-02): designs an AI session is drawing.
-        case .needsYou, .drawing: []
         case .archived:
             lib.archived.map(DesignItem.doc).filter {
                 let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
@@ -203,9 +249,9 @@ public final class DesignModel {
         }
     }
 
-    /// A category row's count: what picking it shows (a category is never scoped to a project).
+    /// A category row's count: what picking it shows, so it follows the project chip.
     func count(_ c: DesignCategory) -> Int {
-        c == .archived && !lib.archivedLoaded ? -1 : items(in: c, project: nil).count
+        c == .archived && !lib.archivedLoaded ? -1 : items(in: c).count
     }
 
     /// The projects with something related to them, for the rail.
@@ -246,14 +292,35 @@ public final class DesignModel {
     /// Loads an asset's picture once: images, logos, icons and PDFs as they are, an Icon Composer file through
     /// `IconComposerPreview`. Fonts and unchecked files are never fetched.
     func loadImage(_ a: DesignAsset) async {
-        guard a.loadable, images[a.sha] == nil, !fetching.contains(a.sha), let service else { return }
+        guard a.loadable, image(a.sha) == nil, !failedImages.contains(a.sha), !fetching.contains(a.sha), let service
+        else { return }
         fetching.insert(a.sha)
         defer { fetching.remove(a.sha) }
-        guard let data = try? await service.data(a.sha) else { return }
-        let img: NSImage? =
-            a.kind == .iconComposer
-            ? await IconComposerPreview.image(zip: data, sha: a.sha) : NSImage(data: data)
-        if let img { images[a.sha] = img }
+        let data = try? await service.data(a.sha)
+        var img: NSImage?
+        if let data {
+            img =
+                a.kind == .iconComposer
+                ? await IconComposerPreview.image(zip: data, sha: a.sha) : NSImage(data: data)
+        }
+        if let img {
+            imageCache.setObject(img, forKey: a.sha as NSString)
+            imageTick += 1
+        } else {
+            failedImages.insert(a.sha)
+        }
+    }
+
+    /// The loaded picture of an asset, if it is still cached.
+    func image(_ sha: String) -> NSImage? {
+        _ = imageTick
+        return imageCache.object(forKey: sha as NSString)
+    }
+
+    /// Tries a picture again after it failed.
+    func retryImage(_ a: DesignAsset) {
+        failedImages.remove(a.sha)
+        Task { await loadImage(a) }
     }
 
     /// A drag to Finder or another app makes a real file with the asset's name; the bytes are fetched when it drops.
@@ -316,7 +383,9 @@ public final class DesignModel {
 
     /// New design, quick: made at once with the defaults (named for the category being looked at) and opened.
     func quickNew(starter: Bool = true) async {
-        let kind: DesignDoc.Kind = category == .systems ? .system : category == .mockups ? .mockup : .design
+        // A mockup is not an empty document: it shows one of the designs, so New there asks which (Present).
+        if category.page == .mockups { return openNew(kind: .mockup) }
+        let kind: DesignDoc.Kind = category.page == .systems ? .system : .design
         await create(kind: kind, name: Self.defaultName(kind), project: project, starter: starter ? nil : [])
     }
 
@@ -344,7 +413,7 @@ public final class DesignModel {
         }
         do {
             let d = try await service.create(
-                kind: kind, name: name.trimmingCharacters(in: .whitespaces), project: project, system: system)
+                kind: kind, name: DesignName.clean(name), project: project, system: system)
             docs.append(d)
             if kind == .design {
                 let ops = starter ?? DesignOptions.starterOps(DesignOptions.canvas)
@@ -368,10 +437,16 @@ public final class DesignModel {
     /// Opens the AI panel on the open design (from the home: on a new blank design). With a frame selected it edits that
     /// frame; with `prompt` (the Ask… field) it starts at once.
     func drawWithAI(prompt: String = "") async {
-        // From the home the new design has no starter frame of its own to keep: the AI's frame replaces it.
+        // AI draws on designs only: from the home it makes a design (never a system or mockup, whatever page is open).
+        // The new design has no starter frame of its own to keep: the AI's frame replaces it.
         let fromHome = openID == nil
-        if fromHome { await quickNew() }
-        guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else { return }
+        if fromHome {
+            guard await create(kind: .design, name: Self.defaultName(.design), project: project) == nil else { return }
+        }
+        guard let id = openID, let item = item(id), case .doc(let d) = item, d.kind == .design else {
+            host.shell.showToast("Draw with AI works on a design. Open a design first.", kind: .warn)
+            return
+        }
         let target = editors[d.id]?.targetFrame().map { DesignComposer.Target(id: $0.id, name: $0.title) }
         let c = DesignComposer(model: self, doc: d.id, prompt: prompt, target: target)
         if fromHome { c.starterFrame = editors[d.id]?.starter?.last?["id"]?.string }
@@ -381,8 +456,8 @@ public final class DesignModel {
     }
 
     /// New design (advanced): the sheet with name, kind and project.
-    func openNew() {
-        host.shell.present(ShellDialog(id: "new-design") { NewDesignView(model: self) })
+    func openNew(kind: DesignDoc.Kind = .design) {
+        host.shell.present(ShellDialog(id: "new-design") { NewDesignView(model: self, kind: kind) })
     }
 
     // MARK: navigation
@@ -395,12 +470,18 @@ public final class DesignModel {
         withAnimation(Motion.out(Motion.move)) { openID = id }
     }
 
-    func closeItem() {
+    /// Lets go of everything that belongs to the open item (its canvases, AI panel and Present) so none keeps the keys.
+    func clearOpen() {
+        presenter?.viewer.present(nil)
         editors = [:]
         aboutOpen = false
         composer?.shutdown()
         composer = nil
         presenter = nil
+    }
+
+    func closeItem() {
+        clearOpen()
         withAnimation(Motion.out(Motion.move)) { openID = nil }
     }
 
@@ -409,7 +490,7 @@ public final class DesignModel {
         withAnimation(Motion.out(Motion.ui)) { category = c }
         selected = nil
         project = nil
-        openID = nil
+        closeItem()
         lib.clearSelection()
         if c == .archived { Task { await lib.loadArchived() } }
     }
@@ -417,16 +498,19 @@ public final class DesignModel {
     func pickProject(_ id: String) {
         project = project == id ? nil : id
         category = .all
-        openID = nil
+        closeItem()
     }
 
     /// Opens the pane; with `item`, on that item (from a project's Designs island); with `project`, filtered to it.
     public func show(item: String? = nil, project: String? = nil) {
-        if let item { openID = item }
+        if let item {
+            if openID != item { clearOpen() }
+            openID = item
+        }
         if let project {
             self.project = project
             category = .all
-            openID = nil
+            closeItem()
         }
         var spec = PaneSpec(
             id: "design", title: "Design", sub: "Home Core", symbol: "paintbrush.pointed", minWidth: 760

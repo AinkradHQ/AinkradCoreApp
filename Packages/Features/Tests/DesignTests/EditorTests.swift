@@ -459,10 +459,10 @@ final class FakeBackend: DesignEditBackend {
         let w = try d.decode(
             [VersionWire].self,
             from: Data(
-                #"[{"id":"v7","kind":"approval","name":"B","created_by":"device:d_1","created_at":"2026-11-18T10:02:00Z"}]"#
+                #"[{"id":"v7","kind":"approval","name":"B","origin":"person:d_1","created_at":"2026-11-18T10:02:00Z","bytes":9}]"#
                     .utf8))
         #expect(w[0].version.kind == .approval && w[0].version.createdAt != nil && w[0].version.id == "v7")
-        #expect(VersionWire(id: "v1", kind: "weird", name: "", createdBy: "", createdAt: "").version.kind == .auto)
+        #expect(VersionWire(id: "v1", kind: "weird", name: nil, origin: "", createdAt: "", bytes: nil).version.kind == .auto)
     }
 }
 
