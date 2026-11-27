@@ -158,10 +158,7 @@ struct ProjectWizard: View {
                 onSubmit: { if nameReady { step = .code } })
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("Colour")
-                CoreSegmented(
-                    "Colour", segments: ProjectColour.allCases.map { CoreSegment($0, $0.title) }, selection: $colour
-                )
-                .fixedSize()
+                ColourSwatches(selection: $colour)
             }
             .onChange(of: name) { _, new in colour = .standard(for: ProjectRules.slug(from: new)) }
         }

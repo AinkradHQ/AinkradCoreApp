@@ -9,15 +9,19 @@ struct ProjectSpaceView: View {
     let project: ProjectItem
     /// What the back button does; nil goes back to the gallery of the Projects pane.
     var onBack: (() -> Void)?
+    @State private var settled = false
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            TopBar(model: model, project: project, onBack: onBack)
+            TopBar(model: model, project: project, onBack: onBack).coreRise(settled, 0)
             HStack(alignment: .top, spacing: Space.s2) {
-                Rail(model: model)
-                page
+                Rail(model: model).coreRise(settled, 1)
+                // Switching pages cross-fades; each page's islands then settle in one after another.
+                ZStack { page.id(model.section).transition(.opacity) }
+                    .animation(Motion.out(Motion.ui), value: model.section)
             }
         }
+        .onAppear { settled = true }
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
@@ -83,7 +87,7 @@ private struct TopBar: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .coreWell(radius: Radius.pane)
+        .coreFrame(radius: Radius.pane, rim: Space.s1)
         .accessibilityElement(children: .contain)
     }
 
@@ -141,7 +145,7 @@ private struct Rail: View {
         }
         .padding(Space.s1)
         .frame(maxHeight: .infinity)
-        .coreWell(radius: Radius.pane)
+        .coreFrame(radius: Radius.pane, rim: Space.s1)
         .accessibilityElement(children: .contain)
     }
     private func tile(_ s: ProjectSection) -> some View {
