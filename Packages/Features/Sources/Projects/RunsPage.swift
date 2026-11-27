@@ -69,7 +69,7 @@ struct RunsPage: View {
         }
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
-        .coreFrame(radius: Radius.pane, rim: Space.s1)
+        .coreWell(radius: Radius.pane)
     }
 }
 

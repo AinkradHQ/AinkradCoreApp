@@ -57,7 +57,7 @@ struct LiveApp: View {
         }
         .padding(Space.s2)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .coreFrame(radius: Radius.pane, rim: Space.s1)
+        .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
     }
 
