@@ -28,9 +28,13 @@ protocol ProjectsService: Sendable {
     func fetch(project: Int64, repo: Int64) async throws
     /// Where the project prefers to run: `auto`, `this_mac` or `home_server` (Core minor 95).
     func setRunner(project: Int64, _ runner: String) async throws
+    /// The project's AI sessions (newest first). The Core has no project filter on the list yet, so a live service reads a page
+    /// and keeps the ones whose `project_id` is this project.
+    func sessions(project: Int64) async throws -> [ProjectLive.Session]
 }
 
 extension ProjectsService {
+    func sessions(project: Int64) async throws -> [ProjectLive.Session] { [] }
     // Stand-ins and tests that do not run projects need not answer these.
     func update(project: Int64, name: String, description: String) async throws {}
     func archive(project: Int64) async throws {}
@@ -121,6 +125,27 @@ struct LiveProjectsService: ProjectsService {
         _ = try await signed("PUT", "/api/v1/projects/defaults", body: try limits.encoded())
     }
 
+    func sessions(project: Int64) async throws -> [ProjectLive.Session] {
+        try await run {
+            let list = try await client.listAgentSessions(query: .init(limit: 200)).ok.body.json
+            return Self.sessions(list, project: project, now: Date())
+        }
+    }
+
+    /// The project's sessions as the Overview rows: waiting on a person, working, or done.
+    static func sessions(_ all: [Components.Schemas.AgentSession], project: Int64, now: Date) -> [ProjectLive.Session] {
+        all.filter { $0.projectId == project }.map { s in
+            let state: ProjectLive.Session.State =
+                s.waiting != nil ? .needsYou : ["starting", "running"].contains(s.state) ? .running : .done
+            let micros = s.usage?.costUsdMicros
+            return ProjectLive.Session(
+                title: s.title ?? "AI session", state: state, harness: s.harness,
+                when: PickRepo.ago(s.updatedAt, now), runner: s.placedOn ?? s.runner,
+                branch: s.workspace?.value["branch"] as? String ?? "–",
+                cost: micros.map { CostWords.money(Double($0) / 1_000_000) } ?? "–", id: s.id)
+        }
+    }
+
     private func signed(_ method: String, _ path: String, body: Data = Data()) async throws -> Data {
         do { return try await connection.signedRequest(method: method, target: path, body: body) } catch {
             throw CoreFailure.of(error) ?? error
@@ -168,7 +193,8 @@ struct LiveProjectsService: ProjectsService {
         return ProjectRunState(
             summary: RunSummary(
                 state: state, lastRun: r.stoppedAt.map { PickRepo.ago($0, Date()) }),
-            startedAt: r.startedAt, idleStopAt: r.idleStopAt, error: r.error, stopReason: r.stopReason)
+            startedAt: r.startedAt, idleStopAt: r.idleStopAt, error: r.error, stopReason: r.stopReason,
+            runner: r.runner, lastActivityAt: r.lastActivityAt)
     }
 
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
@@ -188,7 +214,7 @@ struct LiveProjectsService: ProjectsService {
                     head: $0.mirror?.head, state: $0.mirror?.state, reason: $0.mirror?.reason,
                     startedAt: $0.mirror?.startedAt)
             }, updatedAt: p.updatedAt, cpuLimit: p.cpuLimit, memLimitMb: p.memLimitMb,
-            idleMinutes: Int(p.idleMinutes), archived: p.state == "archived")
+            idleMinutes: Int(p.idleMinutes), archived: p.state == "archived", idleNever: p.idleNever ?? false)
     }
 }
 

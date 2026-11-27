@@ -22,9 +22,12 @@ struct LiveRunsTab: View {
         let c = runs.configs.first { $0.id == r.configID }
         return Island(
             title: runs.name(of: r.configID),
-            sub: "\(label(r.state)) on \(r.runner) · started \(runsAgo(r.startedAt))",
+            sub: "\(label(r.state)) on \(runs.runnerName(r.runner)) · started \(runsAgo(r.startedAt))",
             accessory: {
-                if let p = c?.port { StateBadge("localhost:\(p)", tone: .queue, symbol: "globe") }
+                // The port is on the runner that runs it, not on this Mac.
+                if let p = c?.port {
+                    StateBadge("\(runs.runnerName(r.runner)) · port \(p)", tone: .queue, symbol: "globe")
+                }
                 if let c {
                     Button {
                         Task { await runs.start(c, project: project) }
@@ -48,7 +51,7 @@ struct LiveRunsTab: View {
                     CoreNotice(symbol: "exclamationmark.triangle", title: "It failed to start.", text: e, tone: .fail)
                 }
                 if let e = r.environment { Text("Environment: \(e)").foregroundStyle(GlassInk.secondary) }
-                LogBox(lines: runs.logLines[r.id] ?? [])
+                RunLogBox(runs: runs, run: r, stream: (runs.liveRuns.firstIndex(of: r) ?? 0) < 3)
             }
         }
         .frame(minHeight: Space.s8 * 6)
@@ -57,11 +60,17 @@ struct LiveRunsTab: View {
     private var idle: some View {
         Island("Nothing is running") {
             VStack(alignment: .leading, spacing: Space.s3) {
+                if runs.crashLoop {
+                    CoreNotice(
+                        symbol: "exclamationmark.triangle", title: ProjectsModel.crashLoopWords,
+                        text: "Read the log of its last run in History, fix what stops it, then start it again.",
+                        tone: .fail)
+                }
                 Text("Start a configuration:").foregroundStyle(GlassInk.secondary)
                 starters
             }
         }
-        .frame(height: Space.s8 * 4)
+        .frame(minHeight: Space.s8 * 4)
     }
 
     private var others: some View {
@@ -89,33 +98,33 @@ struct LiveRunsTab: View {
         case "running": "Running"
         case "stopping": "Stopping"
         case "failed": "Failed"
-        default: "Stopped"
+        case "stopped": "Stopped"
+        default: state.isEmpty ? "In an unknown state" : "\(state.capitalized) (a state this app does not know)"
         }
     }
 }
 
-/// The newest log lines of the live run, newest at the bottom.
-private struct LogBox: View {
-    let lines: [ProjectLive.LogLine]
+/// One live run's log: the Core's stream while the device has sockets to spare (it holds four), else a page every 3 s.
+private struct RunLogBox: View {
+    let runs: RunConfigsModel
+    let run: RunRecord
+    let stream: Bool
+    @State private var logs: RunLogsModel?
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    if lines.isEmpty { Text("No log lines yet.").foregroundStyle(GlassInk.secondary) }
-                    ForEach(Array(lines.suffix(120).enumerated()), id: \.offset) { i, l in
-                        Text("\(l.service)  \(l.text)").font(.system(size: MacTextSize.meta, design: .monospaced))
-                            .foregroundStyle(GlassInk.secondary).textSelection(.enabled).id(i)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Space.s3)
+        Group {
+            if let logs {
+                RunLogView(logs: logs, toast: { runs.model.host.shell.showToast($0) })
+            } else {
+                Text("No log lines yet.").foregroundStyle(GlassInk.secondary)
             }
-            .onChange(of: lines.count) { _, _ in proxy.scrollTo(min(lines.count, 120) - 1, anchor: .bottom) }
         }
-        .frame(height: Space.s8 * 4)
-        .coreCard(GlassInk.well, radius: Radius.cardMac)
-        .accessibilityLabel("Run log")
+        .frame(height: Space.s8 * 6)
+        .task(id: "\(run.id) \(runs.model.runTick)") {
+            guard let m = runs.logs(of: run, stream: stream) else { return }
+            logs = m
+            await m.run()
+        }
     }
 }
 
@@ -135,7 +144,8 @@ struct HistoryTab: View {
                     }
                     ForEach(runs.history) { r in
                         CoreRow(
-                            "\(runs.name(of: r.configID)) · \(r.runner)", subtitle: subtitle(r), symbol: icon(r),
+                            "\(runs.name(of: r.configID)) · \(runs.runnerName(r.runner))", subtitle: subtitle(r),
+                            symbol: icon(r),
                             selected: open == r.id, action: { open = open == r.id ? nil : r.id }
                         ) {
                             StateBadge(badge(r).0, tone: badge(r).1, symbol: "circle")
@@ -165,15 +175,7 @@ struct HistoryTab: View {
         r.state == "failed" ? "exclamationmark.triangle" : r.live ? "bolt" : "checkmark"
     }
 
-    private func badge(_ r: RunRecord) -> (String, Tone) {
-        switch r.state {
-        case "failed": ("Failed", .fail)
-        case "stopped": ("Stopped", .queue)
-        case "stopping": ("Stopping", .warn)
-        case "starting": ("Starting", .run)
-        default: ("Running", .run)
-        }
-    }
+    private func badge(_ r: RunRecord) -> (String, Tone) { HistoryWords.badge(r) }
 
     private func ended(_ why: String) -> String {
         switch why {
@@ -188,9 +190,23 @@ struct HistoryTab: View {
         VStack(alignment: .leading, spacing: 2) {
             if let e = r.error { Text(e).font(.system(size: MacTextSize.meta, design: .monospaced)) }
             if let why = r.stopReason { Text(ended(why)).foregroundStyle(GlassInk.secondary) }
-            Text("Ran on \(r.runner)").foregroundStyle(GlassInk.secondary)
+            Text("Ran on \(runs.runnerName(r.runner))").foregroundStyle(GlassInk.secondary)
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .coreCard(GlassInk.well, radius: Radius.row)
+    }
+}
+
+enum HistoryWords {
+    /// A run's state as the History badge says it; a state this app does not know is shown as the Core said it, never "Running".
+    static func badge(_ r: RunRecord) -> (String, Tone) {
+        switch r.state {
+        case "failed": ("Failed", .fail)
+        case "stopped": ("Stopped", .queue)
+        case "stopping": ("Stopping", .warn)
+        case "starting": ("Starting", .run)
+        case "running": ("Running", .run)
+        default: (r.state.isEmpty ? "Unknown" : r.state.capitalized, .queue)
+        }
     }
 }

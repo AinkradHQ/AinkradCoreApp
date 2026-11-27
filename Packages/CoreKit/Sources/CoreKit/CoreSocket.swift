@@ -23,7 +23,11 @@ extension CoreConnection {
     /// the events and terminal sockets are opened. `headers` are extra request headers (Design's `Last-Update-Seq`).
     /// Returns once the upgrade is proven by a pong. A refused upgrade throws the `CoreError` for its status.
     public func openSocket(target: String, headers extra: [String: String] = [:]) async throws -> CoreSocket {
-        guard target.hasPrefix("/modules/") else { throw CoreError.invalidInput("\(target) is not a module socket") }
+        // Module sockets, and a project run's log tail (`/api/v1/projects/{id}/run/logs/ws`, signed like any request).
+        let runLogs = target.hasPrefix("/api/v1/projects/") && target.contains("/run/logs/ws")
+        guard target.hasPrefix("/modules/") || runLogs else {
+            throw CoreError.invalidInput("\(target) is not a module socket")
+        }
         let session = try await sessions.currentSession()
         var headers = try await sessions.headers(method: "GET", target: target, body: Data(), sessionID: session.id)
         for (k, v) in extra { headers[k.lowercased()] = v }
