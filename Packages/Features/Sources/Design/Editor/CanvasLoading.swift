@@ -56,3 +56,19 @@ struct CanvasReconnecting: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// A viewer's quiet cue at the canvas's top edge: you can look, select and copy, nothing changes.
+struct CanvasViewOnly: View {
+    var body: some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: "eye").foregroundStyle(GlassInk.secondary)
+            Text("View only. You can look but not change this design.")
+                .coreFont(size: MacTextSize.meta, weight: .medium).foregroundStyle(GlassInk.secondary)
+        }
+        .padding(.horizontal, Space.s3)
+        .frame(height: MacSize.controlMd + 2)
+        .background(GlassInk.well, in: coreShape(Radius.control))
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+    }
+}

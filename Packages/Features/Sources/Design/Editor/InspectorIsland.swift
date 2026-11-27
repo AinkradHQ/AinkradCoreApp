@@ -48,6 +48,9 @@ struct InspectorIsland: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .animation(Motion.out(Motion.ui), value: editor.node?.id)
+        // A viewer reads the values; nothing in the inspector writes.
+        .disabled(editor.readOnly)
+        .opacity(editor.readOnly ? 0.55 : 1)
         .accessibilityIdentifier("design-inspector")
     }
 

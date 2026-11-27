@@ -31,7 +31,9 @@ struct EditorStage: View {
                         if !editor.loaded { CanvasLoading(editor: editor).transition(.opacity) }
                     }
                     .overlay(alignment: .top) {
-                        if editor.loaded, !editor.syncConnected, !editor.syncHalted {
+                        if editor.readOnly {
+                            CanvasViewOnly().padding(Space.s3).transition(.opacity)
+                        } else if editor.loaded, !editor.syncConnected, !editor.syncHalted {
                             CanvasReconnecting(editor: editor).padding(Space.s3).transition(.opacity)
                         }
                     }
