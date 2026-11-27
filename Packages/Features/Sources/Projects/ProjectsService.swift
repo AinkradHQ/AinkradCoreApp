@@ -5,6 +5,8 @@ import OpenAPIRuntime
 
 /// The API minor that brought the private preview, project colours, metrics, start steps, branch change and crash alerts.
 let coreMinorProjects: Int32 = 110
+/// The API minor that brought the project kind (`web`, `app`, `infra`, `other`).
+let coreMinorKinds: Int32 = 111
 
 /// The Core as the Projects screens use it (`/api/v1/projects`, AinkradCore PR #279). Reads need `read`; every write is
 /// `admin` and step-up, so the model runs them through the host's Touch ID. Tests and the demo bring their own.
@@ -68,6 +70,8 @@ struct ProjectPatch: Equatable, Sendable {
     var idleNever: Bool?
     /// One of the accent names; "" clears it (API 110).
     var colour: String?
+    /// One of `web`, `app`, `infra`, `other` (API 111).
+    var kind: String?
 
     var isEmpty: Bool { self == ProjectPatch() }
 }
@@ -180,7 +184,7 @@ struct LiveProjectsService: ProjectsService {
 
     func update(project: Int64, patch p: ProjectPatch) async throws {
         // `color` is not in the synced client: a patch that sets it goes as raw JSON.
-        if p.colour != nil {
+        if p.colour != nil || p.kind != nil {
             _ = try await signed("PATCH", "/api/v1/projects/\(project)", body: Self.patchBody(p))
             return
         }
@@ -231,6 +235,7 @@ struct LiveProjectsService: ProjectsService {
         if let v = p.idleMinutes { o["idle_minutes"] = v }
         if let v = p.idleNever { o["idle_never"] = v }
         if let v = p.colour { o["color"] = v }
+        if let v = p.kind { o["kind"] = v }
         return try JSONSerialization.data(withJSONObject: o)
     }
 
@@ -448,10 +453,12 @@ struct LiveProjectsService: ProjectsService {
     static func decode(_ data: Data) throws -> [ProjectItem] {
         let json = try? JSONSerialization.jsonObject(with: data)
         var colours: [Int64: String] = [:]
+        var kinds: [Int64: String] = [:]
         for o in (json as? [[String: Any]]) ?? (json as? [String: Any]).map({ [$0] }) ?? [] {
             if let id = (o["id"] as? NSNumber)?.int64Value, let c = o["color"] as? String, !c.isEmpty {
                 colours[id] = c
             }
+            if let id = (o["id"] as? NSNumber)?.int64Value, let k = o["kind"] as? String, !k.isEmpty { kinds[id] = k }
         }
         let infos: [Components.Schemas.ProjectInfo] =
             json is [Any]
@@ -460,8 +467,8 @@ struct LiveProjectsService: ProjectsService {
         return infos.map {
             var p = item($0)
             p.colourName = colours[$0.id]
+            p.kindName = kinds[$0.id]
             return p
         }
     }
 }
-

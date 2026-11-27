@@ -91,6 +91,9 @@ public final class ProjectsModel {
     /// The Core speaks API minor 110 (private preview, colour, metrics, start steps, branch change, crash alerts): every one of
     /// those is gated on this, so an older Core behaves exactly as before.
     internal(set) var core110 = false
+    /// The Core speaks API minor 111 (the project kind). Older, the kind is kept on this Mac.
+    internal(set) var core111 = false
+    @ObservationIgnored let kinds: ProjectKinds
     /// Sends one signed request to the project preview route, and the Core's host (for redirects). Set with the connection.
     @ObservationIgnored var previewFetch: PreviewFetch?
     @ObservationIgnored var previewCoreHost: String?
@@ -142,6 +145,7 @@ public final class ProjectsModel {
     init(host: any AdminHost, defaults: UserDefaults) {
         self.host = host
         colours = ProjectColours(defaults: defaults)
+        kinds = ProjectKinds(defaults: defaults)
         #if DEBUG
         catalog = SampleRepoCatalog()
         #else
@@ -167,6 +171,11 @@ public final class ProjectsModel {
                 self.core110 = new
                 if new { await self.reload() }
             }
+            let has111 = await connection.serverSupports(minor: coreMinorKinds)
+            if let self, has111 != self.core111 {
+                self.core111 = has111
+                if has111 { await self.reload() }
+            }
             let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
@@ -187,6 +196,7 @@ public final class ProjectsModel {
         runService = nil
         previewFetch = nil
         core110 = false
+        core111 = false
         crashes = [:]
         configsService = nil
         insightsService = nil
@@ -502,7 +512,7 @@ public final class ProjectsModel {
     func create(
         name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = [], expose: Bool? = nil,
         runner: String? = nil, description: String = "", autoSuffix: Bool = false, wizard: Bool = false,
-        place: BrainPlace? = nil
+        place: BrainPlace? = nil, kind: ProjectKind = .web
     ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard let service, !busy, mayWrite() else { return false }
@@ -537,6 +547,7 @@ public final class ProjectsModel {
             ) {
                 var patch = ProjectPatch(expose: expose)
                 if self.core110 { patch.colour = colour.rawValue }
+                if self.core111 { patch.kind = kind.rawValue }
                 // GitHub repos first: the Core's from-github route takes up to 10 in one call (with GitHub's own default
                 // branches); the rest are added one by one, each counted on the wizard's setup list.
                 let ordered = github + repos.filter { $0.fullName == nil }
@@ -573,7 +584,8 @@ public final class ProjectsModel {
                 if let made, !patch.isEmpty {
                     do { try await service.update(project: made.id, patch: patch) } catch {
                         let what =
-                            patch.expose != nil ? "the public link" : patch.runner != nil ? "the runner" : "the colour"
+                            patch.expose != nil
+                            ? "the public link" : patch.runner != nil ? "the runner" : "the colour or kind"
                         issues.append("Could not set \(what): \(self.words(error)) Change it in Settings.")
                     }
                 }
@@ -589,6 +601,7 @@ public final class ProjectsModel {
         }
         guard let made else { return false }
         colours.set(colour, for: made.slug)
+        kinds.set(kind, for: made.slug)
         pollAttempt = 0
         await reload()
         if made.slug != slug { issues.append("The link is \(ProjectRules.host(made.slug)): \(slug) was taken.") }
@@ -904,6 +917,7 @@ struct SampleRepoCatalog: RepoCatalog {
             r("tidepool-labs", "tidepool-api", "Go", hoursAgo: 2, priv: true),
             r("tidepool-labs", "tidepool-web", "Next.js", hoursAgo: 1),
             r("tidepool-labs", "tidepool-docs", "Markdown", hoursAgo: 24 * 8),
+            r("tidepool-labs", "tidepool-ios", "Swift", hoursAgo: 6),
             r("lanterna-co", "design-tokens", "TypeScript", hoursAgo: 24 * 3),
             r("lanterna-co", "storefront", "Next.js", hoursAgo: 5),
             r("northwind-books", "ledger", "Rust", hoursAgo: 24 * 20, priv: true),
