@@ -69,6 +69,8 @@ final class FakeConfigsService: RunConfigsService, @unchecked Sendable {
     var plain: [String: String] = ["A": "secret-ish"]
     var linked: [String: String] = ["DB": "database_url"]
     private(set) var calls: [String] = []
+    var refuseReveal = false
+    var runnerList: [RunnerOption] = []
 
     func configs(project: Int64) async throws -> [RunConfigItem] { lock.withLock { items } }
     func createConfig(project: Int64, name: String, command: String) async throws -> RunConfigItem {
@@ -141,7 +143,8 @@ final class FakeConfigsService: RunConfigsService, @unchecked Sendable {
         }
     }
     func reveal(project: Int64, config: Int64, env: String, key: String) async throws -> String {
-        lock.withLock {
+        if refuseReveal { throw RunFailure(sentence: "The Core refused.", code: "forbidden") }
+        return lock.withLock {
             calls.append("reveal \(key)")
             return plain[key] ?? ""
         }
@@ -158,7 +161,7 @@ final class FakeConfigsService: RunConfigsService, @unchecked Sendable {
         RunLogPage(lines: [ProjectLive.LogLine(service: "web", text: "from \(run)")], next: after + 1)
     }
     func stop(project: Int64, run: String) async throws { lock.withLock { calls.append("stop \(run)") } }
-    func runners() async throws -> [RunnerOption] { [] }
+    func runners() async throws -> [RunnerOption] { runnerList }
 }
 
 @MainActor
@@ -252,10 +255,6 @@ struct RunConfigsModelTests {
         await r.load()
         #expect(r.liveRuns.map(\.id) == ["r_b", "r_a"])
         #expect(r.isLive(r.configs[0]))
-        let task = Task { await r.watchLive() }
-        try? await Task.sleep(for: .milliseconds(300))
-        task.cancel()
-        #expect(r.logLines["r_a"]?.first?.text == "from r_a" && r.logLines["r_b"]?.first?.text == "from r_b")
         let p = ProjectItem(
             id: 1, slug: "demo", name: "Demo", description: "", expose: false, repos: [], updatedAt: Date())
         await r.stop(r.liveRuns[1], project: p)

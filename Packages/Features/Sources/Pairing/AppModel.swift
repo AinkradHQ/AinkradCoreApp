@@ -159,6 +159,11 @@ public final class AppModel {
         design = DesignModel(host: AdminHostAdapter(app: self), projects: projects)
         lore = LoreModel(host: AdminHostAdapter(app: self))
         projects.openNote = { [weak lore] id in lore?.open(note: id) }
+        projects.sessionOpener = { [weak agents] id in agents?.openSession(id) }
+        projects.sessionStarter = { [weak agents] id in
+            guard let n = await agents?.startLiveSession(projectID: id) else { return nil }
+            return [n.title, n.detail].filter { !$0.isEmpty }.joined(separator: " ")
+        }
         agents.loreNotes = { [weak lore] session in lore?.notes(ofSession: session) ?? []
         }
         agents.openNoteInLore = { [weak lore] id in lore?.open(note: id) }

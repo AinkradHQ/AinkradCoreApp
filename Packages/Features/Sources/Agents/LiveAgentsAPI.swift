@@ -111,7 +111,8 @@ public struct LiveAgentsAPI: AgentsAPI {
             let plain = new.chain == nil && new.agent == nil
             let body = Components.Schemas.NewAgentSession(
                 agent: new.agent, chain: new.chain, harness: plain ? new.harness : nil, model: plain ? new.model : nil,
-                plan: new.plan ? true : nil, policy: policy, prompt: new.prompt.isEmpty ? nil : new.prompt,
+                plan: new.plan ? true : nil, policy: policy, projectId: new.projectID,
+                prompt: new.prompt.isEmpty ? nil : new.prompt,
                 runner: new.runner,
                 secrets: new.secrets.isEmpty ? nil : new.secrets.map { .init(name: $0, _var: $0) },
                 workspace: try Self.workspace(new))

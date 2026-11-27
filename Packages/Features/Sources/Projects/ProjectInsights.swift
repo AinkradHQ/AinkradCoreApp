@@ -1,3 +1,4 @@
+import Brain
 import CoreKit
 import Foundation
 import Observation
@@ -94,6 +95,7 @@ struct ProjectTuning: Equatable, Sendable {
     var defaultEnvironment: String?
     /// The project's Brain room (`brain_project_rooms`), nil when the Brain is off or none is linked.
     var roomID: String?
+    var roomName: String?
 }
 
 protocol ProjectInsightsService: Sendable {
@@ -107,6 +109,18 @@ protocol ProjectInsightsService: Sendable {
     func setTuning(project: Int64, fetchInterval: Int?, defaultEnvironment: String?) async throws
     /// Undoes an archive (`POST /projects/{id}/unarchive`, admin, step-up): the project is active again.
     func unarchive(project: Int64) async throws
+    /// The project's room overview (the Brain's own route); nil when the Brain has none or is off.
+    func roomOverview(room: String) async throws -> RoomOverview?
+    /// Asks the Brain to write the room's overview again.
+    func writeOverview(room: String) async throws
+    /// Edits the instructions AI sessions read, and approves them (or not).
+    func setInstructions(room: String, text: String, approved: Bool) async throws
+}
+
+extension ProjectInsightsService {
+    func roomOverview(room: String) async throws -> RoomOverview? { nil }
+    func writeOverview(room: String) async throws {}
+    func setInstructions(room: String, text: String, approved: Bool) async throws {}
 }
 
 struct LiveProjectInsightsService: ProjectInsightsService {
@@ -144,6 +158,26 @@ struct LiveProjectInsightsService: ProjectInsightsService {
         _ = try await call("POST", "/api/v1/projects/\(project)/unarchive")
     }
 
+    func roomOverview(room: String) async throws -> RoomOverview? {
+        do {
+            return try JSONDecoder().decode(
+                RoomOverview.self,
+                from: try await call("GET", "/modules/brain/v1/rooms/\(LiveProjectRunService.seg(room))/overview"))
+        } catch let f as RunFailure where f.status == 404 || f.status == 501 { return nil }
+    }
+
+    func writeOverview(room: String) async throws {
+        do {
+            _ = try await call("POST", "/modules/brain/v1/rooms/\(LiveProjectRunService.seg(room))/overview/write")
+        } catch let f as RunFailure where f.code == "overview_open" {}
+    }
+
+    func setInstructions(room: String, text: String, approved: Bool) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["text": text, "approved": approved] as [String: Any])
+        _ = try await call(
+            "PATCH", "/modules/brain/v1/rooms/\(LiveProjectRunService.seg(room))/overview/instructions", body)
+    }
+
     private func call(_ method: String, _ path: String, _ body: Data = Data()) async throws -> Data {
         do {
             return try await connection.signedRequest(method: method, target: path, body: body)
@@ -167,6 +201,8 @@ enum InsightsWire {
     private static func int(_ v: Any?) -> Int { (v as? NSNumber)?.intValue ?? 0 }
     private static func dbl(_ v: Any?) -> Double { (v as? NSNumber)?.doubleValue ?? 0 }
     private static func nums(_ v: Any?) -> [Double] { (v as? [NSNumber])?.map(\.doubleValue) ?? [] }
+    /// The Core's money is USD micros (millionths); the app shows dollars.
+    static func dollars(_ micros: Double) -> Double { micros / 1_000_000 }
 
     static func code(_ d: Data) throws -> [CodeInfo] {
         try list(d).map {
@@ -187,14 +223,14 @@ enum InsightsWire {
         let o = try object(d)
         let rows = (o["sessions"] as? [[String: Any]]) ?? []
         return UsageInfo(
-            weekCost: dbl(o["week_cost"]), prevWeekCost: dbl(o["prev_week_cost"]),
+            weekCost: dollars(dbl(o["week_cost"])), prevWeekCost: dollars(dbl(o["prev_week_cost"])),
             sessionsWeek: int(o["sessions_week"]),
-            byDay: nums(o["by_day"]),
+            byDay: nums(o["by_day"]).map(dollars),
             sessions: rows.compactMap {
                 guard let id = $0["id"] as? String else { return nil }
                 return UsageSession(
                     id: id, title: $0["title"] as? String ?? "Session", state: $0["state"] as? String ?? "",
-                    cost: dbl($0["cost"]), spark: nums($0["spark"]))
+                    cost: dollars(dbl($0["cost"])), spark: nums($0["spark"]).map(dollars))
             })
     }
 
@@ -237,7 +273,8 @@ enum InsightsWire {
         return ProjectTuning(
             fetchInterval: (o["fetch_interval_minutes"] as? NSNumber)?.intValue ?? 15,
             defaultEnvironment: o["default_environment"] as? String,
-            roomID: (o["room"] as? [String: Any])?["room_id"] as? String)
+            roomID: (o["room"] as? [String: Any])?["room_id"] as? String,
+            roomName: (o["room"] as? [String: Any])?["name"] as? String)
     }
 }
 

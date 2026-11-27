@@ -26,6 +26,12 @@ struct LiveApp: View {
                     .disabled(!running)
             }
             .padding(.leading, Space.s2)
+            if project.stale {
+                CoreNotice(
+                    symbol: "wifi.exclamationmark", title: "The Core is not answering.",
+                    text: "This is how \(project.name) looked when it last did. It will update once the Core is back.",
+                    tone: .warn)
+            }
             ZStack {
                 Color.clear.coreCard(GlassInk.well, radius: Radius.cardMac)
                 if hasPicture { picture }
@@ -44,6 +50,7 @@ struct LiveApp: View {
     private var note: String {
         guard project.expose else { return "· only your devices" }
         guard running else { return "· public while running" }
+        if project.stale { return "· last seen running" }
         return ["· public", project.live?.idle].compactMap { $0 }.joined(separator: " · ")
     }
 
@@ -58,23 +65,22 @@ struct LiveApp: View {
     }
 
     @ViewBuilder private var stage: some View {
-        if project.repos.isEmpty {
-            noRepos
-        } else if let run = project.run {
-            switch run.state {
+        switch project.setup {
+        case .noRepos: noRepos
+        case .ran:
+            switch project.run?.state ?? .stopped {
             case .running: EmptyView()
             case .starting: startingStage
             case .stopped: stoppedStage
             case .failed: failedStage
             }
-        } else if let draft = project.draft {
-            ReadyToStart(project: project, draft: draft)
-        } else {
-            SettingUp(project: project)
+        case .copying, .checking, .copyFailed: SettingUp(project: project)
+        case .needsSetup: NeedsSetup(model: model, project: project)
+        case .ready(let draft): ReadyToStart(model: model, project: project, draft: draft)
         }
     }
 
-    private var can: Bool { model.canControl(project) }
+    private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
     private func start(_ title: String) -> some View {
         Button {
@@ -86,7 +92,8 @@ struct LiveApp: View {
         .help(
             can
                 ? "Start \(project.name)"
-                : "Not available while this device cannot change projects or the Core is unreachable")
+                : project.startBlock
+                    ?? "Not available while this device cannot change projects or the Core is unreachable")
     }
 
     private var noRepos: some View {
@@ -176,23 +183,38 @@ struct LiveApp: View {
         .padding(Space.s5).background(.regularMaterial, in: coreShape(Radius.cardMac))
     }
 
+    /// Honest progress: a bar only when the Core reports services up of the setup's; else a moving bar with the words and how long.
     private var startingStage: some View {
         VStack(spacing: Space.s3) {
             Text("Starting \(project.name)").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
-            CoreMeter(project.live?.progress ?? 0, label: "Starting \(project.name)")
-                .frame(width: Space.s8 * 13)
+            if let p = project.live?.progress {
+                CoreMeter(p, label: "Starting \(project.name)").frame(width: Space.s8 * 13)
+            } else {
+                CoreWorkingBar(width: Space.s8 * 13)
+            }
             Text(project.live?.progressLine ?? "Starting…").foregroundStyle(GlassInk.secondary)
+            ForEach(Array((project.live?.steps ?? []).enumerated()), id: \.offset) { _, s in
+                Label(s.title, systemImage: s.done ? "checkmark.circle" : "circle").foregroundStyle(
+                    s.done ? GlassInk.primary : GlassInk.secondary)
+            }
         }
     }
 
     private var stoppedStage: some View {
-        VStack(spacing: Space.s2) {
+        let n = project.draft?.services.count ?? 0
+        let where_ = project.live?.runner ?? model.coreName
+        return VStack(spacing: Space.s2) {
             Text("\(project.name) is stopped").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
+            if let why = project.live?.stopWords { line(why) }
+            if let at = project.live?.lastActivity {
+                line("Last visited \(runsAgo(at, now: model.now())).")
+            }
             line(
-                "Start it to run \(ProjectItem.count(project.live?.services.count ?? 0, "service")) on \(model.coreName) and open it at \(project.link)."
-            )
+                n > 0
+                    ? "Start it to run \(ProjectItem.count(n, "service")) on \(where_) and open it at \(project.link)."
+                    : "Start it to run it on \(where_) and open it at \(project.link).")
             start("Start").padding(.top, Space.s1)
         }
     }

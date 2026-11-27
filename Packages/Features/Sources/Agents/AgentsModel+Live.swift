@@ -32,7 +32,8 @@ extension AgentsModel {
     // MARK: new session
 
     /// ⌘N: a live session at once with the defaults and an empty composer. The best ready runner, the default tool and order.
-    public func startLiveSession(runner: String? = nil, prompt: String = "") async -> InlineNotice? {
+    /// `projectID` starts it for a Core project: the Core builds the workspace from the project's repos.
+    public func startLiveSession(runner: String? = nil, prompt: String = "", projectID: Int64? = nil) async -> InlineNotice? {
         await loadRunners()
         let prefs = AgentPrefs.shared
         let pick =
@@ -47,7 +48,7 @@ extension AgentsModel {
         return await create(
             NewAgentSession(
                 runner: pick, harness: prefs.harness, model: chain == nil && !prefs.model.isEmpty ? prefs.model : nil,
-                prompt: prompt, mode: prefs.mode, chain: chain?.id))
+                prompt: prompt, mode: prefs.mode, chain: chain?.id, projectID: projectID))
     }
 
     // MARK: the live conversation

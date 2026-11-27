@@ -11,6 +11,8 @@ struct Overview: View {
     @State private var runs: [RunRecord] = []
     @State private var names: [Int64: String] = [:]
     @State private var insights: ProjectInsightsModel
+    /// The running project's log, live (Overview's Logs island).
+    @State private var logs: RunLogsModel?
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
@@ -23,7 +25,12 @@ struct Overview: View {
     static let bottomHeight: CGFloat = 220
 
     private var live: ProjectLive? { project.live }
-    private var settingUp: Bool { !project.repos.isEmpty && project.draft == nil && project.run == nil }
+    private var settingUp: Bool {
+        switch project.setup {
+        case .copying, .checking: true
+        default: false
+        }
+    }
 
     var body: some View {
         VStack(spacing: Space.s2) {
@@ -42,7 +49,21 @@ struct Overview: View {
             .frame(height: Self.bottomHeight)
         }
         .onAppear { settled = true }
+        // The tail of the log while it runs; the Core's stream, else a page every 3 s.
+        .task(id: "\(project.id) \(project.tag) \(model.runTick)") {
+            guard project.tag == .running || project.tag == .starting, !project.stale,
+                let source = model.logSources(project.id, nil)
+            else {
+                logs = nil
+                return
+            }
+            let m = RunLogsModel(source: source)
+            logs = m
+            await m.run()
+        }
         .task(id: project.id) {
+            await model.refreshSetup(project.id)
+            await model.refreshLive(project.id)
             await loadRuns()
             await insights.loadUsage()
             await insights.loadKnowledge()
@@ -136,20 +157,27 @@ struct Overview: View {
                 }
             }
         ) {
-            if list.isEmpty {
-                VStack(alignment: .leading, spacing: Space.s3) {
+            VStack(alignment: .leading, spacing: Space.s3) {
+                if list.isEmpty {
                     Text("No AI sessions yet. New ones start in their own clone of this project's repos.")
                         .fixedSize(horizontal: false, vertical: true)
-                    Soon(prominent: false, help: "AI sessions in a project arrive with the next update") {
-                        Label("New AI Session", systemImage: "plus")
+                } else {
+                    VStack(alignment: .leading, spacing: Space.s1) {
+                        ForEach(Array(list.prefix(4).enumerated()), id: \.offset) { _, s in
+                            CoreRow(
+                                s.title, subtitle: "\(s.harness) · \(s.when)",
+                                action: s.id.map { id in { model.sessionOpener?(id) } }
+                            ) { badge(s.state) }
+                        }
                     }
                 }
-            } else {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    ForEach(Array(list.enumerated()), id: \.offset) { _, s in
-                        CoreRow(s.title, subtitle: "\(s.harness) · \(s.when)") { badge(s.state) }
-                    }
+                Button {
+                    model.newSession(in: project)
+                } label: {
+                    Label("New AI Session", systemImage: "plus")
                 }
+                .buttonStyle(CoreButtonStyle(list.isEmpty ? .secondary : .plain, size: .small))
+                .disabled(!model.canStartSession(project)).help(model.sessionBlock(project))
             }
         }
     }
@@ -221,7 +249,7 @@ struct Overview: View {
 
     private var servicesIsland: some View {
         Island(
-            title: "Services", sub: model.coreName,
+            title: "Services", sub: live?.runner ?? model.coreName,
             accessory: {
                 if let l = live, !l.services.isEmpty {
                     Button {
@@ -266,8 +294,11 @@ struct Overview: View {
                 }
             }
         } else {
-            Text(project.repos.isEmpty ? "Drafted once you add repos." : "Drafting…").foregroundStyle(
-                GlassInk.secondary)
+            Text(
+                project.repos.isEmpty
+                    ? "Drafted once you add repos."
+                    : project.setup == .needsSetup ? "No setup yet. Set one up in Runs." : "Reading the setup…"
+            ).foregroundStyle(GlassInk.secondary)
         }
     }
 
@@ -315,23 +346,28 @@ struct Overview: View {
         case .failed(_, let e): return "\(r.branch) · \(e)"
         case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
         case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
+        case .unknown: return "\(r.branch) · not copied yet"
         }
     }
 
     // MARK: Logs
 
     private var logsIsland: some View {
-        Island(
-            title: "Logs", sub: live?.logs.isEmpty == false ? "all services" : nil,
+        let real = logs.map { $0.lineCount > 0 } ?? false
+        let demo = live?.logs ?? []
+        return Island(
+            title: "Logs", sub: real || !demo.isEmpty ? "all services" : nil,
             accessory: {
-                if live?.logs.isEmpty == false {
+                if real || !demo.isEmpty {
                     CoreIconButton(symbol: "ellipsis", label: "Open the logs in Run") { model.section = .run }
                 }
             }
         ) {
-            if let lines = live?.logs, !lines.isEmpty {
+            if let logs, real {
+                RunLogView(logs: logs, compact: true)
+            } else if !demo.isEmpty {
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
+                    ForEach(Array(demo.enumerated()), id: \.offset) { _, l in
                         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
                             Text(l.service).foregroundStyle(GlassInk.secondary).frame(
                                 width: Space.s8 * 2, alignment: .leading)
@@ -341,7 +377,11 @@ struct Overview: View {
                     }
                 }
             } else {
-                Text("No runs yet.").foregroundStyle(GlassInk.secondary)
+                Text(
+                    project.tag == .running || project.tag == .starting
+                        ? "Waiting for the first line…" : "Logs appear while the project runs."
+                )
+                .foregroundStyle(GlassInk.secondary)
             }
         }
     }

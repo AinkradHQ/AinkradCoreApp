@@ -28,9 +28,50 @@ protocol ProjectsService: Sendable {
     func fetch(project: Int64, repo: Int64) async throws
     /// Where the project prefers to run: `auto`, `this_mac` or `home_server` (Core minor 95).
     func setRunner(project: Int64, _ runner: String) async throws
+    /// A new project with a description and a runner preference in the same call (`POST /projects`).
+    func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem
+    /// A project made from GitHub repos (`owner/name`) in one step: the Core reads each repo's real default branch.
+    func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem
+    func addRepo(project: Int64, name: String, url: String, branch: String, primary: Bool) async throws
+    /// Changes the fields set in the patch (`PATCH /projects/{id}`); the rest is kept.
+    func update(project: Int64, patch: ProjectPatch) async throws
+    func removeRepo(project: Int64, repo: Int64) async throws
+    func setPrimary(project: Int64, repo: Int64) async throws
+    /// One project, for the watch on a copy (the whole list is not read again for it); nil when the service has no such route.
+    func project(id: Int64) async throws -> ProjectItem?
+    /// The runners the Core has, for "Where it runs".
+    func runners() async throws -> [RunnerInfo]
+    /// The project's AI sessions (newest first). The Core has no project filter on the list yet, so a live service reads a page
+    /// and keeps the ones whose `project_id` is this project.
+    func sessions(project: Int64) async throws -> [ProjectLive.Session]
+}
+
+/// What a PATCH of a project changes: a nil field is left as it is.
+struct ProjectPatch: Equatable, Sendable {
+    var name: String?
+    var description: String?
+    var slug: String?
+    var expose: Bool?
+    var runner: String?
+    var cpuLimit: Double?
+    var memLimitMb: Int64?
+    var idleMinutes: Int64?
+    var idleNever: Bool?
+
+    var isEmpty: Bool { self == ProjectPatch() }
+}
+
+/// A runner of the Core as "Where it runs" needs it: `this_mac` is a Mac runner and `home_server` a Linux one.
+struct RunnerInfo: Equatable, Identifiable, Sendable {
+    let id: String
+    let name: String
+    /// `macos` or `linux` once it has connected.
+    let os: String?
+    let online: Bool
 }
 
 extension ProjectsService {
+    func sessions(project: Int64) async throws -> [ProjectLive.Session] { [] }
     // Stand-ins and tests that do not run projects need not answer these.
     func update(project: Int64, name: String, description: String) async throws {}
     func archive(project: Int64) async throws {}
@@ -45,6 +86,27 @@ extension ProjectsService {
     func touch(project: Int64) async throws -> ProjectRunState? { nil }
     func fetch(project: Int64, repo: Int64) async throws {}
     func setRunner(project: Int64, _ runner: String) async throws {}
+    func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem {
+        try await create(slug: slug, name: name)
+    }
+    /// Stand-ins and tests: a project, then its repos (the live service makes them in one call).
+    func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem {
+        let p = try await create(slug: slug, name: name)
+        for (i, full) in repos.enumerated() {
+            try await addRepo(
+                project: p.id, name: full.split(separator: "/").last.map(String.init) ?? full,
+                url: "https://github.com/\(full)", branch: "main", primary: i == 0)
+        }
+        return p
+    }
+    func addRepo(project: Int64, name: String, url: String, branch: String, primary: Bool) async throws {
+        try await addRepo(project: project, name: name, url: url, primary: primary)
+    }
+    func update(project: Int64, patch: ProjectPatch) async throws {}
+    func removeRepo(project: Int64, repo: Int64) async throws {}
+    func setPrimary(project: Int64, repo: Int64) async throws {}
+    func project(id: Int64) async throws -> ProjectItem? { nil }
+    func runners() async throws -> [RunnerInfo] { [] }
 }
 
 struct LiveProjectsService: ProjectsService {
@@ -56,17 +118,76 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func create(slug: String, name: String) async throws -> ProjectItem {
+        try await create(slug: slug, name: name, description: "", runner: nil)
+    }
+
+    func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem {
         try await run {
-            Self.item(try await client.createProject(body: .json(.init(name: name, slug: slug))).ok.body.json)
+            Self.item(
+                try await client.createProject(
+                    body: .json(
+                        .init(
+                            description: description.isEmpty ? nil : description, name: name,
+                            runner: runner == "auto" ? nil : runner, slug: slug))
+                ).ok.body.json)
+        }
+    }
+
+    func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem {
+        try await run {
+            Self.item(
+                try await client.createProjectFromGithub(body: .json(.init(name: name, repos: repos, slug: slug))).ok
+                    .body.json)
         }
     }
 
     func addRepo(project: Int64, name: String, url: String, primary: Bool) async throws {
+        try await addRepo(project: project, name: name, url: url, branch: "main", primary: primary)
+    }
+
+    func addRepo(project: Int64, name: String, url: String, branch: String, primary: Bool) async throws {
         try await run {
             _ = try await client.addProjectRepo(
                 path: .init(id: String(project)),
-                body: .json(.init(defaultBranch: "main", name: name, primary: primary, remoteUrl: url))
+                body: .json(.init(defaultBranch: branch, name: name, primary: primary, remoteUrl: url))
             ).ok
+        }
+    }
+
+    func update(project: Int64, patch p: ProjectPatch) async throws {
+        try await run {
+            _ = try await client.updateProject(
+                path: .init(id: String(project)),
+                body: .json(
+                    .init(
+                        cpuLimit: p.cpuLimit, description: p.description, expose: p.expose,
+                        idleMinutes: p.idleMinutes, idleNever: p.idleNever, memLimitMb: p.memLimitMb, name: p.name,
+                        runner: p.runner, slug: p.slug))
+            ).ok
+        }
+    }
+
+    func removeRepo(project: Int64, repo: Int64) async throws {
+        try await run {
+            _ = try await client.removeProjectRepo(path: .init(id: String(project), repo: String(repo))).ok
+        }
+    }
+
+    func setPrimary(project: Int64, repo: Int64) async throws {
+        try await run {
+            _ = try await client.setProjectRepoPrimary(path: .init(id: String(project), repo: String(repo))).ok
+        }
+    }
+
+    func project(id: Int64) async throws -> ProjectItem? {
+        try await run { Self.item(try await client.getProject(path: .init(id: String(id))).ok.body.json) }
+    }
+
+    func runners() async throws -> [RunnerInfo] {
+        try await run {
+            try await client.listRunners().ok.body.json.map {
+                RunnerInfo(id: $0.id, name: $0.name, os: $0.os, online: $0.online ?? false)
+            }
         }
     }
 
@@ -121,6 +242,27 @@ struct LiveProjectsService: ProjectsService {
         _ = try await signed("PUT", "/api/v1/projects/defaults", body: try limits.encoded())
     }
 
+    func sessions(project: Int64) async throws -> [ProjectLive.Session] {
+        try await run {
+            let list = try await client.listAgentSessions(query: .init(limit: 200)).ok.body.json
+            return Self.sessions(list, project: project, now: Date())
+        }
+    }
+
+    /// The project's sessions as the Overview rows: waiting on a person, working, or done.
+    static func sessions(_ all: [Components.Schemas.AgentSession], project: Int64, now: Date) -> [ProjectLive.Session] {
+        all.filter { $0.projectId == project }.map { s in
+            let state: ProjectLive.Session.State =
+                s.waiting != nil ? .needsYou : ["starting", "running"].contains(s.state) ? .running : .done
+            let micros = s.usage?.costUsdMicros
+            return ProjectLive.Session(
+                title: s.title ?? "AI session", state: state, harness: s.harness,
+                when: PickRepo.ago(s.updatedAt, now), runner: s.placedOn ?? s.runner,
+                branch: s.workspace?.value["branch"] as? String ?? "–",
+                cost: micros.map { CostWords.money(Double($0) / 1_000_000) } ?? "–", id: s.id)
+        }
+    }
+
     private func signed(_ method: String, _ path: String, body: Data = Data()) async throws -> Data {
         do { return try await connection.signedRequest(method: method, target: path, body: body) } catch {
             throw CoreFailure.of(error) ?? error
@@ -168,7 +310,8 @@ struct LiveProjectsService: ProjectsService {
         return ProjectRunState(
             summary: RunSummary(
                 state: state, lastRun: r.stoppedAt.map { PickRepo.ago($0, Date()) }),
-            startedAt: r.startedAt, idleStopAt: r.idleStopAt, error: r.error, stopReason: r.stopReason)
+            startedAt: r.startedAt, idleStopAt: r.idleStopAt, error: r.error, stopReason: r.stopReason,
+            runner: r.runner, lastActivityAt: r.lastActivityAt)
     }
 
     private static let unknown = CoreError.protocolViolation("The Core answered something this app does not know.")
@@ -186,36 +329,55 @@ struct LiveProjectsService: ProjectsService {
                     id: $0.id, name: $0.name, remoteURL: $0.remoteUrl, branch: $0.defaultBranch,
                     primary: $0.isPrimary, fetchedAt: $0.mirror?.fetchedAt, fetchError: $0.mirror?.error,
                     head: $0.mirror?.head, state: $0.mirror?.state, reason: $0.mirror?.reason,
-                    startedAt: $0.mirror?.startedAt)
+                    startedAt: $0.mirror?.startedAt, hasMirror: $0.mirror != nil)
             }, updatedAt: p.updatedAt, cpuLimit: p.cpuLimit, memLimitMb: p.memLimitMb,
-            idleMinutes: Int(p.idleMinutes), archived: p.state == "archived")
+            idleMinutes: Int(p.idleMinutes), idleNever: p.idleNever ?? false, runner: p.runner ?? "auto",
+            source: p.source, createdAt: p.createdAt, archived: p.state == "archived")
+    }
+
+    /// The Core's list as JSON (the shapes of `api/openapi.json`), for tests: dates read as the client reads them.
+    static func decode(_ data: Data) throws -> [ProjectItem] {
+        let transcoder = Configuration(dateTranscoder: .iso8601WithFractionalSeconds).dateTranscoder
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { d in
+            try transcoder.decode(try d.singleValueContainer().decode(String.self))
+        }
+        return try decoder.decode([Components.Schemas.ProjectInfo].self, from: data).map(item)
     }
 }
 
-/// GitHub's repos as the Core lists them for the workspace's connection; nil while no connection is set up
-/// (409 `no_connection`), so the picker says "Connect GitHub".
+/// GitHub's repos as the Core lists them for the workspace's connection, a page at a time and searched on the Core (`q`);
+/// nil while no connection is set up (409 `no_connection`), so the picker says "Connect GitHub".
 struct LiveRepoCatalog: RepoCatalog {
     let connection: CoreConnection
 
-    func repos() async throws -> [PickRepo]? {
-        var out: [PickRepo] = []
-        var page: Int64 = 1
-        while page <= 10 {
-            let list: Components.Schemas.GithubRepoList
-            do {
-                list = try await connection.client.listGithubRepos(query: .init(page: page, perPage: 100)).ok.body.json
-            } catch {
-                if case CoreError.http(409, _, _)? = CoreFailure.of(error) { return nil }
-                throw CoreFailure.of(error) ?? error
-            }
-            for o in list.owners {
-                for r in o.repos {
-                    out.append(PickRepo(org: o.owner, name: r.name, url: "https://github.com/\(r.fullName)"))
-                }
-            }
-            if !list.hasMore { break }
-            page += 1
+    func page(query: String, page: Int) async throws -> RepoPage? {
+        let list: Components.Schemas.GithubRepoList
+        do {
+            list = try await connection.client.listGithubRepos(
+                query: .init(q: query.isEmpty ? nil : query, page: Int64(page), perPage: 30)
+            ).ok.body.json
+        } catch {
+            if case CoreError.http(409, "no_connection", _)? = CoreFailure.of(error) { return nil }
+            throw CoreFailure.of(error) ?? error
         }
-        return out
+        return Self.page(list)
+    }
+
+    /// The Core's answer as JSON, for tests.
+    static func decode(_ data: Data) throws -> RepoPage {
+        try Self.page(JSONDecoder().decode(Components.Schemas.GithubRepoList.self, from: data))
+    }
+
+    static func page(_ list: Components.Schemas.GithubRepoList) -> RepoPage {
+        RepoPage(
+            repos: list.owners.flatMap { o in
+                o.repos.map {
+                    PickRepo(
+                        org: o.owner, name: $0.name, url: "https://github.com/\($0.fullName)", fullName: $0.fullName,
+                        defaultBranch: $0.defaultBranch.isEmpty ? nil : $0.defaultBranch, isPrivate: $0._private,
+                        blurb: $0.description)
+                }
+            }, hasMore: list.hasMore, truncated: list.truncated)
     }
 }
