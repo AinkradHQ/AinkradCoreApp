@@ -255,7 +255,7 @@ struct CanvasToolbar: View {
         .background(GlassInk.adaptive(Color(white: 0.15), day: .white), in: coreShape(Radius.cardMac + 2))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .animation(Motion.out(Motion.hover), value: editor.tool)
-        .disabled(!editor.attached || !editor.loaded || model.readOnly || editor.syncHalted)
+        .disabled(!editor.attached || !editor.loaded || model.readOnly || editor.readOnly || editor.syncHalted)
         .help(editor.loaded ? "" : "The tools work once the design has opened.")
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tools")

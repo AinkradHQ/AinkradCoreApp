@@ -117,7 +117,7 @@ struct InspectorIsland: View {
                 if editor.selection.count >= 3 {
                     alignRow([
                         ("rectangle.split.3x1", "Distribute horizontally", { editor.distribute(horizontal: true) }),
-                        ("rectangle.split.1x3", "Distribute vertically", { editor.distribute(horizontal: false) }),
+                        ("line.3.horizontal", "Distribute vertically", { editor.distribute(horizontal: false) }),
                     ])
                 }
             }
