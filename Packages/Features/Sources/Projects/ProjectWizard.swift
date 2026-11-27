@@ -98,7 +98,8 @@ struct ProjectWizard: View {
                                 removal: .opacity))
                         Spacer(minLength: 0)
                     }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .clipped()
                     WizardPreviewCard(
                         name: name, colour: colour,
                         host: name.isEmpty || slugProblem != nil ? nil : ProjectRules.host(slug),
@@ -220,7 +221,7 @@ struct ProjectWizard: View {
         } else {
             VStack(alignment: .leading, spacing: Space.s3) {
                 DialogHead(title: "Pick your repos", line: "Core copies them, so your AI sessions can work on them.")
-                RepoPicker(model: model, picked: $picked, pasted: $pasted)
+                RepoPicker(model: model, picked: $picked, pasted: $pasted, height: nil)
             }
         }
     }
@@ -338,38 +339,59 @@ struct ProjectWizard: View {
     private var reviewStep: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             let progress = WizardProgress(made?.repos ?? [])
+            let started = made != nil || model.creating != nil
             DialogHead(
-                title: made == nil ? "Ready to create \(name)?" : progress.title(name: name),
+                title: !started
+                    ? "Ready to create \(name)?" : made == nil ? "Setting up \(name)" : progress.title(name: name),
                 line:
                     "\(ProjectItem.count(made?.repos.count ?? chosen.count, "repo")) · Runs on \(runner.title) · "
                     + (publicLink ? "Public link on" : "Private"))
-            VStack(spacing: Space.s1) {
-                if let made, !made.repos.isEmpty {
-                    ForEach(made.repos) { r in repoRow(made, r) }
-                } else if made == nil, !chosen.isEmpty {
-                    ForEach(chosen) { r in
-                        CoreRow(r.name, subtitle: "Will be copied", symbol: "tray.full")
+            if started {
+                WizardSetupList(creating: model.creating, made: made, copy: made.map { WizardProgress($0.repos) })
+                    .transition(.opacity)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    if let made, !made.repos.isEmpty {
+                        ForEach(made.repos) { r in repoRow(made, r) }
+                    } else if !chosen.isEmpty {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.adaptive(minimum: Space.s8 * 5), spacing: Space.s2, alignment: .leading)
+                            ],
+                            alignment: .leading, spacing: Space.s2
+                        ) {
+                            ForEach(chosen) { r in
+                                Label(r.name, systemImage: "tray.full").lineLimit(1)
+                                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .coreWell(radius: Radius.control)
+                            }
+                        }
+                    } else {
+                        Text("No code yet. Add repos any time from the project.").foregroundStyle(palette.text2)
                     }
-                } else {
-                    Text("No code yet. Add repos any time from the project.").foregroundStyle(palette.text2)
+                    if made != nil, progress.failed > 0, progress.settled {
+                        Text(
+                            "\(ProjectItem.count(progress.failed, "repo")) could not be copied. The rest are ready, so you can open the project now."
+                        )
+                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(model.wizardMissed) { m in
+                        CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
+                            Text("Not added").foregroundStyle(palette.error)
+                        }
+                    }
+                    ForEach(model.wizardIssues, id: \.self) {
+                        Text($0).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let e = model.writeError { CoreFieldError(e) }
                 }
             }
-            if made != nil, progress.failed > 0, progress.settled {
-                Text(
-                    "\(ProjectItem.count(progress.failed, "repo")) needs you. The others are ready, so you can open the project now."
-                )
-                .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            }
-            ForEach(model.wizardMissed) { m in
-                CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
-                    Text("Not added").foregroundStyle(palette.error)
-                }
-            }
-            ForEach(model.wizardIssues, id: \.self) {
-                Text($0).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-            }
-            if let e = model.writeError { CoreFieldError(e) }
+            .scrollIndicators(.automatic)
         }
+        .animation(Motion.out(Motion.ui), value: model.creating)
+        .animation(Motion.out(Motion.ui), value: made?.repos)
     }
 
     private func repoRow(_ p: ProjectItem, _ r: RepoItem) -> some View {
@@ -430,7 +452,7 @@ struct ProjectWizard: View {
         case .review:
             if made == nil {
                 CoreDialogFooter(
-                    cancel: CoreAction("Back") { go(.runs) },
+                    cancel: model.busy ? nil : CoreAction("Back") { go(.runs) },
                     primary: CoreAction("Create project", key: .primary, run: create), busy: model.busy)
             } else {
                 CoreDialogFooter(

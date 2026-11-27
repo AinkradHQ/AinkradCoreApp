@@ -528,3 +528,11 @@ struct BrainPlace: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
 }
+
+/// A create in progress: the project, then its repos one by one, then the Brain place and settings.
+struct CreateProgress: Equatable, Sendable {
+    enum Stage: Int, Sendable { case project, repos, finishing }
+    var stage: Stage
+    var added = 0
+    var total = 0
+}

@@ -16,7 +16,8 @@ struct RepoPicker: View {
     let model: ProjectsModel
     @Binding var picked: Set<String>
     @Binding var pasted: [PickRepo]
-    var height: CGFloat = Space.s8 * 7
+    /// nil: the list takes all the room it is given (the wizard).
+    var height: CGFloat? = Space.s8 * 7
     /// The repos the project already has: shown as such and left out of the picks.
     var existing: [RepoItem] = []
     @State private var query = ""
@@ -122,7 +123,7 @@ struct RepoPicker: View {
             .padding(Space.s1)
         }
         .scrollIndicators(.never)
-        .frame(height: height)
+        .frame(minHeight: height ?? Space.s8 * 4, maxHeight: height ?? .infinity)
         .coreCard(GlassInk.well, radius: Radius.cardMac)
         .clipShape(coreShape(Radius.cardMac))
     }

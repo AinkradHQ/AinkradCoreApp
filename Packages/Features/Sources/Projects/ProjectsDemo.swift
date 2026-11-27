@@ -97,8 +97,10 @@ public final class ProjectsDemo {
 
     public static let scenes = [
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
-        "gallery-failed", "new-empty", "new-name", "new-brain", "new-runs", "new-advanced", "space-no-repos",
-        "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
+        "gallery-failed", "new-empty", "new-name", "new-code", "new-review", "new-setting-up", "new-brain", "new-runs",
+        "new-advanced", "space-no-repos",
+        "space-add-repos", "space-copying", "space-many-repos", "space-setting-up", "space-ready", "overview-running",
+        "overview-starting",
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
         "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
@@ -225,6 +227,7 @@ public final class ProjectsDemo {
         model.stale = nil
         model.wizardMissed = []
         model.wizardIssues = []
+        model.creating = nil
         model.catalog = SampleRepoCatalog()
         ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
         model.clearWriteError()
@@ -258,6 +261,11 @@ public final class ProjectsDemo {
             list[0].idleNever = scene == "settings-limits"
             list[0].source = "github"
             list[0].createdAt = Date().addingTimeInterval(-86_400 * 12)
+        case "space-many-repos":
+            list[0].repos = (0..<14).map {
+                Self.lanternaRepo(
+                    Int64($0), "lanterna-\($0)", branch: "main", head: "4e1c9a2", minutes: 4, failing: $0 == 9)
+            }
         case "space-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "space-setting-up": list.insert(Self.tidepool(repos: 2), at: 0)
         case "space-ready": list.insert(Self.tidepool(repos: 2, draft: true), at: 0)
@@ -338,7 +346,8 @@ public final class ProjectsDemo {
             (look.mode, look.opacity, look.blur) = (.blurred, 0.12, 1)
             if scene == "overview-look" { model.openID = 1 }
         case "gallery-look-solid": (look.mode, look.opacity, look.blur) = (.solid, 1, 1)
-        case "overview-private", "overview-running", "overview-private-live", "overview-preview-busy",
+        case "overview-private", "overview-running", "space-many-repos", "overview-private-live",
+            "overview-preview-busy",
             "overview-metrics", "overview-crashed":
             model.openID = 1
         case "overview-never-opened": model.openID = 4
@@ -376,6 +385,12 @@ public final class ProjectsDemo {
         case "gallery-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
         case "new-empty": model.newProject()
         case "new-name": NewProjectDialogs.openWizard(model, name: "Tidepool")
+        case "new-code": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .code)
+        case "new-review":
+            NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL], step: .review)
+        case "new-setting-up":
+            NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL], step: .review)
+            model.creating = CreateProgress(stage: .repos, added: 9, total: 22)
         case "new-brain": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .brain)
         case "new-runs": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .runs)
         case "new-advanced":

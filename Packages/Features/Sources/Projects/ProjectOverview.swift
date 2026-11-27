@@ -331,16 +331,21 @@ struct Overview: View {
         if project.repos.isEmpty {
             Text("No repos yet.").foregroundStyle(GlassInk.secondary)
         } else {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                ForEach(project.repos) { r in
-                    CoreRow(r.name, subtitle: repoLine(r), symbol: "arrow.triangle.branch") {
-                        if r.fetchError != nil {
-                            StateBadge("Copy failed", tone: .fail, symbol: "exclamationmark.triangle")
+            // Many repos scroll inside the island; the ones that need a look come first.
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    ForEach(project.repos.filter { $0.copy.isFailed } + project.repos.filter { !$0.copy.isFailed }) {
+                        r in
+                        CoreRow(r.name, subtitle: repoLine(r), symbol: "arrow.triangle.branch") {
+                            if r.fetchError != nil {
+                                StateBadge("Copy failed", tone: .fail, symbol: "exclamationmark.triangle")
+                            }
                         }
+                        .help(r.remoteURL)
                     }
-                    .help(r.remoteURL)
                 }
             }
+            .scrollIndicators(.automatic)
         }
     }
 

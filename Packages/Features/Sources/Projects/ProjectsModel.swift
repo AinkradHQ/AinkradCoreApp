@@ -44,6 +44,8 @@ public final class ProjectsModel {
     internal(set) var runnerSupported = false
     /// The project the New Project wizard just made: its review step shows that project's repos copying.
     internal(set) var wizardProjectID: Int64?
+    /// What a create in progress has done, for the wizard's setup list; nil when none runs.
+    internal(set) var creating: CreateProgress?
     /// What the wizard's Brain step offers (`loadPlaces`).
     internal(set) var places: [BrainPlace]?
 
@@ -520,7 +522,11 @@ public final class ProjectsModel {
         writeError = nil
         wizardMissed = []
         wizardIssues = []
-        defer { busy = false }
+        creating = CreateProgress(stage: .project, total: repos.count)
+        defer {
+            busy = false
+            creating = nil
+        }
         var made: ProjectItem?
         var missed: [MissedRepo] = []
         var issues: [String] = []
@@ -531,26 +537,32 @@ public final class ProjectsModel {
             ) {
                 var patch = ProjectPatch(expose: expose)
                 if self.core110 { patch.colour = colour.rawValue }
-                let viaGithub = !github.isEmpty && github.count == repos.count && repos.count <= 10
-                if viaGithub {
-                    made = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
-                        try await service.createFromGithub(slug: $0, name: name, repos: github.compactMap(\.fullName))
+                // GitHub repos first: the Core's from-github route takes up to 10 in one call (with GitHub's own default
+                // branches); the rest are added one by one, each counted on the wizard's setup list.
+                let ordered = github + repos.filter { $0.fullName == nil }
+                let batch = ordered.prefix(while: { $0.fullName != nil }).prefix(10)
+                let p: ProjectItem
+                if !batch.isEmpty {
+                    p = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
+                        try await service.createFromGithub(slug: $0, name: name, repos: batch.compactMap(\.fullName))
                     }
                     patch.description = description.isEmpty ? nil : description
                     patch.runner = runner == nil || runner == "auto" ? nil : runner
                 } else {
-                    let p = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
+                    p = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
                         try await service.create(slug: $0, name: name, description: description, runner: runner)
                     }
-                    made = p
-                    for (i, r) in repos.enumerated() {
-                        do {
-                            try await service.addRepo(
-                                project: p.id, name: r.name, url: r.url, branch: r.defaultBranch ?? "main",
-                                primary: i == 0)
-                        } catch { missed.append(MissedRepo(name: r.name, why: self.words(error))) }
-                    }
                 }
+                made = p
+                self.creating = CreateProgress(stage: .repos, added: batch.count, total: repos.count)
+                for (i, r) in ordered.enumerated().dropFirst(batch.count) {
+                    do {
+                        try await service.addRepo(
+                            project: p.id, name: r.name, url: r.url, branch: r.defaultBranch ?? "main", primary: i == 0)
+                    } catch { missed.append(MissedRepo(name: r.name, why: self.words(error))) }
+                    self.creating?.added += 1
+                }
+                self.creating?.stage = .finishing
                 if let made, let place {
                     do { try await service.linkPlace(project: made.id, room: place.id) } catch {
                         issues.append(

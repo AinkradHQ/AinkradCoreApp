@@ -215,3 +215,82 @@ struct WizardChoiceTile: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
+
+/// The create, told as it happens: the project, its repos one by one, the Brain place and settings, then the Core copying
+/// the code. Done steps show a check, the running one pulses with its own bar, later ones wait dimmed.
+struct WizardSetupList: View {
+    let creating: CreateProgress?
+    let made: ProjectItem?
+    let copy: WizardProgress?
+    @Environment(\.coreAccent) private var accent
+    @Environment(\.corePalette) private var palette
+
+    private enum State { case waiting, running, done }
+
+    var body: some View {
+        let stage = creating?.stage
+        let total = creating?.total ?? made?.repos.count ?? 0
+        let copied = copy?.ready ?? 0
+        let copyTotal = made?.repos.count ?? 0
+        VStack(alignment: .leading, spacing: Space.s2) {
+            row(
+                "Create the project", nil, state: stage == .project ? .running : .done, value: nil,
+                symbol: "square.grid.2x2")
+            if total > 0 {
+                let added = creating?.added ?? total
+                row(
+                    "Add the repos", "\(added) of \(total)",
+                    state: stage == .project ? .waiting : stage == .repos ? .running : .done,
+                    value: Double(added) / Double(total), symbol: "tray.full")
+            }
+            row(
+                "Brain place and settings", nil,
+                state: stage == .finishing ? .running : made != nil && creating == nil ? .done : .waiting,
+                value: nil, symbol: "brain")
+            if copyTotal > 0 {
+                row(
+                    "Copy the code", "\(copied) of \(copyTotal)",
+                    state: creating != nil ? .waiting : copy?.settled == true ? .done : .running,
+                    value: Double(copied) / Double(copyTotal), symbol: "arrow.down.doc")
+            }
+        }
+        .padding(Space.s3)
+        .coreWell(radius: Radius.cardMac)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Setup progress")
+    }
+
+    private func row(_ title: String, _ count: String?, state: State, value: Double?, symbol: String) -> some View {
+        HStack(spacing: Space.s3) {
+            ZStack {
+                switch state {
+                case .done:
+                    Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold).foregroundStyle(
+                        .white
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                case .running, .waiting:
+                    Image(systemName: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
+                        .foregroundStyle(state == .running ? .white : palette.text2)
+                }
+            }
+            .frame(width: Space.s6, height: Space.s6)
+            .background(
+                state == .waiting ? GlassInk.well : state == .done ? palette.success : GlassInk.accent(accent),
+                in: coreShape(Radius.chip)
+            )
+            .corePulse(state == .running)
+            VStack(alignment: .leading, spacing: Space.s1) {
+                HStack {
+                    Text(title).coreFont(size: MacTextSize.body, weight: state == .running ? .semibold : .regular)
+                    Spacer()
+                    if let count {
+                        Text(count).monospacedDigit().foregroundStyle(palette.text2).contentTransition(.numericText())
+                    }
+                }
+                if state == .running, let value { CoreMeter(value, label: title).transition(.opacity) }
+            }
+        }
+        .opacity(state == .waiting ? 0.5 : 1)
+    }
+}
