@@ -44,6 +44,8 @@ public final class ProjectsModel {
     internal(set) var runnerSupported = false
     /// The project the New Project wizard just made: its review step shows that project's repos copying.
     internal(set) var wizardProjectID: Int64?
+    /// What the wizard's Brain step offers (`loadPlaces`).
+    internal(set) var places: [BrainPlace]?
 
     internal(set) var projects: [ProjectItem] = []
     var load: ProjectsLoad = .notConnected
@@ -473,6 +475,13 @@ public final class ProjectsModel {
     func clearWriteError() { writeError = nil }
 
     /// The wizard's "Open project": closes it and opens the new project's space.
+    /// The Brain places the wizard offers, without the ones another project has; nil when the Core has no Brain.
+    func loadPlaces() async {
+        guard let service else { return }
+        let taken = Set(projects.compactMap(\.roomID))
+        places = (try? await service.places())?.map { $0.filter { !taken.contains($0.id) } }
+    }
+
     func openWizardProject() {
         host.shell.closeDialog()
         if let id = wizardProjectID { openProject(id) }
@@ -490,7 +499,8 @@ public final class ProjectsModel {
     @discardableResult
     func create(
         name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = [], expose: Bool? = nil,
-        runner: String? = nil, description: String = "", autoSuffix: Bool = false, wizard: Bool = false
+        runner: String? = nil, description: String = "", autoSuffix: Bool = false, wizard: Bool = false,
+        place: BrainPlace? = nil
     ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard let service, !busy, mayWrite() else { return false }
@@ -539,6 +549,13 @@ public final class ProjectsModel {
                                 project: p.id, name: r.name, url: r.url, branch: r.defaultBranch ?? "main",
                                 primary: i == 0)
                         } catch { missed.append(MissedRepo(name: r.name, why: self.words(error))) }
+                    }
+                }
+                if let made, let place {
+                    do { try await service.linkPlace(project: made.id, room: place.id) } catch {
+                        issues.append(
+                            "Could not link the Brain place \(place.name): \(self.words(error)) It has a new place instead."
+                        )
                     }
                 }
                 if let made, !patch.isEmpty {

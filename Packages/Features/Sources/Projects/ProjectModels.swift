@@ -154,6 +154,8 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// `manual` or `github`: how the project was made.
     var source = "manual"
     var createdAt: Date?
+    /// The Brain place (room) linked to it (`ProjectInfo.room`); nil without the Brain or before it is linked.
+    var roomID: String?
     /// Set aside with Archive: it keeps its repos, secrets and notes but does not run.
     var archived = false
     /// The Core has been asked whether the project has a run setup (its spec); `draft` is that setup when it has one.
@@ -519,4 +521,10 @@ public struct ProjectRef: Identifiable, Equatable, Hashable, Sendable {
         self.id = id
         self.name = name
     }
+}
+
+/// A Brain place (room) a new project can be linked to instead of getting a new one.
+struct BrainPlace: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
 }

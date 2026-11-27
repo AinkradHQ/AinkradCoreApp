@@ -73,6 +73,12 @@ public final class ProjectsDemo {
             ]
         }
         func unarchive(project: Int64) async throws {}
+        func places() async throws -> [BrainPlace]? {
+            [
+                BrainPlace(id: "r1", name: "Tidepool research"), BrainPlace(id: "r2", name: "Client notes"),
+                BrainPlace(id: "r3", name: "Side ideas"),
+            ]
+        }
         func runners() async throws -> [RunnerInfo] {
             [
                 RunnerInfo(id: "d_mac", name: "Studio Mac", os: "macos", online: true),
@@ -91,7 +97,7 @@ public final class ProjectsDemo {
 
     public static let scenes = [
         "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
-        "gallery-failed", "new-empty", "new-name", "new-runs", "new-advanced", "space-no-repos",
+        "gallery-failed", "new-empty", "new-name", "new-brain", "new-runs", "new-advanced", "space-no-repos",
         "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
@@ -370,6 +376,7 @@ public final class ProjectsDemo {
         case "gallery-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
         case "new-empty": model.newProject()
         case "new-name": NewProjectDialogs.openWizard(model, name: "Tidepool")
+        case "new-brain": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .brain)
         case "new-runs": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .runs)
         case "new-advanced":
             NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])

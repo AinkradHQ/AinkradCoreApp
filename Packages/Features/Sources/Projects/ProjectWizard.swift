@@ -1,15 +1,16 @@
 import CoreUI
 import SwiftUI
 
-/// The four steps of the New Project wizard (D-30): name, code (GitHub first), where it runs, review.
+/// The steps of the New Project wizard (D-30): name, code (GitHub first), Brain place, where it runs, review.
 enum WizardStep: Int, CaseIterable {
     case name = 1
-    case code, runs, review
+    case code, brain, runs, review
 
     var title: String {
         switch self {
         case .name: "Name"
         case .code: "Code"
+        case .brain: "Brain"
         case .runs: "Where it runs"
         case .review: "Review"
         }
@@ -34,6 +35,9 @@ struct ProjectWizard: View {
     @State private var picked: Set<String>
     @State private var pasted: [PickRepo] = []
     @State private var runner = WizardRunner.auto
+    /// The existing Brain place to link; nil makes a new one named after the project.
+    @State private var place: BrainPlace?
+    @State private var existingPlace = false
     @State private var publicLink = false
     /// "Start with no code": the code step is passed with nothing picked.
     @State private var noCode = false
@@ -82,6 +86,7 @@ struct ProjectWizard: View {
                             switch step {
                             case .name: nameStep
                             case .code: codeStep
+                            case .brain: brainStep
                             case .runs: runsStep
                             case .review: reviewStep
                             }
@@ -98,7 +103,8 @@ struct ProjectWizard: View {
                         name: name, colour: colour,
                         host: name.isEmpty || slugProblem != nil ? nil : ProjectRules.host(slug),
                         repos: (made?.repos.map(\.name)) ?? chosen.map(\.name), runner: runner, publicLink: publicLink,
-                        step: step, progress: made.map { WizardProgress($0.repos) })
+                        place: existingPlace ? place?.name : nil, step: step,
+                        progress: made.map { WizardProgress($0.repos) })
                 }
                 .frame(height: Space.s8 * 14 + Space.s4)
                 footer
@@ -128,7 +134,7 @@ struct ProjectWizard: View {
                 }
             }
             .accessibilityHidden(true)
-            Text("Step \(step.rawValue) of 4 · \(step.title)").foregroundStyle(palette.text2)
+            Text("Step \(step.rawValue) of \(WizardStep.allCases.count) · \(step.title)").foregroundStyle(palette.text2)
                 .contentTransition(.opacity)
             Spacer()
             Button(action: close) { Image(systemName: "xmark") }
@@ -244,7 +250,55 @@ struct ProjectWizard: View {
         linkText = ""
     }
 
-    // MARK: 3 · where it runs
+    // MARK: 3 · Brain place
+
+    private var brainStep: some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            DialogHead(
+                title: "Where should the Brain keep it?",
+                line: "Notes, decisions and what the AI learns about this project live in a Brain place.")
+            if let places = model.places {
+                HStack(spacing: Space.s2) {
+                    WizardChoiceTile(
+                        symbol: "plus.square", title: "New place · Best",
+                        line: "A place named “\(name.trimmingCharacters(in: .whitespaces))”, just for this project.",
+                        selected: !existingPlace
+                    ) { existingPlace = false }
+                    WizardChoiceTile(
+                        symbol: "square.stack", title: "Use an existing place",
+                        line: places.isEmpty
+                            ? "Every place already belongs to a project." : "Link a place you already keep notes in.",
+                        selected: existingPlace
+                    ) {
+                        guard !places.isEmpty else { return }
+                        existingPlace = true
+                        if place == nil { place = places.first }
+                    }
+                    .disabled(places.isEmpty)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                if existingPlace {
+                    ScrollView {
+                        VStack(spacing: Space.s1) {
+                            ForEach(places) { p in
+                                CoreRow(p.name, symbol: "square.stack", selected: place == p) { place = p }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: Space.s8 * 5)
+                    .scrollIndicators(.never)
+                    .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -6))))
+                }
+            } else {
+                Text("This Core has no Brain, so the project gets no place. You can turn the Brain on later.")
+                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .animation(Motion.out(Motion.ui), value: existingPlace)
+        .task { await model.loadPlaces() }
+    }
+
+    // MARK: 4 · where it runs
 
     private var runsStep: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
@@ -358,16 +412,20 @@ struct ProjectWizard: View {
         case .code:
             CoreDialogFooter(
                 cancel: CoreAction("Back") { go(.name) },
-                primary: CoreAction("Next", key: .primary) { go(.runs) },
+                primary: CoreAction("Next", key: .primary) { go(.brain) },
                 alternate: needsGithub
                     ? CoreAction("Start with no code") {
                         noCode = true
-                        go(.runs)
+                        go(.brain)
                     } : nil,
                 enabled: !needsGithub)
-        case .runs:
+        case .brain:
             CoreDialogFooter(
                 cancel: CoreAction("Back") { go(.code) },
+                primary: CoreAction("Next", key: .primary) { go(.runs) })
+        case .runs:
+            CoreDialogFooter(
+                cancel: CoreAction("Back") { go(.brain) },
                 primary: CoreAction("Next", key: .primary) { go(.review) })
         case .review:
             if made == nil {
@@ -387,7 +445,8 @@ struct ProjectWizard: View {
         Task {
             await model.create(
                 name: name, slug: slug, colour: colour, repos: chosen, expose: publicLink, runner: runner.rawValue,
-                description: description.trimmingCharacters(in: .whitespaces), autoSuffix: !slugEdited, wizard: true)
+                description: description.trimmingCharacters(in: .whitespaces), autoSuffix: !slugEdited, wizard: true,
+                place: existingPlace ? place : nil)
         }
     }
 }

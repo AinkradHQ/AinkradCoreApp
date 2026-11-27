@@ -79,6 +79,8 @@ struct WizardPreviewCard: View {
     let repos: [String]
     let runner: WizardRunner
     let publicLink: Bool
+    /// The existing Brain place picked; nil means a new one.
+    let place: String?
     let step: WizardStep
     /// The repos' copy states once the project exists.
     let progress: WizardProgress?
@@ -126,6 +128,10 @@ struct WizardPreviewCard: View {
                     }
                     if repos.count > 4 { Text("and \(repos.count - 4) more").foregroundStyle(palette.text2) }
                 }
+            }
+            section("Brain", lit: lit(.brain)) {
+                Label(place ?? "New place “\(shownName)”", systemImage: place == nil ? "plus.square" : "square.stack")
+                    .lineLimit(1).contentTransition(.opacity)
             }
             section("Runs on", lit: lit(.runs)) {
                 Label(runner.title, systemImage: runner.symbol).contentTransition(.opacity)
