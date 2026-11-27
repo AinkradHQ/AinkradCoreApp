@@ -104,19 +104,21 @@ extension ProjectsModel {
     // MARK: AI sessions
 
     func canStartSession(_ p: ProjectItem) -> Bool {
-        sessionStarter != nil && !p.repos.isEmpty && !p.archived && !readOnly
+        sessionStarter != nil && (!p.repos.isEmpty || core111) && !p.archived && !readOnly
     }
 
     func sessionBlock(_ p: ProjectItem) -> String {
         if p.archived { return "An archived project cannot start AI sessions." }
-        if p.repos.isEmpty && p.kind == .other {
-            return
-                "This Core starts an AI session in a project's repos, so add a repo (a notes or docs repo is fine) first."
+        if p.repos.isEmpty && !core111 {
+            return p.kind == .other
+                ? "This Core starts an AI session in a project's repos, so add a repo (a notes or docs repo is fine) first."
+                : "Add a repo first. A session works in a copy of the project's repos."
         }
-        if p.repos.isEmpty { return "Add a repo first. A session works in a copy of the project's repos." }
         if readOnly { return "This device can look at projects but not change them." }
         if sessionStarter == nil { return "Connect to a Core to start an AI session." }
-        return "Start an AI session in its own copy of \(p.name)'s repos"
+        return p.repos.isEmpty
+            ? "Start an AI session in its own folder, with \(p.name)'s Brain place"
+            : "Start an AI session in its own copy of \(p.name)'s repos"
     }
 
     /// New AI Session in the project: a session in its own clone, opened in AI Sessions.

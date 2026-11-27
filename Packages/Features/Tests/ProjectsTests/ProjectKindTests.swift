@@ -109,3 +109,30 @@ struct KindWireTests {
         #expect(o["kind"] as? String == "other" && o["color"] == nil)
     }
 }
+
+@MainActor
+struct NoRepoSessionTests {
+    private func model(core111: Bool) async -> (ProjectsModel, ProjectItem) {
+        let m = ProjectsModel(host: FakeHost(), defaults: UserDefaults(suiteName: "kind-sess-\(UUID())")!)
+        m.use(FakeService())
+        _ = await until { m.load == .ready }
+        m.sessionStarter = { _ in nil }
+        m.core111 = core111
+        let p = ProjectItem(
+            id: 1, slug: "book", name: "Book", description: "", expose: false, repos: [], updatedAt: Date())
+        return (m, p)
+    }
+
+    @Test func aProjectWithNoReposNeedsACoreThatAllowsIt() async {
+        let (old, p) = await model(core111: false)
+        #expect(!old.canStartSession(p) && old.sessionBlock(p).contains("repo"))
+        let (new, q) = await model(core111: true)
+        #expect(new.canStartSession(q) && new.sessionBlock(q).contains("own folder"))
+    }
+
+    @Test func anArchivedProjectStillCannot() async {
+        var (m, p) = await model(core111: true)
+        p.archived = true
+        #expect(!m.canStartSession(p))
+    }
+}

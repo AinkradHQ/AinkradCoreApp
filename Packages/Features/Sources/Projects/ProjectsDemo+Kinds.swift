@@ -10,7 +10,7 @@ extension ProjectsDemo {
     ]
 
     /// The scenes that show a Core with API 111 (it holds the kind).
-    static let core111Scenes: Set<String> = ["page-settings-kind", "gallery-kinds"]
+    static let core111Scenes: Set<String> = ["page-settings-kind", "gallery-kinds", "overview-other"]
 
     static let iosURL = "https://github.com/tidepool-labs/tidepool-ios"
 

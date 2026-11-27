@@ -181,10 +181,10 @@ struct Overview: View {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if list.isEmpty {
                     Text(
-                        project.kind == .other
-                            ? (project.repos.isEmpty
-                                ? "No AI sessions yet. This Core runs them in a repo, so add a notes or docs repo to start one."
-                                : "No AI sessions yet. New ones start in their own copy of this project's repos.")
+                        project.repos.isEmpty
+                            ? (model.core111
+                                ? "No AI sessions yet. New ones start in their own folder, with this project's Brain place."
+                                : "No AI sessions yet. This Core runs them in a repo, so add a repo to start one.")
                             : "No AI sessions yet. New ones start in their own clone of this project's repos."
                     )
                     .fixedSize(horizontal: false, vertical: true)
