@@ -19,7 +19,7 @@ struct DesignCard: View {
         hovering
         #endif
     }
-    private var selected: Bool { model.selected == item.id }
+    private var selected: Bool { model.selected == item.id || model.lib.multi.contains(item.id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
@@ -36,11 +36,18 @@ struct DesignCard: View {
                     Image(systemName: item.symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                         .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
                     Text(item.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                    if model.lib.isFavourite(item) {
+                        Image(systemName: "star.fill").coreFont(size: MacTextSize.meta)
+                            .foregroundStyle(GlassInk.secondary).accessibilityLabel("Favourite")
+                    }
                 }
                 HStack(spacing: Space.s2) {
                     Text(DesignCard.short(model, item)).coreFont(size: MacTextSize.meta)
                         .foregroundStyle(GlassInk.secondary).lineLimit(1)
                     if let b = ItemBadge.of(item) { StateBadge(b.label, tone: b.tone, symbol: b.symbol) }
+                    if case .doc(let d) = item, let a = model.collab.badge(d.id) {
+                        StateBadge(a.label, tone: a.changed ? .queue : .done, symbol: a.changed ? "pencil.circle" : "checkmark.circle")
+                    }
                 }
             }
             .padding(.horizontal, Space.s1)
@@ -50,9 +57,9 @@ struct DesignCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(selected ? palette.btnPrimary.opacity(0.2) : .clear, in: coreShape(Radius.pane))
         .contentShape(coreShape(Radius.pane))
-        .onTapGesture {
-            model.selected = item.id
-            model.openItem(item.id)
+        .onTapGesture { model.cardTap(item) }
+        .task {
+            if case .doc(let d) = item, d.kind == .design { await model.collab.loadApprovalsOnce(d.id) }
         }
         .coreRise(settled, index)
         .animation(Motion.out(Motion.hover), value: lit)
@@ -138,6 +145,14 @@ struct DesignMenu: View {
     let model: DesignModel
     let item: DesignItem
     var body: some View {
+        if model.category == .archived, case .doc(let d) = item {
+            Button("Restore") { Task { await model.restore(d) } }.disabled(!model.lib.restoreSupported)
+        } else {
+            menu
+        }
+    }
+
+    @ViewBuilder private var menu: some View {
         Button("Open") { model.openItem(item.id) }
         Menu("Projects") {
             ForEach(model.allProjects) { p in
@@ -152,7 +167,8 @@ struct DesignMenu: View {
         .disabled(model.allProjects.isEmpty || model.readOnly)
         Divider()
         Button("Rename…") { model.askRename(item) }.disabled(model.readOnly)
-        Button("Delete…", role: .destructive) { model.askDelete(item) }.disabled(model.readOnly)
+        Button("Delete…", role: .destructive) { model.askDelete(model.targets(item)) }.disabled(model.readOnly)
+        DesignMenuExtras(model: model, item: item)
     }
 }
 

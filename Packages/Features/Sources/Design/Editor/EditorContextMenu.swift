@@ -14,7 +14,7 @@ struct CanvasLayerMenu: View {
         let canParent = first?.parent.flatMap { editor.layers[$0] }.map { $0.type != "page" } ?? false
         let ro = editor.readOnly
         Button("Rename") { if let id = ids.first { editor.renaming = id } }.disabled(ro || !one)
-        Button("Duplicate") { editor.duplicateSelection() }.disabled(ro)
+        Button("Duplicate") { _ = editor.duplicate() }.disabled(ro)
         Divider()
         Button("Bring Forward") { if let id = ids.first { editor.step(id, up: true) } }.disabled(ro || !one)
         Button("Send Backward") { if let id = ids.first { editor.step(id, up: false) } }.disabled(ro || !one)

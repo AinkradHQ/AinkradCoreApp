@@ -88,10 +88,10 @@ extension DesignEditor {
         let picked = selection.first.flatMap { layers[$0] }
         let into =
             isFrame
-            ? layers.children(of: nil).first
+            ? currentPage
             : (picked?.isContainer == true && picked?.type != "page" ? picked : picked?.parent.flatMap { layers[$0] })
                 .flatMap { $0.type == "page" ? nil : $0 }
-                ?? layers.layers.first { $0.type == "frame" } ?? layers.children(of: nil).first
+                ?? currentPage.flatMap { p in layers.children(of: p.id).first { $0.type == "frame" } } ?? currentPage
         guard let parent = into else { return false }
         let siblings = layers.children(of: parent.id)
         guard let order = FractionalOrder.between(siblings.last?.order, nil) else { return false }
@@ -230,6 +230,7 @@ struct CanvasToolbar: View {
                 [.text], symbol: CanvasTool.text.symbol, presets: InsertPreset.texts, label: "Text",
                 presetsTitle: "Place text")
             images
+            ComponentsMenu(editor: editor)
             divider
             Button {
                 Task { await model.drawWithAI() }
@@ -244,6 +245,8 @@ struct CanvasToolbar: View {
                     ? "Draw with AI: describe it, AI draws it here" : "This Core cannot draw with AI yet"
             )
             .accessibilityLabel("Draw with AI")
+            divider
+            ZoomMenu(editor: editor)
             divider
             AskField(editor: editor)
         }

@@ -47,6 +47,7 @@ struct LayersIsland: View {
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s2) {
+                if editor.attached { PageSwitcher(editor: editor) }
                 if finding {
                     HStack(spacing: Space.s2) {
                         Image(systemName: "magnifyingglass").foregroundStyle(GlassInk.secondary).accessibilityHidden(
@@ -211,6 +212,18 @@ private struct LayerRowView: View {
                 .foregroundStyle(GlassInk.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            if !page, hovering || layer.locked {
+                Button {
+                    editor.setLocked([layer.id], !layer.locked)
+                } label: {
+                    Image(systemName: layer.locked ? "lock.fill" : "lock.open").coreFont(size: 11)
+                        .foregroundStyle(GlassInk.secondary).frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(layer.locked ? "Unlock Layer" : "Lock Layer")
+                .accessibilityLabel(layer.locked ? "Unlock Layer" : "Lock Layer")
+                .transition(.opacity)
+            }
             if !page, hovering || layer.hidden {
                 Button {
                     editor.setHidden(layer.id, !layer.hidden)
@@ -253,7 +266,9 @@ private struct LayerRowView: View {
         .help(layer.title)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(layer.title)
-        .accessibilityValue(layer.hidden ? "Hidden" : "")
+        .accessibilityValue(
+            [layer.hidden ? "Hidden" : "", layer.locked ? "Locked" : ""].filter { !$0.isEmpty }.joined(separator: ", ")
+        )
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityAction(named: "Move Forward") { editor.step(layer.id, up: true) }
         .accessibilityAction(named: "Move Backward") { editor.step(layer.id, up: false) }
@@ -324,6 +339,7 @@ private struct LayerRowView: View {
         if !page {
             Button("Rename") { beginRename() }.disabled(editor.readOnly)
             Button(layer.hidden ? "Show Layer" : "Hide Layer") { editor.setHidden(layer.id, !layer.hidden) }
+            Button(layer.locked ? "Unlock Layer" : "Lock Layer") { editor.setLocked([layer.id], !layer.locked) }
                 .disabled(editor.readOnly)
             Divider()
             Button("Move Forward") { editor.step(layer.id, up: true) }.disabled(editor.readOnly)

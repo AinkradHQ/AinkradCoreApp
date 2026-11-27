@@ -18,6 +18,17 @@ final class DesignEditor {
     private(set) var selection: [String] = []
     private(set) var node: EditorNode?
     private(set) var peers: [DesignPeer] = []
+    /// Who is on the canvas, as the engine lists them (follow a person from the header).
+    private(set) var collaborators: [Collaborator] = []
+    /// The page shown, as its place among the design's pages.
+    var pageIndex = 0
+    var shortcutsOpen = false
+    #if DEBUG
+    /// Debug only: an inspector section (its title) the snapshot walk wants in view.
+    var inspectorScroll: String?
+    #endif
+    /// Fonts in the library that the canvas can draw (set by the stage from the model's assets).
+    var libraryFonts: [DesignAsset] = []
     private(set) var tokens: [DesignToken] = []
     /// A design system's own tokens with their values (the style guide), name order.
     private(set) var systemTokens: [SystemToken] = []
@@ -71,7 +82,7 @@ final class DesignEditor {
     @ObservationIgnored let service: (any DesignService)?
     /// Held strongly: the canvas hands over a fresh object and keeps none, so a weak hold dropped it at once and the
     /// chrome never saw the canvas (no layers, no selection). The object holds the canvas view weakly, so no cycle.
-    private var backend: (any DesignEditBackend)?
+    private(set) var backend: (any DesignEditBackend)?
     @ObservationIgnored private var pending = false
     /// What a brand-new design starts with (its page and a frame of the default canvas); written once, when the canvas is up
     /// and the design is still empty.
@@ -89,6 +100,7 @@ final class DesignEditor {
     func attach(_ backend: (any DesignEditBackend)?) {
         self.backend = backend
         backend?.setReadOnly(readOnly)
+        backend?.setKeyHandler { [weak self] key in self?.handle(key) ?? false }
         reload()
     }
 
@@ -104,12 +116,6 @@ final class DesignEditor {
     }
 
     func retryAssets() { backend?.retryAssets() }
-
-    func duplicateSelection() {
-        guard !readOnly, !selection.isEmpty else { return }
-        backend?.duplicate()
-        reload()
-    }
 
     var attached: Bool { backend != nil }
 
@@ -242,6 +248,10 @@ final class DesignEditor {
                     }
             } ?? []
         peers = DesignPeer.decode(b.peers())
+        let people = Collaborator.decode(b.presenceList())
+        if people != collaborators { collaborators = people }
+        let pageCount = pages.count
+        if pageIndex >= pageCount { pageIndex = max(0, pageCount - 1) }
         // Linked tokens follow the system doc: read again (cheap, a short list) so an edit there shows here.
         let fresh = b.tokens().flatMap { try? JSONDecoder().decode([DesignToken].self, from: $0) } ?? []
         if fresh != tokens { tokens = fresh }
@@ -300,18 +310,6 @@ final class DesignEditor {
         return false
     }
 
-    /// Selects several layers (⌘ and ⇧-click in the panel).
-    @discardableResult
-    func selectMany(_ ids: [String]) -> Bool {
-        guard let b = backend else { return false }
-        fromPanel = true
-        if b.select(ids) {
-            reload()
-            return true
-        }
-        return false
-    }
-
     /// Deletes every selected layer (never a page; a layer inside another selected one goes with it).
     func deleteSelected() {
         let ids = Set(selection.filter { layers[$0].map { $0.type != "page" } ?? false })
@@ -323,6 +321,15 @@ final class DesignEditor {
     func selectParent() {
         guard let id = selection.first, let p = layers[id]?.parent, layers[p]?.type != "page" else { return }
         select(p, quiet: true)
+    }
+
+    /// Selects several layers (a flow of screens).
+    @discardableResult func select(_ ids: [String], quiet: Bool = false) -> Bool {
+        guard let b = backend else { return false }
+        fromPanel = true
+        guard b.select(ids) else { return false }
+        reload()
+        return true
     }
 
     func rename(_ id: String, to name: String) {

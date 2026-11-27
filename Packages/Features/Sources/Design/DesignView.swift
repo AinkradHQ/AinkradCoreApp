@@ -54,9 +54,14 @@ struct DesignHome: View {
                 DesignSubRow(model: model).padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
                     .transition(.opacity)
             }
+            ArchivedNote(model: model)
+            UploadStrip(model: model)
             wall.frame(maxWidth: .infinity, maxHeight: .infinity)
+            BulkBar(model: model).padding(.bottom, Space.s2)
             DesignFooter(model: model)
         }
+        .modifier(LibraryDrop(model: model))
+        .animation(Motion.out(Motion.ui), value: model.lib.multi.isEmpty)
         .animation(Motion.out(Motion.ui), value: model.category.page == .library)
     }
 
@@ -118,6 +123,11 @@ private struct DesignHeader: View {
                 ) { model.pick(page) }
                 .accessibilityIdentifier("design-tab-\(page.rawValue)")
             }
+            AppFilterTile(
+                title: DesignCategory.archived.short, count: model.count(.archived),
+                on: model.category == .archived, key: ""
+            ) { model.pick(.archived) }
+            .accessibilityIdentifier("design-tab-archived")
         } actions: {
             if let p = model.project {
                 Button {
@@ -130,6 +140,7 @@ private struct DesignHeader: View {
                 .accessibilityIdentifier("design-project-chip")
             }
             DesignFind(text: Binding(get: { model.filter }, set: { model.filter = $0 }), focus: findFocus)
+            LibrarySortMenu(model: model)
             if model.composeSupported && !model.readOnly {
                 AppActionTile(title: "Draw with AI", symbol: "sparkles", key: "", hue: GlassInk.accent(paneAccent)) {
                     Task { await model.drawWithAI() }
@@ -168,6 +179,7 @@ private struct DesignSubRow: View {
                 ForEach(DesignCategory.libraryKinds) { tile($0, $0.short) }
             }
             Spacer(minLength: 0)
+            if model.category.page == .library { LibraryAddMenu(model: model) }
         }
     }
 

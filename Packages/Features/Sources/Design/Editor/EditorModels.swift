@@ -63,14 +63,23 @@ struct DesignLayer: Identifiable, Equatable, Sendable, Decodable {
     var order: String
     var name: String
     var hidden: Bool
+    /// Locked layers cannot be picked or moved on the canvas (the layers panel and inspector still reach them).
+    var locked: Bool
+    /// Degrees, clockwise.
+    var rotation: Double
 
-    init(id: String, type: String, parent: String?, order: String, name: String = "", hidden: Bool = false) {
+    init(
+        id: String, type: String, parent: String?, order: String, name: String = "", hidden: Bool = false,
+        locked: Bool = false, rotation: Double = 0
+    ) {
         self.id = id
         self.type = type
         self.parent = parent
         self.order = order
         self.name = name
         self.hidden = hidden
+        self.locked = locked
+        self.rotation = rotation
     }
 
     init(from decoder: any Decoder) throws {
@@ -81,8 +90,10 @@ struct DesignLayer: Identifiable, Equatable, Sendable, Decodable {
         order = try c.decodeIfPresent(String.self, forKey: .order) ?? "i"
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
         hidden = try c.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
+        locked = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
+        rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
     }
-    private enum Keys: String, CodingKey { case id, type, parent, order, name, hidden }
+    private enum Keys: String, CodingKey { case id, type, parent, order, name, hidden, locked, rotation }
 
     /// Frames, pages and components hold children (T1 `is_container`); an instance's children come from its component.
     var isContainer: Bool { ["page", "frame", "component"].contains(type) }
@@ -212,8 +223,6 @@ public protocol DesignEditBackend: AnyObject {
     func retryAssets()
     /// Read only: the canvas selects but never edits.
     func setReadOnly(_ on: Bool)
-    /// ⌘D on the selection.
-    func duplicate()
     /// The first snapshot from the Core has reached the canvas.
     var loaded: Bool { get }
     /// The sync socket to the Core is open.
@@ -231,6 +240,35 @@ public protocol DesignEditBackend: AnyObject {
     func fit(_ rect: CGRect)
     /// Presenting: clicks report the node under them (prototype links) and nothing is edited; nil ends it.
     func present(_ tap: (@MainActor (String?) -> Void)?)
+    /// The people and AI sessions on the canvas (`[{peer, label, kind, following}]`, oldest first); nil while unknown.
+    func presenceList() -> Data?
+    /// Follows a peer's view (its `peer` id); an empty id stops.
+    func follow(_ peer: String)
+    /// Shows page `index` of the design, framed.
+    func setPage(_ index: Int)
+    /// Zooms about the middle of the canvas: by a factor, to a scale (1 = 100%), or to every artboard.
+    func zoom(by factor: Double)
+    func zoom(to scale: Double)
+    func fitAll()
+    /// Editor commands from the keyboard (copy, group, zoom…) are offered here first while the canvas has focus and no text
+    /// is being edited; true when taken.
+    func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?)
+    /// Debug only: a presence message as the Core relays it.
+    func debugPresence(_ json: String)
+    // The engine's own clipboard, group and component work: each is one undo step, selects what it made and says false when
+    // it could not (nothing selected, a page, a mix of parents…).
+    /// The clipboard JSON of the selection (`{"format": "ainkrad-design/1", …}`); nil when there is nothing to copy.
+    func copy() -> Data?
+    /// Pastes clipboard JSON (this design's or another's) into `parent` (nil: the page) with new ids; `atCenter` puts it
+    /// where the canvas is looking, else it keeps its place.
+    func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool
+    func duplicate() -> Bool
+    func group() -> Bool
+    func ungroup() -> Bool
+    func createComponent() -> Bool
+    /// An instance of a component (`"<design>/<node>"`) with its top-left at a view point (nil: where the canvas is looking).
+    func insertInstance(_ component: String, at: CGPoint?) -> Bool
+    func detachInstance() -> Bool
 }
 
 public struct CanvasCamera: Sendable, Equatable {
@@ -250,7 +288,6 @@ extension DesignEditBackend {
     public var assetFailures: Int { 0 }
     public func retryAssets() {}
     public func setReadOnly(_ on: Bool) {}
-    public func duplicate() {}
     public var loaded: Bool { true }
     public var syncConnected: Bool { true }
     public var lastEditTooLarge: Bool { false }
@@ -260,6 +297,22 @@ extension DesignEditBackend {
     public func camera() -> CanvasCamera? { nil }
     public func present(_ tap: (@MainActor (String?) -> Void)?) {}
     public func fit(_ rect: CGRect) {}
+    public func presenceList() -> Data? { nil }
+    public func follow(_ peer: String) {}
+    public func setPage(_ index: Int) {}
+    public func zoom(by factor: Double) {}
+    public func zoom(to scale: Double) {}
+    public func fitAll() {}
+    public func setKeyHandler(_ handler: (@MainActor (EditorKey) -> Bool)?) {}
+    public func debugPresence(_ json: String) {}
+    public func copy() -> Data? { nil }
+    public func paste(_ json: Data, parent: String?, atCenter: Bool) -> Bool { false }
+    public func duplicate() -> Bool { false }
+    public func group() -> Bool { false }
+    public func ungroup() -> Bool { false }
+    public func createComponent() -> Bool { false }
+    public func insertInstance(_ component: String, at: CGPoint?) -> Bool { false }
+    public func detachInstance() -> Bool { false }
 }
 
 /// One token of a design system as the style guide edits it: a literal per theme.

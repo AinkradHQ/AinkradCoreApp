@@ -4,7 +4,7 @@ import Foundation
 /// What the Design screens ask of the Core. The real one calls the module's routes under `/modules/design/v1` through the
 /// paired connection (`CoreConnection.signedRequest`), the way Leyline and the Brain do; the Debug demo and the tests bring
 /// their own. Reads need `read`; links are `admin` writes without a step-up.
-protocol DesignService: Sendable {
+protocol DesignService: DesignLibraryService {
     func docs() async throws -> [DesignDoc]
     func assets() async throws -> [DesignAsset]
     func kits() async throws -> [BrandKit]
@@ -22,10 +22,14 @@ protocol DesignService: Sendable {
     func restoreVersion(doc: String, id: String) async throws
     /// Makes an empty design (`POST /docs`), related to `project` when there is one.
     func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc
+    /// The same, linked to a design system (`NewDoc.system`; designs only).
+    func create(kind: DesignDoc.Kind, name: String, project: String?, system: String?) async throws -> DesignDoc
     /// Starts an AI session drawing three directions on the design (E11-4, API minor 95).
     /// `count` 1 or 3; `size` the screen to draw (points). A Core from before these ignores them: three phone screens
     /// (the composer then keeps the best).
     func compose(doc: String, prompt: String, count: Int, size: CGSize) async throws -> ComposeState
+    /// Edit mode (API minor 109): the Core reads the frame's whole subtree itself, so only the change is sent.
+    func composeEdit(doc: String, prompt: String, frame: String, size: CGSize) async throws -> ComposeState
     /// Where that drawing is; the first read after the AI is done writes the three frames.
     func composeState(doc: String, id: String) async throws -> ComposeState
     /// Stops the AI session behind a drawing.
@@ -46,6 +50,8 @@ struct ComposeState: Equatable, Sendable {
         let summary: String
         /// The node id of its frame on the canvas.
         let frame: String?
+        /// A flow's screens (frame ids), when the Core says.
+        var screens: [String] = []
         var id: String { frame ?? name }
     }
     let id: String
@@ -53,6 +59,12 @@ struct ComposeState: Equatable, Sendable {
     let reason: String
     let session: String?
     let directions: [Direction]
+    /// What the Core is doing now, in its words (optional: an older Core says nothing).
+    var stage: String? = nil
+    /// The AI drew a multi-screen flow: every frame stays.
+    var flow: Bool? = nil
+    var elementsDone: Int? = nil
+    var elementsTotal: Int? = nil
 }
 
 /// A failure the screens can word. `code` is for hover help only.
@@ -70,8 +82,14 @@ extension DesignService {
     func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc {
         throw DesignFailure(sentence: "This Core cannot make designs.", code: "not_found", status: 404)
     }
+    func create(kind: DesignDoc.Kind, name: String, project: String?, system: String?) async throws -> DesignDoc {
+        try await create(kind: kind, name: name, project: project)
+    }
     func compose(doc: String, prompt: String, count: Int, size: CGSize) async throws -> ComposeState {
         throw Self.noCompose
+    }
+    func composeEdit(doc: String, prompt: String, frame: String, size: CGSize) async throws -> ComposeState {
+        try await compose(doc: doc, prompt: prompt, count: 1, size: size)
     }
     func composeState(doc: String, id: String) async throws -> ComposeState { throw Self.noCompose }
     func cancelCompose(session: String) async throws {}
@@ -108,7 +126,7 @@ struct LiveDesignService: DesignService {
         try await call("GET", "/assets", as: [AssetWire].self).filter(\.library).map(\.asset)
     }
     func kits() async throws -> [BrandKit] {
-        try await call("GET", "/collections", as: [CollectionWire].self).filter { $0.kind == "brand_kit" }.map(\.kit)
+        try await call("GET", "/collections", as: [CollectionWire].self).map(\.kit)
     }
     func asset(_ sha: String) async throws -> DesignAsset {
         try await call("GET", "/assets/\(Self.seg(sha))", as: AssetWire.self).asset
@@ -158,12 +176,17 @@ struct LiveDesignService: DesignService {
     }
 
     func create(kind: DesignDoc.Kind, name: String, project: String?) async throws -> DesignDoc {
+        try await create(kind: kind, name: name, project: project, system: nil)
+    }
+    func create(kind: DesignDoc.Kind, name: String, project: String?, system: String?) async throws -> DesignDoc {
         struct NewDoc: Encodable {
             let kind: String
             let name: String
             let project: String?
+            let system: String?
         }
-        let body = try JSONEncoder().encode(NewDoc(kind: kind.rawValue, name: name, project: project))
+        let body = try JSONEncoder().encode(
+            NewDoc(kind: kind.rawValue, name: name, project: project, system: kind == .design ? system : nil))
         return try await call("POST", "/docs", body: body, as: DocWire.self).doc
     }
 
@@ -180,6 +203,22 @@ struct LiveDesignService: DesignService {
         let s = Size(
             w: min(4000, max(200, Int(size.width.rounded()))), h: min(4000, max(200, Int(size.height.rounded()))))
         let body = try JSONEncoder().encode(Body(prompt: prompt, count: count, size: s))
+        return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
+    }
+    func composeEdit(doc: String, prompt: String, frame: String, size: CGSize) async throws -> ComposeState {
+        struct Size: Encodable {
+            let w: Int
+            let h: Int
+        }
+        struct Body: Encodable {
+            let prompt: String
+            let mode: String
+            let frame: String
+            let size: Size
+        }
+        let s = Size(
+            w: min(4000, max(200, Int(size.width.rounded()))), h: min(4000, max(200, Int(size.height.rounded()))))
+        let body = try JSONEncoder().encode(Body(prompt: prompt, mode: "edit", frame: frame, size: s))
         return try await call("POST", "/docs/\(Self.seg(doc))/compose", body: body, as: ComposeWire.self).result
     }
     func composeSystem(doc: String, prompt: String, brandName: String?, colors: [String]) async throws -> ComposeState {
@@ -203,11 +242,12 @@ struct LiveDesignService: DesignService {
         _ = try await raw("POST", "/api/v1/agent-sessions/\(Self.seg(session))/cancel", absolute: true)
     }
 
-    private func raw(_ method: String, _ path: String, body: Data = Data(), absolute: Bool = false) async throws -> Data
-    {
+    func raw(
+        _ method: String, _ path: String, body: Data = Data(), absolute: Bool = false, limit: Int? = nil
+    ) async throws -> Data {
         do {
             return try await connection.signedRequest(
-                method: method, target: absolute ? path : Self.base + path, body: body)
+                method: method, target: absolute ? path : Self.base + path, body: body, limit: limit)
         } catch CoreError.http(let status, let code, let message) {
             throw Self.failure(status: status, code: code, message: message)
         } catch CoreError.badRequest(let message) {
@@ -215,7 +255,7 @@ struct LiveDesignService: DesignService {
         }
     }
 
-    private func call<T: Decodable>(_ method: String, _ path: String, body: Data = Data(), as: T.Type) async throws -> T
+    func call<T: Decodable>(_ method: String, _ path: String, body: Data = Data(), as: T.Type) async throws -> T
     {
         let data = try await raw(method, path, body: body)
         let decoder = JSONDecoder()
@@ -251,11 +291,12 @@ struct DocWire: Decodable {
     let aiPaused: Bool
     let createdBy: String
     let updatedAt: String
+    let state: String?
 
     var doc: DesignDoc {
         DesignDoc(
             id: id, kind: DesignDoc.Kind(rawValue: kind) ?? .design, name: name, system: system, projects: projects,
-            aiPaused: aiPaused, createdBy: createdBy, updatedAt: Ago.iso(updatedAt))
+            aiPaused: aiPaused, createdBy: createdBy, updatedAt: Ago.iso(updatedAt), archived: state == "archived")
     }
 }
 
@@ -264,17 +305,25 @@ struct ComposeWire: Decodable {
         let name: String
         let summary: String
         let frame: String?
+        let screens: [String]?
     }
     let id: String
     let state: String
     let reason: String
     let session: String?
     let directions: [DirectionWire]
+    let stage: String?
+    let flow: Bool?
+    let elementsDone: Int?
+    let elementsTotal: Int?
 
     var result: ComposeState {
         ComposeState(
             id: id, phase: .init(rawValue: state) ?? .failed, reason: reason, session: session,
-            directions: directions.map { .init(name: $0.name, summary: $0.summary, frame: $0.frame) })
+            directions: directions.map {
+                .init(name: $0.name, summary: $0.summary, frame: $0.frame, screens: $0.screens ?? [])
+            },
+            stage: stage, flow: flow, elementsDone: elementsDone, elementsTotal: elementsTotal)
     }
 }
 
@@ -329,6 +378,6 @@ struct CollectionWire: Decodable {
         BrandKit(
             id: id, name: name, colors: colors, fonts: fonts,
             items: items.map { BrandKit.Item(sha: $0.sha256, role: $0.role) }, projects: projects,
-            updatedAt: Ago.iso(updatedAt))
+            updatedAt: Ago.iso(updatedAt), kind: BrandKit.Kind(rawValue: kind) ?? .brandKit)
     }
 }

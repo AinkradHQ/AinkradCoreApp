@@ -13,6 +13,9 @@ struct SystemStyleGuide: View {
     @State private var night = false
     @State private var ai = SystemAI()
     @State private var asking = false
+    @State private var adding = false
+    /// The second press: a system that already has tokens asks before the AI replaces them.
+    @State private var confirming = false
     @Environment(\.coreAccent) private var paneAccent
 
     private var tokens: [SystemToken] { editor.systemTokens }
@@ -41,9 +44,19 @@ struct SystemStyleGuide: View {
         }
         .background(color("color.background", night ? Color(white: 0.08) : .white).opacity(tokens.isEmpty ? 0 : 1))
         .clipShape(coreShape(Radius.pane))
+        .onChange(of: asking) { _, on in if !on { confirming = false } }
         .animation(Motion.out(Motion.ui), value: night)
         .animation(Motion.out(Motion.ui), value: tokens.count)
         .accessibilityIdentifier("design-system-guide")
+        #if DEBUG
+        .onAppear {
+            if model.debugAddTokenOpen { adding = true }
+            if model.debugSystemAsk {
+                asking = true
+                confirming = true
+            }
+        }
+        #endif
     }
 
     // MARK: bar
@@ -53,15 +66,36 @@ struct SystemStyleGuide: View {
             Text("\(tokens.count) tokens").foregroundStyle(GlassInk.secondary).monospacedDigit()
             if ai.busy {
                 ProgressView().controlSize(.small)
-                Text("AI is writing the system…").foregroundStyle(GlassInk.secondary)
+                Text(ai.progress ?? "AI is writing the system…").foregroundStyle(GlassInk.secondary).lineLimit(1)
+                Button("Stop") { ai.stop(model: model) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .help("Stop the AI and keep the tokens as they are")
             } else if let e = ai.error {
                 Label(e, systemImage: "exclamationmark.triangle").foregroundStyle(GlassInk.secondary).lineLimit(1)
+                if ai.canRetry {
+                    Button("Try again") { ai.start(model: model, doc: doc.id, kit: nil, resuming: true) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .help("Ask the Core about the same drawing first")
+                }
             }
             Spacer(minLength: 0)
             CoreSegmented(
                 "Theme",
                 segments: [CoreSegment(false, "Day", symbol: "sun.max"), CoreSegment(true, "Night", symbol: "moon")],
                 selection: $night)
+            Button {
+                adding = true
+            } label: {
+                Label("Add token", systemImage: "plus")
+            }
+            .buttonStyle(CoreButtonStyle(.secondary))
+            .disabled(!editor.attached || model.readOnly)
+            .help(
+                model.readOnly
+                    ? "This device can look at designs but not change them."
+                    : "Add a colour, type, spacing, radius or shadow token"
+            )
+            .popover(isPresented: $adding, arrowEdge: .bottom) { AddTokenSheet(editor: editor) { adding = false } }
+            .accessibilityIdentifier("design-add-token-button")
             Button {
                 asking = true
             } label: {
@@ -89,17 +123,34 @@ struct SystemStyleGuide: View {
             if !model.kits.isEmpty {
                 CoreSelect(
                     "Brand kit", selection: $ai.kit,
-                    options: [CoreSelectOption("", "None")] + model.kits.map { CoreSelectOption($0.id, $0.name) })
+                    options: [CoreSelectOption("", "None")]
+                        + model.kits.filter { $0.kind == .brandKit }.map { CoreSelectOption($0.id, $0.name) })
             }
-            Text(
-                tokens.isEmpty
-                    ? "It writes 26 tokens." : "It replaces the colour, type, spacing, radius and shadow tokens."
-            )
-            .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            if ai.overLimit {
+                Text(
+                    "That is \(ai.promptLength - DesignComposer.promptLimit) characters too long. Shorten it to generate."
+                )
+                .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
+            if tokens.isEmpty {
+                Text("It writes 26 tokens.").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            } else if confirming {
+                CoreNotice(
+                    symbol: "exclamationmark.triangle",
+                    title: "Replaces \(tokens.count) tokens: the colour, type, spacing, radius and shadow ones.",
+                    tone: .warn)
+            } else {
+                Text("It replaces the colour, type, spacing, radius and shadow tokens.")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            }
             HStack {
                 Spacer()
-                Button("Generate") { run() }.buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(.primary)
-                    .disabled(ai.prompt.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button(confirming ? "Replace \(tokens.count) tokens" : "Generate") {
+                    if tokens.isEmpty || confirming { run() } else { confirming = true }
+                }
+                .buttonStyle(CoreButtonStyle(.prominent)).coreShortcut(.primary)
+                .disabled(ai.prompt.trimmingCharacters(in: .whitespaces).isEmpty || ai.overLimit)
+                .help(ai.overLimit ? "The description is too long" : "")
             }
         }
         .padding(Space.s4).frame(width: Space.s8 * 12)
@@ -107,8 +158,9 @@ struct SystemStyleGuide: View {
 
     private func run() {
         asking = false
+        confirming = false
         let kit = model.kits.first { $0.id == ai.kit }
-        Task { await ai.generate(model: model, doc: doc.id, kit: kit) }
+        ai.start(model: model, doc: doc.id, kit: kit)
     }
 
     // MARK: empty

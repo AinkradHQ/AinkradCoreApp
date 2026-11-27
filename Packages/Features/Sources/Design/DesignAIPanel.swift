@@ -108,12 +108,35 @@ struct DesignAIPanel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!composer.canDraw)
-                .help(composer.editing ? "Redraw it with the change  Return" : "Draw  Return")
+                .help(
+                    composer.overLimit
+                        ? "The words are too long: \(composer.promptLength) of \(DesignComposer.promptLimit)"
+                        : composer.editing ? "Redraw it with the change  Return" : "Draw  Return"
+                )
                 .accessibilityLabel("Draw")
             }
+            if composer.promptLength >= Self.counterFrom { counter }
             suggestions
         }
         .onAppear { field = true }
+    }
+
+    /// Shown near the Core's limit: how many characters are left, and a sentence once over.
+    private static let counterFrom = DesignComposer.promptLimit - 100
+    private var counter: some View {
+        let n = composer.promptLength
+        let limit = DesignComposer.promptLimit
+        return HStack(spacing: Space.s2) {
+            if composer.overLimit {
+                Text("That is \(n - limit) characters too long. Shorten it to draw.")
+            } else {
+                Text("\(limit - n) characters left")
+            }
+            Spacer(minLength: 0)
+            Text("\(n)/\(limit)").monospacedDigit()
+        }
+        .coreFont(size: MacTextSize.meta).foregroundStyle(composer.overLimit ? GlassInk.red : GlassInk.secondary)
+        .accessibilityIdentifier("design-ai-counter")
     }
 
     private func modeChip(_ title: String, _ symbol: String, on: Bool, _ pick: @escaping () -> Void) -> some View {
@@ -158,9 +181,10 @@ struct DesignAIPanel: View {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 let seconds = Int(ctx.date.timeIntervalSince(composer.startedAt ?? ctx.date))
                 HStack(spacing: Space.s2) {
-                    Text(AIStages.line(seconds: seconds, editing: composer.editing))
+                    let line = AIStages.line(seconds: seconds, editing: composer.editing, state: composer.state)
+                    Text(line)
                         .foregroundStyle(GlassInk.secondary)
-                        .id(AIStages.line(seconds: seconds, editing: composer.editing))
+                        .id(line)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     Spacer(minLength: 0)
                     Text("\(seconds) s").monospacedDigit().coreFont(size: MacTextSize.meta)
@@ -285,20 +309,21 @@ private struct DirectionCard: View {
     }
 }
 
-/// What the panel says while the AI works, a new line every few seconds.
+/// What the panel says while the AI works. The Core's own stage and element count when it reports them; otherwise generic
+/// lines that claim nothing about the canvas (placing happens only once the Core says it is applying).
 enum AIStages {
-    static func line(seconds: Int, editing: Bool) -> String {
+    static func line(seconds: Int, editing: Bool, state: ComposeState? = nil) -> String {
+        if state?.phase == .applying { return "Putting it on the canvas…" }
+        var real: [String] = []
+        if let stage = state?.stage, !stage.isEmpty { real.append(stage) }
+        if let d = state?.elementsDone, let t = state?.elementsTotal, t > 0 { real.append("\(d) of \(t) elements") }
+        if !real.isEmpty { return real.joined(separator: " · ") }
         let lines =
             editing
-            ? [
-                "Reading the screen…", "Working out the change…", "Redrawing the layout…", "Fitting the colours…",
-                "Putting it back on the canvas…",
-            ]
-            : [
-                "Reading your words…", "Sketching the layout…", "Choosing type and colours…", "Laying out the parts…",
-                "Placing it on the canvas…",
-            ]
-        return lines[min(seconds / 4, lines.count - 1)]
+            ? ["Reading the screen…", "Working out the change…", "Redrawing the layout…", "Fitting the colours…"]
+            : ["Reading your words…", "Sketching the layout…", "Choosing type and colours…", "Laying out the parts…"]
+        let i = seconds / 4
+        return i < lines.count ? lines[i] : "Still drawing…"
     }
 }
 

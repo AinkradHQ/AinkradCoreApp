@@ -48,8 +48,7 @@ extension DesignCanvasNSView {
         readOnly = on
         if on { editorSetTool(Int(DE_TOOL_SELECT)) }
     }
-    /// ⌘D on the selection.
-    public func editorDuplicate() { if !readOnly { send(key: DE_KEY_DUPLICATE, mods: 0) } }
+
     /// The first snapshot from the Core has been applied.
     public var editorLoaded: Bool { sync?.received ?? false }
     /// The sync socket is open.
@@ -87,7 +86,7 @@ extension DesignCanvasNSView {
     /// The design system's tokens as a JSON array of `{name, kind}`; nil while the engine cannot list them.
     public func editorTokens() -> Data? { engine.tokens() }
 
-    private func changed() {
+    func changed() {
         sync?.schedulePresence()
         loop.wake(input: true)
         sync?.flush()
