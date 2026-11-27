@@ -93,13 +93,6 @@ extension ProjectsModel {
         }
     }
 
-    /// The gallery's cards after the Filter field.
-    var shown: [ProjectItem] {
-        let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty
-            ? projects : projects.filter { $0.name.lowercased().contains(q) || $0.slug.contains(q) }
-    }
-
     /// A refusal of a run route, in words (`words` reads a 409 as a taken link name, which is not what a run says).
     func runWords(_ error: any Error) -> String {
         guard let e = CoreFailure.of(error) ?? CoreError.unwrapping(error) else { return words(error) }

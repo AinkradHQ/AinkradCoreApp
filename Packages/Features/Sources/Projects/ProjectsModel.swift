@@ -44,6 +44,8 @@ public final class ProjectsModel {
     internal(set) var runnerSupported = false
     /// The project the New Project wizard just made: its review step shows that project's repos copying.
     internal(set) var wizardProjectID: Int64?
+    /// What the wizard held when its dialog closed, so New Project opens where it stopped (nil: nothing to keep).
+    internal(set) var wizardDraft: WizardDraft?
     /// What a create in progress has done, for the wizard's setup list; nil when none runs.
     internal(set) var creating: CreateProgress?
     /// What the wizard's Brain step offers (`loadPlaces`).
@@ -59,6 +61,18 @@ public final class ProjectsModel {
     var section = ProjectSection.overview
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
+    /// The gallery's All · Running · Archived switch.
+    var segment = GallerySegment.all
+    /// Archived projects the Core holds, read with every list (the Archived segment shows them).
+    internal(set) var archivedList: [ProjectItem] = []
+    /// When the list on screen was last read from the Core ("Showing the list from 4 min ago").
+    internal(set) var loadedAt: Date?
+    /// The cards have risen once: later visits to the gallery just fade in.
+    var galleryRisen = false
+    /// How many cards fit in a gallery row now (the arrow keys move by a row).
+    var galleryColumns = 3
+    /// Counts up to ask the gallery's Filter field for focus (⌘F, typing).
+    var filterFocus = 0
     /// What a run gets unless a project says otherwise (Settings > Projects > Options); nil until read, or on a Core without it.
     internal(set) var limits: ProjectLimits?
     internal(set) var limitsState = LimitsState.loading
@@ -235,7 +249,8 @@ public final class ProjectsModel {
         do {
             var all = try await service.projects()
             // "Show archived projects" (Settings > Projects > Options): they come after the active ones in the same order.
-            if ProjectsOptions.showArchived { all += (try? await service.archivedProjects()) ?? [] }
+            let archived = (try? await service.archivedProjects()) ?? []
+            if ProjectsOptions.showArchived { all += archived }
             let list = all.sorted { ($0.archived ? 1 : 0, $1.updatedAt) < ($1.archived ? 1 : 0, $0.updatedAt) }
             // One read of each run, in parallel: the gallery's tags and the top bar need them.
             let runs = await withTaskGroup(of: (Int64, ProjectRunState?).self) { group in
@@ -259,6 +274,8 @@ public final class ProjectsModel {
             for (id, r) in reads { setupStates[id] = r }
             coreSilent = false
             projects = list.map(applying)
+            archivedList = archived.map(applying)
+            loadedAt = Date()
             load = .ready
             stale = nil
             syncLauncherProjects()
@@ -280,7 +297,7 @@ public final class ProjectsModel {
 
     /// The twelve most recently touched projects as launcher entries (⌘K → Projects).
     private func syncLauncherProjects() {
-        let recent = projects.prefix(12)
+        let recent = projects.filter { !$0.archived }.prefix(12)
         let ids = Set(recent.map { "project-\($0.id)" })
         for gone in registeredProjects.subtracting(ids) { host.shell.launcher.unregister(gone) }
         for p in recent {
@@ -498,6 +515,9 @@ public final class ProjectsModel {
         host.shell.closeDialog()
         if let id = wizardProjectID { openProject(id) }
         wizardProjectID = nil
+        wizardDraft = nil
+        wizardMissed = []
+        wizardIssues = []
     }
 
     // MARK: writes
@@ -812,7 +832,7 @@ public final class ProjectsModel {
 
     static func paneID(_ id: Int64) -> String { "project-\(id)" }
 
-    private func openInOwnPane(_ p: ProjectItem) {
+    func openInOwnPane(_ p: ProjectItem) {
         let id = p.id
         host.shell.openPane(
             PaneSpec(id: Self.paneID(id), title: p.name, sub: "Project", symbol: "square.grid.2x2", minWidth: 720) {
@@ -835,13 +855,14 @@ public final class ProjectsModel {
         }
     }
 
-    func newProject() {
+    /// `kind` opens the wizard with that kind chosen (the empty gallery's tiles); `name` starts it with a name typed.
+    func newProject(kind: ProjectKind? = nil, name: String = "") {
         if let why = newProjectBlock {
             host.shell.showToast(why, kind: .warn)
             return
         }
         show()
-        NewProjectDialogs.openWizard(self, name: "")
+        NewProjectDialogs.openWizard(self, name: name, kind: kind)
     }
 
     /// ⌘N while the gallery is up: the same as the New Project button.
