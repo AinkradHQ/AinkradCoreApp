@@ -40,8 +40,8 @@ struct Arranged: Equatable {
     var why: String?
 }
 
-/// Group, ungroup, z-order and select: the op lists, with no engine. A group is a frame at the layers' bounds, so they keep
-/// their place on the canvas.
+/// Z-order, select and the one-step wrap for auto layout: the op lists, with no engine. Group and ungroup are the engine's
+/// (`de_group`); `group` here stays for ⇧A, which wraps in a frame that already has auto layout, in one undo step.
 enum Arrange {
     static let maxOps = 200
 
@@ -87,44 +87,6 @@ enum Arrange {
             }
         }
         return Arranged(ops: ops, select: [id])
-    }
-
-    // MARK: ungroup
-
-    /// Takes the children out of each selected frame into the frame's parent, in the frame's place and order, and removes
-    /// the frame. Positions follow the frame's own, so nothing moves on the canvas.
-    static func ungroup(_ ids: [String], layers: LayerTree, box: (String) -> NodeBox?) -> Arranged {
-        let frames = ids.compactMap { layers[$0] }.filter { $0.type == "frame" }
-        guard !frames.isEmpty else { return Arranged(why: "Select a frame or group to ungroup it.") }
-        var out = Arranged()
-        for f in frames {
-            guard let parent = f.parent, layers[parent]?.type != "page" else {
-                return Arranged(why: "A screen cannot be ungrouped. Ungroup a frame inside it.")
-            }
-            let kids = layers.children(of: f.id)
-            guard !kids.isEmpty else { return Arranged(why: "“\(f.title)” has nothing inside to ungroup.") }
-            guard out.ops.count + 2 * kids.count + 1 <= maxOps else {
-                return Arranged(why: "That is too many layers to ungroup at once.")
-            }
-            let sibs = layers.children(of: parent)
-            let hi = sibs.first { ($0.order, $0.id) > (f.order, f.id) && $0.id != f.id }?.order
-            let o = box(f.id)
-            var lo: String? = f.order
-            for k in kids {
-                guard let n = FractionalOrder.between(lo, hi) else {
-                    return Arranged(why: "There is no room to ungroup here.")
-                }
-                lo = n
-                out.ops.append(EditOps.move(k.id, parent: parent, order: n))
-                if let o, let b = box(k.id) {
-                    out.ops.append(EditOps.set(k.id, "x", .number(b.x + o.x)))
-                    out.ops.append(EditOps.set(k.id, "y", .number(b.y + o.y)))
-                }
-                out.select.append(k.id)
-            }
-            out.ops.append(EditOps.delete(f.id))
-        }
-        return out
     }
 
     // MARK: z-order

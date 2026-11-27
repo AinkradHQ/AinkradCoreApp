@@ -23,6 +23,10 @@ final class DesignEditor {
     /// The page shown, as its place among the design's pages.
     var pageIndex = 0
     var shortcutsOpen = false
+    #if DEBUG
+    /// Debug only: an inspector section (its title) the snapshot walk wants in view.
+    var inspectorScroll: String?
+    #endif
     /// Fonts in the library that the canvas can draw (set by the stage from the model's assets).
     var libraryFonts: [DesignAsset] = []
     private(set) var tokens: [DesignToken] = []

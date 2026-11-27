@@ -30,6 +30,7 @@ struct InspectorBlock<Actions: View, Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, Space.s3)
         .overlay(alignment: .top) { coreShape(0).fill(GlassInk.secondary.opacity(0.12)).frame(height: 1) }
+        .id(title)
     }
 }
 

@@ -40,11 +40,50 @@ enum InspectorEdits {
         return rest.isEmpty ? nil : .array(rest)
     }
 
-    static func stroke(_ n: EditorNode, _ key: String, _ value: DJSON) -> DJSON {
-        var o = n.props["stroke"]?.object ?? ["width": .number(1)]
-        o[key] = value
-        return .object(o)
+    /// The most strokes a node takes.
+    static let maxStrokes = 8
+
+    /// `stroke` is one object or a list of up to eight; the inspector always works on the list.
+    static func strokes(_ n: EditorNode) -> [DJSON] {
+        guard let s = n.props["stroke"] else { return [] }
+        return s.array ?? (s.object == nil ? [] : [s])
     }
+
+    /// The prop for a list of strokes: nothing, one object (as older designs and the Core's AI write it) or a list.
+    static func strokeValue(_ list: [DJSON]) -> DJSON? {
+        list.isEmpty ? nil : list.count == 1 ? list[0] : .array(list)
+    }
+
+    static let newStroke = DJSON.object(["color": .string("#111111"), "width": .number(1), "align": .string("inside")])
+
+    /// Stroke `i` with one key changed (`nil` removes it).
+    static func stroking(_ list: [DJSON], _ i: Int, _ key: String, _ value: DJSON?) -> [DJSON] {
+        guard list.indices.contains(i) else { return list }
+        var all = list
+        var o = all[i].object ?? [:]
+        o[key] = value
+        all[i] = .object(o)
+        return all
+    }
+
+    /// How a stroke's dash list reads: none is solid, a gap twice the width after a dash of one width is dotted.
+    static func dashName(_ s: DJSON) -> String {
+        guard let d = s["dash"]?.array?.compactMap(\.double), let first = d.first, first > 0 else { return "solid" }
+        return first <= max(1, s["width"]?.double ?? 1) * 1.01 ? "dotted" : "dashed"
+    }
+
+    /// The `dash` list for a name at a stroke width; nil is solid.
+    static func dash(_ name: String, width: Double) -> DJSON? {
+        let w = max(1, width)
+        switch name {
+        case "dashed": return .array([.number(w * 4), .number(w * 2)])
+        case "dotted": return .array([.number(w), .number(w * 2)])
+        default: return nil
+        }
+    }
+
+    /// An inner shadow is a shadow with `inset`.
+    static func isInset(_ shadow: DJSON) -> Bool { shadow["inset"]?.bool == true }
 
     /// `type` (a text node's style) with one key changed; a token-named style is replaced by a literal one.
     static func type(_ n: EditorNode, _ key: String, _ value: DJSON) -> DJSON {

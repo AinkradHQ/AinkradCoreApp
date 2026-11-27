@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -32,84 +33,31 @@ private let nodes: [String: EditorNode] = [
     "t": EditorNode(id: "t", type: "rect", name: "T", props: rect(10, 10, 20, 20)),
 ]
 
-private func seq(_ ids: [String]) -> () -> String {
-    var i = 0
-    return {
-        defer { i += 1 }
-        return "n_new\(ids.count > i ? ids[i] : String(i))"
-    }
-}
-
 @Suite struct ClipboardTests {
-    private func payload(_ ids: [String]) -> ClipPayload? {
-        EditorClipboard.collect(ids: ids, doc: "dd_1", layers: layers, node: { nodes[$0] })
+    private let clip = Data(
+        #"{"format":"ainkrad-design/1","doc":"dd_1","nodes":[{"type":"frame","name":"A","props":{},"at":[0,0],"children":[]},{"type":"rect","name":"B","props":{},"at":[1,1],"children":[]}]}"#
+            .utf8)
+
+    @Test func theClipboardIsTheEnginesJSONAndNothingElse() {
+        #expect(EditorClipboard.types(clip) == ["frame", "rect"])
+        #expect(EditorClipboard.types(Data("hello".utf8)) == nil)
+        #expect(EditorClipboard.types(Data(#"{"format":"other/1","nodes":[{"type":"rect"}]}"#.utf8)) == nil)
+        #expect(EditorClipboard.types(Data(#"{"format":"ainkrad-design/1","nodes":[]}"#.utf8)) == nil)
     }
 
-    @Test func collectsSubtreesParentsFirstAndSkipsNestedSelection() throws {
-        let p = try #require(payload(["g", "t", "a"]))  // t is inside g: not a root of its own
-        #expect(p.roots == ["g", "a"] && p.nodes.map(\.id) == ["g", "t", "a"])
-        #expect(p.nodes[2].text == nil && payload(["c"])?.nodes[0].text == "Hello")
-        #expect(payload(["p"]) == nil)  // a page is never copied
-    }
-
-    @Test func pasteWritesFreshIdsKeepingTheStructure() throws {
-        let p = try #require(payload(["g", "a"]))
-        let r = try #require(
-            EditorClipboard.ops(p, place: .init(parent: "f", lo: "r", offset: (16, 16)), sameDoc: true, newID: seq([])))
-        #expect(r.ops.count == 3 && r.roots == ["n_new0", "n_new2"])
-        #expect(r.ops.allSatisfy { $0["op"] == .string("add") })
-        let ids = r.ops.compactMap { $0["id"]?.string }
-        #expect(Set(ids).count == 3 && Set(ids).isDisjoint(with: ["g", "t", "a"]))
-        // the child hangs under the copy of g, not under g
-        #expect(r.ops[1]["parent"] == .string(ids[0]) && r.ops[0]["parent"] == .string("f"))
-        // roots stack in order after `lo`, offset applied to x and y; the child keeps its own position
-        let o0 = try #require(r.ops[0]["order"]?.string)
-        let o2 = try #require(r.ops[2]["order"]?.string)
-        #expect(o0 > "r" && o2 > o0 && FractionalOrder.isOrder(o0) && FractionalOrder.isOrder(o2))
-        #expect(r.ops[0]["props"]?["x"] == .number(216) && r.ops[0]["props"]?["y"] == .number(116))
-        #expect(r.ops[1]["props"]?["x"] == .number(10))
-        #expect(r.ops[2]["props"]?["x"] == .number(26))
-    }
-
-    @Test func textKeepsItsWordsAndOtherNodesGetNone() throws {
-        let p = try #require(payload(["c", "a"]))
-        let r = try #require(EditorClipboard.ops(p, place: .init(parent: "f", lo: nil), sameDoc: true))
-        #expect(r.ops[0]["text"] == .string("Hello") && r.ops[1]["text"] == nil)
-        #expect(EditOps.json(r.ops) != nil)
-    }
-
-    @Test func aLinkFollowsTheCopyOrDropsWhenItLeavesTheDesign() throws {
-        var p = try #require(payload(["a", "b"]))
-        p.nodes[0].props["link"] = .object(["to": .string("b")])  // to a copied node
-        p.nodes[1].props["link"] = .object(["to": .string("zz")])  // to one that is not copied
-        let same = try #require(EditorClipboard.ops(p, place: .init(parent: "f", lo: nil), sameDoc: true))
-        let idB = try #require(same.ops[1]["id"]?.string)
-        #expect(same.ops[0]["props"]?["link"]?["to"] == .string(idB))
-        #expect(same.ops[1]["props"]?["link"]?["to"] == .string("zz"))
-        let other = try #require(EditorClipboard.ops(p, place: .init(parent: "f", lo: nil), sameDoc: false))
-        #expect(other.ops[1]["props"]?["link"] == nil)
-    }
-
-    @Test func refusesWhatTheCoreWouldRefuse() throws {
-        var p = try #require(payload(["a"]))
-        let node = p.nodes[0]
-        p.nodes = Array(repeating: node, count: EditorClipboard.maxNodes + 1)
-        #expect(EditorClipboard.ops(p, place: .init(parent: "f", lo: nil), sameDoc: true) == nil)
-        #expect(
-            EditorClipboard.ops(p, place: .init(parent: "f", lo: String(repeating: "z", count: 32)), sameDoc: true)
-                == nil)
-    }
-
-    @Test func pasteboardJSONIsValidatedBeforeItIsTrusted() throws {
-        let p = try #require(payload(["a"]))
-        let data = try JSONEncoder().encode(p)
-        #expect(EditorClipboard.valid(try JSONDecoder().decode(ClipPayload.self, from: data)))
-        var bad = p
-        bad.kind = "something.else"
-        #expect(!EditorClipboard.valid(bad))
-        bad = p
-        bad.roots = ["missing"]
-        #expect(!EditorClipboard.valid(bad))
+    @Test func thePasteboardKeepsItsTypeAndPlainTextPasteWorks() {
+        let pb = NSPasteboard(name: NSPasteboard.Name("design-test-\(UUID().uuidString)"))
+        EditorClipboard.write(clip, to: pb)
+        #expect(pb.data(forType: EditorClipboard.pasteboardType) == clip)
+        #expect(EditorClipboard.read(from: pb) == .nodes(clip))
+        pb.clearContents()
+        pb.setString(String(decoding: clip, as: UTF8.self), forType: .string)  // as JSON text: still ours
+        #expect(EditorClipboard.read(from: pb) == .nodes(clip))
+        pb.clearContents()
+        pb.setString("Hello there", forType: .string)
+        #expect(EditorClipboard.read(from: pb) == .text("Hello there"))
+        pb.clearContents()
+        #expect(EditorClipboard.read(from: pb) == nil)
     }
 }
 
@@ -140,51 +88,6 @@ private func seq(_ ids: [String]) -> () -> String {
         #expect(Arrange.group(["a", "t"], layers: layers, box: box).why?.contains("different frames") == true)
         #expect(Arrange.group(["a"], layers: layers, box: { _ in nil }).why?.contains("position and size") == true)
         #expect(Arrange.group(["p"], layers: layers, box: box).why != nil)
-    }
-
-    @Test func ungroupMovesChildrenToTheParentInPlaceAndDeletesTheFrame() throws {
-        let a = Arrange.ungroup(["g"], layers: layers, box: box)
-        #expect(a.why == nil && a.select == ["t"])
-        #expect(a.ops.count == 4)
-        #expect(a.ops[0]["id"] == .string("t") && a.ops[0]["parent"] == .string("f"))
-        let o = try #require(a.ops[0]["order"]?.string)
-        #expect(o > "w" && FractionalOrder.isOrder(o))  // g was the front-most: the children take its place
-        #expect(a.ops[1] == EditOps.set("t", "x", .number(210)) && a.ops[2] == EditOps.set("t", "y", .number(110)))
-        #expect(a.ops[3] == EditOps.delete("g"))
-    }
-
-    @Test func ungroupRefusesAScreenAnEmptyFrameAndAShape() {
-        #expect(Arrange.ungroup(["f"], layers: layers, box: box).why?.contains("screen") == true)
-        let empty = LayerTree([layer("p", "page", nil), layer("f", "frame", "p"), layer("e", "frame", "f")])
-        #expect(Arrange.ungroup(["e"], layers: empty, box: box).why?.contains("nothing inside") == true)
-        #expect(Arrange.ungroup(["a"], layers: layers, box: box).why != nil)
-    }
-
-    @Test func groupThenUngroupRestoresTheOriginalPositions() throws {
-        let g = Arrange.group(["a", "b"], layers: layers, box: box, id: "n_group")
-        // apply by hand to a model of the nodes, then ungroup it
-        var props = nodes.mapValues(\.props)
-        var parent = ["a": "f", "b": "f"]
-        for op in g.ops {
-            switch op["op"]?.string {
-            case "add": props["n_group"] = op["props"]?.object
-            case "set": props[op["id"]!.string!]?[op["key"]!.string!] = op["value"]
-            case "move": parent[op["id"]!.string!] = op["parent"]!.string
-            default: break
-            }
-        }
-        #expect(parent["a"] == "n_group" && props["a"]?["x"] == .number(0))
-        let back = LayerTree([
-            layer("p", "page", nil), layer("f", "frame", "p"), layer("n_group", "frame", "f", "i"),
-            layer("a", "rect", "n_group", "g"), layer("b", "rect", "n_group", "q"),
-        ])
-        let up = Arrange.ungroup(
-            ["n_group"], layers: back,
-            box: { id in NodeBox(EditorNode(id: id, type: "rect", props: props[id] ?? [:])) })
-        #expect(
-            up.ops.contains(EditOps.set("a", "x", .number(10))) && up.ops.contains(EditOps.set("a", "y", .number(20))))
-        #expect(
-            up.ops.contains(EditOps.set("b", "x", .number(100))) && up.ops.contains(EditOps.set("b", "y", .number(30))))
     }
 
     @Test func autoLayoutGuessesTheDirection() {
@@ -267,57 +170,171 @@ private func seq(_ ids: [String]) -> () -> String {
     }
 }
 
-@Suite struct ComponentTests {
-    private func node(_ id: String) -> EditorNode? { nodes[id] }
-
-    @Test func createTurnsAFrameIntoAComponentInPlace() throws {
-        let a = Components.create("g", doc: "dd_1", layers: layers, node: node)
-        #expect(a.why == nil && a.ops.count == 3)
-        #expect(a.ops[0]["type"] == .string("component") && a.ops[0]["order"] == .string("w"))
-        #expect(a.ops[0]["parent"] == .string("f") && a.ops[2] == EditOps.delete("g"))
-        #expect(a.ops[1]["type"] == .string("rect") && a.ops[1]["parent"] == a.ops[0]["id"])
-        #expect(a.select == [a.ops[0]["id"]!.string!])
-        #expect(Components.create("a", doc: "dd_1", layers: layers, node: node).why != nil)  // not a frame
+/// Group, ungroup, components, copy, paste and lock go to the engine in one call each (the engine's own tests cover the
+/// geometry); the editor's part is what it asks for, what it says when the engine says no, and what it reloads.
+@MainActor
+@Suite struct EngineCallTests {
+    private func make() -> (DesignEditor, FakeBackend) {
+        let b = FakeBackend()
+        b.treeJSON = """
+            [{"id":"p","type":"page","parent":null,"order":"i","name":"Page"},
+             {"id":"f","type":"frame","parent":"p","order":"i","name":"Card"},
+             {"id":"g","type":"frame","parent":"f","order":"i","name":"Group"},
+             {"id":"a","type":"rect","parent":"f","order":"r","name":"A","locked":true,"rotation":30},
+             {"id":"i","type":"instance","parent":"f","order":"w","name":"Inst"}]
+            """
+        let e = DesignEditor(doc: "dd_1")
+        e.attach(b)
+        return (e, b)
     }
 
-    @Test func anInstanceCarriesOnlyItsPlaceAndTheReference() throws {
-        let comp = layer("k", "component", "p", "i", name: "Button")
-        let op = try #require(
-            Components.instance(of: comp, doc: "dd_1", parent: "f", lo: "r", at: (40, 40), id: "n_inst"))
-        #expect(op["type"] == .string("instance") && op["name"] == .string("Button"))
-        #expect(op["props"] == .object(["component": .string("dd_1/k"), "x": .number(40), "y": .number(40)]))
-        #expect(EditOps.json([op]) != nil)
+    @Test func groupUngroupAndComponentsAreOneEngineCallEach() {
+        let (e, b) = make()
+        b.sel = ["a", "g"]
+        e.reload()
+        e.perform(.group)
+        e.perform(.ungroup)
+        e.perform(.createComponent)
+        b.sel = ["i"]
+        e.reload()
+        e.perform(.detachInstance)
+        #expect(b.calls == ["group", "ungroup", "createComponent", "detachInstance"])
+        #expect(b.edits.isEmpty)  // no op list from the app
+        #expect(e.notice == nil)
     }
 
-    @Test func detachFoldsTheInstanceIntoAFrame() throws {
-        let tree = LayerTree([
-            layer("p", "page", nil), layer("k", "component", "p", "i"), layer("kt", "text", "k", "i"),
-            layer("f", "frame", "p", "r"), layer("inst", "instance", "f", "i"),
-        ])
-        let table: [String: EditorNode] = [
-            "k": EditorNode(
-                id: "k", type: "component", name: "Card", props: rect(0, 0, 100, 50, ["radius": .number(8)])),
-            "kt": EditorNode(id: "kt", type: "text", props: rect(4, 4, 90, 20), text: "Title"),
-            "inst": EditorNode(
-                id: "inst", type: "instance", name: "Card 2",
-                props: [
-                    "component": .string("dd_1/k"), "x": .number(30), "y": .number(60),
-                    "overrides": .object(["kt": .object(["text": .string("Pay now")])]),
-                ]),
-        ]
-        let a = Components.detach(["inst"], doc: "dd_1", layers: tree, node: { table[$0] })
-        #expect(a.why == nil && a.ops.count == 3)
-        #expect(a.ops[0]["type"] == .string("frame") && a.ops[0]["order"] == .string("i"))
-        #expect(a.ops[0]["parent"] == .string("f") && a.ops[0]["name"] == .string("Card 2"))
-        let p = try #require(a.ops[0]["props"])
-        #expect(p["x"] == .number(30) && p["y"] == .number(60) && p["radius"] == .number(8) && p["component"] == nil)
-        #expect(a.ops[1]["text"] == .string("Pay now"))  // the override is folded in
-        #expect(a.ops[2] == EditOps.delete("inst"))
-        // an instance of a design-system component cannot be detached here
-        var other = table
-        other["inst"]?.props["component"] = .string("dd_sys/k")
-        #expect(Components.detach(["inst"], doc: "dd_1", layers: tree, node: { other[$0] }).why != nil)
-        #expect(Components.detach(["f"], doc: "dd_1", layers: tree, node: { table[$0] }).why != nil)
+    @Test func whenTheEngineSaysNoTheEditorSaysWhy() {
+        let (e, b) = make()
+        b.engineOK = false
+        b.sel = ["a", "g"]
+        e.reload()
+        e.group()
+        #expect(e.notice?.contains("different frames") == true)
+        e.ungroup()
+        #expect(e.notice?.contains("Ungroup a frame") == true)
+        e.createComponent()
+        #expect(e.notice?.contains("page") == true)
+        b.sel = []
+        e.reload()
+        e.group()
+        #expect(e.notice == "Select the layers to group first.")
+        e.detachInstance()
+        #expect(e.notice == "Select an instance to detach it.")
+    }
+
+    @Test func anInstanceIsPlacedByTheComponentsReference() {
+        let (e, b) = make()
+        #expect(e.insertInstance(DesignLayer(id: "k", type: "component", parent: "p", order: "i")))
+        #expect(b.calls == ["instance dd_1/k"])
+    }
+
+    @Test func anInstanceThatLandedInsideItsOwnComponentIsUndoneAndPlacedBeside() {
+        let (e, b) = make()
+        b.treeJSON =
+            String(b.treeJSON.dropLast()) + #",{"id":"k","type":"component","parent":"p","order":"m","name":"Btn"}]"#
+        b.nodes["k"] =
+            #"{"id":"k","type":"component","parent":"p","order":"m","name":"Btn","props":{"x":100,"y":50,"w":200,"h":80}}"#
+        b.instanceParent = "k"
+        e.reload()
+        #expect(e.insertInstance(DesignLayer(id: "k", type: "component", parent: "p", order: "m")))
+        // beside it: right edge 300 + 40 gap, top 50, in view points at zoom 2 with pan (10, 20)
+        #expect(b.calls == ["instance dd_1/k", "instance dd_1/k at 690,120"])
+        #expect(b.edits.contains("undo") && e.layers["n_inst"]?.parent == "p")
+    }
+
+    @Test func copyPutsTheEnginesJSONOnThePasteboardAndPasteTakesItBack() {
+        let (e, b) = make()
+        b.sel = ["a"]
+        e.reload()
+        b.clip = Data(#"{"format":"ainkrad-design/1","doc":"dd_1","nodes":[{"type":"rect"}]}"#.utf8)
+        let pb = NSPasteboard.general
+        let saved = pb.string(forType: .string)
+        defer {
+            pb.clearContents()
+            if let saved { pb.setString(saved, forType: .string) }
+        }
+        #expect(e.copy())
+        #expect(pb.data(forType: EditorClipboard.pasteboardType) == b.clip)
+        b.sel = ["f"]
+        e.reload()  // a frame is selected: it goes in, where it was
+        #expect(e.paste())
+        #expect(b.calls == ["copy", "paste into f"])
+        b.sel = []
+        e.reload()  // nothing selected: a rectangle goes in the first frame
+        b.calls = []
+        #expect(e.paste() && b.calls == ["paste into f"])
+        b.clip = nil
+        b.sel = ["p"]
+        e.reload()
+        #expect(!e.copy() && e.notice == "A page cannot be copied.")
+    }
+
+    @Test func screensArePastedOnThePageWhereTheCanvasIsLooking() {
+        let (e, b) = make()
+        #expect(e.paste(Data(#"{"format":"ainkrad-design/1","nodes":[{"type":"frame"}]}"#.utf8)))
+        #expect(b.calls == ["paste on the page at the centre"])
+    }
+
+    @Test func lockReadsTheTreeAndWritesTheProp() {
+        let (e, b) = make()
+        #expect(e.layers["a"]?.locked == true && e.layers["a"]?.rotation == 30 && e.layers["g"]?.locked == false)
+        b.sel = ["a"]
+        e.reload()
+        e.reload()
+        e.perform(.toggleLock)  // all locked: unlock
+        #expect(b.edits.last?.contains("\"locked\"") == true && b.edits.last?.contains("true") == false)
+        b.sel = ["a", "g"]
+        e.reload()
+        e.perform(.toggleLock)  // a mix: lock
+        #expect(b.edits.last?.contains("true") == true)
+        e.setLocked(["g"], true)
+        #expect(b.edits.last?.contains("\"g\"") == true)
+        b.sel = []
+        e.reload()
+        e.reload()
+        #expect(!e.canPerform(.toggleLock).ok && e.canPerform(.toggleLock).why == "Select a layer first.")
+    }
+}
+
+@Suite struct InspectorEffectEditTests {
+    private func node(_ stroke: DJSON?) -> EditorNode {
+        EditorNode(id: "n", type: "rect", props: stroke.map { ["stroke": $0] } ?? [:])
+    }
+
+    @Test func strokesAreAListWhetherStoredAsOneObjectOrMany() {
+        let one = DJSON.object(["color": .string("#111111"), "width": .number(2)])
+        #expect(InspectorEdits.strokes(node(nil)).isEmpty)
+        #expect(InspectorEdits.strokes(node(one)) == [one])
+        #expect(InspectorEdits.strokes(node(.array([one, one]))).count == 2)
+        #expect(InspectorEdits.strokeValue([]) == nil)
+        #expect(InspectorEdits.strokeValue([one]) == one)  // one stays an object, as the Core's AI writes it
+        #expect(InspectorEdits.strokeValue([one, one]) == .array([one, one]))
+        #expect(InspectorEdits.maxStrokes == 8)
+    }
+
+    @Test func oneStrokeChangesWithoutTouchingTheOthers() {
+        let a = DJSON.object(["color": .string("#111111"), "width": .number(2)])
+        let b = DJSON.object(["color": .string("#ff0000"), "width": .number(4)])
+        let next = InspectorEdits.stroking([a, b], 1, "align", .string("outside"))
+        #expect(next[0] == a && next[1]["align"] == .string("outside") && next[1]["width"] == .number(4))
+        #expect(InspectorEdits.stroking(next, 1, "align", nil)[1]["align"] == nil)
+        #expect(InspectorEdits.stroking([a], 3, "width", .number(1)) == [a])
+    }
+
+    @Test func dashesAreNamedByTheirShape() {
+        #expect(InspectorEdits.dash("solid", width: 2) == nil)
+        let dashed = InspectorEdits.dash("dashed", width: 2)
+        let dotted = InspectorEdits.dash("dotted", width: 2)
+        #expect(dashed == .array([.number(8), .number(4)]) && dotted == .array([.number(2), .number(4)]))
+        func name(_ d: DJSON?, _ w: Double) -> String {
+            InspectorEdits.dashName(.object(["width": .number(w), "dash": d ?? .null]))
+        }
+        #expect(name(dashed, 2) == "dashed" && name(dotted, 2) == "dotted" && name(nil, 2) == "solid")
+    }
+
+    @Test func anInnerShadowIsAShadowWithInset() {
+        #expect(InspectorEdits.isInset(.object(["inset": .bool(true)])))
+        #expect(!InspectorEdits.isInset(InspectorIsland.shadow))
     }
 }
 
