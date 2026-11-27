@@ -98,6 +98,8 @@ struct GalleryView: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     private var hasAny: Bool { !model.projects.isEmpty || !model.archivedList.isEmpty }
+    /// The header offers its actions only with a list to act on (not while loading, offline or failed).
+    private var showActions: Bool { hasAny && model.load == .ready }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -105,7 +107,7 @@ struct GalleryView: View {
                 Text("Projects").coreFont(size: MacTextSize.large, weight: .semibold)
                     .accessibilityAddTraits(.isHeader)
             } actions: {
-                if hasAny {
+                if showActions {
                     CoreSegmented(
                         "Show", segments: GallerySegment.allCases.map { CoreSegment($0, label($0)) },
                         selection: Binding(get: { model.segment }, set: { model.segment = $0 })
