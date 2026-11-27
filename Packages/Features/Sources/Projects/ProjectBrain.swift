@@ -23,7 +23,8 @@ struct BrainPage: View {
 
     /// Nothing known yet, and nothing still loading: the page is one calm card with the way forward.
     private var empty: Bool {
-        room == nil && (insights.rules ?? []).isEmpty && insights.knowledge?.isEmpty == true
+        // A Core that sends no records list (nil) has nothing to show either: the card, not one line on an empty page.
+        room == nil && (insights.rules ?? []).isEmpty && (insights.knowledge ?? []).isEmpty
     }
 
     /// Never "nothing in it yet" above records: the line follows what the Core holds.

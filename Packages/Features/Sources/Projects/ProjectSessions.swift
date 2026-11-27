@@ -91,7 +91,13 @@ struct SessionsPage: View {
                         }
                     }
                 } else if all.isEmpty {
-                    Text("No AI sessions yet. Start one from the top bar.").foregroundStyle(GlassInk.secondary)
+                    CoreStateCard(
+                        symbol: "sparkles", title: "No AI sessions yet",
+                        line: "A session works in its own copy of this project's repos, with the project's Brain room.",
+                        primary: model.canStartSession(project)
+                            ? CoreAction("New AI Session") { model.newSession(in: project) } : nil
+                    )
+                    .frame(maxWidth: .infinity, minHeight: Space.s8 * 12)
                 } else if shown.isEmpty {
                     Text("No \(filter.rawValue.lowercased()) sessions.").foregroundStyle(GlassInk.secondary)
                 } else {
