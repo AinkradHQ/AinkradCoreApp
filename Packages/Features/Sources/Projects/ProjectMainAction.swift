@@ -21,7 +21,8 @@ extension ProjectItem {
         if archived { return MainAction(kind: .unarchive, title: "Unarchive", symbol: "arrow.uturn.backward") }
         if kind == .other { return MainAction(kind: .newDoc, title: "New Doc…", symbol: "square.and.pencil") }
         let start = MainAction(
-            kind: .start, title: kind == .app ? "Build and Run" : tag == .failed ? "Start Again" : "Start",
+            kind: .start,
+            title: tag == .failed ? (kind == .app ? "Build Again" : "Start Again") : kind == .app ? "Build and Run" : "Start",
             symbol: "play")
         let busyStart = MainAction(kind: .starting, title: "Starting…", symbol: "play", busy: true)
         switch setup {
@@ -40,6 +41,13 @@ extension ProjectItem {
             case .stopped, .failed: return starting ? busyStart : start
             }
         }
+    }
+
+    /// The secret a failure is about: one the setup is missing whose name the failure says. Never a guess from the draft alone.
+    var failedSecret: String? {
+        let said = ([live?.failure, live?.failureFix] + (live?.steps.map(\.detail) ?? [])).compactMap { $0 }
+            .joined(separator: " ").lowercased()
+        return draft?.secrets.first { said.contains($0.lowercased()) }
     }
 
     /// The word of the state in the top bar. It is always the state, never the link: a crashed or unknown project must not

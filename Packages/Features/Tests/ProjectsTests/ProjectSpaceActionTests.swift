@@ -92,3 +92,19 @@ struct LastRunLogTests {
         #expect(!LogWords.isError("ready for connections"))
     }
 }
+
+struct FailureFixTests {
+    @Test func aSecretFixNeedsTheFailureToNameTheSecret() {
+        var p = project(run: .failed, draft: RunDraft(source: "compose", services: ["web"], secrets: ["stripe_secret"]))
+        p.live = ProjectLive(failure: "api stopped", failureFix: "STRIPE_SECRET is not set.")
+        #expect(p.failedSecret == "stripe_secret")
+        p.live = ProjectLive(steps: [StartStep(title: "Building the app", state: .failed, detail: "no such module")])
+        #expect(p.failedSecret == nil)
+    }
+
+    @Test func theStageAndTheHeaderUseTheSameWordPerKind() {
+        #expect(project(run: .failed, kind: .app).mainAction().title == "Build Again")
+        #expect(project(run: .failed, kind: .infra).mainAction().title == "Start Again")
+        #expect(project(run: .failed, kind: .web).mainAction().title == "Start Again")
+    }
+}

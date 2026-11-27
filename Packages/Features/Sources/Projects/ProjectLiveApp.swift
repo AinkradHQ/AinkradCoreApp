@@ -68,7 +68,9 @@ struct LiveApp: View {
             Color.clear.coreCard(GlassInk.well, radius: Radius.cardMac)
                 .overlay {
                     if hasPicture, project.kind == .web {
-                        picture.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                        picture.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // Not running: the picture is only a hint of the page, so the words over it read clean.
+                            .opacity(running ? 1 : 0.65).blur(radius: running ? 0 : Space.s2).clipped()
                     }
                 }
                 .overlay { stageLayer }
@@ -139,7 +141,8 @@ struct LiveApp: View {
 
     private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
-    private func start(_ title: String) -> some View {
+    private func start() -> some View {
+        let title = project.mainAction().title
         Button {
             model.control(.start, project)
         } label: {
@@ -320,7 +323,7 @@ struct LiveApp: View {
                         : n > 0
                             ? "Start it to run \(ProjectItem.count(n, "service")) on \(where_) and open it at \(project.link)."
                             : "Start it to run it on \(where_) and open it at \(project.link).")
-            start(kind == .app ? "Build and Run" : "Start").padding(.top, Space.s1)
+            start().padding(.top, Space.s1)
         }
     }
 
@@ -340,7 +343,7 @@ struct LiveApp: View {
                     Label("Show Log", systemImage: "text.alignleft")
                 }
                 .buttonStyle(CoreButtonStyle(.secondary)).help("Open the log of the last run")
-                if let secret = project.draft?.secrets.first {
+                if let secret = project.failedSecret {
                     Button {
                         model.section = .run
                     } label: {
@@ -348,7 +351,7 @@ struct LiveApp: View {
                     }
                     .buttonStyle(CoreButtonStyle(.secondary)).help("Set the secret the setup is missing")
                 }
-                start("Start Again")
+                start()
             }
         }
     }

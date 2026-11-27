@@ -132,24 +132,28 @@ extension Overview {
     @ViewBuilder private var services: some View {
         if let l = live, !l.services.isEmpty {
             // State, health and memory of each; a row opens the Runs page.
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    ForEach(Array(l.services.enumerated()), id: \.offset) { _, s in
-                        CoreRow(s.name, subtitle: Self.serviceLine(s), action: { model.section = .run }) {
-                            if s.state == .up, let m = live?.metrics[s.name], m.memory.count > 1 {
-                                Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes")
-                            }
-                            if s.state == .exited {
-                                StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
-                            } else if s.state == .up {
-                                Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit()
-                            }
+            // Two rows fit with a way to the rest; a service that needs a look (exited) comes first. Nothing is clipped.
+            let ordered = l.services.filter { $0.state == .exited } + l.services.filter { $0.state != .exited }
+            let shown = ordered.count > 2 ? Array(ordered.prefix(2)) : ordered
+            VStack(alignment: .leading, spacing: Space.s1) {
+                ForEach(Array(shown.enumerated()), id: \.offset) { _, s in
+                    CoreRow(s.name, subtitle: Self.serviceLine(s), action: { model.section = .run }) {
+                        if s.state == .up, let m = live?.metrics[s.name], m.memory.count > 1 {
+                            Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes")
                         }
-                        .help("Open the runs of \(project.name)")
+                        if s.state == .exited {
+                            StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
+                        } else if s.state == .up {
+                            Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                        }
                     }
+                    .help("Open the runs of \(project.name)")
+                }
+                if ordered.count > shown.count {
+                    Button("+\(ordered.count - shown.count) more") { model.section = .run }
+                        .buttonStyle(CoreButtonStyle(.plain, size: .small))
                 }
             }
-            .scrollIndicators(.never)
         } else if !project.repos.isEmpty, let draft = project.draft {
             let live = project.tag == .running || project.tag == .starting
             Text(
