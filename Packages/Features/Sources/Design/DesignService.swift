@@ -256,8 +256,7 @@ struct LiveDesignService: DesignService {
         }
     }
 
-    func call<T: Decodable>(_ method: String, _ path: String, body: Data = Data(), as: T.Type) async throws -> T
-    {
+    func call<T: Decodable>(_ method: String, _ path: String, body: Data = Data(), as: T.Type) async throws -> T {
         let data = try await raw(method, path, body: body)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase

@@ -79,7 +79,9 @@ struct DesignDetail: View {
                 #endif
             }
         } actions: {
-            if let editor { PresenceStrip(peers: editor.peers, collaborators: editor.collaborators) { editor.follow($0) } }
+            if let editor {
+                PresenceStrip(peers: editor.peers, collaborators: editor.collaborators) { editor.follow($0) }
+            }
             if let editor { EditorToolbar(editor: editor, aboutOpen: aboutOpen) }
             CoreDropdown(
                 items: projectItems,

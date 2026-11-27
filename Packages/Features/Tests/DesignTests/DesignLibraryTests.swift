@@ -31,7 +31,8 @@ import Testing
 
     @Test func aRowThisAppCannotReadIsSkipped() throws {
         let rows = try decode(
-            #"[{"id":"x"},{"id":"dv_1","kind":"auto","origin":"system","created_at":"2026-11-26T09:00:00Z","bytes":1}]"#)
+            #"[{"id":"x"},{"id":"dv_1","kind":"auto","origin":"system","created_at":"2026-11-26T09:00:00Z","bytes":1}]"#
+        )
         #expect(rows.map(\.id) == ["dv_1"])
     }
 
