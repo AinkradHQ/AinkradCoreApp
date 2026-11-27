@@ -81,6 +81,7 @@ struct WizardPreviewCard: View {
     let publicLink: Bool
     /// The existing Brain place picked; nil means a new one.
     let place: String?
+    let kind: ProjectKind
     let step: WizardStep
     /// The repos' copy states once the project exists.
     let progress: WizardProgress?
@@ -97,8 +98,9 @@ struct WizardPreviewCard: View {
                 PreviewIllustration(name: shownName, colour: colour)
                     .id(colour).transition(.opacity)
                 StateBadge(
-                    publicLink ? "Public link" : "Private", tone: publicLink ? .run : .queue,
-                    symbol: publicLink ? "link" : "lock"
+                    kind.hasPublicLink ? (publicLink ? "Public link" : "Private") : kind.short,
+                    tone: kind.hasPublicLink && publicLink ? .run : .queue,
+                    symbol: kind.hasPublicLink ? (publicLink ? "link" : "lock") : kind.symbol
                 )
                 .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
                 .coreCard(GlassInk.card, radius: Radius.control)
@@ -112,8 +114,10 @@ struct WizardPreviewCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(shownName).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                         .contentTransition(.opacity)
-                    Text(host ?? "Link made from the name").font(.system(size: MacTextSize.meta, design: .monospaced))
-                        .foregroundStyle(palette.text2).lineLimit(1).truncationMode(.middle)
+                    Text(host ?? (kind.hasPublicLink ? "Link made from the name" : kind.title)).font(
+                        .system(size: MacTextSize.meta, design: .monospaced)
+                    )
+                    .foregroundStyle(palette.text2).lineLimit(1).truncationMode(.middle)
                 }
             }
             .opacity(lit(.name))
@@ -129,12 +133,17 @@ struct WizardPreviewCard: View {
                     if repos.count > 4 { Text("and \(repos.count - 4) more").foregroundStyle(palette.text2) }
                 }
             }
+            section("Kind", lit: lit(.kind)) {
+                Label(kind.title, systemImage: kind.symbol).lineLimit(1).contentTransition(.opacity)
+            }
             section("Brain", lit: lit(.brain)) {
                 Label(place ?? "New place “\(shownName)”", systemImage: place == nil ? "plus.square" : "square.stack")
                     .lineLimit(1).contentTransition(.opacity)
             }
-            section("Runs on", lit: lit(.runs)) {
-                Label(runner.title, systemImage: runner.symbol).contentTransition(.opacity)
+            if kind.runs {
+                section(kind == .app ? "Builds on" : "Runs on", lit: lit(.runs)) {
+                    Label(runner.title, systemImage: runner.symbol).contentTransition(.opacity)
+                }
             }
             if let progress, progress.ready + progress.copying + progress.failed + progress.waiting > 0 {
                 let total = Double(progress.ready + progress.copying + progress.failed + progress.waiting)
@@ -155,6 +164,7 @@ struct WizardPreviewCard: View {
         .animation(Motion.out(Motion.ui), value: colour)
         .animation(Motion.out(Motion.ui), value: step)
         .animation(Motion.out(Motion.ui), value: runner)
+        .animation(Motion.out(Motion.ui), value: kind)
         .animation(Motion.out(Motion.ui), value: progress)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Preview of \(shownName)")
