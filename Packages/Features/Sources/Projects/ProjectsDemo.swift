@@ -1,5 +1,6 @@
 #if DEBUG
 import Brain
+import CoreUI
 import Foundation
 import Shell
 import SwiftUI
@@ -88,6 +89,8 @@ public final class ProjectsDemo {
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
         "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
+        // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
+        "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
         "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
         "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
         "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
@@ -203,6 +206,18 @@ public final class ProjectsDemo {
         model.catalog = SampleRepoCatalog()
         ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
         model.clearWriteError()
+        model.demoPage = true
+        // Every scene starts from the standard Look; the look scenes change it below.
+        let look = LookPrefs.shared
+        (look.mode, look.opacity, look.blur) = (CoreLook.standard.mode, CoreLook.standard.opacity, 1)
+        PreviewStore.shared.forget()
+        for (id, name, colour) in [
+            (1, "Lanterna", ProjectColour.green), (2, "Northwind Ledger", .violet), (3, "Quill", .copper),
+        ] {
+            let r = ImageRenderer(content: DemoSitePage(name: name, colour: colour).frame(width: 1100, height: 680))
+            r.scale = 1
+            if let img = r.nsImage { PreviewStore.shared.seed(img, for: Int64(id)) }
+        }
         var list = Self.sample()
         switch scene {
         case "gallery-empty": list = []
@@ -253,6 +268,10 @@ public final class ProjectsDemo {
         case "overview-real-core", "page-brain-empty":
             list[3].run = nil
             list[3].live = nil
+        case "overview-private":
+            list[0].expose = false
+        case "overview-never-opened":
+            PreviewStore.shared.forget()
         default: break
         }
         await model.useNow(Service(list))
@@ -261,6 +280,15 @@ public final class ProjectsDemo {
         await model.loadRunners()
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
+        switch scene {
+        case "gallery-look", "overview-look":
+            (look.mode, look.opacity, look.blur) = (.blurred, 0.12, 1)
+            if scene == "overview-look" { model.openID = 1 }
+        case "gallery-look-solid": (look.mode, look.opacity, look.blur) = (.solid, 1, 1)
+        case "overview-private", "overview-running": model.openID = 1
+        case "overview-never-opened": model.openID = 4
+        default: break
+        }
         switch scene {
         case "gallery-hover": model.debugHover = 1
         case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
@@ -503,3 +531,59 @@ extension ProjectsModel {
     func setRunnerSupported(_ on: Bool) { runnerSupported = on }
 }
 #endif
+
+/// A made-up web page: the stand-in for the running app's live view and for the pictures behind the cards.
+struct DemoSitePage: View {
+    let name: String
+    let colour: ProjectColour
+    private let design = CGSize(width: 1100, height: 680)
+
+    var body: some View {
+        GeometryReader { g in
+            page.frame(width: design.width, height: design.height)
+                .scaleEffect(g.size.width / design.width, anchor: .topLeading)
+                .frame(width: g.size.width, height: g.size.height, alignment: .topLeading).clipped()
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var page: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 28) {
+                Text(name).font(.system(size: 22, weight: .bold))
+                ForEach(["Shop", "Stories", "About"], id: \.self) { Text($0).font(.system(size: 16)).opacity(0.6) }
+                Spacer()
+                Text("Cart (2)").font(.system(size: 16))
+            }
+            .padding(.horizontal, 48).frame(height: 76)
+            ZStack(alignment: .leading) {
+                LinearGradient(
+                    colors: [colour.fill.opacity(0.9), colour.fill.opacity(0.45)], startPoint: .topLeading,
+                    endPoint: .bottomTrailing)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Light for every room").font(.system(size: 54, weight: .bold))
+                    Text("Handmade lamps, shipped in three days.").font(.system(size: 22)).opacity(0.85)
+                    Text("Shop the collection").font(.system(size: 17, weight: .semibold))
+                        .padding(.horizontal, 22).frame(height: 44)
+                        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(.black)
+                }
+                .foregroundStyle(.white).padding(.horizontal, 48)
+            }
+            .frame(height: 340)
+            HStack(spacing: 20) {
+                ForEach(0..<4, id: \.self) { i in
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 10).fill(colour.fill.opacity(0.18 + Double(i) * 0.06)).frame(
+                            height: 130)
+                        Text(["Dune", "Halo", "Moth", "Ember"][i]).font(.system(size: 16, weight: .semibold))
+                        Text("$\(80 + i * 15)").font(.system(size: 14)).opacity(0.6)
+                    }
+                }
+            }
+            .padding(48)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.12))
+        .background(Color(red: 0.98, green: 0.97, blue: 0.95))
+    }
+}

@@ -79,12 +79,9 @@ struct SettingsPage: View {
                 Text(origin).foregroundStyle(GlassInk.secondary)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Colour")
-                    CoreSegmented(
-                        "Colour", segments: ProjectColour.allCases.map { CoreSegment($0, $0.title) },
+                    ColourSwatches(
                         selection: Binding(
-                            get: { model.colour(project) }, set: { model.setColour($0, for: project) })
-                    )
-                    .fixedSize()
+                            get: { model.colour(project) }, set: { model.setColour($0, for: project) }))
                 }
                 if let e = model.writeError { CoreFieldError(e) }
                 if changed {

@@ -20,6 +20,10 @@ struct Overview: View {
         _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
     }
 
+    static let columnWidth: CGFloat = 420
+    static let cardWidth: CGFloat = 316
+    static let bottomHeight: CGFloat = 220
+
     private var live: ProjectLive? { project.live }
     private var settingUp: Bool {
         switch project.setup {
@@ -33,26 +37,16 @@ struct Overview: View {
             if model.configsService != nil { statRow.coreRise(settled, 0) }
             HStack(alignment: .top, spacing: Space.s2) {
                 LiveApp(model: model, project: project).coreRise(settled, 0)
-                VStack(spacing: Space.s2) {
-                    sessions.coreRise(settled, 1)
-                    brain.coreRise(settled, 2)
-                    if insights.supported {
-                        ChangesCard(insights: insights, now: model.now()).coreRise(settled, 2)
-                        notesCard.coreRise(settled, 3)
-                    }
-                    if let designs = model.designsIsland {
-                        designs(ProjectRef(id: String(project.id), name: project.name)).coreRise(settled, 3)
-                    }
-                }
-                .frame(width: Space.s8 * 10)
+                rightColumn.frame(width: Self.columnWidth)
             }
             .frame(maxHeight: .infinity)
+            // The mockup's bottom row: 220 tall, Services and Repos 316 wide, Logs the rest.
             HStack(spacing: Space.s2) {
-                servicesIsland.coreRise(settled, 3).frame(width: Space.s8 * 14)
-                reposIsland.coreRise(settled, 4).frame(width: Space.s8 * 14)
+                servicesIsland.coreRise(settled, 3).frame(width: Self.cardWidth)
+                reposIsland.coreRise(settled, 4).frame(width: Self.cardWidth)
                 logsIsland.coreRise(settled, 5)
             }
-            .frame(height: Space.s8 * 10)
+            .frame(height: Self.bottomHeight)
         }
         .onAppear { settled = true }
         // The tail of the log while it runs; the Core's stream, else a page every 3 s.
@@ -74,6 +68,28 @@ struct Overview: View {
             await insights.loadUsage()
             await insights.loadKnowledge()
             await insights.loadDocs()
+        }
+    }
+
+    /// AI Sessions on top (300 tall), Brain under it taking what is left; anything more (changes, notes, designs) scrolls
+    /// below, so nothing is ever pushed off the pane.
+    private var rightColumn: some View {
+        GeometryReader { g in
+            ScrollView {
+                VStack(spacing: Space.s2) {
+                    sessions.frame(height: Space.s8 * 9 + Space.s3).coreRise(settled, 1)
+                    brain.frame(minHeight: max(g.size.height - (Space.s8 * 9 + Space.s3) - Space.s2, 180))
+                        .coreRise(settled, 2)
+                    if insights.supported {
+                        ChangesCard(insights: insights, now: model.now()).coreRise(settled, 2)
+                        notesCard.coreRise(settled, 3)
+                    }
+                    if let designs = model.designsIsland {
+                        designs(ProjectRef(id: String(project.id), name: project.name)).coreRise(settled, 3)
+                    }
+                }
+            }
+            .scrollIndicators(.never)
         }
     }
 
@@ -251,7 +267,10 @@ struct Overview: View {
         if let l = live, !l.services.isEmpty {
             VStack(alignment: .leading, spacing: Space.s1) {
                 ForEach(Array(l.services.enumerated()), id: \.offset) { _, s in
-                    CoreRow(s.name, symbol: Self.symbol(s.state)) {
+                    HStack(spacing: Space.s3) {
+                        StatusDot(colour: Self.dot(s.state))
+                        Text(s.name).coreFont(size: MacTextSize.headline, weight: .semibold)
+                        Spacer(minLength: 0)
                         if s.state == .exited {
                             StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
                         } else {
@@ -259,13 +278,16 @@ struct Overview: View {
                                 .monospacedDigit()
                         }
                     }
+                    .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlLg)
+                    .accessibilityElement(children: .combine)
                 }
             }
         } else if let draft = project.draft {
             VStack(alignment: .leading, spacing: Space.s2) {
                 ForEach(draft.services, id: \.self) { s in
-                    HStack(spacing: Space.s2) {
-                        StateBadge(s, tone: .queue, symbol: "circle")
+                    HStack(spacing: Space.s3) {
+                        StatusDot(colour: GlassInk.secondary)
+                        Text(s)
                         Spacer(minLength: 0)
                         Text("–").foregroundStyle(GlassInk.secondary)
                     }
@@ -280,11 +302,11 @@ struct Overview: View {
         }
     }
 
-    private static func symbol(_ s: ProjectLive.Service.State) -> String {
+    private static func dot(_ s: ProjectLive.Service.State) -> Color {
         switch s {
-        case .up: "checkmark.circle"
-        case .down: "circle"
-        case .exited: "exclamationmark.triangle"
+        case .up: GlassInk.green
+        case .down: GlassInk.secondary
+        case .exited: GlassInk.red
         }
     }
 

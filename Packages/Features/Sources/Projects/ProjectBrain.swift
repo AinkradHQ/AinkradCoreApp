@@ -21,6 +21,11 @@ struct BrainPage: View {
 
     private var room: ProjectLive.Room? { project.live?.room }
 
+    /// Nothing known yet, and nothing still loading: the page is one calm card with the way forward.
+    private var empty: Bool {
+        room == nil && (insights.rules ?? []).isEmpty && insights.knowledge?.isEmpty == true
+    }
+
     /// Never "nothing in it yet" above records: the line follows what the Core holds.
     private var emptyLine: String {
         let n = insights.knowledge?.count ?? 0
@@ -35,25 +40,29 @@ struct BrainPage: View {
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            HStack(alignment: .top, spacing: Space.s2) {
-                if let room {
-                    summary(room).coreRise(settled, 0).frame(width: Space.s8 * 18)
-                    rules(room).coreRise(settled, 1)
-                } else {
-                    Island("\(project.name) room") {
-                        VStack(alignment: .leading, spacing: Space.s3) {
-                            Text(emptyLine)
-                                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                            if let r = insights.rules, !r.isEmpty {
-                                Text("Rules").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(
-                                    GlassInk.secondary)
-                                ForEach(r.prefix(8)) { KnownRow(r: $0) }
+            if empty {
+                CoreStateCard(
+                    symbol: "brain", title: "\(project.name) room is empty", line: emptyLine,
+                    primary: CoreAction("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                HStack(alignment: .top, spacing: Space.s2) {
+                    if let room {
+                        summary(room).coreRise(settled, 0).frame(width: Space.s8 * 18)
+                        rules(room).coreRise(settled, 1)
+                    } else {
+                        Island("\(project.name) room", sub: "\(insights.rules?.count ?? 0) rules") {
+                            VStack(alignment: .leading, spacing: Space.s3) {
+                                Text(emptyLine).foregroundStyle(GlassInk.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                ForEach((insights.rules ?? []).prefix(8)) { KnownRow(r: $0) }
                             }
                         }
                     }
                 }
+                if insights.supported { remembered.coreRise(settled, 2) }
             }
-            if insights.supported { remembered.coreRise(settled, 2) }
         }
         .onAppear { settled = true }
         .task(id: project.id) {

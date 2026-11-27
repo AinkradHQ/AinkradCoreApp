@@ -202,16 +202,13 @@ struct ProjectWizard: View {
             CoreTextField("Description", placeholder: "What it is, in a line (optional)", text: $description)
             VStack(alignment: .leading, spacing: Space.s1) {
                 CoreFieldLabel("Colour")
-                CoreSegmented(
-                    "Colour", segments: ProjectColour.allCases.map { CoreSegment($0, $0.title) },
+                ColourSwatches(
                     selection: Binding(
                         get: { colour },
                         set: {
                             colour = $0
                             colourPicked = true
-                        })
-                )
-                .fixedSize()
+                        }))
             }
             .onChange(of: name) { _, new in
                 if !colourPicked { colour = .standard(for: ProjectRules.slug(from: new)) }
