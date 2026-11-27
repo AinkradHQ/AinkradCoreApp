@@ -31,10 +31,17 @@ struct RunPage: View {
                 .frame(width: Space.s8 * 11)
             }
             .frame(maxHeight: .infinity)
-            LogsIsland(project: project, run: run).coreRise(settled, 3).frame(maxHeight: .infinity)
+            LogsIsland(model: model, project: project, run: run).coreRise(settled, 3).frame(maxHeight: .infinity)
         }
         .onAppear { settled = true }
         .task(id: project.id) { await run.watch() }
+        // The Core says a run or its setup changed: read it now, not at the next minute.
+        .task(id: model.runTick) {
+            if run.loaded {
+                await run.load()
+                await run.refreshRun()
+            }
+        }
         .accessibilityIdentifier("project-page-Run")
     }
 }
@@ -55,6 +62,7 @@ private struct ServicesIsland: View {
         let cpu: Int?
         let memory: String?
         let restarts: Int
+        var series: ServiceSeries?
         var id: String { name }
     }
 
@@ -68,19 +76,19 @@ private struct ServicesIsland: View {
                     name: s.name, image: s.image,
                     port: s.port.map { "\($0)\(s.isPublic ? " · public" : "")" } ?? "–", state: l?.state,
                     health: l?.health ?? "none",
-                    cpu: l?.cpu, memory: l?.memory, restarts: l?.restarts ?? 0)
+                    cpu: l?.cpu, memory: l?.memory, restarts: l?.restarts ?? 0, series: project.live?.metrics[s.name])
             }
         }
         return live.map {
             Row(
                 name: $0.name, image: "–", port: "–", state: $0.state, health: $0.health, cpu: $0.cpu,
                 memory: $0.memory,
-                restarts: $0.restarts)
+                restarts: $0.restarts, series: project.live?.metrics[$0.name])
         }
     }
 
     private var sub: String {
-        "\(rows.count) · \(model.coreName) · up to \(ProjectRules.defaultLimits)"
+        "\(rows.count) · \(project.live?.runner ?? model.coreName) · up to \(ProjectRules.limits(cpu: project.cpuLimit, memMb: project.memLimitMb))"
     }
 
     var body: some View {
@@ -90,6 +98,12 @@ private struct ServicesIsland: View {
                 HStack(spacing: Space.s2) {
                     // Where the project's latest heavy job ran (E15); nothing for a Core run or before hardware.
                     RanOnChip(model.host.shell.hardwareDeck.jobByProject[Int(project.id)])
+                    Button("History…") { RunDialogs.openHistory(run, project: project) }
+                        .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                        .disabled(run.versions.count < 2)
+                        .help(
+                            run.versions.count < 2
+                                ? "There is one version of the setup so far" : "Every saved version of the setup")
                     Button("Edit Setup…") { RunDialogs.openSetup(run, project: project) }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                         .disabled(model.readOnly || !run.loaded || run.loadError != nil)
@@ -102,7 +116,7 @@ private struct ServicesIsland: View {
                 if let s = run.status, s.state == "failed" {
                     CoreNotice(
                         symbol: "exclamationmark.triangle", title: "The last start failed.",
-                        text: s.error ?? "", tone: .fail)
+                        text: s.error ?? ProjectsModel.reason(s.stopReason), tone: .fail)
                 }
                 if run.drafted, let spec = run.spec { DraftLine(project: project, run: run, spec: spec) }
                 content
@@ -135,17 +149,23 @@ private struct ServicesIsland: View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s5, verticalSpacing: Space.s3) {
             GridRow {
                 ForEach(["Service", "Image", "Port", "Health", "CPU", "Memory", "Restarts"], id: \.self) {
-                    Text($0).foregroundStyle(GlassInk.secondary)
+                    Text($0).foregroundStyle(GlassInk.secondary).frame(
+                        maxWidth: $0 == "Image" ? .infinity : nil, alignment: .leading)
                 }
             }
             ForEach(rows) { r in
                 GridRow {
                     Text(r.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    mono(r.image)
+                    mono(r.image).frame(maxWidth: .infinity, alignment: .leading)
                     mono(r.port)
                     health(r)
                     cpu(r)
-                    Text(r.state == .up ? (r.memory ?? "–") : "–").monospacedDigit()
+                    HStack(spacing: Space.s2) {
+                        Text(r.state == .up ? (r.memory ?? "–") : "–").monospacedDigit()
+                        if r.state == .up, let m = r.series?.memory, m.count > 1 {
+                            Sparkline(values: m, label: "\(r.name) memory, recent minutes", floor: 1)
+                        }
+                    }
                     Text("\(r.restarts)").monospacedDigit()
                 }
             }
@@ -174,8 +194,12 @@ private struct ServicesIsland: View {
     @ViewBuilder private func cpu(_ r: Row) -> some View {
         if r.state == .up, let cpu = r.cpu {
             HStack(spacing: Space.s2) {
-                CoreMeter(Double(cpu) / 100, low: cpu >= 90, label: "\(r.name) CPU").frame(width: Space.s8 * 3)
-                Text("\(cpu)%").monospacedDigit()
+                CoreMeter(Double(cpu) / 100, low: cpu >= 90, height: Space.s2, label: "\(r.name) CPU")
+                    .frame(width: Space.s8 * 3)
+                Text("\(cpu)%").monospacedDigit().lineLimit(1).fixedSize()
+                if let c = r.series?.cpu, c.count > 1 {
+                    Sparkline(values: c, label: "\(r.name) CPU, recent minutes", floor: 25)
+                }
             }
         } else {
             Text("–").foregroundStyle(GlassInk.secondary)
@@ -262,10 +286,13 @@ private struct PublicLinkIsland: View {
     private var words: String {
         guard project.expose else { return "Only your devices can open it." }
         var s =
-            "Anyone with the link can open it while it runs. It stops after \(ProjectRules.idleMinutes) min with no visits."
+            "Anyone with the link can open it while it runs. It stops \(ProjectRules.idleWords(minutes: project.idleMinutes, never: project.idleNever))."
         if let due = run.status?.idleStopAt, run.status?.state == "running" {
             let min = max(0, Int(due.timeIntervalSince(model.now()) / 60))
             s += " Stops in about \(min) min unless someone visits."
+        }
+        if let at = run.status?.lastActivityAt {
+            s += " Last visited \(runsAgo(at, now: model.now()))."
         }
         return s
     }
@@ -302,22 +329,37 @@ private struct SecretsIsland: View {
                 ScrollView {
                     VStack(spacing: Space.s1) {
                         ForEach(rows) { r in
-                            CoreRow(r.name, symbol: "key") {
-                                HStack(spacing: Space.s2) {
-                                    if let at = r.item?.updatedAt {
-                                        Text("Set \(PickRepo.ago(at, model.now()))").foregroundStyle(
-                                            GlassInk.secondary)
-                                    } else if r.item == nil {
-                                        Text("Not set").foregroundStyle(GlassInk.redInk)
+                            HStack(spacing: Space.s3) {
+                                Image(systemName: "key").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                                Text(r.name).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer(minLength: 0)
+                                if let at = r.item?.updatedAt {
+                                    Text("Set \(PickRepo.ago(at, model.now()))").foregroundStyle(GlassInk.secondary)
+                                        .lineLimit(1).fixedSize()
+                                } else if r.item == nil {
+                                    Text("Not set").foregroundStyle(GlassInk.redInk).lineLimit(1).fixedSize()
+                                }
+                                if let k = r.item?.kind, k != "text" {
+                                    Text(SecretSheet.kinds.first { $0.value == k }?.title ?? k)
+                                        .foregroundStyle(GlassInk.secondary).lineLimit(1).fixedSize()
+                                }
+                                Button(r.item == nil ? "Set…" : "Replace…") {
+                                    RunDialogs.openSecret(
+                                        run, project: project, name: r.name, replacing: r.item != nil,
+                                        kind: r.item?.kind ?? "text")
+                                }
+                                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
+                                .fixedSize()
+                                .accessibilityLabel("\(r.item == nil ? "Set" : "Replace") \(r.name)")
+                                if r.item != nil {
+                                    CoreIconButton(symbol: "trash", label: "Delete \(r.name)") {
+                                        RunDialogs.confirmDelete(run, project: project, name: r.name)
                                     }
-                                    Button(r.item == nil ? "Set…" : "Replace…") {
-                                        RunDialogs.openSecret(
-                                            run, project: project, name: r.name, replacing: r.item != nil)
-                                    }
-                                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
-                                    .accessibilityLabel("\(r.item == nil ? "Set" : "Replace") \(r.name)")
+                                    .disabled(model.readOnly)
                                 }
                             }
+                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlLg)
                         }
                     }
                 }
@@ -331,55 +373,33 @@ private struct SecretsIsland: View {
 // MARK: Logs
 
 private struct LogsIsland: View {
+    let model: ProjectsModel
     let project: ProjectItem
     let run: RunPageModel
+    @State private var logs: RunLogsModel?
 
     private var names: [String] { run.spec?.services.map(\.name) ?? project.live?.services.map(\.name) ?? [] }
-
-    private var lines: [ProjectLive.LogLine] {
-        (run.logLines.isEmpty ? (project.live?.logs ?? []) : run.logLines).filter {
-            run.logService == nil || $0.service == run.logService
-        }
-    }
+    private var live: Bool { run.status?.state == "running" || run.status?.state == "starting" }
 
     var body: some View {
-        Island(
-            title: "Logs", sub: run.logService ?? "all services",
-            accessory: {
-                if !names.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        CoreSegmented(
-                            "Log service", segments: [CoreSegment("", "All")] + names.map { CoreSegment($0, $0) },
-                            selection: Binding(
-                                get: { run.logService ?? "" }, set: { run.logService = $0.isEmpty ? nil : $0 })
-                        )
-                    }
-                    .frame(maxWidth: Space.s8 * 18)
-                }
-            }
-        ) {
-            if lines.isEmpty {
-                Text(empty).foregroundStyle(GlassInk.secondary)
+        Island("Logs", sub: logs?.service ?? "all services") {
+            if let logs, live {
+                RunLogView(logs: logs, services: names, toast: { model.host.shell.showToast($0) })
+            } else if !(project.live?.logs.isEmpty ?? true) {
+                // The Debug stand-in's lines.
+                RunLogView(logs: RunLogsModel.fixed(project.live?.logs ?? [], lost: 12, times: true))
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
-                            HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-                                Text(l.service).foregroundStyle(GlassInk.secondary)
-                                    .frame(width: Space.s8 * 2, alignment: .leading)
-                                Text(l.text)
-                            }
-                            .font(.system(size: MacTextSize.body, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
+                Text("No logs yet. They appear while the project runs.").foregroundStyle(GlassInk.secondary)
             }
         }
-    }
-
-    private var empty: String {
-        if let s = run.logService { return "Nothing from \(s) yet." }
-        return project.tag == .running ? "No log lines yet." : "No logs yet. They appear while the project runs."
+        // The Core's stream while it runs; it starts again when a run starts or stops.
+        .task(id: "\(project.id) \(live) \(model.runTick)") {
+            guard live, let m = run.makeLogs() else {
+                logs = nil
+                return
+            }
+            logs = m
+            await m.run()
+        }
     }
 }

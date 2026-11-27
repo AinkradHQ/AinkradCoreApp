@@ -106,7 +106,12 @@ public final class DesignModel {
         lib.model = self
         collab.model = self
         projects.designsIsland = { [weak self] ref in
+            // Hidden unless Design is loading or ready: "Not connected" and "No Design" are not news on a project.
             guard let self else { return AnyView(EmptyView()) }
+            switch self.load {
+            case .ready, .loading: break
+            default: return AnyView(EmptyView())
+            }
             return AnyView(DesignsIsland(model: self, project: ref))
         }
     }

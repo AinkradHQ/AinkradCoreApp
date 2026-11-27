@@ -259,6 +259,46 @@ actor SessionManager {
         }
     }
 
+    /// One signed request whose answer is returned whatever its status (the preview proxy: an app's own 404 or 500 is an
+    /// answer, not a failure). Only the Core's own refusals (a bad session, a missing proof, rate limiting) are thrown, after
+    /// the usual single retry on `session_expired`. `extra` are plain request headers; nothing here adds Origin or Authorization.
+    func exchange(method: String, target: String, headers extra: [String: String], body: Data) async throws
+        -> RawResponse
+    {
+        var retried: Retried = []
+        while true {
+            var request = RawRequest(method: method, target: target, headers: extra, body: body)
+            let sessionID = try await currentSession().id
+            request.headers.merge(try headers(method: method, target: target, body: body, sessionID: sessionID)) { $1 }
+            let res = try await http.send(request)
+            guard Self.isCoreRefusal(res) else { return res }
+            let error = CoreError.from(status: res.status, headers: res.headers, body: res.body)
+            if let next = retry(after: error, sessionID: sessionID, retried: retried) {
+                retried = next
+                continue
+            }
+            throw error
+        }
+    }
+
+    /// Whether a 401, 403 or 429 is the Core's own and not the proxied app's: the Core marks every error it makes with
+    /// `Ainkrad-Refusal: 1` and strips every `ainkrad-*` header a project sends, so a project cannot fake one (an app that
+    /// answers 403 `unlock_required` must never pop an unlock prompt).
+    static func isCoreRefusal(_ res: RawResponse) -> Bool {
+        let marked = res.headers.contains { $0.key.lowercased() == "ainkrad-refusal" && $0.value == "1" }
+        guard marked else { return false }
+        switch res.status {
+        case 429: return true
+        case 401, 403:
+            let code = (try? JSONSerialization.jsonObject(with: res.body) as? [String: Any])?["code"] as? String
+            return [
+                "auth_failed", "clock_skew", "session_expired", "step_up_required", "unlock_required",
+                "forbidden_scope",
+            ].contains(code ?? "")
+        default: return false
+        }
+    }
+
     // MARK: background refresh
 
     /// Refreshes the session at 80 % of its life, for as long as the app runs, with no user interaction. A revoked device or

@@ -17,6 +17,8 @@ struct RepoItem: Identifiable, Equatable, Sendable {
     var state: String? = nil
     var reason: String? = nil
     var startedAt: Date? = nil
+    /// The Core had a `mirror` for it (`ProjectRepo.mirror` is null until the first fetch is tried).
+    var hasMirror = true
 
     /// Where the Core's copy stands: copying (since when), ready, or failed with a reason the person can act on.
     var copy: RepoCopy {
@@ -24,7 +26,9 @@ struct RepoItem: Identifiable, Equatable, Sendable {
         if state == "failed" || fetchError != nil {
             return .failed(RepoFailure(code: reason), fetchError ?? "The Core could not copy this repo.")
         }
-        return fetchedAt == nil ? .fetching(since: startedAt) : .ready
+        if fetchedAt != nil { return .ready }
+        // No mirror at all: the Core never tried (or does not keep copies). It is not "copying", so nothing waits on it.
+        return state == nil && !hasMirror ? .unknown : .fetching(since: startedAt)
     }
 }
 
@@ -51,6 +55,8 @@ enum RepoCopy: Equatable, Sendable {
     case fetching(since: Date?)
     case ready
     case failed(RepoFailure, String)
+    /// The Core has no copy and is not making one (no `mirror`): the person can ask with Fetch Now.
+    case unknown
 
     /// "copying · 40 s" (the Core's start time, else just "copying…").
     static func elapsed(since: Date?, now: Date) -> String {
@@ -81,13 +87,48 @@ struct ProjectRunState: Equatable, Sendable {
     var error: String?
     /// `user`, `idle`, `crash`, `runner_lost`, `replaced` or `start_failed`.
     var stopReason: String?
+    /// The runner's id it is placed on, and when anything last visited it.
+    var runner: String?
+    var lastActivityAt: Date?
+    /// How far the start got (API 110, on `GET /run`): empty from an older Core, and for a stopped run.
+    var steps: [RunStep] = []
+}
+
+/// One step of a run's start, as the Core says it (API 110): `pull`, `build`, `start`, `health`.
+struct RunStep: Equatable, Sendable {
+    enum State: String, Equatable, Sendable { case done, active, pending, failed }
+    let name: String
+    let state: State
+    let detail: String?
+
+    var title: String {
+        switch name {
+        case "pull": "Getting the code"
+        case "build": "Building the images"
+        case "start": "Starting the services"
+        case "health": "Checking they are healthy"
+        default: name.capitalized
+        }
+    }
+
+    /// The Core's `steps` array; unknown states or malformed rows are left out, never guessed.
+    static func read(_ raw: Any?) -> [RunStep] {
+        (raw as? [[String: Any]] ?? []).compactMap {
+            guard let n = $0["name"] as? String, let s = ($0["state"] as? String).flatMap(State.init(rawValue:))
+            else { return nil }
+            return RunStep(name: n, state: s, detail: ($0["detail"] as? String).flatMap { $0.isEmpty ? nil : $0 })
+        }
+    }
 }
 
 /// A drafted run (P4): shown in the "ready to start" state.
 struct RunDraft: Equatable, Sendable {
     let source: String
     let services: [String]
+    /// The secrets the setup asks for that the Core does not hold yet.
     let secrets: [String]
+    /// Written or saved by a person, not drafted from a repo file.
+    var manual = false
 }
 
 struct ProjectItem: Identifiable, Equatable, Sendable {
@@ -106,8 +147,58 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var cpuLimit = 2.0
     var memLimitMb: Int64 = 2048
     var idleMinutes = ProjectRules.idleMinutes
+    /// The idle stop is off for this project (`ProjectInfo.idle_never`).
+    var idleNever = false
+    /// Where it prefers to run: `auto`, `this_mac` or `home_server` (`ProjectInfo.runner`).
+    var runner = "auto"
+    /// `manual` or `github`: how the project was made.
+    var source = "manual"
+    var createdAt: Date?
     /// Set aside with Archive: it keeps its repos, secrets and notes but does not run.
     var archived = false
+    /// The Core has been asked whether the project has a run setup (its spec); `draft` is that setup when it has one.
+    var setupChecked = false
+    /// The Core could not be reached just now: the run state shown is how it last looked.
+    var stale = false
+    /// The colour the Core holds for the project (API 110): one of the accent names; nil when it has none or is older.
+    var colourName: String?
+    /// A service of it crashed (`project.service_crashed`) and it has not run again since.
+    var crash: ServiceCrash?
+
+    /// Where a project with no run yet stands, from what the Core says.
+    enum Setup: Equatable {
+        case noRepos, copying
+        case copyFailed(String)
+        /// The Core has not been asked yet whether there is a spec.
+        case checking
+        /// Copies are ready, there is no spec: it has to be drafted or written.
+        case needsSetup
+        case ready(RunDraft)
+        /// It has run before, so it has a setup.
+        case ran
+    }
+
+    var setup: Setup {
+        if repos.isEmpty { return .noRepos }
+        if run != nil { return .ran }
+        if let e = repos.compactMap({ $0.fetchError }).first { return .copyFailed(e) }
+        if repos.contains(where: { $0.fetchedAt == nil }) { return .copying }
+        if let draft { return .ready(draft) }
+        return setupChecked ? .needsSetup : .checking
+    }
+
+    /// Why Start cannot be pressed for the project's own reasons (not the connection's); nil when it can.
+    var startBlock: String? {
+        switch setup {
+        case .noRepos: "Add a repo first. The Core runs what is in it."
+        case .copying, .checking: "Start is ready once the repos are copied and the setup is read."
+        case .copyFailed: "A repo could not be copied. Fix that first."
+        case .needsSetup: "This project has no setup yet. Draft one from the repo in Runs, Setup and secrets."
+        case .ready(let d) where !d.secrets.isEmpty:
+            "Set the secrets the setup needs first: \(d.secrets.joined(separator: ", "))."
+        case .ready, .ran: nil
+        }
+    }
 
     var link: String { ProjectRules.host(slug) }
 
@@ -131,19 +222,35 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The state as the design system's badge says it.
     var badge: (label: String, tone: Tone, symbol: String) {
         if archived { return ("Archived", .queue, "archivebox") }
+        if crash != nil, !stale { return ("Crashed", .fail, "exclamationmark.triangle") }
+        if stale, tag == .running || tag == .starting { return ("Status unknown", .queue, "questionmark.circle") }
         return switch tag {
         case .running: ("Running", Tone.run, "play.circle")
         case .starting: ("Starting", Tone.warn, "gearshape")
         case .stopped: ("Stopped", Tone.queue, "stop.circle")
         case .failed: ("Failed", Tone.fail, "exclamationmark.triangle")
-        case .settingUp: ("Setting up", Tone.warn, "gearshape")
+        case .settingUp:
+            copyFailed ? ("Can’t copy", Tone.fail, "exclamationmark.triangle") : ("Setting up", Tone.warn, "gearshape")
         case .new: ("New", Tone.queue, "sparkle")
         }
+    }
+
+    /// Every repo that is not copied yet failed: nothing is still copying, so "Setting up" would never end.
+    var copyFailed: Bool {
+        let waiting = repos.filter { $0.fetchedAt == nil }
+        return !waiting.isEmpty && waiting.allSatisfy { $0.copy.isFailed }
+    }
+
+    /// What this project may use, as the Options page's choices.
+    var limits: ProjectLimits {
+        ProjectLimits(cpus: cpuLimit, memoryMb: memLimitMb, idleMinutes: idleMinutes, idleNever: idleNever)
     }
 
     /// The line under the name: "Running · 5 services · 2 AI sessions".
     var subtitle: String {
         if archived { return "Archived · \(Self.count(repos.count, "repo"))" }
+        if let crash, !stale { return crash.words }
+        if stale, tag == .running || tag == .starting { return "Last seen running · the Core is not answering" }
         if let run {
             switch run.state {
             case .running:
@@ -158,8 +265,14 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
         }
         switch tag {
         case .new: return "New · no repos yet"
-        case .settingUp: return "Setting up · \(Self.count(repos.count, "repo"))"
-        default: return "Stopped · \(Self.count(repos.count, "repo"))"
+        case .settingUp:
+            return copyFailed
+                ? "Couldn’t copy \(Self.count(repos.filter { $0.fetchedAt == nil }.count, "repo"))"
+                : "Setting up · \(Self.count(repos.count, "repo"))"
+        default:
+            if draft != nil { return "Ready to start · \(Self.count(repos.count, "repo"))" }
+            if setupChecked { return "No setup yet · \(Self.count(repos.count, "repo"))" }
+            return "Stopped · \(Self.count(repos.count, "repo"))"
         }
     }
 
@@ -184,24 +297,59 @@ enum ProjectRules {
     static let idleMinutes = 30
     /// What the Core gives a new project (its table defaults), shown as "Runs on".
     static let defaultLimits = "2 CPUs, 2 GB"
+    /// "2 CPUs, 2 GB": what a project's run really gets.
+    static func limits(cpu: Double, memMb: Int64) -> String {
+        let c = cpu == cpu.rounded() ? String(Int(cpu)) : String(format: "%.1f", cpu)
+        let g = Double(memMb) / 1024
+        let mem = g >= 1 ? (g == g.rounded() ? "\(Int(g)) GB" : String(format: "%.1f GB", g)) : "\(memMb) MB"
+        return "\(c) CPU\(cpu == 1 ? "" : "s"), \(mem)"
+    }
+    /// "after 30 min with no visits", or that it never stops.
+    static func idleWords(minutes: Int, never: Bool) -> String {
+        never ? "never" : "after \(minutes) min with no visits"
+    }
     static func host(_ slug: String) -> String { "\(slug).\(domain)" }
 
-    /// "Tidepool Labs" -> "tidepool-labs": lowercase letters and digits, one dash between words, at most 40.
+    /// "Tidepool Labs" -> "tidepool-labs": lowercase letters and digits, one dash between words, at most 40. Other scripts are
+    /// read as Latin ("東京 Lab" -> "dong-jing-lab"); a name that starts with a digit gets "project-" in front ("2048 game"
+    /// -> "project-2048-game"), and a name with nothing usable, a reserved name or a single letter ends in "project".
     static func slug(from name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let latin = trimmed.applyingTransform(.toLatin, reverse: false) ?? trimmed
+        let plain = latin.applyingTransform(.stripDiacritics, reverse: false) ?? latin
         var out = ""
-        for ch in name.lowercased().unicodeScalars {
+        for ch in plain.lowercased().unicodeScalars {
             if (ch.value >= 97 && ch.value <= 122) || (ch.value >= 48 && ch.value <= 57) {
                 out.unicodeScalars.append(ch)
             } else if !out.hasSuffix("-") {
                 out += "-"
             }
         }
-        out = String(out.drop { $0 == "-" }.prefix(40))
+        out = String(out.drop { $0 == "-" })
+        while out.hasSuffix("-") { out.removeLast() }
+        if out.isEmpty { out = "project" }
+        if let first = out.first, first.isNumber { out = "project-" + out }
+        if out.count < 2 || reserved.contains(out) { out += "-project" }
+        out = String(out.prefix(40))
         while out.hasSuffix("-") { out.removeLast() }
         return out
     }
 
-    /// Why a link name would be refused, in words; nil when it is fine. (The Core also refuses reserved names.)
+    /// The Core's reserved link names (`store::projects::RESERVED`).
+    static let reserved: Set<String> = [
+        "www", "api", "core", "signin", "admin", "mail", "app", "status", "docs", "brain", "citadel", "design",
+        "leyline",
+        "lore", "toy",
+    ]
+
+    /// `slug` with a number on the end that still fits in 40 characters: "tidepool-2".
+    static func suffixed(_ slug: String, _ n: Int) -> String {
+        let tail = "-\(n)"
+        return String(slug.prefix(40 - tail.count)).trimmingCharacters(in: CharacterSet(charactersIn: "-")) + tail
+    }
+
+    /// Why a link name would be refused, in words; nil when it is fine (the Core's own rules, checked before Touch ID).
     static func slugProblem(_ slug: String) -> String? {
         if slug.count < 2 { return "Use at least 2 letters or digits for the link." }
         if slug.count > 40 { return "The link can be at most 40 characters." }
@@ -211,6 +359,8 @@ enum ProjectRules {
         if slug.contains(where: { !($0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-")) }) {
             return "Use lowercase letters, digits and dashes in the link."
         }
+        if slug.hasSuffix("-") { return "The link can’t end with a dash." }
+        if reserved.contains(slug) { return "“\(slug)” is reserved by Core. Pick another link name." }
         return nil
     }
 
@@ -221,24 +371,59 @@ enum ProjectRules {
         return nil
     }
 
-    /// A repo link typed or pasted by hand: `https://`, `ssh://` or `git@host:org/repo`. The Core checks again.
+    /// A repo link typed or pasted by hand: the https address of a repo. The Core checks again.
     static func repo(fromLink link: String) -> (name: String, url: String)? {
-        let url = link.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !url.isEmpty, !url.contains(where: \.isWhitespace) else { return nil }
-        let scp = !url.contains("://") && url.contains("@") && url.contains(":")
-        if url.hasPrefix("https://") || url.hasPrefix("ssh://") {
-            // A password in the link would be stored in the Core; refuse it before it leaves this Mac.
-            let authority = url.drop { $0 != "/" }.dropFirst(2).prefix { $0 != "/" }
-            if url.hasPrefix("https://"), authority.contains("@") { return nil }
-        } else if !scp {
-            return nil
-        }
-        var last = url.split(whereSeparator: { $0 == "/" || $0 == ":" }).last.map(String.init) ?? ""
+        guard repoLinkProblem(link) == nil else { return nil }
+        var url = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        while url.hasSuffix("/") { url.removeLast() }
+        var last = url.split(separator: "/").last.map(String.init) ?? ""
         if last.hasSuffix(".git") { last.removeLast(4) }
         let name = String(last.map { $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0)) ? $0 : "-" })
             .drop { $0 == "." || $0 == "-" }
         guard !name.isEmpty, name.count <= 100 else { return nil }
         return (String(name), url)
+    }
+
+    /// Why a pasted repo link cannot be used, in words (the Core holds no SSH key and never keeps a password); nil when it is
+    /// fine. Said before Touch ID, so nothing is asked for a link the Core would refuse.
+    static func repoLinkProblem(_ link: String) -> String? {
+        let url = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = url.lowercased()
+        if url.isEmpty { return "Paste the https address of a repo, like https://github.com/owner/name." }
+        // The Core's own test: `ssh://` or anything with a colon and no `://` (git@github.com:owner/repo).
+        if lower.hasPrefix("ssh://") || (!lower.contains("://") && !lower.hasPrefix("/") && lower.contains(":")) {
+            return "SSH addresses are not supported yet. Use the https address of the repo."
+        }
+        if url.contains(where: \.isWhitespace) { return "A repo link can’t contain spaces." }
+        if lower.hasPrefix("http://") { return "Use the https address of the repo, not http." }
+        guard lower.hasPrefix("https://") else {
+            return "Paste the https address of a repo, like https://github.com/owner/name."
+        }
+        let authority = url.dropFirst("https://".count).prefix { $0 != "/" }
+        if authority.contains("@") {
+            return "Take the user name and password out of the link. Core uses your GitHub connection."
+        }
+        if url.contains("?") || url.contains("#") { return "End the link at the repo name, with no ? or #." }
+        if authority.isEmpty || url.dropFirst("https://".count).dropFirst(authority.count).allSatisfy({ $0 == "/" }) {
+            return "That link has no repo name in it."
+        }
+        return nil
+    }
+
+    static func same(_ a: String, _ b: String) -> Bool { canonical(a) == canonical(b) }
+
+    /// Text that is meant as a link (not a search): the picker tells what is wrong with it.
+    static func looksLikeLink(_ s: String) -> Bool {
+        s.contains("://") || (s.contains("@") && s.contains(":")) || s.lowercased().hasPrefix("git@")
+    }
+
+    /// The same repo however it was typed: "https://GitHub.com/o/r.git/" and "https://github.com/o/r" are one.
+    static func canonical(_ url: String) -> String {
+        var s = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for p in ["https://", "http://", "ssh://", "git@"] where s.hasPrefix(p) { s.removeFirst(p.count) }
+        while s.hasSuffix("/") { s.removeLast() }
+        if s.hasSuffix(".git") { s.removeLast(4) }
+        return s.replacingOccurrences(of: ":", with: "/")
     }
 }
 
@@ -249,12 +434,19 @@ struct PickRepo: Identifiable, Hashable, Sendable {
     let url: String
     var language: String?
     var updatedAt: Date?
+    /// What GitHub says (`GithubRepo`): `owner/name` for the Core's from-github route, the real default branch, private, and a line.
+    var fullName: String?
+    var defaultBranch: String?
+    var isPrivate = false
+    var blurb = ""
     var id: String { url }
-    /// "Go · updated 2 h ago".
+    /// "Private · Go · updated 2 h ago · Order tracking for the shop".
     func detail(now: Date) -> String {
         var parts: [String] = []
+        if isPrivate { parts.append("Private") }
         if let language { parts.append(language) }
         if let updatedAt { parts.append("updated \(Self.ago(updatedAt, now))") }
+        if !blurb.isEmpty { parts.append(blurb) }
         return parts.joined(separator: " · ")
     }
     static func ago(_ d: Date, _ now: Date) -> String {
@@ -268,14 +460,22 @@ struct PickRepo: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Where the picker's repos come from: the Core's GitHub list (`LiveRepoCatalog`).
+/// One page of GitHub's repos (`GET /projects/github/repos`).
+struct RepoPage: Equatable, Sendable {
+    var repos: [PickRepo]
+    var hasMore: Bool = false
+    /// GitHub has more repos than the Core reads (1000): the picker says "search to find more".
+    var truncated: Bool = false
+}
+
+/// Where the picker's repos come from: the Core's GitHub list (`LiveRepoCatalog`), a page at a time, searched on the Core.
 protocol RepoCatalog: Sendable {
     /// Nil when there is no GitHub connection (or this Core cannot list repos): the picker then says "Connect GitHub".
-    func repos() async throws -> [PickRepo]?
+    func page(query: String, page: Int) async throws -> RepoPage?
 }
 
 struct NoRepoCatalog: RepoCatalog {
-    func repos() async throws -> [PickRepo]? { nil }
+    func page(query: String, page: Int) async throws -> RepoPage? { nil }
 }
 
 enum ProjectsLoad: Equatable {
@@ -294,6 +494,15 @@ final class ProjectColours {
     func colour(_ slug: String) -> ProjectColour {
         let all = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]
         return all[slug].flatMap(ProjectColour.init(rawValue:)) ?? .standard(for: slug)
+    }
+    /// The colour picked on this Mac for the link name, nil when none was ever picked.
+    func explicit(_ slug: String) -> ProjectColour? {
+        (defaults.dictionary(forKey: Self.key) as? [String: String])?[slug].flatMap(ProjectColour.init(rawValue:))
+    }
+    /// The colours were pushed up to a Core that holds colours (once per Mac).
+    var migrated: Bool {
+        get { defaults.bool(forKey: Self.key + ".migrated") }
+        set { defaults.set(newValue, forKey: Self.key + ".migrated") }
     }
     func set(_ colour: ProjectColour, for slug: String) {
         var all = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]

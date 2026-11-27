@@ -50,7 +50,7 @@ struct ReposPage: View {
             title: "Repos", sub: project.repos.isEmpty ? nil : "\(project.repos.count)",
             accessory: {
                 CoreIconButton(symbol: "arrow.clockwise", label: "Check the Core's copies again") { model.resync() }
-                Button("Fetch All") { for r in project.repos { model.fetchRepo(project, r) } }
+                Button("Fetch All") { model.fetchAll(project) }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     .disabled(model.readOnly || project.repos.isEmpty)
                     .help("Copy the latest changes of every repo into the Core now")
@@ -72,8 +72,11 @@ struct ReposPage: View {
                             switch r.copy {
                             case .failed: StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
                             case .fetching: StateBadge("Copying", tone: .warn, symbol: "gearshape")
+                            case .unknown: StateBadge("Not copied", tone: .queue, symbol: "tray")
                             case .ready:
-                                if let i = insights.code?.first(where: { $0.repo == r.name }) {
+                                if model.fetching.contains(r.id) {
+                                    StateBadge("Copying", tone: .warn, symbol: "gearshape")
+                                } else if let i = insights.code?.first(where: { $0.repo == r.name }) {
                                     HStack(spacing: Space.s1) {
                                         if i.ahead > 0 { StateBadge("↑ \(i.ahead)", tone: .run, symbol: "arrow.up") }
                                         if i.behind > 0 {
@@ -99,6 +102,7 @@ struct ReposPage: View {
         case .failed(let why, let text): return why.needsConnection ? "\(r.branch) · private" : "\(r.branch) · \(text)"
         case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
         case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
+        case .unknown: return "\(r.branch) · not copied yet"
         }
     }
 }
@@ -116,6 +120,18 @@ private struct RepoDetail: View {
         Island(
             title: repo.name, sub: Self.path(repo.remoteURL),
             accessory: {
+                if !repo.primary, project.repos.count > 1 {
+                    Button("Make Primary") { Task { await model.makePrimary(project, repo) } }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly || model.busy)
+                        .help("Sessions and runs start in the primary repo")
+                }
+                Button("Remove…") { model.confirmRemove(project, repo) }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .disabled(model.readOnly || model.busy || (repo.primary && project.repos.count > 1))
+                    .help(
+                        repo.primary && project.repos.count > 1
+                            ? "Make another repo primary before removing this one."
+                            : "Take it out of the project. It stays on GitHub.")
                 Button("Fetch Now") { model.fetchRepo(project, repo) }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly || copying)
                     .help(copying ? "The Core is copying this repo now" : "Copy the latest changes into the Core now")
@@ -129,7 +145,7 @@ private struct RepoDetail: View {
         }
     }
 
-    private var copying: Bool { if case .fetching = repo.copy { true } else { false } }
+    private var copying: Bool { model.isCopying(repo) }
 
     private func failure(_ why: RepoFailure, _ text: String) -> some View {
         let last = repo.head == nil ? "" : " Sessions and runs keep using the last copy (\(short))."
@@ -153,9 +169,17 @@ private struct RepoDetail: View {
                 label("Branch")
                 HStack(spacing: Space.s2) {
                     Text(repo.branch)
-                    // TODO(core): changing a repo's branch has no route in the synced client.
-                    Button("Change…") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                        .help("Changing the branch arrives with the next Core update")
+                    Button("Change…") { RepoDialogs.openBranch(model, project, repo) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .disabled(!model.core110 || model.readOnly || copying || model.busy)
+                        .help(
+                            !model.core110
+                                ? "Changing the branch needs a newer Core. Update the Core to use it."
+                                : model.readOnly
+                                    ? "This device can look at projects but not change them."
+                                    : copying
+                                        ? "The Core is copying this repo now"
+                                        : "Make \(repo.name) follow another branch")
                 }
             }
             GridRow {
@@ -203,6 +227,7 @@ private struct RepoDetail: View {
             guard let at = repo.fetchedAt else { return "never copied" }
             return "· last fetched \(PickRepo.ago(at, model.now()))"
         case .ready: return "· fetched \(PickRepo.ago(repo.fetchedAt ?? model.now(), model.now()))"
+        case .unknown: return "not copied yet"
         }
     }
 

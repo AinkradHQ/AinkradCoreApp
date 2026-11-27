@@ -26,4 +26,21 @@ import Testing
         }
         #expect(h.core.requests(to: "/modules").isEmpty)
     }
+
+    @Test func theCoresOwnRefusalsAreToldApartFromAnAppsAnswers() {
+        func res(_ status: Int, _ body: String, marked: Bool = true) -> RawResponse {
+            RawResponse(status: status, headers: marked ? ["Ainkrad-Refusal": "1"] : [:], body: Data(body.utf8))
+        }
+        // A project that fakes the Core's error shape without the Core-only marker is the app answering.
+        #expect(!SessionManager.isCoreRefusal(res(403, #"{"code":"unlock_required","message":"x"}"#, marked: false)))
+        #expect(!SessionManager.isCoreRefusal(res(429, "", marked: false)))
+        #expect(SessionManager.isCoreRefusal(res(401, #"{"code":"session_expired","message":"x"}"#)))
+        #expect(SessionManager.isCoreRefusal(res(403, #"{"code":"step_up_required","message":"x"}"#)))
+        #expect(SessionManager.isCoreRefusal(res(429, "")))
+        // An app behind the preview that says 401, 403 or 404 on its own is an answer to show, not a failure.
+        #expect(!SessionManager.isCoreRefusal(res(401, "<html>log in</html>")))
+        #expect(!SessionManager.isCoreRefusal(res(403, #"{"code":"nope"}"#)))
+        #expect(!SessionManager.isCoreRefusal(res(404, "")))
+        #expect(!SessionManager.isCoreRefusal(res(409, #"{"code":"not_running"}"#)))
+    }
 }

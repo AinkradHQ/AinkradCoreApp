@@ -29,8 +29,7 @@ public struct Island<Content: View, Accessory: View>: View {
         }
         .padding(Space.s4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .coreWell(radius: Radius.pane)
-        .clipShape(coreShape(Radius.pane))
+        .coreFrame(radius: Radius.pane, rim: Space.s1)
         .accessibilityElement(children: .contain)
     }
 }

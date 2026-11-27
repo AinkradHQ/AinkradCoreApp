@@ -76,12 +76,16 @@ struct GalleryView: View {
                     Label("New Project", systemImage: "plus")
                 }
                 .buttonStyle(CoreButtonStyle(.prominent))
-                .disabled(model.readOnly || model.load == .notConnected)
-                .help("New Project  ⌘N")
+                .disabled(model.newProjectBlock != nil)
+                .help(model.newProjectBlock ?? "New Project  ⌘N")
                 .accessibilityIdentifier("projects-new")
             }
+            if let why = model.stale { staleNotice(why) }
             content
         }
+        // The mockup's gallery: the header and the grid share one column, at most 1240 wide, centred.
+        .frame(maxWidth: Self.maxWidth + Space.s4 * 2)
+        .frame(maxWidth: .infinity)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
         .overlay(alignment: .topTrailing) { quick }
@@ -101,14 +105,25 @@ struct GalleryView: View {
         }
     }
 
+    /// The list on screen is the last one the Core gave: said, with a way to ask again.
+    private func staleNotice(_ why: String) -> some View {
+        CoreNotice(
+            symbol: "wifi.exclamationmark", title: "Showing the last list the Core gave.", text: why, tone: .warn
+        ) {
+            Button("Try again") { model.resync() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        }
+        .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
+        .accessibilityIdentifier("projects-stale")
+    }
+
     @ViewBuilder private var content: some View {
         switch model.load {
         case .loading:
             ScrollView {
-                LazyVGrid(columns: Self.columns, spacing: Space.s4) {
+                LazyVGrid(columns: Self.columns, spacing: Space.s6) {
                     ForEach(0..<3, id: \.self) { _ in ProjectCardSkeleton() }
                 }
-                .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
+                .padding(.horizontal, Space.s4).padding(.bottom, Space.s6).padding(.top, Space.s2)
             }
             .scrollIndicators(.never)
         case .notConnected:
@@ -121,9 +136,15 @@ struct GalleryView: View {
                 CoreStateCard(
                     symbol: "exclamationmark.triangle", title: "Projects did not load", line: why,
                     primary: CoreAction("Try again") { model.resync() }))
+        case .ready where model.projects.isEmpty:
+            centered(
+                CoreStateCard(
+                    symbol: "square.grid.2x2", title: "No projects yet",
+                    line: "A project keeps your code, notes and AI sessions in one place.",
+                    primary: model.readOnly ? nil : CoreAction("New Project") { model.newProject() }))
         case .ready:
             ScrollView {
-                LazyVGrid(columns: Self.columns, spacing: Space.s4) {
+                LazyVGrid(columns: Self.columns, spacing: Space.s6) {
                     ForEach(Array(model.shown.enumerated()), id: \.element.id) { i, p in
                         ProjectCard(model: model, project: p, index: i, settled: settled)
                     }
@@ -131,7 +152,7 @@ struct GalleryView: View {
                         NewProjectCard(model: model, index: model.shown.count, settled: settled)
                     }
                 }
-                .padding(.horizontal, Space.s4).padding(.bottom, Space.s4)
+                .padding(.horizontal, Space.s4).padding(.bottom, Space.s6).padding(.top, Space.s2)
                 if !model.filter.isEmpty, model.shown.isEmpty {
                     Text("No project matches “\(model.filter)”.").foregroundStyle(GlassInk.secondary)
                         .frame(maxWidth: .infinity).padding(.top, Space.s2)
@@ -141,10 +162,9 @@ struct GalleryView: View {
         }
     }
 
-    /// Wide cards: three to a row on a full-size pane.
-    static let columns = [
-        GridItem(.adaptive(minimum: Space.s8 * 15, maximum: Space.s8 * 20), spacing: Space.s4, alignment: .top)
-    ]
+    static let maxWidth: CGFloat = 1240
+    /// Three cards to a row on a full-size pane (the mockup's grid, gap 24); fewer when the pane is narrower.
+    static let columns = [GridItem(.adaptive(minimum: 340, maximum: .infinity), spacing: Space.s6, alignment: .top)]
 
     private func centered<V: View>(_ v: V) -> some View {
         v.frame(maxWidth: .infinity, maxHeight: .infinity).padding(Space.s4)

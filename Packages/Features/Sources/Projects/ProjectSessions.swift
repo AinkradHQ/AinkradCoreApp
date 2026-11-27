@@ -3,9 +3,8 @@ import SwiftUI
 
 /// The AI Sessions page: this project's sessions as a table, filtered All / Needs you / Running / Done.
 ///
-/// TODO(P3-02): the Core's sessions list has no project filter and a session carries no project, so a real project has no
-/// sessions here yet (`ProjectItem.live` is nil); only the Debug demo fills the table. When P3-02 lands, read them in
-/// `ProjectsModel.reload` and set `live.sessions`; this page needs no change.
+/// The sessions come from the Core's list, kept where `project_id` is this project (`ProjectsModel.refreshLive`); a server
+/// filter (lane Q) replaces that read without a change here.
 struct SessionsPage: View {
     let model: ProjectsModel
     let project: ProjectItem
@@ -54,7 +53,10 @@ struct SessionsPage: View {
             }
             sessionsIsland
         }
-        .task(id: project.id) { await insights.loadUsage() }
+        .task(id: project.id) {
+            await model.refreshLive(project.id)
+            await insights.loadUsage()
+        }
     }
 
     private var sessionsIsland: some View {
@@ -66,9 +68,13 @@ struct SessionsPage: View {
                         "Show", segments: Filter.allCases.map { CoreSegment($0, $0.rawValue) },
                         selection: $filter)
                 }
-                Soon(prominent: false, help: "AI sessions in a project arrive with the next update") {
+                Button {
+                    model.newSession(in: project)
+                } label: {
                     Label("New AI Session", systemImage: "plus")
                 }
+                .buttonStyle(CoreButtonStyle(.secondary)).disabled(!model.canStartSession(project))
+                .help(model.sessionBlock(project))
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -85,7 +91,13 @@ struct SessionsPage: View {
                         }
                     }
                 } else if all.isEmpty {
-                    Text("No AI sessions yet. Start one from the top bar.").foregroundStyle(GlassInk.secondary)
+                    CoreStateCard(
+                        symbol: "sparkles", title: "No AI sessions yet",
+                        line: "A session works in its own copy of this project's repos, with the project's Brain room.",
+                        primary: model.canStartSession(project)
+                            ? CoreAction("New AI Session") { model.newSession(in: project) } : nil
+                    )
+                    .frame(maxWidth: .infinity, minHeight: Space.s8 * 12)
                 } else if shown.isEmpty {
                     Text("No \(filter.rawValue.lowercased()) sessions.").foregroundStyle(GlassInk.secondary)
                 } else {
@@ -113,7 +125,12 @@ struct SessionsPage: View {
             ForEach(Array(shown.enumerated()), id: \.offset) { _, s in
                 GridRow {
                     VStack(alignment: .leading, spacing: Space.s1) {
-                        Text(s.title).lineLimit(1)
+                        if let id = s.id {
+                            Button(s.title) { model.sessionOpener?(id) }.buttonStyle(.plain).lineLimit(1)
+                                .help("Open this session in AI Sessions")
+                        } else {
+                            Text(s.title).lineLimit(1)
+                        }
                         badge(s.state)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

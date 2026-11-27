@@ -53,6 +53,10 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
             : [
                 SecretItem(name: "app_key", version: 1, updatedAt: Date().addingTimeInterval(-3 * day)),
                 SecretItem(name: "db_password", version: 1, updatedAt: Date().addingTimeInterval(-3 * day)),
+                SecretItem(
+                    name: "tls_key", version: 2, updatedAt: Date().addingTimeInterval(-day), kind: "multiline"),
+                SecretItem(
+                    name: "service_account", version: 1, updatedAt: Date().addingTimeInterval(-2 * day), kind: "file"),
             ] + (id == 3 ? [] : [SecretItem(name: "stripe_secret", version: 1, updatedAt: Date())])
         stored[id] = s
         return s
@@ -104,5 +108,17 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
     }
 
     func touch(project: Int64) async throws {}
+
+    func metrics(project: Int64) async throws -> [String: ServiceSeries] { DemoLive.metrics() }
+
+    func specVersions(project: Int64) async throws -> [SpecVersionSummary] {
+        lock.withLock {
+            history(project).reversed().map {
+                SpecVersionSummary(
+                    version: $0.version, origin: $0.origin,
+                    createdAt: Date().addingTimeInterval(-Double($0.version) * 3600))
+            }
+        }
+    }
 }
 #endif

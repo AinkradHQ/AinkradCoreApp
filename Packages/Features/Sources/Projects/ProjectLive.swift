@@ -24,6 +24,9 @@ struct ProjectLive: Equatable, Sendable {
     struct LogLine: Equatable, Sendable {
         let service: String
         let text: String
+        /// The Core's line number in the run (`seq`) and when the container wrote it; 0 and nil from a stand-in.
+        var seq = 0
+        var at: Date? = nil
     }
     struct Session: Equatable, Sendable {
         enum State: Equatable, Sendable { case needsYou, running, done }
@@ -35,6 +38,8 @@ struct ProjectLive: Equatable, Sendable {
         var runner = "–"
         var branch = "–"
         var cost = "–"
+        /// The Core's session id, to open it in AI Sessions; nil from a stand-in.
+        var id: String? = nil
     }
     /// A recent commit of a repo.
     struct Commit: Equatable, Sendable {
@@ -71,15 +76,36 @@ struct ProjectLive: Equatable, Sendable {
     var sessions: [Session] = []
     var repoExtras: [String: RepoExtra] = [:]
     var room: Room?
+    /// The Brain room the project is linked to (`ProjectInfo.room`), written or not.
+    var roomID: String?
     /// "idle 4 min of 30", while running.
     var idle: String?
-    /// 0...1 and its words, while starting.
-    var progress = 0.0
+    /// 0...1 while starting when the Core's own state says how far (services up of the setup's); nil when it does not.
+    /// No guessed easing: a bar only moves on something read. `steps` is the seam for the Core's real start steps.
+    var progress: Double? = nil
     var progressLine = ""
+    var steps: [StartStep] = []
+    /// CPU and memory history per service (API 110), for the sparklines.
+    var metrics: [String: ServiceSeries] = [:]
     /// Why the last start failed, in words.
     var failure: String?
     /// What to do about it.
     var failureFix: String?
+    /// The Core's own word for why it ended (`stop_reason`) and when anything last visited it.
+    var stopWords: String?
+    var lastActivity: Date?
+    /// The runner's name (not its id), where the run lives.
+    var runner: String?
+    /// The Core could not be asked just now: what is shown is how it last looked.
+    var stale = false
+}
+
+/// One step of a start, as the Core says them (API 110, `ProjectRun.steps`).
+struct StartStep: Equatable, Sendable {
+    let title: String
+    var state: RunStep.State = .pending
+    var detail: String?
+    var done: Bool { state == .done }
 }
 
 /// The pages of a project's space. `⌘` + `key` opens one. The rail shows them in this order, Project Settings last at the

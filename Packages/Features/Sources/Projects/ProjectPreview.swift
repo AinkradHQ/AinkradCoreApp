@@ -1,0 +1,196 @@
+import AppKit
+import CoreUI
+import Observation
+import SwiftUI
+import WebKit
+
+/// The last picture of each project's live view, kept on disk (Application Support/Ainkrad/ProjectPreviews/<id>.png) so the
+/// gallery's cards show the running app even after it stops. The live view of the space is where pictures are taken
+/// (`WKWebView.takeSnapshot`); the gallery only reads them. Reading and writing happen off the main thread.
+@MainActor @Observable
+final class PreviewStore {
+    static let shared = PreviewStore()
+    private var images: [Int64: NSImage] = [:]
+    private var asked: Set<Int64> = []
+    @ObservationIgnored private let dir: URL? = FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask
+    ).first?.appendingPathComponent("Ainkrad/ProjectPreviews", isDirectory: true)
+
+    /// The picture, or nil while none is known (the view draws the illustration). Reading starts the disk load once.
+    func image(_ id: Int64) -> NSImage? {
+        if images[id] == nil, !asked.contains(id) { Task { await load(id) } }
+        return images[id]
+    }
+
+    private func load(_ id: Int64) async {
+        guard !asked.contains(id), let url = dir?.appendingPathComponent("\(id).png") else { return }
+        asked.insert(id)
+        let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
+        if images[id] == nil, let data, let img = NSImage(data: data) { images[id] = img }
+    }
+
+    /// A new picture of the live view: shown at once, written to disk in the background.
+    func save(_ image: NSImage, for id: Int64) {
+        asked.insert(id)
+        images[id] = image
+        guard let dir, let tiff = image.tiffRepresentation else { return }
+        Task.detached(priority: .utility) {
+            guard let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return }
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? png.write(to: dir.appendingPathComponent("\(id).png"), options: .atomic)
+        }
+    }
+
+    #if DEBUG
+    /// Snapshots only: a picture that is never written to disk.
+    func seed(_ image: NSImage, for id: Int64) {
+        asked.insert(id)
+        images[id] = image
+    }
+    func forget() {
+        images = [:]
+        asked = Set(1...1000)
+    }
+    #endif
+}
+
+/// What a project's picture shows when it was never opened: its colour and first letter, calm.
+struct PreviewIllustration: View {
+    let name: String
+    let colour: ProjectColour
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [colour.fill.opacity(0.32), colour.fill.opacity(0.08)], startPoint: .topLeading,
+                endPoint: .bottomTrailing)
+            Text(String(name.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased())
+                .coreFont(size: Space.s8 * 2, weight: .semibold).foregroundStyle(.white.opacity(0.9))
+                .frame(width: Space.s8 * 3, height: Space.s8 * 3)
+                .background(colour.fill.opacity(0.85), in: coreShape(Radius.pane))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A project's picture: the last snapshot of its live view (greyed unless it is running), else the illustration.
+struct ProjectPicture: View {
+    let project: ProjectItem
+    let colour: ProjectColour
+    /// False on the space's stage, where the words sit over the picture: no snapshot means no illustration there.
+    var illustrate = true
+    var body: some View {
+        let running = project.tag == .running
+        if let img = PreviewStore.shared.image(project.id) {
+            Image(nsImage: img).resizable().scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .grayscale(running ? 0 : 1).opacity(running ? 1 : 0.45)
+                .clipped().accessibilityHidden(true)
+        } else if illustrate {
+            PreviewIllustration(name: project.name, colour: colour).opacity(running ? 1 : 0.7)
+        }
+    }
+}
+
+extension ProjectsModel {
+    /// Where the running app can be seen from this Mac. On a Core with the preview route (API 110) that is the private preview,
+    /// served through the signed API from the app's own URL scheme, so a running project shows live with the public link off.
+    /// On an older Core it is the public link while it runs and the link is on, as before.
+    func previewURL(for project: ProjectItem) -> URL? {
+        guard project.tag == .running else { return nil }
+        if core110, previewFetch != nil { return PreviewProxy.url() }
+        guard project.expose else { return nil }
+        return URL(string: "https://\(project.link)")
+    }
+}
+
+/// The state of the live view in the space.
+@MainActor @Observable
+final class LiveWebModel {
+    enum State: Equatable {
+        case loading, live
+        case failed(String)
+    }
+    var state = State.loading
+    @ObservationIgnored weak var web: WKWebView?
+
+    /// A picture of what the page shows now, once it has something to show.
+    func snapshot(into id: Int64) {
+        guard state == .live, let web else { return }
+        web.takeSnapshot(with: WKSnapshotConfiguration()) { image, _ in
+            guard let image else { return }
+            Task { @MainActor in PreviewStore.shared.save(image, for: id) }
+        }
+    }
+}
+
+/// The running app in a web view. Links to other sites open in the browser; the page itself stays here.
+struct LiveWebView: NSViewRepresentable {
+    let url: URL
+    let model: LiveWebModel
+    /// The project's preview (the private one, when `url` is of the app's own scheme): its id, how to send a signed request and
+    /// the Core's host, for redirects.
+    var preview: (project: Int64, coreHost: String?, fetch: PreviewFetch)?
+
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, host: url.host) }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        if url.scheme == PreviewProxy.scheme, let p = preview {
+            let handler = PreviewSchemeHandler(project: p.project, coreHost: p.coreHost, fetch: p.fetch)
+            let model = model
+            handler.onProblem = { words in model.state = .failed(words) }
+            config.setURLSchemeHandler(handler, forURLScheme: PreviewProxy.scheme)
+        }
+        let web = WKWebView(frame: .zero, configuration: config)
+        web.navigationDelegate = context.coordinator
+        web.setValue(false, forKey: "drawsBackground")
+        model.web = web
+        web.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 20))
+        return web
+    }
+
+    func updateNSView(_ web: WKWebView, context: Context) {
+        if web.url?.host != url.host, web.url != url, !web.isLoading {
+            model.state = .loading
+            web.load(URLRequest(url: url))
+        }
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        let model: LiveWebModel
+        let host: String?
+        init(model: LiveWebModel, host: String?) {
+            self.model = model
+            self.host = host
+        }
+        func webView(_ w: WKWebView, didFinish navigation: WKNavigation!) {
+            Task { @MainActor in
+                // A page the Core could not show already said why; the words stay until Try Again.
+                if case .failed = model.state { return }
+                model.state = .live
+            }
+        }
+        func webView(_ w: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }
+        func webView(_ w: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            fail(error)
+        }
+        private func fail(_ error: Error) {
+            let code = (error as NSError).code
+            if code == NSURLErrorCancelled { return }
+            let why = (error as NSError).localizedDescription
+            Task { @MainActor in model.state = .failed(why) }
+        }
+        func webView(
+            _ w: WKWebView, decidePolicyFor action: WKNavigationAction,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+        ) {
+            if action.navigationType == .linkActivated, let url = action.request.url, url.host != host {
+                if url.scheme == "https" || url.scheme == "http" { NSWorkspace.shared.open(url) }
+                decisionHandler(.cancel)
+            } else {
+                decisionHandler(.allow)
+            }
+        }
+    }
+}

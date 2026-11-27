@@ -1,5 +1,7 @@
 #if DEBUG
 import Brain
+import CoreKit
+import CoreUI
 import Foundation
 import Shell
 import SwiftUI
@@ -44,6 +46,37 @@ public final class ProjectsDemo {
             }
         }
         func archive(project: Int64) async throws { lock.withLock { list.removeAll { $0.id == project } } }
+        func project(id: Int64) async throws -> ProjectItem? { lock.withLock { list.first { $0.id == id } } }
+        func update(project: Int64, patch p: ProjectPatch) async throws {
+            lock.withLock {
+                guard let i = list.firstIndex(where: { $0.id == project }) else { return }
+                if let v = p.runner { list[i].runner = v }
+                if let v = p.cpuLimit { list[i].cpuLimit = v }
+                if let v = p.memLimitMb { list[i].memLimitMb = v }
+                if let v = p.idleMinutes { list[i].idleMinutes = Int(v) }
+                if let v = p.idleNever { list[i].idleNever = v }
+                if let v = p.slug { list[i] = ProjectItem.renamed(list[i], slug: v) }
+            }
+        }
+        func setBranch(project: Int64, repo: Int64, branch: String) async throws {
+            guard branch != "nope" else { throw CoreError.badRequest(message: "no such branch") }
+            // The demo keeps the repo as it is: the branch dialog is what is shown.
+        }
+        func archivedProjects() async throws -> [ProjectItem] {
+            [
+                ProjectItem(
+                    id: 90, slug: "old-quill", name: "Old Quill", description: "", expose: false,
+                    repos: [DemoRepo.make(900, "old-quill-web", "old-quill-co")],
+                    updatedAt: Date().addingTimeInterval(-86_400 * 40), archived: true)
+            ]
+        }
+        func unarchive(project: Int64) async throws {}
+        func runners() async throws -> [RunnerInfo] {
+            [
+                RunnerInfo(id: "d_mac", name: "Studio Mac", os: "macos", online: true),
+                RunnerInfo(id: "d_srv", name: "home-server", os: "linux", online: false),
+            ]
+        }
         func setRun(_ project: Int64, _ state: RunSummary.State, progress: Double = 0) {
             lock.withLock {
                 guard let i = list.firstIndex(where: { $0.id == project }) else { return }
@@ -61,6 +94,23 @@ public final class ProjectsDemo {
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
         "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
+        // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
+        "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
+        "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
+        "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
+        "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
+        "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
+        // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
+        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+        "dialog-branch-error", "gallery-crashed", "overview-crashed",
+    ]
+
+    /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
+    static let core110Scenes: Set<String> = [
+        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+        "dialog-branch-error", "gallery-crashed", "overview-crashed",
     ]
 
     private let model: ProjectsModel
@@ -112,7 +162,24 @@ public final class ProjectsDemo {
             fetchError: failing ? "The GitHub connection can no longer read this repo." : nil, head: head)
     }
 
-    private static func tidepool(repos: Int, fetched: Bool = true, draft: Bool = false) -> ProjectItem {
+    /// A project whose first copy failed for every repo, one the Core never started: "Setting up" would never end.
+    private static func copyFailed() -> ProjectItem {
+        var p = tidepool(repos: 2, fetched: false)
+        p.repos = [
+            RepoItem(
+                id: 71, name: "tidepool-api", remoteURL: apiURL, branch: "main", primary: true, fetchedAt: nil,
+                fetchError: "This repo is private and no GitHub connection covers it.", state: "failed",
+                reason: "needs_github"),
+            RepoItem(
+                id: 72, name: "tidepool-web", remoteURL: webURL, branch: "main", primary: false, fetchedAt: nil,
+                fetchError: "The Core could not reach the repo.", state: "failed", reason: "timeout"),
+        ]
+        return p
+    }
+
+    private static func tidepool(repos: Int, fetched: Bool = true, draft: Bool = false, missing: Bool = false)
+        -> ProjectItem
+    {
         ProjectItem(
             id: 7, slug: "tidepool", name: "Tidepool", description: "", expose: true,
             repos: [repo(1, "tidepool-api", fetched: fetched), repo(2, "tidepool-web", fetched: fetched)].prefix(repos)
@@ -121,7 +188,7 @@ public final class ProjectsDemo {
             draft: draft
                 ? RunDraft(
                     source: "docker-compose.yml", services: ["web", "api", "postgres"],
-                    secrets: ["DATABASE_URL", "JWT_SECRET"]) : nil)
+                    secrets: missing ? ["jwt_secret"] : []) : nil)
     }
 
     private static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
@@ -149,29 +216,154 @@ public final class ProjectsDemo {
         model.openID = nil
         model.section = .overview
         model.debugHover = nil
+        model.stale = nil
+        model.wizardMissed = []
+        model.wizardIssues = []
+        model.catalog = SampleRepoCatalog()
+        ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
         model.clearWriteError()
+        model.demoPage = true
+        model.demoPreviewProblem = nil
+        model.crashes = [:]
+        model.core110 = Self.core110Scenes.contains(scene)
+        model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
+        // Every scene starts from the standard Look; the look scenes change it below.
+        let look = LookPrefs.shared
+        (look.mode, look.opacity, look.blur) = (CoreLook.standard.mode, CoreLook.standard.opacity, 1)
+        PreviewStore.shared.forget()
+        for (id, name, colour) in [
+            (1, "Lanterna", ProjectColour.green), (2, "Northwind Ledger", .violet), (3, "Quill", .copper),
+        ] {
+            let r = ImageRenderer(content: DemoSitePage(name: name, colour: colour).frame(width: 1100, height: 680))
+            r.scale = 1
+            if let img = r.nsImage { PreviewStore.shared.seed(img, for: Int64(id)) }
+        }
         var list = Self.sample()
         switch scene {
         case "gallery-empty": list = []
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
+        case "gallery-copy-failed", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
+        case "gallery-archived": ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, true)
+        case "new-paste-link", "new-paste-link-ssh": model.catalog = NoRepoCatalog()
+        case "settings-runner", "settings-limits":
+            list[0].runner = "this_mac"
+            list[0].cpuLimit = 4
+            list[0].memLimitMb = 8192
+            list[0].idleNever = scene == "settings-limits"
+            list[0].source = "github"
+            list[0].createdAt = Date().addingTimeInterval(-86_400 * 12)
         case "space-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "space-setting-up": list.insert(Self.tidepool(repos: 2), at: 0)
         case "space-ready": list.insert(Self.tidepool(repos: 2, draft: true), at: 0)
+        case "space-ready-secrets": list.insert(Self.tidepool(repos: 2, draft: true, missing: true), at: 0)
+        case "space-needs-setup":
+            var t = Self.tidepool(repos: 2)
+            t.setupChecked = true
+            list.insert(t, at: 0)
         case "overview-starting":
             list[1].run = RunSummary(state: .starting, services: 5)
             list[1].live = DemoLive.make(.starting, progress: 0.4)
+        // The Core reports no services yet: a moving bar and words, no number.
+        case "overview-starting-honest":
+            list[1].run = RunSummary(state: .starting, services: 0)
+            var l = DemoLive.make(.starting)
+            l.services = []
+            l.progress = nil
+            l.progressLine = "Starting on core-oracle…"
+            list[1].live = l
+        case "overview-stopped-real":
+            var l = DemoLive.make(.stopped)
+            l.services = []
+            l.stopWords = "It stopped after a while with no visits."
+            l.lastActivity = Date().addingTimeInterval(-3 * 3600)
+            l.runner = "core-oracle"
+            list[3].live = l
+            list[3].draft = RunDraft(source: "docker-compose.yml", services: ["web", "api", "db"], secrets: [])
+        case "overview-crash-loop":
+            var l = DemoLive.make(.failed)
+            l.failure = ProjectsModel.crashLoopWords
+            l.failureFix = "Read the log of the last run, fix what stops it, then start it again."
+            list[2].live = l
         // A real Core today: no run state, services, logs, sessions or room.
         case "overview-real-core", "page-brain-empty":
             list[3].run = nil
             list[3].live = nil
+        case "overview-private":
+            list[0].expose = false
+        case "overview-private-live", "overview-preview-busy":
+            list[0].expose = false
+        case "overview-starting-steps":
+            list[1].run = RunSummary(state: .starting, services: 5)
+            var l = DemoLive.make(.starting, progress: 0.4)
+            l.progressLine = "Starting on core-oracle · 2 of 5 services up"
+            l.steps = [
+                StartStep(title: "Getting the code", state: .done),
+                StartStep(title: "Building the images", state: .done),
+                StartStep(title: "Starting the services", state: .active, detail: "2 of 5 services up"),
+                StartStep(title: "Checking they are healthy", state: .pending),
+            ]
+            list[1].live = l
+        case "overview-failed-step":
+            var l = DemoLive.make(.failed)
+            l.failure = "The last start failed."
+            l.failureFix = "Check the run setup, then start it again."
+            l.steps = [
+                StartStep(title: "Getting the code", state: .done),
+                StartStep(title: "Building the images", state: .failed, detail: "web: npm ci exited with code 1"),
+                StartStep(title: "Starting the services", state: .pending),
+                StartStep(title: "Checking they are healthy", state: .pending),
+            ]
+            list[2].live = l
+        case "overview-metrics", "page-run-metrics":
+            list[0].live?.metrics = DemoLive.metrics()
+        case "page-settings-core-colour": list[0].colourName = "teal"
+        case "overview-never-opened":
+            PreviewStore.shared.forget()
         default: break
         }
         await model.useNow(Service(list))
         model.runService = DemoRunService()
+        model.setRunnerSupported(true)
+        await model.loadRunners()
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
         switch scene {
+        case "gallery-look", "overview-look":
+            (look.mode, look.opacity, look.blur) = (.blurred, 0.12, 1)
+            if scene == "overview-look" { model.openID = 1 }
+        case "gallery-look-solid": (look.mode, look.opacity, look.blur) = (.solid, 1, 1)
+        case "overview-private", "overview-running", "overview-private-live", "overview-preview-busy",
+            "overview-metrics", "overview-crashed":
+            model.openID = 1
+        case "overview-never-opened": model.openID = 4
+        default: break
+        }
+        switch scene {
         case "gallery-hover": model.debugHover = 1
+        case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
+        case "new-link-name":
+            NewProjectDialogs.openAdvanced(model, name: "2048 game")
+        case "new-paste-link":
+            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
+        case "new-paste-link-ssh":
+            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
+        case "new-failed-repos":
+            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .review)
+            try? await Task.sleep(for: .milliseconds(300))
+            model.wizardMissed = [
+                MissedRepo(name: "tidepool-docs", why: "This project already has that repo."),
+                MissedRepo(
+                    name: "tidepool-ops", why: "SSH addresses are not supported yet. Use the https address of the repo."
+                ),
+            ]
+            model.wizardIssues = ["The link is tidepool-2.ainkrad.io: tidepool was taken."]
+            model.wizardProjectID = 7
+        case "settings-runner", "settings-limits":
+            model.openID = 1
+            model.section = .settings
+        case "repo-menu":
+            model.openID = 1
+            model.section = .repos
         case "gallery-filtered": model.filter = "n"
         case "gallery-loading": model.setLoad(.loading)
         case "gallery-offline": model.setLoad(.notConnected)
@@ -185,7 +377,7 @@ public final class ProjectsDemo {
             model.quickOpen = true
         case "new-advanced":
             NewProjectDialogs.openAdvanced(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
-        case "space-no-repos", "space-copying", "space-setting-up", "space-ready": model.openID = 7
+        case "space-no-repos", "space-copying", "space-setting-up", "space-ready", "space-needs-setup": model.openID = 7
         case "overview-running": model.openID = 1
         case "page-run":
             model.openID = 1
@@ -196,6 +388,52 @@ public final class ProjectsDemo {
         case "page-run-draft":
             model.openID = 2
             model.section = .run
+        case "page-run-logs":
+            model.openID = 1
+            model.section = .run
+        case "dialog-history", "dialog-secret-file", "dialog-instructions":
+            model.openID = 1
+            model.section = scene == "dialog-instructions" ? .brain : .run
+            try? await Task.sleep(for: .milliseconds(800))
+            guard let p = model.open else { break }
+            let run = RunPageModel(model: model, projectID: p.id)
+            await run.load()
+            switch scene {
+            case "dialog-history": RunDialogs.openHistory(run, project: p)
+            case "dialog-secret-file":
+                RunDialogs.openSecret(run, project: p, name: "service_account", replacing: true, kind: "file")
+            default: model.openInstructions(p)
+            }
+        case "overview-preview-busy":
+            model.demoPreviewProblem = "The app is busy with other requests. Try again in a moment."
+        case "gallery-crashed", "overview-crashed":
+            model.serviceCrashed(
+                [
+                    "id": "1", "run": "r_demo", "service": "api", "exit_code": "1", "restarts": "3", "config": "web",
+                    "environment": "development",
+                ])
+        case "page-run-metrics":
+            model.openID = 1
+            model.section = .run
+        case "page-settings-core-colour":
+            model.openID = 1
+            model.section = .settings
+        case "page-repos-branch", "dialog-branch", "dialog-branch-error":
+            model.openID = 1
+            model.section = .repos
+            try? await Task.sleep(for: .milliseconds(500))
+            if scene != "page-repos-branch", let p = model.open, let r = p.repos.first {
+                RepoDialogs.openBranch(model, p, r)
+                if scene == "dialog-branch-error" {
+                    model.writeError = model.branchWords(
+                        CoreError.badRequest(message: "no such branch"), branch: "release/9", repo: r.name)
+                }
+            }
+        case "overview-stale":
+            model.openID = 1
+            try? await Task.sleep(for: .milliseconds(700))
+            model.markSilent(true)
+        case "space-ready-secrets": model.openID = 7
         case "page-settings", "page-settings-stopped":
             model.openID = scene == "page-settings" ? 1 : 4
             model.section = .settings
@@ -208,14 +446,34 @@ public final class ProjectsDemo {
         case "page-brain", "page-brain-empty":
             model.openID = scene == "page-brain" ? 1 : 4
             model.section = .brain
-        case "overview-starting": model.openID = 2
-        case "overview-failed": model.openID = 3
-        case "overview-stopped", "overview-real-core": model.openID = 4
+        case "overview-starting", "overview-starting-honest": model.openID = 2
+        case "overview-failed", "overview-crash-loop": model.openID = 3
+        case "overview-stopped", "overview-real-core", "overview-stopped-real": model.openID = 4
         case "space-add-repos":
             model.openID = 7
             if let p = model.open { NewProjectDialogs.openAddRepos(model, p, picked: [Self.apiURL]) }
         default: break
         }
+    }
+}
+
+enum DemoRepo {
+    static func make(_ id: Int64, _ name: String, _ org: String) -> RepoItem {
+        RepoItem(
+            id: id, name: name, remoteURL: "https://github.com/\(org)/\(name)", branch: "main", primary: true,
+            fetchedAt: Date(), fetchError: nil)
+    }
+}
+
+extension ProjectItem {
+    /// A copy with another link name (the id and the rest stay).
+    static func renamed(_ p: ProjectItem, slug: String) -> ProjectItem {
+        var q = ProjectItem(
+            id: p.id, slug: slug, name: p.name, description: p.description, expose: p.expose, repos: p.repos,
+            updatedAt: p.updatedAt)
+        q.run = p.run
+        q.live = p.live
+        return q
     }
 }
 
@@ -235,13 +493,16 @@ enum DemoLive {
             return ProjectLive.Service(
                 name: s.0, memory: s.1, state: st, cpu: cpu[i], restarts: st == .exited ? 3 : 0)
         }
+        let t = Date()
         let ok: [ProjectLive.LogLine] = [
-            .init(service: "mysql", text: "ready for connections · 8.4.2"),
-            .init(service: "api", text: "Server running on 0.0.0.0:8000"),
-            .init(service: "web", text: "Next.js 15.1 · ready in 2.1 s"),
-            .init(service: "web", text: "GET / 200 in 84 ms"),
-            .init(service: "api", text: "GET /api/products?page=1 200 31 ms"),
-            .init(service: "queue", text: "ResizeImage ........ 212 ms DONE"),
+            .init(service: "mysql", text: "ready for connections · 8.4.2", at: t.addingTimeInterval(-60)),
+            .init(
+                service: "api", text: "\u{1B}[32mServer running\u{1B}[0m on 0.0.0.0:8000", at: t.addingTimeInterval(-50)
+            ),
+            .init(service: "web", text: "Next.js 15.1 · ready in 2.1 s", at: t.addingTimeInterval(-40)),
+            .init(service: "web", text: "GET / 200 in 84 ms", at: t.addingTimeInterval(-30)),
+            .init(service: "api", text: "GET /api/products?page=1 200 31 ms", at: t.addingTimeInterval(-20)),
+            .init(service: "queue", text: "ResizeImage ........ 212 ms DONE", at: t.addingTimeInterval(-10)),
         ]
         let bad: [ProjectLive.LogLine] = [
             .init(service: "mysql", text: "ready for connections · 8.4.2"),
@@ -299,7 +560,8 @@ enum DemoLive {
                                 OverviewRule("Never log customer addresses."),
                             ])),
                     instructionsApprovedAt: "2026-11-16T10:00:00Z"),
-                items: 2320, updated: "2 h ago", approved: "yesterday"))
+                items: 2320, updated: "2 h ago", approved: "yesterday"),
+            roomID: "room_demo")
         if state == .running { live.idle = "idle 4 min of 30" }
         if state == .starting {
             live.progress = progress
@@ -310,6 +572,24 @@ enum DemoLive {
             live.failureFix = "STRIPE_SECRET is not set. Set it in Run › Secrets, then start again."
         }
         return live
+    }
+}
+
+extension DemoLive {
+    /// A calm hour of readings for the demo's five services, 30 a service.
+    static func metrics() -> [String: ServiceSeries] {
+        let base: [(String, Double, Double)] = [
+            ("web", 18, 212), ("api", 9, 148), ("queue", 3, 96), ("mysql", 6, 402), ("redis", 1, 12),
+        ]
+        return Dictionary(
+            uniqueKeysWithValues: base.enumerated().map { i, b in
+                (
+                    b.0,
+                    ServiceSeries(
+                        cpu: (0..<30).map { max(0, b.1 * (1 + 0.6 * sin(Double($0 + i * 5) / 3))) },
+                        memory: (0..<30).map { (b.2 + Double($0) * b.2 / 120 + 4 * sin(Double($0 + i))) * 1_048_576 })
+                )
+            })
     }
 }
 
@@ -340,5 +620,62 @@ extension ProjectsModel {
         await reload()
     }
     func setLoad(_ l: ProjectsLoad) { load = l }
+    func setRunnerSupported(_ on: Bool) { runnerSupported = on }
 }
 #endif
+
+/// A made-up web page: the stand-in for the running app's live view and for the pictures behind the cards.
+struct DemoSitePage: View {
+    let name: String
+    let colour: ProjectColour
+    private let design = CGSize(width: 1100, height: 680)
+
+    var body: some View {
+        GeometryReader { g in
+            page.frame(width: design.width, height: design.height)
+                .scaleEffect(g.size.width / design.width, anchor: .topLeading)
+                .frame(width: g.size.width, height: g.size.height, alignment: .topLeading).clipped()
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var page: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 28) {
+                Text(name).font(.system(size: 22, weight: .bold))
+                ForEach(["Shop", "Stories", "About"], id: \.self) { Text($0).font(.system(size: 16)).opacity(0.6) }
+                Spacer()
+                Text("Cart (2)").font(.system(size: 16))
+            }
+            .padding(.horizontal, 48).frame(height: 76)
+            ZStack(alignment: .leading) {
+                LinearGradient(
+                    colors: [colour.fill.opacity(0.9), colour.fill.opacity(0.45)], startPoint: .topLeading,
+                    endPoint: .bottomTrailing)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Light for every room").font(.system(size: 54, weight: .bold))
+                    Text("Handmade lamps, shipped in three days.").font(.system(size: 22)).opacity(0.85)
+                    Text("Shop the collection").font(.system(size: 17, weight: .semibold))
+                        .padding(.horizontal, 22).frame(height: 44)
+                        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(.black)
+                }
+                .foregroundStyle(.white).padding(.horizontal, 48)
+            }
+            .frame(height: 340)
+            HStack(spacing: 20) {
+                ForEach(0..<4, id: \.self) { i in
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 10).fill(colour.fill.opacity(0.18 + Double(i) * 0.06)).frame(
+                            height: 130)
+                        Text(["Dune", "Halo", "Moth", "Ember"][i]).font(.system(size: 16, weight: .semibold))
+                        Text("$\(80 + i * 15)").font(.system(size: 14)).opacity(0.6)
+                    }
+                }
+            }
+            .padding(48)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.12))
+        .background(Color(red: 0.98, green: 0.97, blue: 0.95))
+    }
+}
