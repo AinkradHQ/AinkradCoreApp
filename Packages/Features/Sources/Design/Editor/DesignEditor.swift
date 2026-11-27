@@ -230,6 +230,13 @@ final class DesignEditor {
         return false
     }
 
+    /// Selects several layers (a flow of screens).
+    @discardableResult func select(_ ids: [String], quiet: Bool = false) -> Bool {
+        guard let b = backend, b.select(ids) else { return false }
+        reload()
+        return true
+    }
+
     func rename(_ id: String, to name: String) {
         renaming = nil
         let n = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))

@@ -14,19 +14,34 @@ import SwiftUI
     enum Canvas: String, CaseIterable {
         case phone, tablet, desktop
         var title: String { rawValue.capitalized }
-        /// The size the words ask for ("a desktop landing page", "tablet", "mobile app"), nil when they name none.
+        /// The size the words ask for ("a desktop landing page", "tablet", "mobile app"), nil when they name none. A phone
+        /// word wins over a desktop one ("phone dashboard", "mobile app dashboard"); "web" and "landing page" mean desktop.
+        /// Also English, Arabic, French, Spanish and German common words.
         static func named(in words: String) -> Canvas? {
             let w = words.lowercased()
+            // ASCII words match whole words; other scripts match anywhere (Arabic prefixes: للموبايل).
             func has(_ list: [String]) -> Bool {
-                list.contains { w.range(of: "\\b\($0)\\b", options: .regularExpression) != nil }
+                list.contains {
+                    $0.unicodeScalars.first.map(\.isASCII) == false
+                        ? w.contains($0) : w.range(of: "\\b\($0)\\b", options: .regularExpression) != nil
+                }
             }
+            // ponytail: "handy" is also an English adjective; a word list has no way to tell, add context checks if it bites.
+            if has([
+                "mobile", "phone", "iphone", "android", "smartphone", "موبايل", "جوال", "هاتف", "móvil", "movil",
+                "celular", "handy", "téléphone", "telephone",
+            ]) {
+                return .phone
+            }
+            if has(["tablet", "ipad", "tablette", "tableta", "تابلت", "لوحي"]) { return .tablet }
             if has([
                 "desktop", "web", "website", "webpage", "web page", "landing page", "laptop", "browser", "dashboard",
+                "سطح المكتب", "ويب", "موقع", "ordinateur", "site web", "escritorio", "sitio web", "página web",
+                "pagina web", "computadora", "webseite", "webanwendung",
             ]) {
                 return .desktop
             }
-            if has(["tablet", "ipad"]) { return .tablet }
-            if has(["mobile", "phone", "iphone", "android", "ios"]) { return .phone }
+            if has(["ios"]) { return .phone }
             return nil
         }
         /// The frame's width and height in points.
