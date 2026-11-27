@@ -95,26 +95,28 @@ public final class ProjectsDemo {
         }
     }
 
-    public static let scenes = [
-        "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
-        "gallery-failed", "new-empty", "new-name", "new-code", "new-review", "new-setting-up", "new-brain", "new-runs",
-        "new-advanced", "space-no-repos",
-        "space-add-repos", "space-copying", "space-many-repos", "space-setting-up", "space-ready", "overview-running",
-        "overview-starting",
-        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
-        "page-settings-stopped", "page-repos", "page-sessions",
-        "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
-        // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
-        "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
-        "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
-        "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
-        "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
-        "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
-        // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
-        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
-        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
-        "dialog-branch-error", "gallery-crashed", "overview-crashed",
-    ] + kindScenes
+    public static let scenes =
+        [
+            "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
+            "gallery-failed", "new-empty", "space-no-repos",
+            "space-add-repos", "space-copying", "space-many-repos", "space-setting-up", "space-ready",
+            "overview-running",
+            "overview-starting",
+            "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
+            "page-settings-stopped", "page-repos", "page-sessions",
+            "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
+            // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
+            "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
+            "gallery-stale", "gallery-archived", "gallery-copy-failed", "settings-runner", "settings-limits",
+            "repo-menu",
+            "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop",
+            "overview-stopped-real",
+            "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
+            // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
+            "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+            "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+            "dialog-branch-error", "gallery-crashed", "overview-crashed",
+        ] + kindScenes + wizardScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -201,8 +203,8 @@ public final class ProjectsDemo {
                     secrets: missing ? ["jwt_secret"] : []) : nil)
     }
 
-    private static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
-    private static let webURL = "https://github.com/tidepool-labs/tidepool-web"
+    static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
+    static let webURL = "https://github.com/tidepool-labs/tidepool-web"
 
     /// The sample projects on the model without opening the pane (other apps' demos name them).
     public func loadSample() async { await model.useNow(Service(Self.sample())) }
@@ -227,6 +229,8 @@ public final class ProjectsDemo {
         model.stale = nil
         model.wizardMissed = []
         model.wizardIssues = []
+        model.wizardDraft = nil
+        model.wizardProjectID = nil
         model.creating = nil
         model.catalog = SampleRepoCatalog()
         ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
@@ -254,7 +258,9 @@ public final class ProjectsDemo {
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
         case "gallery-copy-failed", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
         case "gallery-archived": ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, true)
-        case "new-paste-link", "new-paste-link-ssh": model.catalog = NoRepoCatalog()
+        case "new-paste-link", "new-paste-link-ssh", "new-code-no-github": model.catalog = NoRepoCatalog()
+        case "new-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
+        case "new-finished": list.insert(Self.tidepool(repos: 2), at: 0)
         case "settings-runner", "settings-limits":
             list[0].runner = "this_mac"
             list[0].cpuLimit = 4
@@ -358,23 +364,6 @@ public final class ProjectsDemo {
         switch scene {
         case "gallery-hover": model.debugHover = 1
         case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
-        case "new-link-name":
-            NewProjectDialogs.openWizard(model, name: "2048 game")
-        case "new-paste-link":
-            NewProjectDialogs.openWizard(model, name: "Tidepool", step: .code)
-        case "new-paste-link-ssh":
-            NewProjectDialogs.openWizard(model, name: "Tidepool", step: .code)
-        case "new-failed-repos":
-            NewProjectDialogs.openWizard(model, name: "Tidepool", step: .review)
-            try? await Task.sleep(for: .milliseconds(300))
-            model.wizardMissed = [
-                MissedRepo(name: "tidepool-docs", why: "This project already has that repo."),
-                MissedRepo(
-                    name: "tidepool-ops", why: "SSH addresses are not supported yet. Use the https address of the repo."
-                ),
-            ]
-            model.wizardIssues = ["The link is tidepool-2.ainkrad.io: tidepool was taken."]
-            model.wizardProjectID = 7
         case "settings-runner", "settings-limits":
             model.openID = 1
             model.section = .settings
@@ -386,17 +375,6 @@ public final class ProjectsDemo {
         case "gallery-offline": model.setLoad(.notConnected)
         case "gallery-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
         case "new-empty": model.newProject()
-        case "new-name": NewProjectDialogs.openWizard(model, name: "Tidepool")
-        case "new-code": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .code)
-        case "new-review":
-            NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL], step: .review)
-        case "new-setting-up":
-            NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL], step: .review)
-            model.creating = CreateProgress(stage: .repos, added: 9, total: 22)
-        case "new-brain": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .brain)
-        case "new-runs": NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL], step: .runs)
-        case "new-advanced":
-            NewProjectDialogs.openWizard(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
         case "space-no-repos", "space-copying", "space-setting-up", "space-ready", "space-needs-setup": model.openID = 7
         case "overview-running": model.openID = 1
         case "page-run":
@@ -475,6 +453,7 @@ public final class ProjectsDemo {
         default: break
         }
         await showKind(scene)
+        await showWizard(scene)
     }
 }
 
