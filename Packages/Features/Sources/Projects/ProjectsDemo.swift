@@ -1,10 +1,12 @@
-#if DEBUG
 import Brain
 import CoreKit
 import CoreUI
 import Foundation
 import Shell
 import SwiftUI
+
+// The demo service and scenes are Debug only; `DemoSitePage` (after `#endif`) is used by the live app island in every build.
+#if DEBUG
 
 /// Debug only: every Projects state on sample data and a stand-in service, for screenshots and for the reviewer to click
 /// through. Nothing here reaches a Core. The names are made up; the links go nowhere.
