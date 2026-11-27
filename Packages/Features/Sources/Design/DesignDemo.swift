@@ -50,10 +50,12 @@ public final class DesignDemo {
     }
 
     public static let scenes = [
-        "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "needs-you",
-        "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
+        "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "library",
+        "capped", "refresh-failed", "image-failed", "filtered", "project", "empty", "loading", "offline", "absent",
+        "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
-        "project-island", "project-island-empty", "new-advanced", "rename", "delete",
+        "project-island", "project-island-empty", "project-island-offline", "new-advanced", "new-mockup",
+        "save-reconnecting", "save-halted", "save-saving", "present-empty", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
         "system-guide", "system-guide-night",
@@ -222,11 +224,16 @@ public final class DesignDemo {
         model.projectsMenuOpen = false
         await ProjectsDemo(model: model.projectsModel).loadSample()
         let s = Self.sample()
-        let empty = scene == "empty" || scene == "project-island-empty"
+        let empty = scene == "empty" || scene == "project-island-empty" || scene == "project-island-offline"
         await model.useNow(
             Service(
                 docs: empty ? [] : Self.docs(), assets: empty ? [] : s.assets, kits: empty ? [] : Self.kits(),
                 bytes: s.bytes))
+        model.debugSave = nil
+        model.refreshFailure = nil
+        model.docsCapped = false
+        model.failedImages = []
+        if scene == "project-island-offline" { model.load = .failed("The Core did not answer in time.") }
         if scene.hasPrefix("project-island") {
             shell.closePane("design")
             await ProjectsDemo(model: model.projectsModel).show("overview-running")
@@ -244,8 +251,13 @@ public final class DesignDemo {
         case "fonts": model.category = .fonts
         case "systems": model.category = .systems
         case "mockups": model.category = .mockups
-        case "needs-you": model.category = .needsYou
-        case "drawing": model.category = .drawing
+        case "library": model.category = .library
+        case "capped":
+            model.docsCapped = true
+        case "refresh-failed": model.refreshFailure = "The Core did not answer in time."
+        case "image-failed":
+            model.category = .library
+            for a in s.assets where a.loadable { model.failedImages.insert(a.sha) }
         case "filtered": model.filter = "checkout"
         case "project": model.project = "1"
         case "loading": model.load = .loading
@@ -254,7 +266,7 @@ public final class DesignDemo {
         case "failed": model.load = .failed("The Core did not answer in time (timeout).")
         case "open-design", "open-design-menu", "open-design-insert", "open-design-text", "editor-selftest", "ai-new",
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
-            "tools-probe":
+            "tools-probe", "save-reconnecting", "save-halted", "save-saving", "present-empty":
             model.openID = "doc:\(Self.did(1))"
         case "open-system", "system-empty", "system-guide", "system-guide-night": model.openID = "doc:\(Self.did(8))"
         case "open-mockup": model.openID = "doc:\(Self.did(10))"
@@ -265,6 +277,13 @@ public final class DesignDemo {
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
+        if scene == "new-mockup" { model.openNew(kind: .mockup) }
+        switch scene {
+        case "save-reconnecting": model.debugSave = .reconnecting
+        case "save-halted": model.debugSave = .notSaving
+        case "save-saving": model.debugSave = .saving
+        default: break
+        }
         if scene == "tools-probe" {
             try? await Task.sleep(for: .seconds(2))
             await model.debugCanvasProbe?({ FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
@@ -295,7 +314,14 @@ public final class DesignDemo {
             }
         }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
-        if scene.hasPrefix("present-") {
+        if scene == "present-empty" {
+            try? await Task.sleep(for: .seconds(1))
+            if let item = model.open, case .doc(let d) = item {
+                model.present(d)
+                try? await Task.sleep(for: .seconds(3))  // after the real open settles
+                model.presenter?.debugPhase(.empty)
+            }
+        } else if scene.hasPrefix("present-") {
             // Present on the real canvas (CORE_DESIGN_SCENE): the scene's frame in a phone, or as a desktop in a browser.
             try? await Task.sleep(for: .seconds(2))
             if let item = model.open, case .doc(let d) = item {

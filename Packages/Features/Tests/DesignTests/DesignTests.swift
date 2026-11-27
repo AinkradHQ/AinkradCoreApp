@@ -29,12 +29,27 @@ final class FakeService: DesignService, @unchecked Sendable {
     var kitList: [BrandKit] = []
     var fail: DesignFailure?
     private(set) var calls: [String] = []
+    /// Which lists were read ("docs", "assets", "kits"), apart from `calls` (the writes).
+    private(set) var listCalls: [String] = []
     func docs() async throws -> [DesignDoc] {
         if let fail { throw fail }
-        return lock.withLock { docList }
+        return lock.withLock {
+            listCalls.append("docs")
+            return docList
+        }
     }
-    func assets() async throws -> [DesignAsset] { lock.withLock { assetList } }
-    func kits() async throws -> [BrandKit] { lock.withLock { kitList } }
+    func assets() async throws -> [DesignAsset] {
+        lock.withLock {
+            listCalls.append("assets")
+            return assetList
+        }
+    }
+    func kits() async throws -> [BrandKit] {
+        lock.withLock {
+            listCalls.append("kits")
+            return kitList
+        }
+    }
     func data(_ sha: String) async throws -> Data {
         lock.withLock { calls.append("data \(sha)") }
         return Data()
@@ -127,8 +142,6 @@ private func ready(_ s: FakeService) async -> DesignModel {
         #expect(m.items(in: .illustrations).map(\.name) == ["Scene"])
         #expect(m.items(in: .fonts).map(\.name) == ["Serif"])
         #expect(m.count(.all) == 9)
-        // Review and AI drawing are later stories: nothing claims to need you yet.
-        #expect(m.count(.needsYou) == 0 && m.count(.drawing) == 0)
     }
 
     @Test func filterMatchesNamesKindsAndTags() async {
@@ -152,8 +165,8 @@ private func ready(_ s: FakeService) async -> DesignModel {
         m.pickProject("1")
         #expect(m.project == "1" && m.category == .all)
         #expect(m.items(in: .all).map(\.name) == ["Checkout"])
-        // Category counts say what picking them shows, whatever project is selected.
-        #expect(m.count(.systems) == 1)
+        // Page counts follow the project chip: they say what the page shows with it on.
+        #expect(m.count(.systems) == 0 && m.count(.screens) == 1)
         m.pick(.screens)
         #expect(m.project == nil)
     }

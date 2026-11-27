@@ -54,6 +54,15 @@ final class DesignPresenter {
     var background = PresentBackground.night
     /// A short fade while moving between screens.
     private(set) var switching = false
+    /// What the stage can show: the design is still opening, it has screens, it has none, or it never opened.
+    enum Phase: Equatable { case opening, ready, empty, failed }
+    private(set) var phase = Phase.opening
+    #if DEBUG
+    /// Snapshots only.
+    func debugPhase(_ p: Phase) { phase = p }
+    #endif
+    /// The export size (1× to 3×).
+    var exportScale = 2
     @ObservationIgnored private weak var model: DesignModel?
 
     init(model: DesignModel, doc: DesignDoc, frame: String?, size: CGSize?) {
@@ -65,19 +74,49 @@ final class DesignPresenter {
     }
 
     /// The screens to step through: the page's top-level frames, in order.
-    var frames: [DesignLayer] {
-        guard let page = viewer.layers.children(of: nil).first else { return [] }
-        return viewer.layers.children(of: page.id).filter { $0.type == "frame" || $0.type == "component" }
+    var frames: [DesignLayer] { Self.screens(in: viewer) }
+
+    /// The screens of a design: the first page's top-level frames, in order.
+    static func screens(in editor: DesignEditor) -> [DesignLayer] {
+        guard let page = editor.layers.children(of: nil).first else { return [] }
+        return editor.layers.children(of: page.id).filter { $0.type == "frame" || $0.type == "component" }
+    }
+
+    /// The screen a layer is on (itself when it is one), or nil when it is on none of them.
+    func screen(containing id: String) -> String? {
+        let tops = Set(frames.map(\.id))
+        var at: String? = id
+        while let i = at {
+            if tops.contains(i) { return i }
+            at = viewer.layers[i]?.parent
+        }
+        return nil
+    }
+
+    func canStep(_ by: Int) -> Bool {
+        let all = frames
+        guard let i = all.firstIndex(where: { $0.id == current?.id }) else { return false }
+        return all.indices.contains(i + by)
     }
     var current: DesignLayer? { frame.flatMap { viewer.layers[$0] } ?? frames.first }
     var size: CGSize? { current.flatMap { DesignComposer.rect(of: $0.id, in: viewer) }?.size }
 
     /// Once the viewer's canvas is up and has the document: presenting on, the screen fitted.
     func ready() async {
-        for _ in 0..<100 where !(viewer.attached && current != nil) {
-            try? await Task.sleep(for: .milliseconds(100))
+        for _ in 0..<100 {
             viewer.reload()
+            if viewer.attached && viewer.loaded { break }
+            try? await Task.sleep(for: .milliseconds(100))
         }
+        guard viewer.attached, viewer.loaded else {
+            phase = .failed
+            return
+        }
+        guard current != nil else {
+            phase = .empty
+            return
+        }
+        phase = .ready
         viewer.present { [weak self] id in self?.tap(id) }
         show()
         // The canvas fits the whole page when its first content lands; fit the screen again after that.
@@ -103,19 +142,47 @@ final class DesignPresenter {
     func tap(_ id: String?) {
         var at = id
         while let i = at {
-            if let to = viewer.node(of: i)?.props["link"]?["to"]?.string, viewer.layers[to] != nil {
-                return go(to)
+            if let to = viewer.node(of: i)?.props["link"]?["to"]?.string {
+                guard viewer.layers[to] != nil else { return tell("That screen was removed.") }
+                // A link to a layer inside a screen goes to that screen.
+                guard let top = screen(containing: to) else {
+                    return tell("That link goes to a screen on another page.")
+                }
+                return go(top)
             }
             at = viewer.layers[i]?.parent
         }
     }
 
+    private func tell(_ words: String) { model?.host.shell.showToast(words, kind: .warn) }
+
     func step(_ by: Int) {
         let all = frames
-        guard let i = all.firstIndex(where: { $0.id == current?.id }) else { return }
-        let next = i + by
-        guard all.indices.contains(next) else { return }
-        go(all[next].id)
+        guard canStep(by), let i = all.firstIndex(where: { $0.id == current?.id }) else { return }
+        go(all[i + by].id)
+    }
+
+    /// Saves the current screen alone as a PNG, drawn by the engine (`de_export_png`), at `exportScale`×. The backdrop's
+    /// theme picks the day or night tokens.
+    func exportPNG() {
+        guard let node = current?.id else { return }
+        switch viewer.exportPNG(node: node, scale: exportScale, night: background == .night) {
+        case .png(let png):
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.png]
+            panel.nameFieldStringValue = "\(doc.name) – \(current?.title ?? "screen")@\(exportScale)x.png"
+            panel.begin { [weak self] r in
+                guard r == .OK, let url = panel.url else { return }
+                do {
+                    try png.write(to: url)
+                    self?.model?.host.shell.showToast("Saved \(url.lastPathComponent)")
+                } catch {
+                    self?.tell("The PNG could not be saved: \(error.localizedDescription)")
+                }
+            }
+        case .tooLarge: tell("That screen is too large to export at \(exportScale)×. Try a smaller size.")
+        case .failed: tell("The screen could not be exported.")
+        }
     }
 
     func go(_ id: String) {
@@ -146,11 +213,7 @@ extension DesignModel {
     /// Presents a design: the selected (or first) screen in a device.
     func present(_ d: DesignDoc) {
         let editor = editors[d.id]
-        let frame =
-            editor?.targetFrame()?.id
-            ?? editor?.layers.children(of: nil).first.flatMap { p in
-                editor?.layers.children(of: p.id).first { $0.type == "frame" }?.id
-            }
+        let frame = editor?.targetFrame()?.id ?? editor.flatMap { DesignPresenter.screens(in: $0).first?.id }
         let size = frame.flatMap { f in editor.flatMap { DesignComposer.rect(of: f, in: $0) } }?.size
         withAnimation(Motion.out(Motion.ui)) {
             presenter = DesignPresenter(model: self, doc: d, frame: frame, size: size)
@@ -163,7 +226,6 @@ struct DesignPresentView: View {
     let model: DesignModel
     @Bindable var presenter: DesignPresenter
     @Environment(\.coreAccent) private var paneAccent
-    @State private var stage: CGRect = .zero
 
     var body: some View {
         VStack(spacing: 0) {
@@ -171,7 +233,15 @@ struct DesignPresentView: View {
             GeometryReader { g in
                 ZStack {
                     PresentBackdrop(kind: presenter.background, ink: GlassInk.accent(paneAccent))
-                    if let canvas = model.canvasView(presenter.doc, editor: presenter.viewer) {
+                    if presenter.phase == .empty || presenter.phase == .failed {
+                        CoreStateCard(
+                            symbol: presenter.phase == .empty ? "rectangle.dashed" : "exclamationmark.triangle",
+                            title: presenter.phase == .empty ? "Nothing to present" : "The design did not open",
+                            line: presenter.phase == .empty
+                                ? "This design has no screens yet. Draw a frame or ask AI, then present again."
+                                : "Go back and open it again.",
+                            primary: CoreAction("Back to editing") { presenter.close() })
+                    } else if let canvas = model.canvasView(presenter.doc, editor: presenter.viewer) {
                         DeviceFrame(
                             device: presenter.device, screen: presenter.size ?? CGSize(width: 390, height: 844),
                             room: g.size, title: presenter.current?.title ?? ""
@@ -185,11 +255,6 @@ struct DesignPresentView: View {
                         }
                         .animation(Motion.out(Motion.ui), value: presenter.device)
                     }
-                }
-                .onGeometryChange(for: CGRect.self) {
-                    $0.frame(in: .global)
-                } action: {
-                    stage = $0
                 }
             }
             .clipShape(coreShape(Radius.pane))
@@ -217,7 +282,11 @@ struct DesignPresentView: View {
             }
         } actions: {
             CoreIconButton(symbol: "chevron.left", label: "Previous screen  ←") { presenter.step(-1) }
+                .disabled(!presenter.canStep(-1))
+                .help(presenter.canStep(-1) ? "Previous screen  ←" : "This is the first screen")
             CoreIconButton(symbol: "chevron.right", label: "Next screen  →") { presenter.step(1) }
+                .disabled(!presenter.canStep(1))
+                .help(presenter.canStep(1) ? "Next screen  →" : "This is the last screen")
             CoreSegmented(
                 "Device",
                 segments: PresentDevice.allCases.map { CoreSegment($0, "", symbol: $0.symbol) },
@@ -229,37 +298,19 @@ struct DesignPresentView: View {
                 choices: PresentBackground.allCases.map(\.title)
             ) { t in presenter.background = PresentBackground.allCases.first { $0.title == t } ?? .night }
             .frame(width: Space.s8 * 5)
+            InlineMenu(
+                label: "Size", value: "\(presenter.exportScale)×", choices: ["1×", "2×", "3×"]
+            ) { t in presenter.exportScale = Int(t.dropLast()) ?? 2 }
+            .frame(width: Space.s8 * 3)
+            .help("The PNG's size: 1×, 2× or 3× the screen")
             AppActionTile(
                 title: "Export PNG", symbol: "square.and.arrow.up", key: "", hue: GlassInk.accent(paneAccent),
                 prominent: true
             ) {
-                export()
+                presenter.exportPNG()
             }
-        }
-    }
-
-    /// Saves what is on the stage (backdrop + device) as a PNG, from the window server (the canvas is Metal).
-    private func export() {
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow, let screen = window.screen ?? NSScreen.screens.first
-        else { return }
-        let top = screen.frame.maxY  // window-server space has its origin at the top left of the main display
-        let main = NSScreen.screens.first?.frame.maxY ?? top
-        let inWindow = CGRect(
-            x: stage.minX, y: window.contentLayoutRect.height - stage.maxY, width: stage.width, height: stage.height)
-        let onScreen = window.convertToScreen(inWindow)
-        let rect = CGRect(x: onScreen.minX, y: main - onScreen.maxY, width: onScreen.width, height: onScreen.height)
-        guard
-            let shot = CGWindowListCreateImage(
-                rect, .optionIncludingWindow, CGWindowID(window.windowNumber), [.bestResolution, .boundsIgnoreFraming])
-        else { return model.host.shell.showToast("The screen could not be captured.", kind: .warn) }
-        let rep = NSBitmapImageRep(cgImage: shot)
-        guard let png = rep.representation(using: .png, properties: [:]) else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "\(presenter.doc.name) – \(presenter.current?.title ?? "screen").png"
-        panel.begin { r in
-            guard r == .OK, let url = panel.url else { return }
-            try? png.write(to: url)
+            .disabled(presenter.phase != .ready)
+            .help(presenter.phase == .ready ? "Save this screen as a PNG" : "There is no screen to export")
         }
     }
 }
