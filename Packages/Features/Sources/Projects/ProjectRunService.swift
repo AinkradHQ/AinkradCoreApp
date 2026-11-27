@@ -107,6 +107,8 @@ protocol ProjectRunService: Sendable {
     func services(project: Int64) async throws -> [ProjectLive.Service]
     /// Log lines of the live run after `after` (0 for the oldest held), and the `seq` to ask with next.
     func logs(project: Int64, after: Int) async throws -> RunLogPage
+    /// CPU and memory history per service of the live run (API 110); empty when there is none.
+    func metrics(project: Int64) async throws -> [String: ServiceSeries]
     /// Drafts the setup from a file in the project's primary repo (compose, run.sh, Makefile or package.json), saved as the
     /// next version (admin, step-up). `image` is what a Makefile or script runs in; a Makefile cannot be drafted without one.
     func draft(project: Int64, image: String?) async throws -> SpecVersionItem
@@ -116,6 +118,14 @@ protocol ProjectRunService: Sendable {
     func setSecret(project: Int64, name: String, _ input: SecretInput) async throws
     /// Deletes a secret (admin, step-up). The Core refuses with `conflict` while a spec version still uses it, unless `force`.
     func deleteSecret(project: Int64, name: String, force: Bool) async throws
+}
+
+/// The last readings of one service (API 110, `GET /run/metrics`): oldest first, at most 60, one a minute or so.
+struct ServiceSeries: Equatable, Sendable {
+    /// Percent of one CPU; 0 where the service was not running.
+    var cpu: [Double] = []
+    /// Bytes.
+    var memory: [Double] = []
 }
 
 /// A page of run log lines.
@@ -128,6 +138,7 @@ struct RunLogPage: Equatable, Sendable {
 
 extension ProjectRunService {
     func services(project: Int64) async throws -> [ProjectLive.Service] { [] }
+    func metrics(project: Int64) async throws -> [String: ServiceSeries] { [:] }
     func logs(project: Int64, after: Int) async throws -> RunLogPage { RunLogPage(next: after) }
     func draft(project: Int64, image: String?) async throws -> SpecVersionItem {
         throw RunFailure(sentence: "This Core cannot draft a setup.", code: "unsupported")
@@ -206,6 +217,12 @@ struct LiveProjectRunService: ProjectRunService {
         do {
             return try RunWire.services(try await call("GET", "\(Self.base(project))/run/services"))
         } catch let f as RunFailure where f.status == 404 || f.status == 501 { return [] }
+    }
+
+    func metrics(project: Int64) async throws -> [String: ServiceSeries] {
+        do {
+            return try RunWire.metrics(try await call("GET", "\(Self.base(project))/run/metrics"))
+        } catch let f as RunFailure where f.status == 404 || f.status == 501 { return [:] }
     }
 
     func logs(project: Int64, after: Int) async throws -> RunLogPage {
@@ -359,6 +376,22 @@ enum RunWire {
                 cpu: ($0["cpu_percent"] as? Double).map { Int($0.rounded()) },
                 restarts: ($0["restarts"] as? NSNumber)?.intValue ?? 0, health: ($0["health"] as? String) ?? "none")
         }
+    }
+
+    /// `GET /run/metrics`: per service the CPU and memory samples, oldest first.
+    static func metrics(_ data: Data) throws -> [String: ServiceSeries] {
+        guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = o["services"] as? [[String: Any]]
+        else { throw bad }
+        var out: [String: ServiceSeries] = [:]
+        for s in list {
+            guard let name = s["name"] as? String else { throw bad }
+            let samples = s["samples"] as? [[String: Any]] ?? []
+            out[name] = ServiceSeries(
+                cpu: samples.map { ($0["cpu_percent"] as? NSNumber)?.doubleValue ?? 0 },
+                memory: samples.map { ($0["memory_bytes"] as? NSNumber)?.doubleValue ?? 0 })
+        }
+        return out
     }
 
     static func state(_ podman: String) -> ProjectLive.Service.State {

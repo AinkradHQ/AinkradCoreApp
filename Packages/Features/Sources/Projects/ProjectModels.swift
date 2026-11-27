@@ -90,6 +90,35 @@ struct ProjectRunState: Equatable, Sendable {
     /// The runner's id it is placed on, and when anything last visited it.
     var runner: String?
     var lastActivityAt: Date?
+    /// How far the start got (API 110, on `GET /run`): empty from an older Core, and for a stopped run.
+    var steps: [RunStep] = []
+}
+
+/// One step of a run's start, as the Core says it (API 110): `pull`, `build`, `start`, `health`.
+struct RunStep: Equatable, Sendable {
+    enum State: String, Equatable, Sendable { case done, active, pending, failed }
+    let name: String
+    let state: State
+    let detail: String?
+
+    var title: String {
+        switch name {
+        case "pull": "Getting the code"
+        case "build": "Building the images"
+        case "start": "Starting the services"
+        case "health": "Checking they are healthy"
+        default: name.capitalized
+        }
+    }
+
+    /// The Core's `steps` array; unknown states or malformed rows are left out, never guessed.
+    static func read(_ raw: Any?) -> [RunStep] {
+        (raw as? [[String: Any]] ?? []).compactMap {
+            guard let n = $0["name"] as? String, let s = ($0["state"] as? String).flatMap(State.init(rawValue:))
+            else { return nil }
+            return RunStep(name: n, state: s, detail: ($0["detail"] as? String).flatMap { $0.isEmpty ? nil : $0 })
+        }
+    }
 }
 
 /// A drafted run (P4): shown in the "ready to start" state.
@@ -131,6 +160,10 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var setupChecked = false
     /// The Core could not be reached just now: the run state shown is how it last looked.
     var stale = false
+    /// The colour the Core holds for the project (API 110): one of the accent names; nil when it has none or is older.
+    var colourName: String?
+    /// A service of it crashed (`project.service_crashed`) and it has not run again since.
+    var crash: ServiceCrash?
 
     /// Where a project with no run yet stands, from what the Core says.
     enum Setup: Equatable {
@@ -189,6 +222,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The state as the design system's badge says it.
     var badge: (label: String, tone: Tone, symbol: String) {
         if archived { return ("Archived", .queue, "archivebox") }
+        if crash != nil, !stale { return ("Crashed", .fail, "exclamationmark.triangle") }
         if stale, tag == .running || tag == .starting { return ("Status unknown", .queue, "questionmark.circle") }
         return switch tag {
         case .running: ("Running", Tone.run, "play.circle")
@@ -215,6 +249,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The line under the name: "Running · 5 services · 2 AI sessions".
     var subtitle: String {
         if archived { return "Archived · \(Self.count(repos.count, "repo"))" }
+        if let crash, !stale { return crash.words }
         if stale, tag == .running || tag == .starting { return "Last seen running · the Core is not answering" }
         if let run {
             switch run.state {
@@ -459,6 +494,15 @@ final class ProjectColours {
     func colour(_ slug: String) -> ProjectColour {
         let all = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]
         return all[slug].flatMap(ProjectColour.init(rawValue:)) ?? .standard(for: slug)
+    }
+    /// The colour picked on this Mac for the link name, nil when none was ever picked.
+    func explicit(_ slug: String) -> ProjectColour? {
+        (defaults.dictionary(forKey: Self.key) as? [String: String])?[slug].flatMap(ProjectColour.init(rawValue:))
+    }
+    /// The colours were pushed up to a Core that holds colours (once per Mac).
+    var migrated: Bool {
+        get { defaults.bool(forKey: Self.key + ".migrated") }
+        set { defaults.set(newValue, forKey: Self.key + ".migrated") }
     }
     func set(_ colour: ProjectColour, for slug: String) {
         var all = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]

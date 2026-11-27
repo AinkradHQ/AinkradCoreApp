@@ -72,6 +72,19 @@ public actor CoreConnection {
         return try await sessions.perform(method: method, target: target, body: body).body
     }
 
+    /// A signed request whose answer comes back whatever its status, with its headers (lower-case names): for the project
+    /// preview, where the running app's own 404 or 500 is the answer. The Core's refusals are still thrown as `CoreError`.
+    public func signedExchange(
+        method: String, target: String, headers: [String: String] = [:], body: Data = Data()
+    ) async throws -> SignedReply {
+        guard target.hasPrefix("/"), !target.hasPrefix("/handshake"), !target.hasPrefix("/pair") else {
+            throw CoreError.invalidInput("\(target) is not a signed route")
+        }
+        guard body.count <= SigningMiddleware.maxBody else { throw CoreError.bodyTooLarge }
+        let r = try await sessions.exchange(method: method, target: target, headers: headers, body: body)
+        return SignedReply(status: r.status, headers: r.headers, body: r.body)
+    }
+
     /// Proves the Core, opens a session and keeps it fresh in the background.
     @discardableResult
     public func connect() async throws -> CoreSession {
@@ -254,5 +267,18 @@ func offloaded<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async th
         DispatchQueue.global(qos: .userInitiated).async {
             continuation.resume(with: Result { try work() })
         }
+    }
+}
+
+/// What `CoreConnection.signedExchange` returns.
+public struct SignedReply: Sendable, Equatable {
+    public let status: Int
+    /// Header names in lower case.
+    public let headers: [String: String]
+    public let body: Data
+    public init(status: Int, headers: [String: String], body: Data) {
+        self.status = status
+        self.headers = headers
+        self.body = body
     }
 }

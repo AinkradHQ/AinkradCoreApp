@@ -271,6 +271,9 @@ struct Overview: View {
                         StatusDot(colour: Self.dot(s.state))
                         Text(s.name).coreFont(size: MacTextSize.headline, weight: .semibold)
                         Spacer(minLength: 0)
+                        if s.state == .up, let m = live?.metrics[s.name], m.memory.count > 1 {
+                            Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes")
+                        }
                         if s.state == .exited {
                             StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
                         } else {

@@ -87,8 +87,19 @@ public final class ProjectsModel {
     @ObservationIgnored public var sessionOpener: (@MainActor (String) -> Void)?
     /// A run's log: the Core's routes for a project (and one run by id). The Debug demo brings its own.
     @ObservationIgnored var logSources: (Int64, String?) -> (any RunLogSource)? = { _, _ in nil }
+    /// The Core speaks API minor 110 (private preview, colour, metrics, start steps, branch change, crash alerts): every one of
+    /// those is gated on this, so an older Core behaves exactly as before.
+    internal(set) var core110 = false
+    /// Sends one signed request to the project preview route, and the Core's host (for redirects). Set with the connection.
+    @ObservationIgnored var previewFetch: PreviewFetch?
+    @ObservationIgnored var previewCoreHost: String?
+    /// The last service crash the Core reported for each project (`project.service_crashed`), until it runs again.
+    internal(set) var crashes: [Int64: ServiceCrash] = [:]
+    @ObservationIgnored var colourMigrating = false
+    @ObservationIgnored var colourMigrationDeclined = false
     /// Bumps when a colour is picked, so the views that read `colour(_:)` redraw.
     private var colourTick = 0
+    func bumpColour() { colourTick += 1 }
     @ObservationIgnored let colours: ProjectColours
     @ObservationIgnored var now: () -> Date = { Date() }
     /// The Core's name, for "Runs on" (the Core this Mac is paired with).
@@ -98,6 +109,8 @@ public final class ProjectsModel {
     var debugHover: Int64?
     /// Snapshots only: a drawn page stands in for the web view of a running app (the demo's links go nowhere).
     var demoPage = false
+    /// Snapshots only: the words of a live view the Core could not show.
+    var demoPreviewProblem: String?
     #endif
 
     /// The notes of the Docs page (R6-06): the Lore routes of the same Core.
@@ -142,7 +155,17 @@ public final class ProjectsModel {
         runService = LiveProjectRunService(connection: connection)
         logSources = { LiveRunLogSource(connection: connection, project: $0, run: $1) }
         catalog = LiveRepoCatalog(connection: connection)
+        previewCoreHost = connection.endpoint.host
+        previewFetch = { method, target, headers, body in
+            let r = try await connection.signedExchange(method: method, target: target, headers: headers, body: body)
+            return PreviewReply(status: r.status, headers: r.headers, body: r.body)
+        }
         Task { [weak self] in
+            let new = await connection.serverSupports(minor: coreMinorProjects)
+            if let self, new != self.core110 {
+                self.core110 = new
+                if new { await self.reload() }
+            }
             let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
@@ -161,6 +184,9 @@ public final class ProjectsModel {
         service = nil
         lore = nil
         runService = nil
+        previewFetch = nil
+        core110 = false
+        crashes = [:]
         configsService = nil
         insightsService = nil
         projects = []
@@ -227,6 +253,7 @@ public final class ProjectsModel {
             stale = nil
             syncLauncherProjects()
             pollWhileCopying()
+            if core110 { Task { await migrateColours() } }
         } catch {
             // A list already on screen stays, marked as old; only a first load that failed shows the failure.
             if projects.isEmpty {
@@ -416,14 +443,10 @@ public final class ProjectsModel {
 
     func project(_ id: Int64?) -> ProjectItem? { id.flatMap { id in projects.first { $0.id == id } } }
     var open: ProjectItem? { project(openID) }
+    /// The colour the Core holds (API 110), else the one picked on this Mac, else one made from the link name.
     func colour(_ p: ProjectItem) -> ProjectColour {
         _ = colourTick
-        return colours.colour(p.slug)
-    }
-
-    func setColour(_ c: ProjectColour, for p: ProjectItem) {
-        colours.set(c, for: p.slug)
-        colourTick += 1
+        return p.colourName.flatMap(ProjectColour.init(rawValue:)) ?? colours.colour(p.slug)
     }
 
     // MARK: words
@@ -501,6 +524,7 @@ public final class ProjectsModel {
                 "Create the project \(name) and its link \(ProjectRules.host(slug)).", done: "created", keepsEdit: true
             ) {
                 var patch = ProjectPatch(expose: expose)
+                if self.core110 { patch.colour = colour.rawValue }
                 let viaGithub = !github.isEmpty && github.count == repos.count && repos.count <= 10
                 if viaGithub {
                     made = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
@@ -523,7 +547,8 @@ public final class ProjectsModel {
                 }
                 if let made, !patch.isEmpty {
                     do { try await service.update(project: made.id, patch: patch) } catch {
-                        let what = patch.expose == nil ? "the runner" : "the public link"
+                        let what =
+                            patch.expose != nil ? "the public link" : patch.runner != nil ? "the runner" : "the colour"
                         issues.append("Could not set \(what): \(self.words(error)) Change it in Settings.")
                     }
                 }

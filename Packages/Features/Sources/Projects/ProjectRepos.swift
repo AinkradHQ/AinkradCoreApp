@@ -169,9 +169,17 @@ private struct RepoDetail: View {
                 label("Branch")
                 HStack(spacing: Space.s2) {
                     Text(repo.branch)
-                    // TODO(core): changing a repo's branch has no route in the synced client.
-                    Button("Change…") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                        .help("Changing the branch arrives with the next Core update")
+                    Button("Change…") { RepoDialogs.openBranch(model, project, repo) }
+                        .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                        .disabled(!model.core110 || model.readOnly || copying || model.busy)
+                        .help(
+                            !model.core110
+                                ? "Changing the branch needs a newer Core. Update the Core to use it."
+                                : model.readOnly
+                                    ? "This device can look at projects but not change them."
+                                    : copying
+                                        ? "The Core is copying this repo now"
+                                        : "Make \(repo.name) follow another branch")
                 }
             }
             GridRow {

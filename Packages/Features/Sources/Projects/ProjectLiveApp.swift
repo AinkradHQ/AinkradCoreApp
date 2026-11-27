@@ -14,6 +14,21 @@ struct LiveApp: View {
     /// A project with a run has a picture behind its words: the live app, or its last snapshot greyed.
     private var hasPicture: Bool { !project.repos.isEmpty && project.run != nil }
     private var previewURL: URL? { model.previewURL(for: project) }
+    private var isDemo: Bool {
+        #if DEBUG
+        model.demoPage
+        #else
+        false
+        #endif
+    }
+    /// Why the live view cannot be shown, in the Core's words or the web view's.
+    private var problem: String? {
+        #if DEBUG
+        if let d = model.demoPreviewProblem { return d }
+        #endif
+        if case .failed(let why) = web.state { return why }
+        return nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
@@ -124,7 +139,9 @@ struct LiveApp: View {
         ZStack {
             ProjectPicture(project: project, colour: model.colour(project), illustrate: false)
             if let url = previewURL {
-                LiveWebView(url: url, model: web).opacity(web.state == .live ? 1 : 0)
+                LiveWebView(
+                    url: url, model: web, preview: model.previewFetch.map { (project.id, model.previewCoreHost, $0) }
+                ).opacity(web.state == .live ? 1 : 0)
                     .animation(Motion.out(Motion.ui), value: web.state)
                     .task(id: url) { await keepSnapshot() }
             }
@@ -148,15 +165,15 @@ struct LiveApp: View {
                     line: "Turn on the public link to see it live here.",
                     button: model.readOnly ? nil : "Turn On Public Link"
                 ) { Task { await model.setExpose(project, true) } }
-            } else if case .failed(let why) = web.state {
+            } else if let why = problem {
                 note(
-                    symbol: "exclamationmark.triangle", title: "Could not open \(project.link)", line: why,
+                    symbol: "exclamationmark.triangle", title: "Could not open \(project.name)", line: why,
                     button: "Try Again"
                 ) {
                     web.state = .loading
                     web.web?.reload()
                 }
-            } else if web.state == .loading {
+            } else if web.state == .loading, !isDemo {
                 Text("Opening \(project.link)…").foregroundStyle(GlassInk.secondary).padding(.horizontal, Space.s3)
                     .frame(height: MacSize.controlMd).background(.regularMaterial, in: coreShape(Radius.control))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading).padding(Space.s2)
@@ -194,10 +211,7 @@ struct LiveApp: View {
                 CoreWorkingBar(width: Space.s8 * 13)
             }
             Text(project.live?.progressLine ?? "Starting…").foregroundStyle(GlassInk.secondary)
-            ForEach(Array((project.live?.steps ?? []).enumerated()), id: \.offset) { _, s in
-                Label(s.title, systemImage: s.done ? "checkmark.circle" : "circle").foregroundStyle(
-                    s.done ? GlassInk.primary : GlassInk.secondary)
-            }
+            StartStepsList(steps: project.live?.steps ?? [])
         }
     }
 
@@ -226,6 +240,7 @@ struct LiveApp: View {
                 text: project.live?.failureFix ?? "", tone: .fail
             )
             .frame(maxWidth: Space.s8 * 14)
+            StartStepsList(steps: project.live?.steps ?? [])
             start("Start Again")
         }
     }
@@ -233,5 +248,44 @@ struct LiveApp: View {
     private func line(_ s: String) -> some View {
         Text(s).foregroundStyle(GlassInk.secondary).multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true).frame(maxWidth: Space.s8 * 11)
+    }
+}
+
+/// The Core's start steps in order: done, the one under way, those waiting, and the one that failed with its reason.
+struct StartStepsList: View {
+    let steps: [StartStep]
+    var body: some View {
+        if !steps.isEmpty {
+            VStack(alignment: .leading, spacing: Space.s1) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { _, s in
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
+                        Image(systemName: symbol(s)).foregroundStyle(tint(s)).frame(width: Space.s4)
+                            .accessibilityHidden(true)
+                        Text(s.title).foregroundStyle(s.state == .pending ? GlassInk.secondary : GlassInk.primary)
+                        if let d = s.detail { Text(d).foregroundStyle(GlassInk.secondary).lineLimit(2) }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(s.title), \(s.state.rawValue)\(s.detail.map { ", \($0)" } ?? "")")
+                }
+            }
+        }
+    }
+
+    private func symbol(_ s: StartStep) -> String {
+        switch s.state {
+        case .done: "checkmark.circle"
+        case .active: "circle.dotted"
+        case .pending: "circle"
+        case .failed: "xmark.circle"
+        }
+    }
+
+    private func tint(_ s: StartStep) -> Color {
+        switch s.state {
+        case .done: GlassInk.green
+        case .active: GlassInk.primary
+        case .pending: GlassInk.secondary
+        case .failed: GlassInk.red
+        }
     }
 }

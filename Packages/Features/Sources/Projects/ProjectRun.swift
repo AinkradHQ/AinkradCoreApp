@@ -62,6 +62,7 @@ private struct ServicesIsland: View {
         let cpu: Int?
         let memory: String?
         let restarts: Int
+        var series: ServiceSeries?
         var id: String { name }
     }
 
@@ -75,14 +76,14 @@ private struct ServicesIsland: View {
                     name: s.name, image: s.image,
                     port: s.port.map { "\($0)\(s.isPublic ? " · public" : "")" } ?? "–", state: l?.state,
                     health: l?.health ?? "none",
-                    cpu: l?.cpu, memory: l?.memory, restarts: l?.restarts ?? 0)
+                    cpu: l?.cpu, memory: l?.memory, restarts: l?.restarts ?? 0, series: project.live?.metrics[s.name])
             }
         }
         return live.map {
             Row(
                 name: $0.name, image: "–", port: "–", state: $0.state, health: $0.health, cpu: $0.cpu,
                 memory: $0.memory,
-                restarts: $0.restarts)
+                restarts: $0.restarts, series: project.live?.metrics[$0.name])
         }
     }
 
@@ -159,7 +160,12 @@ private struct ServicesIsland: View {
                     mono(r.port)
                     health(r)
                     cpu(r)
-                    Text(r.state == .up ? (r.memory ?? "–") : "–").monospacedDigit()
+                    HStack(spacing: Space.s2) {
+                        Text(r.state == .up ? (r.memory ?? "–") : "–").monospacedDigit()
+                        if r.state == .up, let m = r.series?.memory, m.count > 1 {
+                            Sparkline(values: m, label: "\(r.name) memory, recent minutes", floor: 1)
+                        }
+                    }
                     Text("\(r.restarts)").monospacedDigit()
                 }
             }
@@ -191,6 +197,9 @@ private struct ServicesIsland: View {
                 CoreMeter(Double(cpu) / 100, low: cpu >= 90, height: Space.s2, label: "\(r.name) CPU")
                     .frame(width: Space.s8 * 3)
                 Text("\(cpu)%").monospacedDigit().lineLimit(1).fixedSize()
+                if let c = r.series?.cpu, c.count > 1 {
+                    Sparkline(values: c, label: "\(r.name) CPU, recent minutes", floor: 25)
+                }
             }
         } else {
             Text("–").foregroundStyle(GlassInk.secondary)
