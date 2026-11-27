@@ -113,12 +113,18 @@ struct ProjectWizard: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .clipped()
-                    WizardPreviewCard(
-                        name: name, colour: colour,
-                        host: name.isEmpty || slugProblem != nil || !kind.hasPublicLink ? nil : ProjectRules.host(slug),
-                        repos: (made?.repos.map(\.name)) ?? chosen.map(\.name), runner: runner, publicLink: publicLink,
-                        place: existingPlace ? place?.name : nil, kind: kind, step: step,
-                        progress: made.map { WizardProgress($0.repos) })
+                    if step != .review {
+                        WizardPreviewCard(
+                            name: name, colour: colour,
+                            host: name.isEmpty || slugProblem != nil || !kind.hasPublicLink
+                                ? nil : ProjectRules.host(slug),
+                            repos: (made?.repos.map(\.name)) ?? chosen.map(\.name), runner: runner,
+                            publicLink: publicLink,
+                            place: existingPlace ? place?.name : nil, kind: kind, step: step,
+                            progress: made.map { WizardProgress($0.repos) }
+                        )
+                        .transition(.opacity)
+                    }
                 }
                 .frame(height: Space.s8 * 14 + Space.s4)
                 footer
@@ -305,6 +311,7 @@ struct ProjectWizard: View {
                                 CoreRow(p.name, symbol: "square.stack", selected: place == p) { place = p }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxHeight: Space.s8 * 5)
                     .scrollIndicators(.never)
@@ -329,62 +336,68 @@ struct ProjectWizard: View {
     // MARK: 4 · review, then live progress
 
     private var reviewStep: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
-            let progress = WizardProgress(made?.repos ?? [])
-            let started = made != nil || model.creating != nil
-            DialogHead(
-                title: !started
-                    ? "Ready to create \(name)?" : made == nil ? "Setting up \(name)" : progress.title(name: name),
-                line:
-                    "\(ProjectItem.count(made?.repos.count ?? chosen.count, "repo")) · \(kind.short)"
-                    + (kind.runs ? " · Runs on \(runner.title)" : "")
-                    + (kind.hasPublicLink ? (publicLink ? " · Public link on" : " · Private") : ""))
-            if started {
-                WizardSetupList(creating: model.creating, made: made, copy: made.map { WizardProgress($0.repos) })
-                    .transition(.opacity)
+        VStack(spacing: Space.s3) {
+            WizardReview(
+                name: name, colour: colour, kind: kind, rows: reviewRows, creating: model.creating, made: made,
+                busy: model.busy, go: go)
+            // Only what needs a look: repos that could not be copied or added, and anything the Core refused.
+            let attention = (made?.repos ?? []).filter { r in
+                if case .ready = r.copy { return false }
+                if case .fetching = r.copy { return false }
+                return true
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    if let made, !made.repos.isEmpty {
-                        ForEach(made.repos) { r in repoRow(made, r) }
-                    } else if !chosen.isEmpty {
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.adaptive(minimum: Space.s8 * 5), spacing: Space.s2, alignment: .leading)
-                            ],
-                            alignment: .leading, spacing: Space.s2
-                        ) {
-                            ForEach(chosen) { r in
-                                Label(r.name, systemImage: "tray.full").lineLimit(1)
-                                    .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .coreWell(radius: Radius.control)
+            if !attention.isEmpty || !model.wizardMissed.isEmpty || !model.wizardIssues.isEmpty
+                || model.writeError != nil
+            {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.s1) {
+                        if let made { ForEach(attention) { r in repoRow(made, r) } }
+                        ForEach(model.wizardMissed) { m in
+                            CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
+                                Text("Not added").foregroundStyle(palette.error)
                             }
                         }
-                    } else {
-                        Text("No code yet. Add repos any time from the project.").foregroundStyle(palette.text2)
-                    }
-                    if made != nil, progress.failed > 0, progress.settled {
-                        Text(
-                            "\(ProjectItem.count(progress.failed, "repo")) could not be copied. The rest are ready, so you can open the project now."
-                        )
-                        .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                    }
-                    ForEach(model.wizardMissed) { m in
-                        CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
-                            Text("Not added").foregroundStyle(palette.error)
+                        ForEach(model.wizardIssues, id: \.self) {
+                            Text($0).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                         }
+                        if let e = model.writeError { CoreFieldError(e) }
                     }
-                    ForEach(model.wizardIssues, id: \.self) {
-                        Text($0).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let e = model.writeError { CoreFieldError(e) }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: Space.s8 * 18)
+                .scrollIndicators(.automatic)
             }
-            .scrollIndicators(.automatic)
         }
-        .animation(Motion.out(Motion.ui), value: model.creating)
-        .animation(Motion.out(Motion.ui), value: made?.repos)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// The summary rows: every choice made, each with Change.
+    private var reviewRows: [WizardReview.Row] {
+        let names = chosen.map(\.name)
+        let more = names.count > 3 ? " and \(names.count - 3) more" : ""
+        var rows: [WizardReview.Row] = [
+            .init(
+                id: .code, symbol: "tray.full",
+                label: "Code", value: names.isEmpty ? "No code" : ProjectItem.count(names.count, "repo"),
+                sub: names.isEmpty ? nil : names.prefix(3).joined(separator: ", ") + more),
+            .init(id: .kind, symbol: kind.symbol, label: "Kind", value: kind.title),
+            .init(
+                id: .brain, symbol: existingPlace ? "square.stack" : "plus.square", label: "Brain",
+                value: existingPlace ? (place?.name ?? "Existing place") : "New place “\(name)”"),
+        ]
+        if kind.runs {
+            rows.append(
+                .init(
+                    id: .runs, symbol: runner.symbol, label: kind == .app ? "Builds on" : "Runs on",
+                    value: runner.title))
+        }
+        if kind.hasPublicLink {
+            rows.append(
+                .init(
+                    id: .runs, symbol: publicLink ? "link" : "lock", label: "Link",
+                    value: publicLink ? ProjectRules.host(slug) : "Private"))
+        }
+        return rows
     }
 
     private func repoRow(_ p: ProjectItem, _ r: RepoItem) -> some View {

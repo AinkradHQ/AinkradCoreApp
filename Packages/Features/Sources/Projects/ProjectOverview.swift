@@ -375,6 +375,7 @@ struct Overview: View {
                         .help(r.remoteURL)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollIndicators(.automatic)
         }

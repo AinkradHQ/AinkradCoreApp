@@ -121,6 +121,7 @@ struct RepoPicker: View {
                 more
             }
             .padding(Space.s1)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.never)
         .frame(minHeight: height ?? Space.s8 * 4, maxHeight: height ?? .infinity)

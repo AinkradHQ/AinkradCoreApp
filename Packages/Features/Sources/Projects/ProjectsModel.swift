@@ -565,6 +565,15 @@ public final class ProjectsModel {
                     }
                 }
                 made = p
+                // The chosen Brain place first: the Brain gives a project with no place its own new one a few seconds
+                // after it is made, so linking before the repos keeps it from making a second.
+                if let place {
+                    do { try await service.linkPlace(project: p.id, room: place.id) } catch {
+                        issues.append(
+                            "Could not link the Brain place \(place.name): \(self.words(error)) It has a new place instead."
+                        )
+                    }
+                }
                 self.creating = CreateProgress(stage: .repos, added: batch.count, total: repos.count)
                 for (i, r) in ordered.enumerated().dropFirst(batch.count) {
                     do {
@@ -574,13 +583,6 @@ public final class ProjectsModel {
                     self.creating?.added += 1
                 }
                 self.creating?.stage = .finishing
-                if let made, let place {
-                    do { try await service.linkPlace(project: made.id, room: place.id) } catch {
-                        issues.append(
-                            "Could not link the Brain place \(place.name): \(self.words(error)) It has a new place instead."
-                        )
-                    }
-                }
                 if let made, !patch.isEmpty {
                     do { try await service.update(project: made.id, patch: patch) } catch {
                         let what =

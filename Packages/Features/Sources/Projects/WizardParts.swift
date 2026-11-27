@@ -115,7 +115,7 @@ struct WizardPreviewCard: View {
                     Text(shownName).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                         .contentTransition(.opacity)
                     Text(host ?? (kind.hasPublicLink ? "Link made from the name" : kind.title)).font(
-                        .system(size: MacTextSize.meta, design: .monospaced)
+                        .system(size: MacTextSize.meta, design: host == nil ? .default : .monospaced)
                     )
                     .foregroundStyle(palette.text2).lineLimit(1).truncationMode(.middle)
                 }
@@ -235,7 +235,7 @@ struct WizardSetupList: View {
     @Environment(\.coreAccent) private var accent
     @Environment(\.corePalette) private var palette
 
-    private enum State { case waiting, running, done }
+    private enum State { case waiting, running, done, warn }
 
     var body: some View {
         let stage = creating?.stage
@@ -260,7 +260,9 @@ struct WizardSetupList: View {
             if copyTotal > 0 {
                 row(
                     "Copy the code", "\(copied) of \(copyTotal)",
-                    state: creating != nil ? .waiting : copy?.settled == true ? .done : .running,
+                    state: creating != nil
+                        ? .waiting
+                        : copy?.settled == true ? ((copy?.failed ?? 0) > 0 ? .warn : .done) : .running,
                     value: Double(copied) / Double(copyTotal), symbol: "arrow.down.doc")
             }
         }
@@ -279,6 +281,9 @@ struct WizardSetupList: View {
                         .white
                     )
                     .transition(.scale.combined(with: .opacity))
+                case .warn:
+                    Image(systemName: "exclamationmark").coreFont(size: MacTextSize.meta, weight: .bold)
+                        .foregroundStyle(.white)
                 case .running, .waiting:
                     Image(systemName: symbol).coreFont(size: MacTextSize.meta, weight: .semibold)
                         .foregroundStyle(state == .running ? .white : palette.text2)
@@ -286,7 +291,9 @@ struct WizardSetupList: View {
             }
             .frame(width: Space.s6, height: Space.s6)
             .background(
-                state == .waiting ? GlassInk.well : state == .done ? palette.success : GlassInk.accent(accent),
+                state == .waiting
+                    ? GlassInk.well
+                    : state == .done ? palette.success : state == .warn ? palette.error : GlassInk.accent(accent),
                 in: coreShape(Radius.chip)
             )
             .corePulse(state == .running)
