@@ -196,12 +196,16 @@ public protocol DesignEditBackend: AnyObject {
     var loaded: Bool { get }
     /// The sync socket to the Core is open.
     var syncConnected: Bool { get }
+    /// The sync stopped applying updates (the engine halted): edits go nowhere until the design is reopened.
+    var syncHalted: Bool { get }
     /// The last `edit` was refused because the change is too large for one update.
     var lastEditTooLarge: Bool { get }
     /// The canvas tool (`CanvasTool`); it returns to select by itself after a shape is drawn.
     var tool: Int { get }
     /// A design system's own tokens as JSON `[{name, kind, day, night}]`.
     func docTokens() -> Data?
+    /// A node as a PNG at `scale` 1 to 4 in the day or night theme, drawn by the engine (transparent background).
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport
     func setTool(_ tool: Int)
     /// How document points show in the canvas view: `view = doc × zoom + pan`.
     func camera() -> CanvasCamera?
@@ -209,6 +213,14 @@ public protocol DesignEditBackend: AnyObject {
     func fit(_ rect: CGRect)
     /// Presenting: clicks report the node under them (prototype links) and nothing is edited; nil ends it.
     func present(_ tap: (@MainActor (String?) -> Void)?)
+}
+
+/// The engine's answer to a PNG export.
+public enum PNGExport: Sendable, Equatable {
+    case png(Data)
+    /// Over 16384 px a side or 64 million pixels.
+    case tooLarge
+    case failed
 }
 
 public struct CanvasCamera: Sendable, Equatable {
@@ -224,6 +236,8 @@ extension DesignEditBackend {
     public var syncStuck: Bool { false }
     public var loaded: Bool { true }
     public var syncConnected: Bool { true }
+    public var syncHalted: Bool { false }
+    public func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport { .failed }
     public var lastEditTooLarge: Bool { false }
     public var tool: Int { 0 }
     public func docTokens() -> Data? { nil }

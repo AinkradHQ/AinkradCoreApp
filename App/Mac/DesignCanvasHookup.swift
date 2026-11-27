@@ -28,6 +28,14 @@ final class CanvasEditing: DesignEditBackend {
     var lastEditTooLarge: Bool { view?.editorLastEditTooLarge ?? false }
     var tool: Int { view?.editorTool ?? 0 }
     func docTokens() -> Data? { view?.editorDocTokens() }
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport {
+        guard let view else { return .failed }
+        switch view.editorExportPNG(node: node, scale: scale, night: night) {
+        case .png(let d): return .png(d)
+        case .tooLarge: return .tooLarge
+        case .failed: return .failed
+        }
+    }
     func setTool(_ tool: Int) { view?.editorSetTool(tool) }
     func camera() -> CanvasCamera? {
         view?.editorCamera.map { CanvasCamera(zoom: $0.zoom, pan: CGPoint(x: $0.panX, y: $0.panY)) }
