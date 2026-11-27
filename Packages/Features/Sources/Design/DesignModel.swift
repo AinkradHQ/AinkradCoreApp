@@ -83,6 +83,11 @@ public final class DesignModel {
     #if DEBUG
     /// Snapshots only: draws this card in its hover state.
     var debugHover: String?
+    /// Snapshots only: forgets every loaded picture, so a card shows its failed state.
+    func debugForgetImages() {
+        imageCache.removeAllObjects()
+        imageTick += 1
+    }
     /// Snapshots only: shows the Saved badge in this state.
     var debugSave: SaveState?
     /// Snapshots only: the Comments panel shown open.

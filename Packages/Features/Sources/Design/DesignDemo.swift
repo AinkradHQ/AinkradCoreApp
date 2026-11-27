@@ -389,6 +389,7 @@ public final class DesignDemo {
         case "image-failed":
             model.category = .library
             for a in s.assets where a.loadable { model.failedImages.insert(a.sha) }
+            model.debugForgetImages()
         case "filtered": model.filter = "checkout"
         case "project": model.project = "1"
         case "loading": model.load = .loading

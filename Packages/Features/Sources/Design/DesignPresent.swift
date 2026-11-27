@@ -277,15 +277,17 @@ struct DesignPresentView: View {
             .help("Back to editing  Esc")
             Text(presenter.current?.title ?? presenter.doc.name).coreFont(size: MacTextSize.title, weight: .semibold)
                 .lineLimit(1)
-            if let i = presenter.frames.firstIndex(where: { $0.id == presenter.current?.id }) {
+            if presenter.phase == .ready,
+                let i = presenter.frames.firstIndex(where: { $0.id == presenter.current?.id })
+            {
                 Text("\(i + 1) of \(presenter.frames.count)").foregroundStyle(GlassInk.secondary).monospacedDigit()
             }
         } actions: {
             CoreIconButton(symbol: "chevron.left", label: "Previous screen  ←") { presenter.step(-1) }
-                .disabled(!presenter.canStep(-1))
+                .disabled(presenter.phase != .ready || !presenter.canStep(-1))
                 .help(presenter.canStep(-1) ? "Previous screen  ←" : "This is the first screen")
             CoreIconButton(symbol: "chevron.right", label: "Next screen  →") { presenter.step(1) }
-                .disabled(!presenter.canStep(1))
+                .disabled(presenter.phase != .ready || !presenter.canStep(1))
                 .help(presenter.canStep(1) ? "Next screen  →" : "This is the last screen")
             CoreSegmented(
                 "Device",
