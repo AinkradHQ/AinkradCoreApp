@@ -281,8 +281,12 @@ actor SessionManager {
         }
     }
 
-    /// Whether a 401, 403 or 429 is the Core's own (its error shape names a known code) and not the proxied app's.
+    /// Whether a 401, 403 or 429 is the Core's own and not the proxied app's: the Core marks every error it makes with
+    /// `Ainkrad-Refusal: 1` and strips every `ainkrad-*` header a project sends, so a project cannot fake one (an app that
+    /// answers 403 `unlock_required` must never pop an unlock prompt).
     static func isCoreRefusal(_ res: RawResponse) -> Bool {
+        let marked = res.headers.contains { $0.key.lowercased() == "ainkrad-refusal" && $0.value == "1" }
+        guard marked else { return false }
         switch res.status {
         case 429: return true
         case 401, 403:

@@ -28,6 +28,22 @@ struct PreviewReply: Sendable, Equatable {
 typealias PreviewFetch = @Sendable (String, String, [String: String], Data) async throws -> PreviewReply
 
 enum PreviewProxy {
+    /// The sandbox the Core puts on every preview answer (`preview::SANDBOX`) so a browser rendering it under the Core's own
+    /// host gets no origin. This app renders previews under its own scheme (its own origin), so it drops exactly this value
+    /// and keeps any policy the project sent; otherwise the page would lose its storage and its own-site requests here.
+    static let coreSandbox =
+        "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads; frame-ancestors 'none'"
+
+    /// The CSP header without the Core's sandbox: several CSP headers arrive joined by ", ".
+    static func withoutCoreSandbox(_ csp: String?) -> String? {
+        guard let csp else { return nil }
+        let rest = csp.components(separatedBy: ", ").filter {
+            $0.trimmingCharacters(in: .whitespaces) != coreSandbox
+        }
+        let joined = rest.joined(separator: ", ")
+        return joined.isEmpty ? nil : joined
+    }
+
     static let scheme = "ainkrad-preview"
     static let host = "project"
     static let outsideWords = "The app redirected outside Ainkrad."
@@ -300,6 +316,7 @@ final class PreviewSchemeHandler: NSObject, WKURLSchemeHandler {
 
     static func response(_ r: PreviewReply, url: URL) -> URLResponse {
         var head = r.headers.filter { !PreviewProxy.dropped.contains($0.key) }
+        head["content-security-policy"] = PreviewProxy.withoutCoreSandbox(head["content-security-policy"])
         head["content-length"] = String(r.body.count)
         return HTTPURLResponse(url: url, statusCode: r.status, httpVersion: "HTTP/1.1", headerFields: head)
             ?? URLResponse(url: url, mimeType: nil, expectedContentLength: r.body.count, textEncodingName: nil)
