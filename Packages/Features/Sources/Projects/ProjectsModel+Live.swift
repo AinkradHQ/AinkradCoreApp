@@ -109,6 +109,10 @@ extension ProjectsModel {
 
     func sessionBlock(_ p: ProjectItem) -> String {
         if p.archived { return "An archived project cannot start AI sessions." }
+        if p.repos.isEmpty && p.kind == .other {
+            return
+                "This Core starts an AI session in a project's repos, so add a repo (a notes or docs repo is fine) first."
+        }
         if p.repos.isEmpty { return "Add a repo first. A session works in a copy of the project's repos." }
         if readOnly { return "This device can look at projects but not change them." }
         if sessionStarter == nil { return "Connect to a Core to start an AI session." }

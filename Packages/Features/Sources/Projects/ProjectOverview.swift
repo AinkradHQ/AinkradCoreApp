@@ -180,8 +180,14 @@ struct Overview: View {
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
                 if list.isEmpty {
-                    Text("No AI sessions yet. New ones start in their own clone of this project's repos.")
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        project.kind == .other
+                            ? (project.repos.isEmpty
+                                ? "No AI sessions yet. This Core runs them in a repo, so add a notes or docs repo to start one."
+                                : "No AI sessions yet. New ones start in their own copy of this project's repos.")
+                            : "No AI sessions yet. New ones start in their own clone of this project's repos."
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
                 } else {
                     VStack(alignment: .leading, spacing: Space.s1) {
                         ForEach(Array(list.prefix(4).enumerated()), id: \.offset) { _, s in
