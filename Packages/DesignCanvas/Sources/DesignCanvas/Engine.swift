@@ -159,6 +159,15 @@ public final class Engine: Sendable {
         }
     }
 
+    /// Node `id` as PNG bytes (`de_export_png`: Skia on the CPU, transparent background).
+    public enum PNGResult: Sendable { case png(Data), tooLarge, failed }
+    func exportPNG(node id: String, scale: Float, night: Bool) -> PNGResult {
+        let b = Array(id.utf8)
+        let (rc, d) = fetch { de_export_png(h, b, b.count, scale, night ? 1 : 0, $0, $1, $2) }
+        if rc == DE_OK, let d { return .png(d) }
+        return rc == DE_ERR_TOO_LARGE ? .tooLarge : .failed
+    }
+
     /// Calls an out-buffer function, growing the buffer once to the size it asks for.
     func read(_ f: (UnsafeMutablePointer<UInt8>?, Int, UnsafeMutablePointer<Int>?) -> Int32) -> Data? {
         let (rc, d) = fetch(f)

@@ -138,6 +138,9 @@ final class DesignEditor {
 
     /// The canvas camera now (not observed: the AI overlay reads it every display frame).
     func camera() -> CanvasCamera? { backend?.camera() }
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport {
+        backend?.exportPNG(node: node, scale: scale, night: night) ?? .failed
+    }
     func fit(_ rect: CGRect) { backend?.fit(rect) }
     /// Presenting: clicks report the node under them; nil goes back to editing.
     func present(_ tap: (@MainActor (String?) -> Void)?) { backend?.present(tap) }

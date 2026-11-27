@@ -159,13 +159,16 @@ struct MockupStage: View {
             .buttonStyle(.coreSecondary)
             .disabled(model.readOnly)
             .help("Click a point of the page to leave a note there")
+            // The Core's approvals and comments belong to a design's frames, so a mockup page has nowhere to save one:
+            // the review lasts while this mockup is open, and the words say so instead of claiming "Approved".
             if v.review.isApproved(v.screenKey) {
-                Label("Approved", systemImage: "checkmark.seal").foregroundStyle(GlassInk.secondary)
+                Label("Reviewed (not saved)", systemImage: "checkmark.circle").foregroundStyle(GlassInk.secondary)
+                    .help("Kept only while this mockup is open. The Core cannot save a mockup review yet.")
             } else {
-                Button("Approve Screen") { v.review.approve(v.screenKey) }
+                Button("Mark Reviewed") { v.review.approve(v.screenKey) }
                     .buttonStyle(.coreProminent)
-                    .disabled(model.readOnly)
-                    .help("Approve this screen as it is now")
+                    .help(
+                        "Mark this screen reviewed. Kept only while this mockup is open; the Core cannot save it yet.")
             }
         }
         .frame(minHeight: MacSize.controlMd)
@@ -215,8 +218,8 @@ private struct PinList: View {
         let pins = viewer.review.pins(on: viewer.screenKey)
         Island("Notes") {
             if pins.isEmpty {
-                Text("No notes yet. Use Add Pin, then click the page.").foregroundStyle(GlassInk.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("No notes yet. Use Add Pin, then click the page. Notes last while this mockup is open.")
+                    .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.s1) {

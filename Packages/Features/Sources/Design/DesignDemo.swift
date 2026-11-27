@@ -146,10 +146,12 @@ public final class DesignDemo {
     }
 
     public static let scenes = [
-        "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "needs-you",
-        "drawing", "filtered", "project", "empty", "loading", "offline", "absent", "failed", "open-design",
+        "home", "home-hover", "screens", "brand", "icons", "illustrations", "fonts", "systems", "mockups", "library",
+        "capped", "refresh-failed", "image-failed", "filtered", "project", "empty", "loading", "offline", "absent",
+        "failed", "open-design",
         "open-design-menu", "open-system", "open-mockup", "open-logo", "open-icon-composer", "open-kit", "open-font",
-        "project-island", "project-island-empty", "new-advanced", "rename", "delete",
+        "project-island", "project-island-empty", "project-island-offline", "new-advanced", "new-mockup",
+        "save-reconnecting", "save-halted", "save-saving", "present-empty", "rename", "delete",
         "open-design-insert", "open-design-text", "editor-selftest", "tools-probe", "ai-new", "ai-edit", "ai-drawing",
         "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop", "system-empty",
         "system-guide", "system-guide-night", "comments", "approval", "ai-paused", "archived", "archived-old-core",
@@ -336,7 +338,7 @@ public final class DesignDemo {
         model.projectsMenuOpen = false
         await ProjectsDemo(model: model.projectsModel).loadSample()
         let s = Self.sample()
-        let empty = scene == "empty" || scene == "project-island-empty"
+        let empty = scene == "empty" || scene == "project-island-empty" || scene == "project-island-offline"
         let svc = Service(
             docs: empty ? [] : Self.docs(), assets: empty ? [] : s.assets, kits: empty ? [] : Self.kits(),
             bytes: s.bytes)
@@ -354,6 +356,11 @@ public final class DesignDemo {
             ])
         await model.useNow(svc)
         model.debugSystemAsk = false
+        model.debugSave = nil
+        model.refreshFailure = nil
+        model.docsCapped = false
+        model.failedImages = []
+        if scene == "project-island-offline" { model.load = .failed("The Core did not answer in time.") }
         // Scenes share one run: nothing from the scene before (AI panel, dialog) may stay open.
         model.composer?.shutdown()
         model.composer = nil
@@ -376,8 +383,14 @@ public final class DesignDemo {
         case "fonts": model.category = .fonts
         case "systems": model.category = .systems
         case "mockups": model.category = .mockups
-        case "needs-you": model.category = .needsYou
-        case "drawing": model.category = .drawing
+        case "library": model.category = .library
+        case "capped":
+            model.docsCapped = true
+        case "refresh-failed": model.refreshFailure = "The Core did not answer in time."
+        case "image-failed":
+            model.category = .library
+            for a in s.assets where a.loadable { model.failedImages.insert(a.sha) }
+            model.debugForgetImages()
         case "filtered": model.filter = "checkout"
         case "project": model.project = "1"
         case "loading": model.load = .loading
@@ -388,7 +401,8 @@ public final class DesignDemo {
             "ai-edit", "ai-drawing", "ai-directions", "ai-done", "ai-drawing-new", "present-phone", "present-desktop",
             "tools-probe", "tools-selftest", "tools-zoom", "tools-pages", "tools-cursors", "tools-follow",
             "tools-shortcuts", "tools-paste", "tools-text", "ai-over-limit", "ai-flow", "tools-rotate", "tools-locked",
-            "tools-effects", "tools-strokes", "tools-effects-look", "editor-halted", "editor-offline", "editor-mixed", "editor-readonly":
+            "tools-effects", "tools-strokes", "tools-effects-look", "save-reconnecting", "save-halted", "save-saving",
+            "present-empty", "editor-halted", "editor-offline", "editor-mixed", "editor-readonly":
             model.openID = "doc:\(Self.did(1))"
         case "open-design-about", "comments", "approval": model.openID = "doc:\(Self.did(1))"
         case "open-system", "system-empty", "system-guide", "system-guide-night", "add-token", "system-replace-confirm":
@@ -423,6 +437,13 @@ public final class DesignDemo {
         default: break
         }
         if scene == "new-advanced" { model.openNew() }
+        if scene == "new-mockup" { model.openNew(kind: .mockup) }
+        switch scene {
+        case "save-reconnecting": model.debugSave = .reconnecting
+        case "save-halted": model.debugSave = .notSaving
+        case "save-saving": model.debugSave = .saving
+        default: break
+        }
         if scene == "new-kit" {
             model.host.shell.present(ShellDialog(id: "new-kit") { NewKitView(model: model, kind: .brandKit) })
         }
@@ -521,7 +542,14 @@ public final class DesignDemo {
         }
         if scene.hasPrefix("tools-") { await tools(scene) }
         if scene == "rename" { model.askRename(.doc(Self.docs()[0])) }
-        if scene.hasPrefix("present-") {
+        if scene == "present-empty" {
+            try? await Task.sleep(for: .seconds(1))
+            if let item = model.open, case .doc(let d) = item {
+                model.present(d)
+                try? await Task.sleep(for: .seconds(3))  // after the real open settles
+                model.presenter?.debugPhase(.empty)
+            }
+        } else if scene.hasPrefix("present-") {
             // Present on the real canvas (CORE_DESIGN_SCENE): the scene's frame in a phone, or as a desktop in a browser.
             try? await Task.sleep(for: .seconds(2))
             if let item = model.open, case .doc(let d) = item {

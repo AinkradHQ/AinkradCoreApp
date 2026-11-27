@@ -92,7 +92,7 @@ struct EditorStage: View {
             .coreWell(radius: Radius.pane)
             .onAppear { sync() }
             .onChange(of: model.readOnly) { sync() }
-            .onChange(of: model.composer?.phase == .drawing) { sync() }
+            .onChange(of: model.composer?.phase == .drawing) { editor.revealPaused = model.composer?.phase == .drawing }
             Island("Inspector") { InspectorIsland(editor: editor) }.frame(width: Space.s8 * 10)
         }
         .environment(model.collab)

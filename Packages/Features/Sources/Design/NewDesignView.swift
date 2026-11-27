@@ -15,8 +15,10 @@ struct NewDesignView: View {
     @State private var source = ""
     @State private var error: String?
 
-    init(model: DesignModel) {
+    init(model: DesignModel, kind: DesignDoc.Kind = .design) {
         self.model = model
+        _kind = State(initialValue: kind.rawValue)
+        _name = State(initialValue: DesignModel.defaultName(kind))
         _project = State(initialValue: model.project ?? "")
     }
 
@@ -27,11 +29,11 @@ struct NewDesignView: View {
         (.mockup, "Mockup", "iphone", "A design in a device, clickable"),
     ]
 
-    private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
+    private var trimmed: String { DesignName.clean(name) }
     private var designs: [DesignDoc] { model.docs.filter { $0.kind == .design } }
     private var systems: [DesignDoc] { model.docs.filter { $0.kind == .system } }
     private var mockup: Bool { kind == DesignDoc.Kind.mockup.rawValue }
-    private var valid: Bool { mockup ? designs.contains { $0.id == source } : (1...100).contains(trimmed.count) }
+    private var valid: Bool { mockup ? designs.contains { $0.id == source } : DesignName.valid(name, limit: 100) }
 
     var body: some View {
         CoreDialogPanel("New design", width: Space.s8 * 14) {

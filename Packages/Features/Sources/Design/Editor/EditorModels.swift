@@ -233,6 +233,8 @@ public protocol DesignEditBackend: AnyObject {
     var tool: Int { get }
     /// A design system's own tokens as JSON `[{name, kind, day, night}]`.
     func docTokens() -> Data?
+    /// A node as a PNG at `scale` 1 to 4 in the day or night theme, drawn by the engine (transparent background).
+    func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport
     func setTool(_ tool: Int)
     /// How document points show in the canvas view: `view = doc × zoom + pan`.
     func camera() -> CanvasCamera?
@@ -271,6 +273,14 @@ public protocol DesignEditBackend: AnyObject {
     func detachInstance() -> Bool
 }
 
+/// The engine's answer to a PNG export.
+public enum PNGExport: Sendable, Equatable {
+    case png(Data)
+    /// Over 16384 px a side or 64 million pixels.
+    case tooLarge
+    case failed
+}
+
 public struct CanvasCamera: Sendable, Equatable {
     public let zoom: Double
     public let pan: CGPoint
@@ -290,6 +300,7 @@ extension DesignEditBackend {
     public func setReadOnly(_ on: Bool) {}
     public var loaded: Bool { true }
     public var syncConnected: Bool { true }
+    public func exportPNG(node: String, scale: Int, night: Bool) -> PNGExport { .failed }
     public var lastEditTooLarge: Bool { false }
     public var tool: Int { 0 }
     public func docTokens() -> Data? { nil }
