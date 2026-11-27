@@ -71,6 +71,22 @@ public final class ProjectsModel {
     internal(set) var controlling: Set<Int64> = []
     /// The newest run of each project, as the Core's run routes last said it.
     @ObservationIgnored var runStates: [Int64: ProjectRunState] = [:]
+    /// What the Core says of each project's setup (its run spec); a project with no entry has not been read yet.
+    @ObservationIgnored var setupStates: [Int64: SetupRead] = [:]
+    /// The services, sessions and room of each project, read from the Core (the Overview's islands).
+    @ObservationIgnored var liveParts: [Int64: LiveParts] = [:]
+    /// Runner id to its name, for "on core-oracle".
+    @ObservationIgnored var runnerNames: [String: String] = [:]
+    /// Bumps when the Core says a run or its setup changed, so the Run pages read again at once.
+    internal(set) var runTick = 0
+    /// The last read of the Core failed: what is shown is how it last looked.
+    @ObservationIgnored var coreSilent = false
+    /// Starts an AI session in a project (the app wires it to the AI Sessions app); returns the refusal in words.
+    @ObservationIgnored public var sessionStarter: (@MainActor (Int64) async -> String?)?
+    /// Opens an AI session in the AI Sessions app.
+    @ObservationIgnored public var sessionOpener: (@MainActor (String) -> Void)?
+    /// A run's log: the Core's routes for a project (and one run by id). The Debug demo brings its own.
+    @ObservationIgnored var logSources: (Int64, String?) -> (any RunLogSource)? = { _, _ in nil }
     /// Bumps when a colour is picked, so the views that read `colour(_:)` redraw.
     private var colourTick = 0
     @ObservationIgnored let colours: ProjectColours
@@ -122,6 +138,7 @@ public final class ProjectsModel {
     public func attach(connection: CoreConnection) {
         lore = LiveLoreService(connection: connection)
         runService = LiveProjectRunService(connection: connection)
+        logSources = { LiveRunLogSource(connection: connection, project: $0, run: $1) }
         catalog = LiveRepoCatalog(connection: connection)
         Task { [weak self] in
             let ok = await connection.serverSupports(minor: coreMinorV010)
@@ -145,6 +162,8 @@ public final class ProjectsModel {
         configsService = nil
         insightsService = nil
         projects = []
+        setupStates = [:]
+        liveParts = [:]
         limits = nil
         limitsState = .loading
         pollTask?.cancel()
@@ -160,7 +179,18 @@ public final class ProjectsModel {
     public func resync() { if service != nil { Task { await reload() } } }
 
     /// An event from the Core that may change what the gallery shows.
-    public func event(kind: String) { if kind.hasPrefix("project.") { resync() } }
+    public func event(kind: String) {
+        if kind.hasPrefix("project.") { resync() }
+        // A run or its setup changed, or an AI session did: the open project's pages read again now, not at the next poll.
+        if kind.hasPrefix("project.run_") || kind == "project.spec_saved" || kind.hasPrefix("agent"), let id = openID {
+            if kind.hasPrefix("project.") { runTick += 1 }
+            Task {
+                await refreshRun(id)
+                await refreshSetup(id)
+                await refreshLive(id)
+            }
+        }
+    }
 
     func reload() async {
         guard let service else { return }
@@ -179,6 +209,17 @@ public final class ProjectsModel {
                 return out
             }
             runStates = runs
+            // The setup of a project that never ran (and of the open one): spec present means ready to start.
+            let wanted = list.filter { !$0.repos.isEmpty && !$0.archived && (runs[$0.id] == nil || $0.id == openID) }
+            let rs = runService
+            let reads = await withTaskGroup(of: (Int64, SetupRead?).self) { group in
+                for p in wanted { group.addTask { (p.id, await Self.readSetup(rs, p.id)) } }
+                var out: [Int64: SetupRead] = [:]
+                for await (id, r) in group { if let r { out[id] = r } }
+                return out
+            }
+            for (id, r) in reads { setupStates[id] = r }
+            coreSilent = false
             projects = list.map(applying)
             load = .ready
             stale = nil
@@ -186,7 +227,12 @@ public final class ProjectsModel {
             pollWhileCopying()
         } catch {
             // A list already on screen stays, marked as old; only a first load that failed shows the failure.
-            if projects.isEmpty { load = .failed(words(error)) } else { stale = words(error) }
+            if projects.isEmpty {
+                load = .failed(words(error))
+            } else {
+                stale = words(error)
+                markSilent(true)
+            }
         }
     }
 

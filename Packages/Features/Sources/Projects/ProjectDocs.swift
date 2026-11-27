@@ -66,7 +66,14 @@ final class ProjectDocs {
     let project: ProjectItem
     var phase = Phase.loading
     var docs: [DocItem] = []
-    var query = "" { didSet { if query != oldValue { scheduleSearch() } } }
+    var query = "" {
+        didSet {
+            if query != oldValue {
+                notice = nil
+                scheduleSearch()
+            }
+        }
+    }
     /// nil = not searching; the hits of the typed words otherwise.
     var hits: [DocItem]?
     var notice: String?
@@ -95,6 +102,7 @@ final class ProjectDocs {
         do {
             let notes = try await service.list(filter: LoreFilter(kind: "note", project: pid))
             phase = .ready
+            notice = nil
             docs = notes.map { DocItem(id: $0.id, title: Self.title($0), group: .other) }
             let read = Array(notes.prefix(Self.tagReadLimit))
             // Eight reads at a time: a project with many notes does not open a hundred requests at once.
@@ -144,6 +152,7 @@ final class ProjectDocs {
         Task {
             do {
                 let n = try await service.create(text: "", project: pid)
+                notice = nil
                 open(n.id)
                 await load()
             } catch { notice = "Unable to create the doc." }

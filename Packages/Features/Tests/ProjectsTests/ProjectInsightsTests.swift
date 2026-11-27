@@ -17,9 +17,12 @@ struct InsightsWireTests {
     @Test func usageAndTrend() throws {
         let u = try InsightsWire.usage(
             Data(
-                #"{"week_cost":4.2,"prev_week_cost":3.75,"sessions_week":5,"by_day":[1,2,3,0,0,1,2],"sessions":[{"id":"a","title":"Fix","state":"running","cost":0.4,"spark":[1,2]},{"id":"b","title":"Done","state":"done","cost":1.1,"spark":[]}]}"#
+                #"{"week_cost":4200000,"prev_week_cost":3750000,"sessions_week":5,"by_day":[1000000,2000000,3000000,0,0,1000000,2000000],"sessions":[{"id":"a","title":"Fix","state":"running","cost":400000,"spark":[1000000,2000000]},{"id":"b","title":"Done","state":"ended","cost":1100000,"spark":[]}]}"#
                     .utf8))
         #expect(u.sessionsWeek == 5 && u.byDay.count == 7 && u.running == 1)
+        // The Core sends USD micros: $4.20 is 4200000, never "$4200000.00".
+        #expect(u.weekCost == 4.2 && u.byDay[2] == 3 && u.sessions[0].cost == 0.4 && u.sessions[0].spark == [1, 2])
+        #expect(CostWords.money(u.weekCost) == "$4.20")
         #expect(u.trend == "Up 12% on last week")
         #expect(UsageInfo().trend == "No usage yet")
         #expect(UsageInfo(weekCost: 1).trend == "First week with usage")
@@ -47,7 +50,7 @@ struct InsightsWireTests {
             try InsightsWire.tuning(
                 Data(
                     #"{"id":1,"fetch_interval_minutes":60,"default_environment":"Staging","room":{"room_id":"room_a","name":"Atlas"}}"#
-                        .utf8)) == ProjectTuning(fetchInterval: 60, defaultEnvironment: "Staging", roomID: "room_a"))
+                        .utf8)) == ProjectTuning(fetchInterval: 60, defaultEnvironment: "Staging", roomID: "room_a", roomName: "Atlas"))
         // An older answer without the fields keeps the Core's real default.
         #expect(
             try InsightsWire.tuning(Data(#"{"id":1}"#.utf8))

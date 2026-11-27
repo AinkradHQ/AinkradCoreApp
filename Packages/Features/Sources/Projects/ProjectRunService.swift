@@ -50,6 +50,27 @@ struct SecretItem: Equatable, Sendable {
     let name: String
     let version: Int
     let updatedAt: Date?
+    /// `text`, `multiline`, `file` or `env_bundle`.
+    var kind = "text"
+    var description = ""
+    var lastUsedAt: Date? = nil
+    var useCount = 0
+}
+
+/// What a secret is stored as: its kind decides how the value is read. For `file` the value is the file's base64.
+struct SecretInput: Equatable, Sendable {
+    var value: String
+    var kind = "text"
+    var description = ""
+    var fileName: String?
+}
+
+/// One saved version without its spec (`GET /spec/versions`).
+struct SpecVersionSummary: Equatable, Identifiable, Sendable {
+    let version: Int
+    let origin: String
+    let createdAt: Date?
+    var id: Int { version }
 }
 
 /// What the Core says of the project's run (the live one, else the newest).
@@ -58,6 +79,8 @@ struct RunStatus: Equatable, Sendable {
     let state: String
     let error: String?
     let idleStopAt: Date?
+    var stopReason: String? = nil
+    var lastActivityAt: Date? = nil
 }
 
 /// A failure the Run page can word.
@@ -87,12 +110,20 @@ protocol ProjectRunService: Sendable {
     /// Drafts the setup from a file in the project's primary repo (compose, run.sh, Makefile or package.json), saved as the
     /// next version (admin, step-up). `image` is what a Makefile or script runs in; a Makefile cannot be drafted without one.
     func draft(project: Int64, image: String?) async throws -> SpecVersionItem
+    /// Every saved version, newest first, without the spec.
+    func specVersions(project: Int64) async throws -> [SpecVersionSummary]
+    /// Stores a secret of any kind (admin, step-up); `setSecret(project:name:value:)` is the text one.
+    func setSecret(project: Int64, name: String, _ input: SecretInput) async throws
+    /// Deletes a secret (admin, step-up). The Core refuses with `conflict` while a spec version still uses it, unless `force`.
+    func deleteSecret(project: Int64, name: String, force: Bool) async throws
 }
 
 /// A page of run log lines.
 struct RunLogPage: Equatable, Sendable {
     var lines: [ProjectLive.LogLine] = []
     var next = 0
+    /// Lines the runner had dropped before the first one here (a flood, or a slow reader).
+    var lost = 0
 }
 
 extension ProjectRunService {
@@ -100,6 +131,13 @@ extension ProjectRunService {
     func logs(project: Int64, after: Int) async throws -> RunLogPage { RunLogPage(next: after) }
     func draft(project: Int64, image: String?) async throws -> SpecVersionItem {
         throw RunFailure(sentence: "This Core cannot draft a setup.", code: "unsupported")
+    }
+    func specVersions(project: Int64) async throws -> [SpecVersionSummary] { [] }
+    func setSecret(project: Int64, name: String, _ input: SecretInput) async throws {
+        try await setSecret(project: project, name: name, value: input.value)
+    }
+    func deleteSecret(project: Int64, name: String, force: Bool) async throws {
+        throw RunFailure(sentence: "This Core cannot delete a secret.", code: "unsupported")
     }
 }
 
@@ -131,8 +169,20 @@ struct LiveProjectRunService: ProjectRunService {
     }
 
     func setSecret(project: Int64, name: String, value: String) async throws {
-        let body = try JSONSerialization.data(withJSONObject: ["value": value, "kind": "text"])
+        try await setSecret(project: project, name: name, SecretInput(value: value))
+    }
+
+    func setSecret(project: Int64, name: String, _ input: SecretInput) async throws {
+        let body = try JSONSerialization.data(withJSONObject: RunWire.secretBody(input))
         _ = try await call("PUT", "\(Self.base(project))/secrets/\(Self.seg(name))", body)
+    }
+
+    func deleteSecret(project: Int64, name: String, force: Bool) async throws {
+        _ = try await call("DELETE", "\(Self.base(project))/secrets/\(Self.seg(name))\(force ? "?force=true" : "")")
+    }
+
+    func specVersions(project: Int64) async throws -> [SpecVersionSummary] {
+        try RunWire.versions(try await call("GET", "\(Self.base(project))/spec/versions"))
     }
 
     func run(project: Int64) async throws -> RunStatus? {
@@ -227,12 +277,22 @@ enum RunWire {
             let ports = (s["ports"] as? [[String: Any]]) ?? []
             let first = ports.first
             let build = (s["build"] as? [String: Any])?["repo"] as? String
-            let env = (s["env"] as? [String: String]) ?? [:]
+            // A value may be a number or a flag in the file; it is kept as its text, never dropped.
+            let env = (s["env"] as? [String: Any] ?? [:]).mapValues { Self.text($0) }
             return SpecService(
                 name: name, image: (s["image"] as? String) ?? build.map { "build \($0)" } ?? "–",
                 port: first?["port"] as? Int, isPublic: ports.contains { ($0["expose"] as? Bool) == true },
                 secrets: Array(Set(env.values.flatMap(secretRefs))).sorted())
         }
+    }
+
+    /// An env value as text: a string as it is, a number or a flag as it would be written.
+    static func text(_ v: Any) -> String {
+        if let s = v as? String { return s }
+        if let n = v as? NSNumber {
+            return CFGetTypeID(n) == CFBooleanGetTypeID() ? (n.boolValue ? "true" : "false") : n.stringValue
+        }
+        return String(describing: v)
     }
 
     /// The names in `${secret:NAME}` references of one value.
@@ -253,7 +313,26 @@ enum RunWire {
         return try list.map {
             guard let name = $0["name"] as? String else { throw bad }
             return SecretItem(
-                name: name, version: $0["version"] as? Int ?? 1, updatedAt: date($0["updated_at"] as? String))
+                name: name, version: $0["version"] as? Int ?? 1, updatedAt: date($0["updated_at"] as? String),
+                kind: $0["kind"] as? String ?? "text", description: $0["description"] as? String ?? "",
+                lastUsedAt: date($0["last_used_at"] as? String), useCount: ($0["use_count"] as? NSNumber)?.intValue ?? 0
+            )
+        }
+    }
+
+    /// The body of `PUT /secrets/{name}`: the value, its kind, and what only some kinds take.
+    static func secretBody(_ i: SecretInput) -> [String: Any] {
+        var o: [String: Any] = ["value": i.value, "kind": i.kind]
+        if !i.description.isEmpty { o["description"] = i.description }
+        if i.kind == "file", let n = i.fileName { o["file_name"] = n }
+        return o
+    }
+
+    static func versions(_ data: Data) throws -> [SpecVersionSummary] {
+        guard let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { throw bad }
+        return try list.map {
+            guard let v = $0["version"] as? Int, let origin = $0["origin"] as? String else { throw bad }
+            return SpecVersionSummary(version: v, origin: origin, createdAt: date($0["created_at"] as? String))
         }
     }
 
@@ -261,7 +340,8 @@ enum RunWire {
         guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let state = o["state"] as? String
         else { throw bad }
         return RunStatus(
-            state: state, error: o["error"] as? String, idleStopAt: date(o["idle_stop_at"] as? String))
+            state: state, error: o["error"] as? String, idleStopAt: date(o["idle_stop_at"] as? String),
+            stopReason: o["stop_reason"] as? String, lastActivityAt: date(o["last_activity_at"] as? String))
     }
 
     /// The Core's service rows: Podman's `state` read as up (running), exited (it stopped on its own) or down (anything else),
@@ -296,8 +376,9 @@ enum RunWire {
         return RunLogPage(
             lines: lines.compactMap {
                 guard let s = $0["service"] as? String, let t = $0["text"] as? String else { return nil }
-                return ProjectLive.LogLine(service: s, text: t)
-            }, next: (o["next"] as? NSNumber)?.intValue ?? after)
+                return ProjectLive.LogLine(
+                    service: s, text: t, seq: ($0["seq"] as? NSNumber)?.intValue ?? 0, at: date($0["at"] as? String))
+            }, next: (o["next"] as? NSNumber)?.intValue ?? after, lost: (o["lost"] as? NSNumber)?.intValue ?? 0)
     }
 
     static func date(_ s: String?) -> Date? {
@@ -325,22 +406,68 @@ enum SecretRules {
     }
 }
 
-/// The lines that differ between two spec versions, for "See Changes": `+` added, `-` removed, in file order.
+/// The lines that differ between two spec versions, for "See Changes": added (`+`) and removed (`-`) lines in file order, each
+/// change with a few unchanged lines around it for context, and `…` where a stretch of unchanged lines was left out.
 enum SpecDiff {
+    enum Kind: Hashable, Sendable { case added, removed, context, gap }
     struct Line: Hashable, Sendable {
-        let added: Bool
+        let kind: Kind
         let text: String
+        var added: Bool { kind == .added }
+        init(kind: Kind, text: String) {
+            self.kind = kind
+            self.text = text
+        }
+        init(added: Bool, text: String) { self.init(kind: added ? .added : .removed, text: text) }
     }
+
+    /// Unchanged lines kept on each side of a change.
+    static let context = 3
 
     static func lines(from old: String?, to new: String) -> [Line] {
         let n = new.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        guard let old else { return n.map { Line(added: true, text: $0) } }
+        guard let old else { return n.map { Line(kind: .added, text: $0) } }
         let o = old.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        var out: [Line] = []
-        for change in n.difference(from: o).inferringMoves() {
+        var removed = Set<Int>()
+        var inserted = Set<Int>()
+        for change in n.difference(from: o) {
             switch change {
-            case .insert(_, let text, _): out.append(Line(added: true, text: text))
-            case .remove(_, let text, _): out.append(Line(added: false, text: text))
+            case .insert(let at, _, _): inserted.insert(at)
+            case .remove(let at, _, _): removed.insert(at)
+            }
+        }
+        if removed.isEmpty && inserted.isEmpty { return [] }
+        // Walk both files together: a removed old line, an inserted new line, else a line both have.
+        var all: [Line] = []
+        var i = 0
+        var j = 0
+        while i < o.count || j < n.count {
+            if i < o.count, removed.contains(i) {
+                all.append(Line(kind: .removed, text: o[i]))
+                i += 1
+            } else if j < n.count, inserted.contains(j) {
+                all.append(Line(kind: .added, text: n[j]))
+                j += 1
+            } else {
+                if j < n.count { all.append(Line(kind: .context, text: n[j])) }
+                i += 1
+                j += 1
+            }
+        }
+        // Keep the changes and `context` lines around each; the rest becomes one gap line.
+        var keep = [Bool](repeating: false, count: all.count)
+        for (k, l) in all.enumerated() where l.kind != .context {
+            for m in max(0, k - context)...min(all.count - 1, k + context) { keep[m] = true }
+        }
+        var out: [Line] = []
+        var skipped = false
+        for (k, l) in all.enumerated() {
+            if keep[k] {
+                out.append(l)
+                skipped = false
+            } else if !skipped {
+                out.append(Line(kind: .gap, text: "…"))
+                skipped = true
             }
         }
         return out

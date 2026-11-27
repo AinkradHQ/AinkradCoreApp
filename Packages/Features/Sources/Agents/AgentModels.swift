@@ -190,12 +190,15 @@ public struct NewAgentSession: Equatable, Sendable {
     /// with either the harness and model are left out: the account the Core picks sets them.
     public var chain: Int64?
     public var agent: String?
+    /// A Core project (`project_id`): the Core builds the session's workspace from the project's repos. Excludes `project`.
+    public var projectID: Int64?
     public init(
         runner: String?, harness: String, model: String? = nil, prompt: String, mode: String = "ask",
         secrets: [String] = [], chain: Int64? = nil, agent: String? = nil, project: String? = nil,
         branch: String? = nil,
-        base: String? = nil
+        base: String? = nil, projectID: Int64? = nil
     ) {
+        self.projectID = projectID
         self.project = project
         self.branch = branch
         self.base = base

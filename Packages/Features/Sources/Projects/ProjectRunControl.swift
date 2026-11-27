@@ -8,32 +8,75 @@ import SwiftUI
 /// Run control and Project Settings writes (P7-05): Start, Stop and Restart on the Core's run routes, the watch that keeps the
 /// open project's run fresh and its idle timer pushed back, General and Archive. Each change is behind Touch ID.
 extension ProjectsModel {
-    /// The project with its run as the Core last said it: state, idle timer, progress and why a start failed.
+    /// The project with what the Core last said of it: its setup, its run (state, idle timer, start progress, why it ended) and,
+    /// for the open one, the services, sessions and room the Overview shows.
     func applying(_ p: ProjectItem) -> ProjectItem {
-        guard let r = runStates[p.id] else { return p }
         var p = p
+        if let s = setupStates[p.id] {
+            p.draft = s.draft
+            p.setupChecked = true
+        }
+        p.stale = isStale
         var live = p.live ?? ProjectLive()
+        let parts = liveParts[p.id]
+        if let parts {
+            live.services = parts.services
+            live.sessions = parts.sessions
+            live.room = parts.room
+            live.roomID = parts.roomID
+        }
+        live.stale = p.stale
+        guard let r = runStates[p.id] else {
+            if parts != nil { p.live = live }
+            return p
+        }
+        let planned = max(live.services.count, p.draft?.services.count ?? 0)
         p.run = RunSummary(
-            state: r.summary.state, services: live.services.count, sessions: live.sessions.count,
-            lastRun: r.summary.lastRun)
+            state: r.summary.state, services: planned, sessions: live.sessions.count, lastRun: r.summary.lastRun)
         let remaining = r.idleStopAt.map { Int(ceil($0.timeIntervalSince(now()) / 60)) }
         live.idle =
-            r.summary.state == .running
+            r.summary.state == .running && !p.idleNever
             ? remaining.map { "idle \(max(0, p.idleMinutes - $0)) min of \(p.idleMinutes)" } : nil
-        // ponytail: the Core gives no start progress, so the bar eases toward 90% over a minute; replace with real steps (P5-04).
-        live.progress = min(0.9, now().timeIntervalSince(r.startedAt) / 60)
-        live.progressLine = "Starting on \(coreName)…"
-        live.failure = r.summary.state == .failed ? (r.error ?? Self.reason(r.stopReason)) : nil
-        live.failureFix = r.summary.state == .failed ? "Check the run setup, then start it again." : nil
+        // No guessed easing: the bar is the services the Core reports up of the services the setup has, and nothing when it
+        // reports none yet. `live.steps` is where the Core's own start steps will go.
+        let up = live.services.filter { $0.state == .up }.count
+        let total = p.draft?.services.count ?? live.services.count
+        live.progress = total > 0 && !live.services.isEmpty ? Double(up) / Double(total) : nil
+        let where_ = runnerName(r.runner) ?? coreName
+        live.progressLine =
+            total > 0 && !live.services.isEmpty
+            ? "Starting on \(where_) · \(up) of \(ProjectItem.count(total, "service")) up" : "Starting on \(where_)…"
+        live.runner = runnerName(r.runner)
+        live.lastActivity = r.lastActivityAt
+        live.stopWords = r.summary.state == .stopped ? Self.reason(r.stopReason) : nil
+        let crashLoop = parts?.crashLoop == true
+        live.failure =
+            r.summary.state == .failed || crashLoop
+            ? (crashLoop ? Self.crashLoopWords : r.error ?? Self.reason(r.stopReason)) : nil
+        live.failureFix =
+            live.failure == nil
+            ? nil
+            : crashLoop
+                ? "Read the log of the last run, fix what stops it, then start it again."
+                : "Check the run setup, then start it again."
         p.live = live
+        if crashLoop, p.run?.state == .stopped { p.run?.state = .failed }
         return p
     }
 
+    static let crashLoopWords = "It kept crashing, so the Core stopped restarting it."
+
+    /// Why a run ended, in a sentence (the Core's `stop_reason`).
     static func reason(_ code: String?) -> String {
         switch code {
         case "runner_lost": "The machine running it went offline."
         case "crash": "It stopped by itself."
-        default: "The last start failed."
+        case "user": "You stopped it."
+        case "idle": "It stopped after a while with no visits."
+        case "replaced": "Another run replaced it."
+        case "start_failed": "The last start failed."
+        case nil: "The last start failed."
+        case let other?: "It ended (\(other))."
         }
     }
 
@@ -89,7 +132,15 @@ extension ProjectsModel {
 
     /// Reads one project's run again.
     func refreshRun(_ id: Int64) async {
-        guard let service, let r = try? await service.run(project: id) else { return }
+        guard let service else { return }
+        let answer: ProjectRunState?
+        do { answer = try await service.run(project: id) } catch {
+            // A Core that cannot be asked is not "running": what is shown is marked as how it last looked.
+            markSilent(true)
+            return
+        }
+        markSilent(false)
+        guard let r = answer else { return }
         runStates[id] = r
         if let i = projects.firstIndex(where: { $0.id == id }) { projects[i] = applying(projects[i]) }
     }
@@ -99,6 +150,7 @@ extension ProjectsModel {
     func watch(_ id: Int64) async {
         while !Task.isCancelled, let service {
             await refreshRun(id)
+            await refreshLive(id)
             switch project(id)?.tag {
             case .some(.starting):
                 try? await Task.sleep(for: .seconds(2))
@@ -191,13 +243,13 @@ extension ProjectsModel {
         closeProject()
         host.shell.closePane(Self.paneID(project.id))
         await reload()
-        // A Core with the unarchive route (minor 95) gives a few seconds to undo, as the mockup's delete does.
+        // A Core with the unarchive route (minor 95) gives a few seconds to undo.
         guard let undo = insightsService else {
             host.shell.showToast("\(project.name) archived")
             return
         }
         host.shell.showToast(
-            "Deleted \(project.name). Your repos stay on GitHub.", kind: .ok,
+            "Archived \(project.name). Your repos stay on GitHub.", kind: .ok,
             undo: { [weak self] in Task { await self?.restore(project, undo) } })
     }
 

@@ -90,6 +90,8 @@ public final class ProjectsDemo {
         "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
         "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
         "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
+        "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
+        "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
     ]
 
     private let model: ProjectsModel
@@ -156,7 +158,9 @@ public final class ProjectsDemo {
         return p
     }
 
-    private static func tidepool(repos: Int, fetched: Bool = true, draft: Bool = false) -> ProjectItem {
+    private static func tidepool(repos: Int, fetched: Bool = true, draft: Bool = false, missing: Bool = false)
+        -> ProjectItem
+    {
         ProjectItem(
             id: 7, slug: "tidepool", name: "Tidepool", description: "", expose: true,
             repos: [repo(1, "tidepool-api", fetched: fetched), repo(2, "tidepool-web", fetched: fetched)].prefix(repos)
@@ -165,7 +169,7 @@ public final class ProjectsDemo {
             draft: draft
                 ? RunDraft(
                     source: "docker-compose.yml", services: ["web", "api", "postgres"],
-                    secrets: ["DATABASE_URL", "JWT_SECRET"]) : nil)
+                    secrets: missing ? ["jwt_secret"] : []) : nil)
     }
 
     private static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
@@ -216,9 +220,35 @@ public final class ProjectsDemo {
         case "space-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "space-setting-up": list.insert(Self.tidepool(repos: 2), at: 0)
         case "space-ready": list.insert(Self.tidepool(repos: 2, draft: true), at: 0)
+        case "space-ready-secrets": list.insert(Self.tidepool(repos: 2, draft: true, missing: true), at: 0)
+        case "space-needs-setup":
+            var t = Self.tidepool(repos: 2)
+            t.setupChecked = true
+            list.insert(t, at: 0)
         case "overview-starting":
             list[1].run = RunSummary(state: .starting, services: 5)
             list[1].live = DemoLive.make(.starting, progress: 0.4)
+        // The Core reports no services yet: a moving bar and words, no number.
+        case "overview-starting-honest":
+            list[1].run = RunSummary(state: .starting, services: 0)
+            var l = DemoLive.make(.starting)
+            l.services = []
+            l.progress = nil
+            l.progressLine = "Starting on core-oracle…"
+            list[1].live = l
+        case "overview-stopped-real":
+            var l = DemoLive.make(.stopped)
+            l.services = []
+            l.stopWords = "It stopped after a while with no visits."
+            l.lastActivity = Date().addingTimeInterval(-3 * 3600)
+            l.runner = "core-oracle"
+            list[3].live = l
+            list[3].draft = RunDraft(source: "docker-compose.yml", services: ["web", "api", "db"], secrets: [])
+        case "overview-crash-loop":
+            var l = DemoLive.make(.failed)
+            l.failure = ProjectsModel.crashLoopWords
+            l.failureFix = "Read the log of the last run, fix what stops it, then start it again."
+            list[2].live = l
         // A real Core today: no run state, services, logs, sessions or room.
         case "overview-real-core", "page-brain-empty":
             list[3].run = nil
@@ -270,7 +300,7 @@ public final class ProjectsDemo {
             model.quickOpen = true
         case "new-advanced":
             NewProjectDialogs.openAdvanced(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
-        case "space-no-repos", "space-copying", "space-setting-up", "space-ready": model.openID = 7
+        case "space-no-repos", "space-copying", "space-setting-up", "space-ready", "space-needs-setup": model.openID = 7
         case "overview-running": model.openID = 1
         case "page-run":
             model.openID = 1
@@ -281,6 +311,27 @@ public final class ProjectsDemo {
         case "page-run-draft":
             model.openID = 2
             model.section = .run
+        case "page-run-logs":
+            model.openID = 1
+            model.section = .run
+        case "dialog-history", "dialog-secret-file", "dialog-instructions":
+            model.openID = 1
+            model.section = scene == "dialog-instructions" ? .brain : .run
+            try? await Task.sleep(for: .milliseconds(800))
+            guard let p = model.open else { break }
+            let run = RunPageModel(model: model, projectID: p.id)
+            await run.load()
+            switch scene {
+            case "dialog-history": RunDialogs.openHistory(run, project: p)
+            case "dialog-secret-file":
+                RunDialogs.openSecret(run, project: p, name: "service_account", replacing: true, kind: "file")
+            default: model.openInstructions(p)
+            }
+        case "overview-stale":
+            model.openID = 1
+            try? await Task.sleep(for: .milliseconds(700))
+            model.markSilent(true)
+        case "space-ready-secrets": model.openID = 7
         case "page-settings", "page-settings-stopped":
             model.openID = scene == "page-settings" ? 1 : 4
             model.section = .settings
@@ -293,9 +344,9 @@ public final class ProjectsDemo {
         case "page-brain", "page-brain-empty":
             model.openID = scene == "page-brain" ? 1 : 4
             model.section = .brain
-        case "overview-starting": model.openID = 2
-        case "overview-failed": model.openID = 3
-        case "overview-stopped", "overview-real-core": model.openID = 4
+        case "overview-starting", "overview-starting-honest": model.openID = 2
+        case "overview-failed", "overview-crash-loop": model.openID = 3
+        case "overview-stopped", "overview-real-core", "overview-stopped-real": model.openID = 4
         case "space-add-repos":
             model.openID = 7
             if let p = model.open { NewProjectDialogs.openAddRepos(model, p, picked: [Self.apiURL]) }
@@ -340,13 +391,16 @@ enum DemoLive {
             return ProjectLive.Service(
                 name: s.0, memory: s.1, state: st, cpu: cpu[i], restarts: st == .exited ? 3 : 0)
         }
+        let t = Date()
         let ok: [ProjectLive.LogLine] = [
-            .init(service: "mysql", text: "ready for connections · 8.4.2"),
-            .init(service: "api", text: "Server running on 0.0.0.0:8000"),
-            .init(service: "web", text: "Next.js 15.1 · ready in 2.1 s"),
-            .init(service: "web", text: "GET / 200 in 84 ms"),
-            .init(service: "api", text: "GET /api/products?page=1 200 31 ms"),
-            .init(service: "queue", text: "ResizeImage ........ 212 ms DONE"),
+            .init(service: "mysql", text: "ready for connections · 8.4.2", at: t.addingTimeInterval(-60)),
+            .init(
+                service: "api", text: "\u{1B}[32mServer running\u{1B}[0m on 0.0.0.0:8000", at: t.addingTimeInterval(-50)
+            ),
+            .init(service: "web", text: "Next.js 15.1 · ready in 2.1 s", at: t.addingTimeInterval(-40)),
+            .init(service: "web", text: "GET / 200 in 84 ms", at: t.addingTimeInterval(-30)),
+            .init(service: "api", text: "GET /api/products?page=1 200 31 ms", at: t.addingTimeInterval(-20)),
+            .init(service: "queue", text: "ResizeImage ........ 212 ms DONE", at: t.addingTimeInterval(-10)),
         ]
         let bad: [ProjectLive.LogLine] = [
             .init(service: "mysql", text: "ready for connections · 8.4.2"),
@@ -404,7 +458,8 @@ enum DemoLive {
                                 OverviewRule("Never log customer addresses."),
                             ])),
                     instructionsApprovedAt: "2026-11-16T10:00:00Z"),
-                items: 2320, updated: "2 h ago", approved: "yesterday"))
+                items: 2320, updated: "2 h ago", approved: "yesterday"),
+            roomID: "room_demo")
         if state == .running { live.idle = "idle 4 min of 30" }
         if state == .starting {
             live.progress = progress

@@ -43,6 +43,8 @@ struct RunsPage: View {
             }
             .onAppear { settled = true }
             .task(id: project.id) { await runs.load() }
+            // The Core says a run changed: the runs are read again now.
+            .task(id: model.runTick) { if runs.loaded { await runs.refreshHistory() } }
             .task(id: runs.tab) {
                 if runs.tab == .live || runs.tab == .history { await runs.watchLive() }
             }
@@ -68,6 +70,25 @@ struct RunsPage: View {
         .padding(Space.s3)
         .frame(maxWidth: .infinity)
         .coreWell(radius: Radius.pane)
+    }
+}
+
+/// Why an entry of a configuration is not saved, in words; nil when it is fine. A refused entry used to be dropped silently.
+enum ProjectConfigFormRules {
+    static func name(_ v: String) -> String? {
+        v.trimmingCharacters(in: .whitespaces).isEmpty ? "Give it a name. Nothing is saved until it has one." : nil
+    }
+    static func command(_ v: String) -> String? {
+        v.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "Give it a command to run. Nothing is saved until it has one." : nil
+    }
+    static func port(_ v: String) -> String? {
+        let t = v.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return nil }
+        guard let n = Int(t), (1...65535).contains(n) else {
+            return "Use a port from 1 to 65535, or leave it empty. This one is not saved."
+        }
+        return nil
     }
 }
 
@@ -162,6 +183,15 @@ struct ConfigurationsTab: View {
                         Label("Delete", systemImage: "trash")
                     }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
+                    if runs.envs.count > 1 {
+                        CoreSelect(
+                            nil, selection: Binding(get: { runs.runEnv }, set: { runs.runEnvChoice = $0 }),
+                            options: runs.envs.map {
+                                CoreSelectOption($0, $0, note: $0 == runs.defaultEnv ? "Default" : nil)
+                            }
+                        )
+                        .frame(width: Space.s8 * 4).help("The environment Run starts in")
+                    }
                     Button {
                         Task { await runs.start(c, project: project) }
                     } label: {
@@ -230,8 +260,11 @@ private struct ConfigForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
             HStack(alignment: .top, spacing: Space.s3) {
-                CoreTextField("Name", placeholder: "Dev server", text: $name)
-                CoreTextField("Command", placeholder: "npm run dev", text: $command, mono: true)
+                CoreTextField("Name", placeholder: "Dev server", text: $name, error: ProjectConfigFormRules.name(name))
+                CoreTextField(
+                    "Command", placeholder: "npm run dev", text: $command,
+                    error: ProjectConfigFormRules.command(command),
+                    mono: true)
             }
             HStack(alignment: .top, spacing: Space.s3) {
                 CoreTextField("Working folder", placeholder: "./app", text: $workdir, mono: true)
@@ -241,7 +274,7 @@ private struct ConfigForm: View {
                     options: runnerOptions)
             }
             HStack(alignment: .top, spacing: Space.s3) {
-                CoreTextField("Port", placeholder: "None", text: $port)
+                CoreTextField("Port", placeholder: "None", text: $port, error: ProjectConfigFormRules.port(port))
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Restart if it stops")
                     HStack(spacing: Space.s2) {

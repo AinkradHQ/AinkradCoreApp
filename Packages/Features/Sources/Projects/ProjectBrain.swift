@@ -21,6 +21,18 @@ struct BrainPage: View {
 
     private var room: ProjectLive.Room? { project.live?.room }
 
+    /// Never "nothing in it yet" above records: the line follows what the Core holds.
+    private var emptyLine: String {
+        let n = insights.knowledge?.count ?? 0
+        let rules = insights.rules?.count ?? 0
+        if n > 0 || rules > 0 {
+            return
+                "The room has no written summary yet. \(ProjectItem.count(n, "thing")) and \(ProjectItem.count(rules, "rule")) are remembered below."
+        }
+        if project.live?.roomID == nil { return "This project has no Brain room linked yet." }
+        return "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
+    }
+
     var body: some View {
         VStack(spacing: Space.s2) {
             HStack(alignment: .top, spacing: Space.s2) {
@@ -30,10 +42,8 @@ struct BrainPage: View {
                 } else {
                     Island("\(project.name) room") {
                         VStack(alignment: .leading, spacing: Space.s3) {
-                            Text(
-                                "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
-                            )
-                            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                            Text(emptyLine)
+                                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                             if let r = insights.rules, !r.isEmpty {
                                 Text("Rules").coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(
                                     GlassInk.secondary)
@@ -46,7 +56,10 @@ struct BrainPage: View {
             if insights.supported { remembered.coreRise(settled, 2) }
         }
         .onAppear { settled = true }
-        .task(id: project.id) { await insights.loadKnowledge() }
+        .task(id: project.id) {
+            await model.refreshLive(project.id)
+            await insights.loadKnowledge()
+        }
         .accessibilityIdentifier("project-page-Brain")
     }
 
@@ -77,8 +90,10 @@ struct BrainPage: View {
             accessory: {
                 Button("Open Room") { model.host.shell.launcher.entry("brain")?.run() }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                Button("Rewrite") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                    .help("Rewriting from here arrives with the project’s room link")
+                Button("Rewrite") { Task { await model.rewriteRoom(project) } }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    .disabled(model.readOnly || project.live?.roomID == nil)
+                    .help("Ask the Brain to write this summary again")
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s4) {
@@ -105,8 +120,9 @@ struct BrainPage: View {
                             StateBadge("Not approved yet", tone: .warn, symbol: "clock")
                         }
                         Spacer(minLength: 0)
-                        Button("Edit…") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                            .help("Editing from here arrives with the project’s room link")
+                        Button("Edit…") { model.openInstructions(project) }
+                            .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
+                            .help("Change the instructions AI sessions read, and approve them")
                     }
                 }
             }

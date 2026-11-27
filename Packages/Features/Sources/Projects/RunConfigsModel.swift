@@ -41,18 +41,24 @@ final class RunConfigsModel {
     private(set) var secretNames: [String] = []
     private(set) var history: [RunRecord] = []
     private(set) var runnerOptions: [RunnerOption] = []
-    /// The newest log lines of each live run, by run id (the last 300 each).
-    private(set) var logLines: [String: [ProjectLive.LogLine]] = [:]
-    private var logNext: [String: Int] = [:]
     private(set) var loaded = false
     private(set) var loadError: String?
     private(set) var busy = false
     /// A refusal for the write in flight, in words.
     private(set) var writeError: String?
-    private var pending = RunConfigPatch()
-    private var saveTask: Task<Void, Never>?
-    /// The environment a Run button starts in (Project Settings has the default; the first one until then).
-    var runEnv: String { env.isEmpty ? (envs.first ?? "") : env }
+    /// What each configuration has changed and not saved yet (a second configuration's edit never rides on the first's).
+    private var pending: [Int64: RunConfigPatch] = [:]
+    private var saveTasks: [Int64: Task<Void, Never>] = [:]
+    /// The project's default environment (Project Settings), when it names one that exists.
+    private(set) var defaultEnv: String?
+    /// The environment the person picked next to Run, until the page closes.
+    var runEnvChoice: String?
+    /// The environment a Run button starts in: the one picked next to it, else the project's default, else the first.
+    var runEnv: String {
+        if let c = runEnvChoice, envs.contains(c) { return c }
+        if let d = defaultEnv, envs.contains(d) { return d }
+        return envs.first ?? ""
+    }
 
     init(model: ProjectsModel, projectID: Int64) {
         self.model = model
@@ -89,7 +95,8 @@ final class RunConfigsModel {
             secretNames = ((try? await model.runService?.secrets(project: projectID)) ?? []).map(\.name).sorted()
             if selected == nil || !configs.contains(where: { $0.id == selected }) { selected = configs.first?.id }
             if envConfig == nil || !configs.contains(where: { $0.id == envConfig }) { envConfig = configs.first?.id }
-            if env.isEmpty || !envs.contains(env) { env = envs.first ?? "" }
+            defaultEnv = (try? await model.insightsService?.tuning(project: projectID))?.defaultEnvironment
+            if env.isEmpty || !envs.contains(env) { env = runEnv }
             if compareWith.isEmpty || !envs.contains(compareWith) || compareWith == env { compareWith = other }
             history = try await service.history(project: projectID)
             runnerOptions = (try? await service.runners()) ?? []
@@ -117,18 +124,34 @@ final class RunConfigsModel {
         }
     }
 
-    /// While the Live runs or History tab is open: the runs and the live run's log, every few seconds.
+    /// The runs again. The Core says when one changes (`project.run_*`, through `ProjectsModel.runTick`), so this runs then; the
+    /// slow loop below is only the safety net for a missed event.
+    func refreshHistory() async {
+        if let service, let h = try? await service.history(project: projectID) { history = h }
+    }
+
+    /// While the Live runs or History tab is open: the runs every half minute, and at once when the Core says one changed.
     func watchLive() async {
         while !Task.isCancelled {
-            if let service, let h = try? await service.history(project: projectID) { history = h }
-            for r in liveRuns {
-                guard let page = try? await service?.logs(project: projectID, run: r.id, after: logNext[r.id] ?? 0)
-                else { continue }
-                logNext[r.id] = page.next
-                logLines[r.id] = Array(((logLines[r.id] ?? []) + page.lines).suffix(300))
-            }
-            try? await Task.sleep(for: .seconds(3))
+            await refreshHistory()
+            try? await Task.sleep(for: .seconds(30))
         }
+    }
+
+    /// The project's run crashed until the Core stopped restarting it.
+    var crashLoop: Bool { CrashLoop.detect(history, now: model.now()) }
+
+    /// The runner's name for a run's runner id.
+    func runnerName(_ id: String) -> String {
+        runnerOptions.first { $0.id == id }?.name ?? model.runnerNames[id] ?? id
+    }
+
+    /// The Core's log of a run, read live (the stream while the device has sockets to spare, else every 3 s).
+    func logs(of run: RunRecord, stream: Bool) -> RunLogsModel? {
+        guard let source = model.logSources(projectID, run.id) else { return nil }
+        let m = RunLogsModel(source: source)
+        m.useStream = stream
+        return m
     }
 
     // MARK: configurations
@@ -169,47 +192,49 @@ final class RunConfigsModel {
         }
     }
 
-    /// Applies a field change at once on screen and saves it 0.8 s after the last one.
+    /// Applies a field change at once on screen and saves it 0.8 s after the last one of that configuration.
     func edit(_ c: RunConfigItem, _ change: RunConfigPatch) {
         guard let i = configs.firstIndex(where: { $0.id == c.id }) else { return }
+        var p = pending[c.id] ?? RunConfigPatch()
         if let v = change.name {
             configs[i].name = v
-            pending.name = v
+            p.name = v
         }
         if let v = change.command {
             configs[i].command = v
-            pending.command = v
+            p.command = v
         }
         if let v = change.workdir {
             configs[i].workdir = v
-            pending.workdir = v
+            p.workdir = v
         }
         if let v = change.runner {
             configs[i].runner = v
-            pending.runner = v
+            p.runner = v
         }
         if let v = change.port {
             configs[i].port = v == 0 ? nil : v
-            pending.port = v
+            p.port = v
         }
         if let v = change.restart {
             configs[i].restart = v
-            pending.restart = v
+            p.restart = v
         }
-        saveTask?.cancel()
+        pending[c.id] = p
+        saveTasks[c.id]?.cancel()
         let id = c.id
-        saveTask = Task { [weak self] in
+        saveTasks[id] = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(800))
             guard !Task.isCancelled else { return }
             await self?.flush(id)
         }
     }
 
-    /// Saves what `edit` held back; on a refusal the page reads the Core's version again and says why.
+    /// Saves what `edit` held back for one configuration; on a refusal the page reads the Core's version again and says why.
     func flush(_ id: Int64) async {
         guard let service, model.mayWrite() else { return }
-        let patch = pending
-        pending = RunConfigPatch()
+        let patch = pending[id] ?? RunConfigPatch()
+        pending[id] = nil
         guard !patch.json.isEmpty else { return }
         do {
             _ = try await service.updateConfig(project: projectID, id: id, patch)
@@ -368,7 +393,13 @@ final class RunConfigsModel {
             return
         }
         guard let service, let c = envConfigItem, v.secret == nil else { return }
-        revealed[v.key] = try? await service.reveal(project: projectID, config: c.id, env: env, key: v.key)
+        do {
+            revealed[v.key] = try await service.reveal(project: projectID, config: c.id, env: env, key: v.key)
+        } catch {
+            let why = words(error)
+            writeError = "Could not show \(v.key): \(why)"
+            model.host.shell.showToast(writeError ?? "", kind: .warn)
+        }
     }
 
     func importEnv(_ text: String) async -> Bool {

@@ -9,6 +9,7 @@ struct EnvironmentTab: View {
     let runs: RunConfigsModel
     @State private var newKey = ""
     @State private var newValue = ""
+    @State private var removing = false
 
     var body: some View {
         VStack(spacing: Space.s2) {
@@ -16,6 +17,14 @@ struct EnvironmentTab: View {
             if runs.comparing { compare } else { variables }
         }
         .frame(maxHeight: .infinity, alignment: .top)
+        .coreConfirm(
+            "Remove the \(runs.env) environment?", isPresented: $removing,
+            message: "Its variables go with it. A run that is going keeps going.", confirmTitle: "Remove",
+            destructive: true
+        ) {
+            let name = runs.env
+            Task { await runs.removeEnvironment(name) }
+        }
     }
 
     private var controls: some View {
@@ -29,6 +38,19 @@ struct EnvironmentTab: View {
                 Label("Environment", systemImage: "plus")
             }
             .buttonStyle(CoreButtonStyle(.plain, size: .small)).disabled(runs.model.readOnly || runs.busy)
+            Button {
+                removing = true
+            } label: {
+                Label("Remove", systemImage: "minus")
+            }
+            .buttonStyle(CoreButtonStyle(.plain, size: .small))
+            .disabled(runs.model.readOnly || runs.busy || runs.envs.count < 2)
+            .help(
+                runs.envs.count < 2
+                    ? "A project keeps at least one environment"
+                    : runs.env == runs.defaultEnv
+                        ? "\(runs.env) is the project's default; pick another default in Project Settings first"
+                        : "Remove the \(runs.env) environment")
             Spacer(minLength: 0)
             if runs.configs.count > 1 {
                 CoreSelect(

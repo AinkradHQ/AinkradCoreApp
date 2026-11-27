@@ -87,13 +87,19 @@ struct ProjectRunState: Equatable, Sendable {
     var error: String?
     /// `user`, `idle`, `crash`, `runner_lost`, `replaced` or `start_failed`.
     var stopReason: String?
+    /// The runner's id it is placed on, and when anything last visited it.
+    var runner: String?
+    var lastActivityAt: Date?
 }
 
 /// A drafted run (P4): shown in the "ready to start" state.
 struct RunDraft: Equatable, Sendable {
     let source: String
     let services: [String]
+    /// The secrets the setup asks for that the Core does not hold yet.
     let secrets: [String]
+    /// Written or saved by a person, not drafted from a repo file.
+    var manual = false
 }
 
 struct ProjectItem: Identifiable, Equatable, Sendable {
@@ -121,6 +127,47 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var createdAt: Date?
     /// Set aside with Archive: it keeps its repos, secrets and notes but does not run.
     var archived = false
+    /// The project never stops for being idle (`idle_never`).
+    var idleNever = false
+    /// The Core has been asked whether the project has a run setup (its spec); `draft` is that setup when it has one.
+    var setupChecked = false
+    /// The Core could not be reached just now: the run state shown is how it last looked.
+    var stale = false
+
+    /// Where a project with no run yet stands, from what the Core says.
+    enum Setup: Equatable {
+        case noRepos, copying
+        case copyFailed(String)
+        /// The Core has not been asked yet whether there is a spec.
+        case checking
+        /// Copies are ready, there is no spec: it has to be drafted or written.
+        case needsSetup
+        case ready(RunDraft)
+        /// It has run before, so it has a setup.
+        case ran
+    }
+
+    var setup: Setup {
+        if repos.isEmpty { return .noRepos }
+        if run != nil { return .ran }
+        if let e = repos.compactMap({ $0.fetchError }).first { return .copyFailed(e) }
+        if repos.contains(where: { $0.fetchedAt == nil }) { return .copying }
+        if let draft { return .ready(draft) }
+        return setupChecked ? .needsSetup : .checking
+    }
+
+    /// Why Start cannot be pressed for the project's own reasons (not the connection's); nil when it can.
+    var startBlock: String? {
+        switch setup {
+        case .noRepos: "Add a repo first. The Core runs what is in it."
+        case .copying, .checking: "Start is ready once the repos are copied and the setup is read."
+        case .copyFailed: "A repo could not be copied. Fix that first."
+        case .needsSetup: "This project has no setup yet. Draft one from the repo in Runs, Setup and secrets."
+        case .ready(let d) where !d.secrets.isEmpty:
+            "Set the secrets the setup needs first: \(d.secrets.joined(separator: ", "))."
+        case .ready, .ran: nil
+        }
+    }
 
     var link: String { ProjectRules.host(slug) }
 
@@ -144,6 +191,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The state as the design system's badge says it.
     var badge: (label: String, tone: Tone, symbol: String) {
         if archived { return ("Archived", .queue, "archivebox") }
+        if stale, tag == .running || tag == .starting { return ("Status unknown", .queue, "questionmark.circle") }
         return switch tag {
         case .running: ("Running", Tone.run, "play.circle")
         case .starting: ("Starting", Tone.warn, "gearshape")
@@ -169,6 +217,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     /// The line under the name: "Running · 5 services · 2 AI sessions".
     var subtitle: String {
         if archived { return "Archived · \(Self.count(repos.count, "repo"))" }
+        if stale, tag == .running || tag == .starting { return "Last seen running · the Core is not answering" }
         if let run {
             switch run.state {
             case .running:
@@ -187,7 +236,10 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
             return copyFailed
                 ? "Couldn’t copy \(Self.count(repos.filter { $0.fetchedAt == nil }.count, "repo"))"
                 : "Setting up · \(Self.count(repos.count, "repo"))"
-        default: return "Stopped · \(Self.count(repos.count, "repo"))"
+        default:
+            if draft != nil { return "Ready to start · \(Self.count(repos.count, "repo"))" }
+            if setupChecked { return "No setup yet · \(Self.count(repos.count, "repo"))" }
+            return "Stopped · \(Self.count(repos.count, "repo"))"
         }
     }
 
@@ -212,6 +264,17 @@ enum ProjectRules {
     static let idleMinutes = 30
     /// What the Core gives a new project (its table defaults), shown as "Runs on".
     static let defaultLimits = "2 CPUs, 2 GB"
+    /// "2 CPUs, 2 GB": what a project's run really gets.
+    static func limits(cpu: Double, memMb: Int64) -> String {
+        let c = cpu == cpu.rounded() ? String(Int(cpu)) : String(format: "%.1f", cpu)
+        let g = Double(memMb) / 1024
+        let mem = g >= 1 ? (g == g.rounded() ? "\(Int(g)) GB" : String(format: "%.1f GB", g)) : "\(memMb) MB"
+        return "\(c) CPU\(cpu == 1 ? "" : "s"), \(mem)"
+    }
+    /// "after 30 min with no visits", or that it never stops.
+    static func idleWords(minutes: Int, never: Bool) -> String {
+        never ? "never" : "after \(minutes) min with no visits"
+    }
     static func host(_ slug: String) -> String { "\(slug).\(domain)" }
 
     /// "Tidepool Labs" -> "tidepool-labs": lowercase letters and digits, one dash between words, at most 40. Other scripts are

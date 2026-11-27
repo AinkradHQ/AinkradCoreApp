@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import Shell
 import SwiftUI
@@ -6,12 +7,65 @@ import SwiftUI
 @MainActor
 enum RunDialogs {
     /// Set… (a new name or a name the spec asks for) and Replace… (`name` given, so it cannot be renamed).
-    static func openSecret(_ run: RunPageModel, project: ProjectItem, name: String?, replacing: Bool) {
+    static func openSecret(
+        _ run: RunPageModel, project: ProjectItem, name: String?, replacing: Bool, kind: String = "text"
+    ) {
         run.clearWriteError()
         let shell = run.model.host.shell
         shell.present(
             ShellDialog(id: "project-secret", onClose: { [weak run] in run?.clearWriteError() }) {
-                SecretSheet(run: run, project: project, name: name, replacing: replacing) { shell.closeDialog() }
+                SecretSheet(run: run, project: project, name: name, replacing: replacing, kind: kind) {
+                    shell.closeDialog()
+                }
+            })
+    }
+
+    /// The setup's saved versions, each with See Changes and Go back to it.
+    static func openHistory(_ run: RunPageModel, project: ProjectItem) {
+        run.clearWriteError()
+        let shell = run.model.host.shell
+        shell.present(
+            ShellDialog(id: "project-history", onClose: { [weak run] in run?.clearWriteError() }) {
+                SetupHistorySheet(run: run, project: project) { shell.closeDialog() }
+            })
+    }
+
+    static func openChanges(_ spec: SpecVersionItem, previous: SpecVersionItem?, model: ProjectsModel) {
+        let shell = model.host.shell
+        shell.present(
+            ShellDialog(id: "project-changes") { ChangesSheet(spec: spec, previous: previous) { shell.closeDialog() } })
+    }
+
+    /// Delete…: asks once; when the setup still uses the secret the Core says so and a second ask offers to delete anyway.
+    static func confirmDelete(_ run: RunPageModel, project: ProjectItem, name: String) {
+        let shell = run.model.host.shell
+        shell.present(
+            ShellDialog(id: "project-secret-delete") {
+                CoreConfirmDialog(
+                    "Delete \(name)?",
+                    message: "It is removed from the Core for good. A setup that asks for it will not start.",
+                    confirmTitle: "Delete", destructive: true,
+                    onConfirm: {
+                        shell.closeDialog()
+                        Task {
+                            let r = await run.deleteSecret(name, force: false, projectName: project.name)
+                            if case .usedBy(let why) = r { forceDelete(run, project: project, name: name, why: why) }
+                        }
+                    }, onCancel: { shell.closeDialog() })
+            })
+    }
+
+    private static func forceDelete(_ run: RunPageModel, project: ProjectItem, name: String, why: String) {
+        let shell = run.model.host.shell
+        shell.present(
+            ShellDialog(id: "project-secret-force") {
+                CoreConfirmDialog(
+                    "\(name) is still used", message: "\(why) Delete it anyway?", confirmTitle: "Delete Anyway",
+                    destructive: true,
+                    onConfirm: {
+                        shell.closeDialog()
+                        Task { _ = await run.deleteSecret(name, force: true, projectName: project.name) }
+                    }, onCancel: { shell.closeDialog() })
             })
     }
 
@@ -26,11 +80,7 @@ enum RunDialogs {
 
     static func openChanges(_ run: RunPageModel) {
         guard let spec = run.spec else { return }
-        let shell = run.model.host.shell
-        shell.present(
-            ShellDialog(id: "project-changes") {
-                ChangesSheet(spec: spec, previous: run.previous) { shell.closeDialog() }
-            })
+        openChanges(spec, previous: run.previous, model: run.model)
     }
 }
 
@@ -45,19 +95,41 @@ struct SecretSheet: View {
     let close: () -> Void
     @State private var name: String
     @State private var value = ""
+    @State private var kind: String
+    @State private var note = ""
+    @State private var fileName: String?
+    @State private var fileProblem: String?
     @Environment(\.corePalette) private var palette
 
-    init(run: RunPageModel, project: ProjectItem, name: String?, replacing: Bool, close: @escaping () -> Void) {
+    /// What a secret can be stored as, in the Core's words.
+    static let kinds = [
+        CoreSelectOption("text", "Text", note: "One value, such as a key or a password"),
+        CoreSelectOption("multiline", "Several lines", note: "A certificate or a private key"),
+        CoreSelectOption("file", "A file", note: "Given to the run as a file"),
+        CoreSelectOption("env_bundle", "Environment bundle", note: "NAME=value lines, all given to the run"),
+    ]
+
+    /// The largest file the Core takes, decoded.
+    static let fileLimit = 1_048_576
+
+    init(
+        run: RunPageModel, project: ProjectItem, name: String?, replacing: Bool, kind: String = "text",
+        close: @escaping () -> Void
+    ) {
         self.run = run
         self.project = project
         self.replacing = replacing
         nameFixed = name != nil
         self.close = close
         _name = State(initialValue: name ?? "")
+        _kind = State(initialValue: kind)
     }
 
     private var nameProblem: String? { name.isEmpty || nameFixed ? nil : SecretRules.nameProblem(name) }
-    private var ready: Bool { SecretRules.nameProblem(name) == nil && !value.isEmpty }
+    private var ready: Bool {
+        SecretRules.nameProblem(name) == nil && !value.isEmpty && fileProblem == nil
+            && (kind != "file" || fileName != nil)
+    }
 
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 14) {
@@ -75,9 +147,9 @@ struct SecretSheet: View {
                         "Name", placeholder: "stripe_secret", text: $name, error: nameProblem, mono: true,
                         autofocus: true)
                 }
-                CoreSecureField(
-                    "Value", placeholder: replacing ? "New value" : "Value", text: $value,
-                    error: run.writeError, autofocus: nameFixed, onSubmit: save)
+                CoreSelect("Kind", selection: $kind, options: Self.kinds)
+                valueField
+                CoreTextField("Note (optional)", placeholder: "What it is for", text: $note)
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),
                     primary: CoreAction(replacing ? "Replace" : "Set", key: .primary, run: save), busy: run.busy,
@@ -85,14 +157,62 @@ struct SecretSheet: View {
             }
         }
         .onChange(of: value) { _, _ in run.clearWriteError() }
+        .onChange(of: kind) { _, _ in
+            value = ""
+            fileName = nil
+            fileProblem = nil
+        }
         .accessibilityIdentifier("project-secret")
+    }
+
+    @ViewBuilder private var valueField: some View {
+        switch kind {
+        case "multiline", "env_bundle":
+            CoreTextArea(
+                "Value", placeholder: kind == "env_bundle" ? "NAME=value" : "Paste it here", text: $value,
+                error: run.writeError, minHeight: Space.s8 * 4, maxHeight: Space.s8 * 8, autofocus: nameFixed,
+                design: .monospaced)
+        case "file":
+            VStack(alignment: .leading, spacing: Space.s1) {
+                CoreFieldLabel("File")
+                HStack(spacing: Space.s2) {
+                    Button(fileName == nil ? "Choose File…" : "Choose Another…") { chooseFile() }
+                        .buttonStyle(CoreButtonStyle(.secondary))
+                    if let fileName { Text(fileName).font(.system(size: MacTextSize.body, design: .monospaced)) }
+                }
+                if let e = fileProblem ?? run.writeError { CoreFieldError(e) }
+            }
+        default:
+            CoreSecureField(
+                "Value", placeholder: replacing ? "New value" : "Value", text: $value, error: run.writeError,
+                autofocus: nameFixed, onSubmit: save)
+        }
+    }
+
+    private func chooseFile() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let data = try? Data(contentsOf: url) else {
+            fileProblem = "That file could not be read."
+            return
+        }
+        if data.count > Self.fileLimit {
+            fileProblem = "That file is over 1 MB, which is the most a secret can hold."
+            return
+        }
+        fileProblem = nil
+        fileName = url.lastPathComponent
+        value = data.base64EncodedString()
     }
 
     private func save() {
         guard ready, !run.busy else { return }
-        let (n, v) = (name, value)
+        let n = name
+        let input = SecretInput(value: value, kind: kind, description: note, fileName: kind == "file" ? fileName : nil)
         Task {
-            if await run.setSecret(name: n, value: v, replacing: replacing, projectName: project.name) { close() }
+            if await run.setSecret(name: n, input: input, replacing: replacing, projectName: project.name) { close() }
         }
     }
 }
@@ -145,6 +265,11 @@ struct SetupSheet: View {
                     minHeight: Space.s8 * 8, maxHeight: Space.s8 * 14, autofocus: true, design: .monospaced)
                 HStack(alignment: .bottom, spacing: Space.s3) {
                     CoreSelect("Image for a Makefile or script", selection: $image, options: Self.images)
+                    Button("History…") { RunDialogs.openHistory(run, project: project) }
+                        .buttonStyle(CoreButtonStyle(.plain))
+                        .disabled(run.versions.count < 2)
+                        .help(
+                            run.versions.count < 2 ? "There is one version so far" : "Every saved version of the setup")
                     Button("Draft from Repo") {
                         let i = image
                         Task { if await run.draftFromRepo(image: i, projectName: project.name) { close() } }
@@ -186,6 +311,22 @@ struct ChangesSheet: View {
 
     private var lines: [SpecDiff.Line] { SpecDiff.lines(from: previous?.json, to: spec.json) }
 
+    private func sign(_ k: SpecDiff.Kind) -> String {
+        switch k {
+        case .added: "+"
+        case .removed: "−"
+        case .context, .gap: " "
+        }
+    }
+
+    private func ink(_ k: SpecDiff.Kind) -> Color {
+        switch k {
+        case .added: palette.tone(.done).ink
+        case .removed: palette.tone(.fail).ink
+        case .context, .gap: palette.text2
+        }
+    }
+
     var body: some View {
         CoreDialogPanel("", width: Space.s8 * 20) {
             VStack(alignment: .leading, spacing: Space.s4) {
@@ -196,10 +337,10 @@ struct ChangesSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
-                            // The sign carries the meaning; the colour only backs it.
-                            Text("\(l.added ? "+" : "−") \(l.text)")
+                            // The sign carries the meaning; the colour only backs it. Unchanged lines give the context.
+                            Text("\(sign(l.kind)) \(l.text)")
                                 .font(.system(size: MacTextSize.body, design: .monospaced))
-                                .foregroundStyle(palette.tone(l.added ? .done : .fail).ink)
+                                .foregroundStyle(ink(l.kind))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if lines.isEmpty { Text("Nothing changed.").foregroundStyle(palette.text2) }
@@ -212,5 +353,68 @@ struct ChangesSheet: View {
             }
         }
         .accessibilityIdentifier("project-changes")
+    }
+}
+
+/// Every saved version of the setup, newest first. See Changes compares one with the one before it; Go Back saves an older one
+/// again as the newest (nothing is lost or rewritten).
+struct SetupHistorySheet: View {
+    let run: RunPageModel
+    let project: ProjectItem
+    let close: () -> Void
+
+    var body: some View {
+        CoreDialogPanel("", width: Space.s8 * 18) {
+            VStack(alignment: .leading, spacing: Space.s4) {
+                DialogHead(
+                    title: "Setup History",
+                    line: "Each save is a new version. Going back saves the older one again, so nothing is lost.")
+                ScrollView {
+                    VStack(spacing: Space.s1) {
+                        ForEach(run.versions) { v in
+                            CoreRow(
+                                "Version \(v.version)\(v.version == run.versions.first?.version ? " · current" : "")",
+                                subtitle: [
+                                    Self.origin(v.origin), v.createdAt.map { runsAgo($0, now: run.model.now()) },
+                                ]
+                                .compactMap { $0 }.joined(separator: " · "),
+                                symbol: "clock.arrow.circlepath"
+                            ) {
+                                Button("See Changes") {
+                                    Task {
+                                        if let (cur, before) = await run.changes(of: v) {
+                                            RunDialogs.openChanges(cur, previous: before, model: run.model)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                                if v.version != run.versions.first?.version {
+                                    Button("Go Back") {
+                                        Task { if await run.rollBack(to: v, projectName: project.name) { close() } }
+                                    }
+                                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                                    .disabled(run.busy || run.model.readOnly)
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(height: Space.s8 * 9)
+                if let e = run.writeError { CoreFieldError(e) }
+                CoreDialogFooter(cancel: CoreAction("Close", key: .cancel, run: close), primary: nil)
+            }
+        }
+        .accessibilityIdentifier("project-history")
+    }
+
+    static func origin(_ o: String) -> String {
+        switch o {
+        case "manual": "Written by hand"
+        case "compose": "Drafted from docker-compose.yml"
+        case "package_json": "Drafted from package.json"
+        case "makefile": "Drafted from the Makefile"
+        case "run_sh": "Drafted from run.sh"
+        default: o
+        }
     }
 }

@@ -76,16 +76,22 @@ private struct TopBar: View {
             .disabled(model.readOnly).accessibilityLabel("Public link")
             .help("While this project runs, anyone with \(project.link) can open it")
             runButtons
-            CoreIconButton(symbol: "terminal", label: "A project terminal arrives with the run engine") {}
-                .disabled(true)
-            Soon(prominent: true, help: "AI sessions in a project arrive with the next update") {
+            // No terminal button: a project's clone lives inside an AI session's folder, and Terminals has no project folder
+            // of the Core's to open yet (proposal in the lane report).
+            Button {
+                model.newSession(in: project)
+            } label: {
                 Label("New AI Session", systemImage: "plus")
             }
+            .buttonStyle(CoreButtonStyle(.prominent)).disabled(!model.canStartSession(project))
+            .help(model.sessionBlock(project)).accessibilityIdentifier("project-new-session")
         }
         .frame(maxWidth: .infinity)
         .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
     }
+
+    static let cannot = "Not available while this device cannot change projects or the Core is unreachable"
 
     /// Restart and Stop while it runs, Stop while it starts, Start otherwise. Each asks the Core's run routes behind Touch ID.
     @ViewBuilder private var runButtons: some View {
@@ -106,18 +112,20 @@ private struct TopBar: View {
             case .starting:
                 run("Stop", "stop", .stop, enabled: can)
             case .stopped, .failed:
-                run("Start", "play", .start, enabled: can)
+                run(
+                    "Start", "play", .start, enabled: can && project.startBlock == nil,
+                    why: project.startBlock ?? Self.cannot)
             case .settingUp, .new:
                 run(
                     "Start", "play", .start, enabled: false,
-                    why: "Start is ready once the repos are copied and the run is drafted")
+                    why: project.startBlock ?? "Start is ready once the repos are copied and the setup is read")
             }
         }
     }
 
     private func run(
         _ title: String, _ symbol: String, _ action: RunAction, enabled: Bool,
-        why: String = "Not available while this device cannot change projects or the Core is unreachable"
+        why: String = TopBar.cannot
     ) -> some View {
         Button {
             model.control(action, project)

@@ -57,7 +57,7 @@ struct RunWireTests {
         let logs = try RunWire.logs(
             Data(#"{"run":"r_1","lines":[{"seq":4,"service":"web","at":"x","text":"up"}],"next":5,"lost":0}"#.utf8),
             after: 0)
-        #expect(logs.next == 5 && logs.lines == [ProjectLive.LogLine(service: "web", text: "up")])
+        #expect(logs.next == 5 && logs.lines.map(\.text) == ["up"] && logs.lines[0].seq == 4 && logs.lost == 0)
     }
 
     @Test func secretNamesFollowTheCoresRule() {
@@ -83,7 +83,9 @@ struct RunWireTests {
         let a = "{\n  \"a\": 1,\n  \"b\": 2\n}"
         let b = "{\n  \"a\": 1,\n  \"b\": 3\n}"
         let d = SpecDiff.lines(from: a, to: b)
-        #expect(Set(d) == [.init(added: false, text: "  \"b\": 2"), .init(added: true, text: "  \"b\": 3")])
+        #expect(
+            Set(d.filter { $0.kind == .added || $0.kind == .removed })
+                == [.init(added: false, text: "  \"b\": 2"), .init(added: true, text: "  \"b\": 3")])
         #expect(SpecDiff.lines(from: a, to: a).isEmpty)
         // The first version: everything is new.
         #expect(SpecDiff.lines(from: nil, to: "x\ny").allSatisfy { $0.added })

@@ -16,18 +16,16 @@ final class RunPageModel {
     private(set) var previous: SpecVersionItem?
     private(set) var secrets: [SecretItem] = []
     private(set) var status: RunStatus?
-    /// What the live run reports of each service, and its newest log lines (the last 500).
+    /// What the live run reports of each service.
     private(set) var services: [ProjectLive.Service] = []
-    private(set) var logLines: [ProjectLive.LogLine] = []
-    private var logNext = 0
+    /// Every saved version of the setup, newest first.
+    private(set) var versions: [SpecVersionSummary] = []
     private(set) var loaded = false
     /// Why the first read failed, in words.
     private(set) var loadError: String?
     private(set) var busy = false
     /// A refusal for the write in flight, shown in its sheet.
     private(set) var writeError: String?
-    /// The log filter: a service name, nil for all.
-    var logService: String?
 
     init(model: ProjectsModel, projectID: Int64) {
         self.model = model
@@ -67,11 +65,14 @@ final class RunPageModel {
             status = try await service.run(project: projectID)
             await observe(service)
             previous = try await earlier(service)
+            versions = (try? await service.specVersions(project: projectID)) ?? versions
             loadError = nil
         } catch {
             if !loaded { loadError = words(error) }
         }
         loaded = true
+        // The gallery, the Overview and Start read the same setup: tell them it may have changed.
+        await model.refreshSetup(projectID)
     }
 
     private func earlier(_ service: any ProjectRunService) async throws -> SpecVersionItem? {
@@ -79,30 +80,36 @@ final class RunPageModel {
         return try await service.specVersion(project: projectID, v - 1)
     }
 
-    /// Every minute while the page is open: a viewer on the Run page keeps a running project from idling out, then the run, its
-    /// services and its logs are read again. Ends when the view goes away (the task is cancelled).
+    /// While the page is open: a viewer on the Run page keeps a running project from idling out (a touch every minute), and the
+    /// run and its services are read again at once when the Core says they changed (`ProjectsModel.runTick`) and, as a safety
+    /// net, every minute. The log is its own live stream (`RunLogsModel`). Ends when the view goes away.
     func watch() async {
         await load()
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(60))
             guard !Task.isCancelled, let service else { continue }
             if status?.state == "running" { try? await service.touch(project: projectID) }
-            if let s = try? await service.run(project: projectID) { status = s }
-            await observe(service)
+            await refreshRun()
         }
     }
 
-    /// Services and log lines of the live run; both empty once it is over.
+    /// The run and its services, once.
+    func refreshRun() async {
+        guard let service else { return }
+        if let s = try? await service.run(project: projectID) { status = s }
+        await observe(service)
+    }
+
+    /// The log of the live run on this page.
+    func makeLogs() -> RunLogsModel? { model.logSources(projectID, nil).map { RunLogsModel(source: $0) } }
+
+    /// Services of the live run; empty once it is over.
     private func observe(_ service: any ProjectRunService) async {
         guard status?.state == "running" || status?.state == "starting" else {
             services = []
             return
         }
         if let s = try? await service.services(project: projectID) { services = s }
-        if let page = try? await service.logs(project: projectID, after: logNext) {
-            logNext = page.next
-            logLines = Array((logLines + page.lines).suffix(500))
-        }
     }
 
     // MARK: writes
@@ -138,14 +145,65 @@ final class RunPageModel {
         }
     }
 
+    /// A text secret, the common case.
     @discardableResult
     func setSecret(name: String, value: String, replacing: Bool, projectName: String) async -> Bool {
+        await setSecret(name: name, input: SecretInput(value: value), replacing: replacing, projectName: projectName)
+    }
+
+    @discardableResult
+    func setSecret(name: String, input: SecretInput, replacing: Bool, projectName: String) async -> Bool {
         await write("\(replacing ? "Replace" : "Set") the secret \(name) of \(projectName).") { service in
-            try await service.setSecret(project: self.projectID, name: name, value: value)
+            try await service.setSecret(project: self.projectID, name: name, input)
         } then: {
             await self.load()
             self.model.host.shell.showToast(replacing ? "\(name) replaced" : "\(name) set")
         }
+    }
+
+    /// Deletes a secret. The Core refuses while a setup version still uses it; that comes back as `usedBy` so the page can ask
+    /// once more, then delete anyway (`force`).
+    enum Deleted: Equatable {
+        case done
+        case usedBy(String)
+        case failed
+    }
+
+    func deleteSecret(_ name: String, force: Bool, projectName: String) async -> Deleted {
+        var out = Deleted.failed
+        let ok = await write("Delete the secret \(name) of \(projectName).") { service in
+            do {
+                try await service.deleteSecret(project: self.projectID, name: name, force: force)
+                out = .done
+            } catch let f as RunFailure where f.code == "conflict" && !force {
+                out = .usedBy(f.sentence)
+                throw f
+            }
+        } then: {
+            await self.load()
+            self.model.host.shell.showToast("\(name) deleted")
+        }
+        if case .usedBy = out { writeError = nil }
+        return ok ? .done : out
+    }
+
+    /// Goes back to an older version: its setup is saved again as the newest (nothing is lost, nothing is rewritten).
+    @discardableResult
+    func rollBack(to v: SpecVersionSummary, projectName: String) async -> Bool {
+        guard let service, let old = try? await service.specVersion(project: projectID, v.version) else {
+            writeError = "That version could not be read."
+            return false
+        }
+        return await saveSpec(
+            old.json, reason: "Go back to version \(v.version) of the setup of \(projectName).",
+            done: "Back to version \(v.version)")
+    }
+
+    /// One version against the one before it, for See Changes in the history.
+    func changes(of v: SpecVersionSummary) async -> (SpecVersionItem, SpecVersionItem?)? {
+        guard let service, let cur = try? await service.specVersion(project: projectID, v.version) else { return nil }
+        let before = v.version > 1 ? try? await service.specVersion(project: projectID, v.version - 1) : nil
+        return (cur, before)
     }
 
     func clearWriteError() { writeError = nil }
