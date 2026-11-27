@@ -9,6 +9,15 @@ import Testing
 // Core's real JSON shapes (api/openapi.json of feat/projects-core).
 
 struct PreviewProxyTests {
+    @Test func onlyTheCoresSandboxIsDroppedFromThePolicy() {
+        let core = PreviewProxy.coreSandbox
+        #expect(PreviewProxy.withoutCoreSandbox(core) == nil)
+        #expect(PreviewProxy.withoutCoreSandbox("default-src 'self', \(core)") == "default-src 'self'")
+        #expect(PreviewProxy.withoutCoreSandbox("\(core), img-src *") == "img-src *")
+        #expect(PreviewProxy.withoutCoreSandbox("sandbox allow-scripts") == "sandbox allow-scripts")
+        #expect(PreviewProxy.withoutCoreSandbox(nil) == nil)
+    }
+
     @Test func theTargetIsTheProjectsPreviewPathSignedAsSent() throws {
         func t(_ s: String) -> String? { PreviewProxy.target(project: 7, for: URL(string: s)!) }
         #expect(t("ainkrad-preview://project/") == "/api/v1/projects/7/preview/")
