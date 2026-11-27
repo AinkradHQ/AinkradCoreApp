@@ -44,6 +44,33 @@ public final class ProjectsDemo {
             }
         }
         func archive(project: Int64) async throws { lock.withLock { list.removeAll { $0.id == project } } }
+        func project(id: Int64) async throws -> ProjectItem? { lock.withLock { list.first { $0.id == id } } }
+        func update(project: Int64, patch p: ProjectPatch) async throws {
+            lock.withLock {
+                guard let i = list.firstIndex(where: { $0.id == project }) else { return }
+                if let v = p.runner { list[i].runner = v }
+                if let v = p.cpuLimit { list[i].cpuLimit = v }
+                if let v = p.memLimitMb { list[i].memLimitMb = v }
+                if let v = p.idleMinutes { list[i].idleMinutes = Int(v) }
+                if let v = p.idleNever { list[i].idleNever = v }
+                if let v = p.slug { list[i] = ProjectItem.renamed(list[i], slug: v) }
+            }
+        }
+        func archivedProjects() async throws -> [ProjectItem] {
+            [
+                ProjectItem(
+                    id: 90, slug: "old-quill", name: "Old Quill", description: "", expose: false,
+                    repos: [DemoRepo.make(900, "old-quill-web", "old-quill-co")],
+                    updatedAt: Date().addingTimeInterval(-86_400 * 40), archived: true)
+            ]
+        }
+        func unarchive(project: Int64) async throws {}
+        func runners() async throws -> [RunnerInfo] {
+            [
+                RunnerInfo(id: "d_mac", name: "Studio Mac", os: "macos", online: true),
+                RunnerInfo(id: "d_srv", name: "home-server", os: "linux", online: false),
+            ]
+        }
         func setRun(_ project: Int64, _ state: RunSummary.State, progress: Double = 0) {
             lock.withLock {
                 guard let i = list.firstIndex(where: { $0.id == project }) else { return }
@@ -61,6 +88,8 @@ public final class ProjectsDemo {
         "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
         "page-settings-stopped", "page-repos", "page-sessions",
         "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
+        "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
+        "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
     ]
 
     private let model: ProjectsModel
@@ -112,6 +141,21 @@ public final class ProjectsDemo {
             fetchError: failing ? "The GitHub connection can no longer read this repo." : nil, head: head)
     }
 
+    /// A project whose first copy failed for every repo, one the Core never started: "Setting up" would never end.
+    private static func copyFailed() -> ProjectItem {
+        var p = tidepool(repos: 2, fetched: false)
+        p.repos = [
+            RepoItem(
+                id: 71, name: "tidepool-api", remoteURL: apiURL, branch: "main", primary: true, fetchedAt: nil,
+                fetchError: "This repo is private and no GitHub connection covers it.", state: "failed",
+                reason: "needs_github"),
+            RepoItem(
+                id: 72, name: "tidepool-web", remoteURL: webURL, branch: "main", primary: false, fetchedAt: nil,
+                fetchError: "The Core could not reach the repo.", state: "failed", reason: "timeout"),
+        ]
+        return p
+    }
+
     private static func tidepool(repos: Int, fetched: Bool = true, draft: Bool = false) -> ProjectItem {
         ProjectItem(
             id: 7, slug: "tidepool", name: "Tidepool", description: "", expose: true,
@@ -149,11 +193,26 @@ public final class ProjectsDemo {
         model.openID = nil
         model.section = .overview
         model.debugHover = nil
+        model.stale = nil
+        model.wizardMissed = []
+        model.wizardIssues = []
+        model.catalog = SampleRepoCatalog()
+        ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
         model.clearWriteError()
         var list = Self.sample()
         switch scene {
         case "gallery-empty": list = []
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
+        case "gallery-copy-failed", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
+        case "gallery-archived": ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, true)
+        case "new-paste-link", "new-paste-link-ssh": model.catalog = NoRepoCatalog()
+        case "settings-runner", "settings-limits":
+            list[0].runner = "this_mac"
+            list[0].cpuLimit = 4
+            list[0].memLimitMb = 8192
+            list[0].idleNever = scene == "settings-limits"
+            list[0].source = "github"
+            list[0].createdAt = Date().addingTimeInterval(-86_400 * 12)
         case "space-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "space-setting-up": list.insert(Self.tidepool(repos: 2), at: 0)
         case "space-ready": list.insert(Self.tidepool(repos: 2, draft: true), at: 0)
@@ -168,10 +227,36 @@ public final class ProjectsDemo {
         }
         await model.useNow(Service(list))
         model.runService = DemoRunService()
+        model.setRunnerSupported(true)
+        await model.loadRunners()
         model.show()
         try? await Task.sleep(for: .milliseconds(400))
         switch scene {
         case "gallery-hover": model.debugHover = 1
+        case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
+        case "new-link-name":
+            NewProjectDialogs.openAdvanced(model, name: "2048 game")
+        case "new-paste-link":
+            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
+        case "new-paste-link-ssh":
+            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
+        case "new-failed-repos":
+            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .review)
+            try? await Task.sleep(for: .milliseconds(300))
+            model.wizardMissed = [
+                MissedRepo(name: "tidepool-docs", why: "This project already has that repo."),
+                MissedRepo(
+                    name: "tidepool-ops", why: "SSH addresses are not supported yet. Use the https address of the repo."
+                ),
+            ]
+            model.wizardIssues = ["The link is tidepool-2.ainkrad.io: tidepool was taken."]
+            model.wizardProjectID = 7
+        case "settings-runner", "settings-limits":
+            model.openID = 1
+            model.section = .settings
+        case "repo-menu":
+            model.openID = 1
+            model.section = .repos
         case "gallery-filtered": model.filter = "n"
         case "gallery-loading": model.setLoad(.loading)
         case "gallery-offline": model.setLoad(.notConnected)
@@ -216,6 +301,26 @@ public final class ProjectsDemo {
             if let p = model.open { NewProjectDialogs.openAddRepos(model, p, picked: [Self.apiURL]) }
         default: break
         }
+    }
+}
+
+enum DemoRepo {
+    static func make(_ id: Int64, _ name: String, _ org: String) -> RepoItem {
+        RepoItem(
+            id: id, name: name, remoteURL: "https://github.com/\(org)/\(name)", branch: "main", primary: true,
+            fetchedAt: Date(), fetchError: nil)
+    }
+}
+
+extension ProjectItem {
+    /// A copy with another link name (the id and the rest stay).
+    static func renamed(_ p: ProjectItem, slug: String) -> ProjectItem {
+        var q = ProjectItem(
+            id: p.id, slug: slug, name: p.name, description: p.description, expose: p.expose, repos: p.repos,
+            updatedAt: p.updatedAt)
+        q.run = p.run
+        q.live = p.live
+        return q
     }
 }
 
@@ -340,5 +445,6 @@ extension ProjectsModel {
         await reload()
     }
     func setLoad(_ l: ProjectsLoad) { load = l }
+    func setRunnerSupported(_ on: Bool) { runnerSupported = on }
 }
 #endif

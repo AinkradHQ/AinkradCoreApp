@@ -13,6 +13,7 @@ struct SettingsPage: View {
     let project: ProjectItem
     @State private var name: String
     @State private var description: String
+    @State private var slug: String
     @State private var settled = false
     @State private var insights: ProjectInsightsModel
 
@@ -22,12 +23,15 @@ struct SettingsPage: View {
         _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
         _name = State(initialValue: project.name)
         _description = State(initialValue: project.description)
+        _slug = State(initialValue: project.slug)
     }
 
     private var changed: Bool {
         name.trimmingCharacters(in: .whitespaces) != project.name || description != project.description
+            || slug != project.slug
     }
     private var nameProblem: String? { ProjectRules.nameProblem(name) }
+    private var slugProblem: String? { slug == project.slug ? nil : ProjectRules.slugProblem(slug) }
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s2) {
@@ -43,7 +47,11 @@ struct SettingsPage: View {
         }
         .onAppear { settled = true }
         .task(id: project.id) { await insights.loadTuning() }
-        .onChange(of: project.name) { _, new in if !changed { name = new } }
+        // Edited elsewhere (another Mac, the Core): a field the person has not touched follows it, so it never looks unsaved.
+        .onChange(of: project.name) { old, new in if name == old { name = new } }
+        .onChange(of: project.description) { old, new in if description == old { description = new } }
+        .onChange(of: project.slug) { old, new in if slug == old { slug = new } }
+        .task { await model.loadRunners() }
         .accessibilityIdentifier("project-page-Project Settings")
     }
 
@@ -56,6 +64,19 @@ struct SettingsPage: View {
                     "Name", placeholder: "Project name", text: $name, error: changed ? nameProblem : nil, onSubmit: save
                 )
                 CoreTextField("Description", placeholder: "What it is, in a line", text: $description, onSubmit: save)
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    CoreTextField(
+                        "Link name", placeholder: "atlas-notes", text: $slug, error: slugProblem, onSubmit: save
+                    )
+                    .disabled(model.readOnly)
+                    Text(
+                        project.tag == .running || project.tag == .starting
+                            ? "Stop the project to change its link name."
+                            : "Public link: \(ProjectRules.host(slug)). It can change while the project is stopped and holds no secrets."
+                    )
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Text(origin).foregroundStyle(GlassInk.secondary)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Colour")
                     CoreSegmented(
@@ -72,12 +93,13 @@ struct SettingsPage: View {
                         Button("Revert") {
                             name = project.name
                             description = project.description
+                            slug = project.slug
                             model.clearWriteError()
                         }
                         .buttonStyle(CoreButtonStyle(.secondary))
                         Button("Save") { save() }
                             .buttonStyle(CoreButtonStyle(.prominent, busy: model.busy))
-                            .disabled(nameProblem != nil || model.busy || model.readOnly)
+                            .disabled(nameProblem != nil || slugProblem != nil || model.busy || model.readOnly)
                             .keyboardShortcut(.defaultAction)
                     }
                 }
@@ -87,8 +109,15 @@ struct SettingsPage: View {
     }
 
     private func save() {
-        guard changed, nameProblem == nil, !model.busy else { return }
-        Task { await model.saveGeneral(project, name: name, description: description) }
+        guard changed, nameProblem == nil, slugProblem == nil, !model.busy else { return }
+        Task { await model.saveGeneral(project, name: name, description: description, slug: slug) }
+    }
+
+    /// "Made by hand · created 12 Nov 2026" or "Made from GitHub · …".
+    private var origin: String {
+        let how = project.source == "github" ? "Made from GitHub" : "Made by hand"
+        guard let at = project.createdAt else { return how }
+        return "\(how) · created \(at.formatted(date: .abbreviated, time: .omitted))"
     }
 
     // MARK: Public link
@@ -103,7 +132,9 @@ struct SettingsPage: View {
                     isOn: Binding(
                         get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
                 )
-                .disabled(model.readOnly).accessibilityLabel("Public link")
+                .disabled(model.readOnly || pending).accessibilityLabel("Public link")
+                .help(
+                    model.readOnly ? "This device can look at projects but not change them." : pending ? "Saving…" : "")
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
@@ -112,11 +143,9 @@ struct SettingsPage: View {
                 HStack(spacing: Space.s2) {
                     Text(project.link).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
                     Spacer(minLength: 0)
-                    CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString("https://\(project.link)", forType: .string)
-                        model.host.shell.showToast("Link copied")
-                    }
+                    CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { model.copyLink(project) }
+                        .disabled(!project.expose || pending)
+                        .help(project.expose ? "Copy the link" : "Turn the public link on to share it")
                 }
                 .padding(.horizontal, Space.s3).padding(.vertical, Space.s2)
                 .coreCard(GlassInk.well, radius: Radius.row)
@@ -124,6 +153,8 @@ struct SettingsPage: View {
             }
         }
     }
+
+    private var pending: Bool { model.exposing.contains(project.id) }
 
     // MARK: Keep copies fresh
 
@@ -153,12 +184,7 @@ struct SettingsPage: View {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s5, verticalSpacing: Space.s3) {
                     GridRow {
                         label("Runs on")
-                        HStack(spacing: Space.s2) {
-                            Text(model.coreName)
-                            // TODO(core): more than one machine to run on; the Core runs projects on itself today.
-                            Button("Change…") {}.buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                                .help("Only \(model.coreName) can run projects for now")
-                        }
+                        runnerChoice
                     }
                     if insights.supported, !insights.environments.isEmpty {
                         GridRow {
@@ -175,18 +201,33 @@ struct SettingsPage: View {
                     }
                     GridRow {
                         label("CPU")
-                        Text("up to \(Self.cpus(project.cpuLimit))")
+                        limitSelect(
+                            ProjectsOptions.coreChoice(project.limits),
+                            ProjectsOptions.cores.map { CoreSelectOption($0, $0 == 1 ? "1 core" : "\($0) cores") }
+                        ) { n in
+                            var l = project.limits
+                            l.cpus = Double(n)
+                            return l
+                        }
                     }
                     GridRow {
                         label("Memory")
-                        Text("up to \(Self.memory(project.memLimitMb))")
+                        limitSelect(
+                            ProjectsOptions.memoryChoice(project.limits),
+                            ProjectsOptions.memoryGB.map { CoreSelectOption($0, "\($0) GB") }
+                        ) { g in
+                            var l = project.limits
+                            l.memoryMb = Int64(g) * 1024
+                            return l
+                        }
                     }
                     GridRow {
                         label("Idle stop")
                         HStack(spacing: Space.s2) {
-                            Text(
-                                model.limits?.idleNever == true
-                                    ? "never" : "after \(project.idleMinutes) min with no visits")
+                            limitSelect(
+                                ProjectsOptions.idleChoice(project.limits),
+                                ProjectsOptions.idleChoices.map { CoreSelectOption($0.minutes, $0.title) }
+                            ) { m in ProjectsOptions.setIdle(project.limits, minutes: m) }
                             if let idle = project.live?.idle, project.tag == .running {
                                 Text("· \(idle)").foregroundStyle(GlassInk.secondary).monospacedDigit()
                             }
@@ -197,6 +238,37 @@ struct SettingsPage: View {
         }
     }
 
+    /// One of this project's own limits: saved behind Touch ID, and the select shows what the Core holds.
+    private func limitSelect(
+        _ current: Int, _ options: [CoreSelectOption<Int>], _ make: @escaping (Int) -> ProjectLimits
+    ) -> some View {
+        CoreSelect(
+            nil, selection: Binding(get: { current }, set: { v in Task { await model.setLimits(project, make(v)) } }),
+            options: options
+        )
+        .disabled(model.readOnly || model.busy).frame(width: Space.s8 * 5)
+    }
+
+    /// Where the project prefers to run, with what the Core has paired (Mac runners serve This Mac, Linux ones Home server).
+    @ViewBuilder private var runnerChoice: some View {
+        if model.runnerSupported {
+            VStack(alignment: .leading, spacing: Space.s1) {
+                CoreSelect(
+                    nil,
+                    selection: Binding(
+                        get: { WizardRunner(rawValue: project.runner) ?? .auto },
+                        set: { r in Task { await model.setRunner(project, r.rawValue) } }),
+                    options: WizardRunner.allCases.map { CoreSelectOption($0, $0.title) }
+                )
+                .disabled(model.readOnly || model.busy).frame(width: Space.s8 * 5)
+                Text((WizardRunner(rawValue: project.runner) ?? .auto).line(model.runners))
+                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            Text(model.coreName).help("This Core keeps one place for now. Update it to choose where projects run.")
+        }
+    }
+
     // MARK: Delete
 
     /// Delete this project: the Core archives it (nothing is erased) and the toast offers Undo for a few seconds. A Core without
@@ -204,8 +276,12 @@ struct SettingsPage: View {
     private var deleteCard: some View {
         Island("Delete this project") {
             VStack(alignment: .leading, spacing: Space.s3) {
-                Text("Removes it from Core. Your repos stay on GitHub, and you can undo for a few seconds.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(
+                    model.insightsService == nil
+                        ? "Removes it from the list after one question. Your repos stay on GitHub. This Core cannot bring it back from here."
+                        : "Removes it from Core. Your repos stay on GitHub, and you can undo for a few seconds."
+                )
+                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 Button {
                     if model.insightsService == nil {
                         model.confirmArchive(project)

@@ -79,7 +79,7 @@ struct ProjectCard: View {
         .coreRise(settled, index)
         .animation(Motion.out(Motion.hover), value: lit)
         .onHover { hovering = $0 }
-        .contextMenu { Button("Open") { model.openProject(project.id) } }
+        .contextMenu { CardMenu(model: model, project: project) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(project.name), \(project.subtitle)")
         .coreActivates { model.openProject(project.id) }
@@ -103,25 +103,7 @@ struct ProjectCard: View {
         .clipShape(coreShape(Radius.control))
     }
 
-    /// Open, and Start while it is stopped. Starting needs the run engine, so Start waits for it.
-    private var hoverActions: some View {
-        HStack(spacing: Space.s2) {
-            if project.tag != .running {
-                Button {
-                } label: {
-                    Label("Start", systemImage: "play")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(true)
-                .help("Starting a project arrives with the run engine")
-            }
-            Button {
-                model.openProject(project.id)
-            } label: {
-                Label("Open", systemImage: "arrow.right")
-            }
-            .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-        }
-    }
+    private var hoverActions: some View { CardHoverActions(model: model, project: project) }
 
     private var info: some View {
         HStack(spacing: Space.s3) {
@@ -164,14 +146,14 @@ struct NewProjectCard: View {
         }
         .coreCard(hovering ? GlassInk.wellHover : GlassInk.well, radius: Radius.pane)
         .contentShape(coreShape(Radius.pane))
-        .onTapGesture { if !model.readOnly { model.newProject() } }
+        .onTapGesture { model.newProject() }
         .coreScaleEffect(hovering ? 1.01 : 1)
         .coreRise(settled, index)
         .animation(Motion.out(Motion.hover), value: hovering)
         .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("New Project")
-        .coreActivates(enabled: !model.readOnly) { model.newProject() }
+        .coreActivates { model.newProject() }
         .accessibilityIdentifier("project-card-new")
     }
 }

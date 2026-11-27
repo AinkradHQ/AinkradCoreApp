@@ -5,13 +5,15 @@ import SwiftUI
 /// The dialogs of Projects, shown over the shell like the other apps' dialogs.
 @MainActor
 enum NewProjectDialogs {
-    static func openAdvanced(_ m: ProjectsModel, name: String, picked: Set<String> = []) {
+    static func openAdvanced(
+        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name, pasted: [PickRepo] = []
+    ) {
         m.quickOpen = false
         m.clearWriteError()
         let shell = m.host.shell
         shell.present(
             ShellDialog(id: "project-new", onClose: { [weak m] in m?.clearWriteError() }) {
-                ProjectWizard(model: m, name: name, picked: picked) { shell.closeDialog() }
+                ProjectWizard(model: m, name: name, picked: picked, step: step, pasted: pasted) { shell.closeDialog() }
             })
     }
 
@@ -93,7 +95,7 @@ struct QuickNewProject: View {
 
     private func create() {
         guard ready, !model.busy else { return }
-        Task { await model.create(name: model.quickName, slug: slug, colour: .standard(for: slug)) }
+        Task { await model.create(name: model.quickName, slug: slug, colour: .standard(for: slug), autoSuffix: true) }
     }
 }
 
@@ -116,7 +118,8 @@ struct AddReposSheet: View {
         CoreDialogPanel("", width: Space.s8 * 18) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 DialogHead(title: "Add Repos", line: "The Core keeps a copy of each one and drafts how to run them.")
-                RepoPicker(model: model, picked: $picked, pasted: $pasted, height: Space.s8 * 5)
+                RepoPicker(
+                    model: model, picked: $picked, pasted: $pasted, height: Space.s8 * 5, existing: project.repos)
                 if let e = model.writeError { CoreFieldError(e) }
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),

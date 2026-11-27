@@ -76,10 +76,11 @@ struct GalleryView: View {
                     Label("New Project", systemImage: "plus")
                 }
                 .buttonStyle(CoreButtonStyle(.prominent))
-                .disabled(model.readOnly || model.load == .notConnected)
-                .help("New Project  ⌘N")
+                .disabled(model.newProjectBlock != nil)
+                .help(model.newProjectBlock ?? "New Project  ⌘N")
                 .accessibilityIdentifier("projects-new")
             }
+            if let why = model.stale { staleNotice(why) }
             content
         }
         .foregroundStyle(GlassInk.primary)
@@ -99,6 +100,17 @@ struct GalleryView: View {
                     .transition(.opacity)
             }
         }
+    }
+
+    /// The list on screen is the last one the Core gave: said, with a way to ask again.
+    private func staleNotice(_ why: String) -> some View {
+        CoreNotice(
+            symbol: "wifi.exclamationmark", title: "Showing the last list the Core gave.", text: why, tone: .warn
+        ) {
+            Button("Try again") { model.resync() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+        }
+        .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
+        .accessibilityIdentifier("projects-stale")
     }
 
     @ViewBuilder private var content: some View {

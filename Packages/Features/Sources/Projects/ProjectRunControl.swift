@@ -119,30 +119,38 @@ extension ProjectsModel {
         service != nil && !readOnly && !controlling.contains(project.id)
     }
 
-    /// General in Project Settings: the name and the description, behind Touch ID.
+    /// General in Project Settings: the name, the description and (when it changed) the link name, behind Touch ID.
     @discardableResult
-    func saveGeneral(_ project: ProjectItem, name: String, description: String) async -> Bool {
+    func saveGeneral(_ project: ProjectItem, name: String, description: String, slug: String? = nil) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard let service, !busy, mayWrite() else { return false }
-        if let problem = ProjectRules.nameProblem(name) {
+        let newSlug = slug.flatMap { $0 == project.slug ? nil : $0 }
+        if let problem = ProjectRules.nameProblem(name) ?? newSlug.flatMap(ProjectRules.slugProblem) {
             writeError = problem
             return false
         }
         busy = true
         writeError = nil
         defer { busy = false }
+        let colour = colour(project)
         do {
             try await host.elevated("Save the name and description of \(project.name).", done: "saved", keepsEdit: true)
             {
-                try await service.update(project: project.id, name: name, description: description)
+                if let newSlug {
+                    try await service.update(
+                        project: project.id, patch: ProjectPatch(name: name, description: description, slug: newSlug))
+                } else {
+                    try await service.update(project: project.id, name: name, description: description)
+                }
             }
         } catch is AdminDeclined {
             return false
         } catch {
-            if CoreError.unwrapping(error) == .forbiddenScope { readOnly = true }
             writeError = words(error)
             return false
         }
+        // The colour is kept by link name on this Mac: it follows the new one.
+        if let newSlug { colours.set(colour, for: newSlug) }
         await reload()
         host.shell.showToast("Saved")
         return true
