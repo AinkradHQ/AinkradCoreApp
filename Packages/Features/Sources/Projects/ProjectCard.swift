@@ -23,14 +23,16 @@ struct ProjectStateBadge: View {
     @State private var beat = false
     var body: some View {
         let b = project.badge
-        StateBadge(project.tag == .running ? project.link : b.label, tone: b.tone, symbol: b.symbol)
-            .opacity(project.tag == .starting && !project.archived && beat ? 0.55 : 1)
-            .coreLoop(
-                project.tag == .starting ? .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true) : nil,
-                value: beat
-            )
-            .onAppear { if project.tag == .starting { beat = true } }
-            .accessibilityLabel("State: \(b.label)")
+        StateBadge(
+            project.tag == .running && project.kind == .web ? project.link : b.label, tone: b.tone, symbol: b.symbol
+        )
+        .opacity(project.tag == .starting && !project.archived && beat ? 0.55 : 1)
+        .coreLoop(
+            project.tag == .starting ? .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true) : nil,
+            value: beat
+        )
+        .onAppear { if project.tag == .starting { beat = true } }
+        .accessibilityLabel("State: \(b.label)")
     }
 }
 
@@ -107,6 +109,10 @@ struct ProjectCard: View {
                 Text(project.subtitle).foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
+            if project.kind != .web {
+                Image(systemName: project.kind.symbol).foregroundStyle(GlassInk.secondary)
+                    .help(project.kind.title).accessibilityLabel(project.kind.title)
+            }
         }
         .padding(.horizontal, Space.s1).padding(.bottom, Space.s1)
         .help(project.name)

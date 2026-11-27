@@ -34,19 +34,24 @@ struct Overview: View {
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            if model.configsService != nil { statRow.coreRise(settled, 0) }
-            HStack(alignment: .top, spacing: Space.s2) {
-                LiveApp(model: model, project: project).coreRise(settled, 0)
-                rightColumn.frame(width: Self.columnWidth)
+            if project.kind == .other {
+                notSoftware
+            } else {
+                if model.configsService != nil { statRow.coreRise(settled, 0) }
+                HStack(alignment: .top, spacing: Space.s2) {
+                    LiveApp(model: model, project: project).coreRise(settled, 0)
+                    rightColumn.frame(width: Self.columnWidth)
+                }
+                .frame(maxHeight: .infinity)
+                // The mockup's bottom row: 220 tall, Services and Repos 316 wide, Logs the rest. Infrastructure shows its
+                // services in the big island, so its bottom row is Repos and Logs.
+                HStack(spacing: Space.s2) {
+                    if project.kind != .infra { servicesIsland.coreRise(settled, 3).frame(width: Self.cardWidth) }
+                    reposIsland.coreRise(settled, 4).frame(width: Self.cardWidth)
+                    logsIsland.coreRise(settled, 5)
+                }
+                .frame(height: Self.bottomHeight)
             }
-            .frame(maxHeight: .infinity)
-            // The mockup's bottom row: 220 tall, Services and Repos 316 wide, Logs the rest.
-            HStack(spacing: Space.s2) {
-                servicesIsland.coreRise(settled, 3).frame(width: Self.cardWidth)
-                reposIsland.coreRise(settled, 4).frame(width: Self.cardWidth)
-                logsIsland.coreRise(settled, 5)
-            }
-            .frame(height: Self.bottomHeight)
         }
         .onAppear { settled = true }
         // The tail of the log while it runs; the Core's stream, else a page every 3 s.
@@ -68,6 +73,22 @@ struct Overview: View {
             await insights.loadUsage()
             await insights.loadKnowledge()
             await insights.loadDocs()
+        }
+    }
+
+    /// A project that is not software: no run, no services, no logs. Brain and AI Sessions up top, Notes and Repos under them.
+    private var notSoftware: some View {
+        VStack(spacing: Space.s2) {
+            HStack(alignment: .top, spacing: Space.s2) {
+                brain.coreRise(settled, 0)
+                sessions.frame(width: Self.columnWidth).coreRise(settled, 1)
+            }
+            .frame(maxHeight: .infinity)
+            HStack(spacing: Space.s2) {
+                notesCard.coreRise(settled, 2)
+                reposIsland.coreRise(settled, 3)
+            }
+            .frame(height: Self.bottomHeight)
         }
     }
 
@@ -211,7 +232,9 @@ struct Overview: View {
                     Text(
                         settingUp
                             ? "Creating… It fills from the repos’ instruction files, AI sessions and docs you add."
-                            : "Nothing remembered yet. It fills from the repos’ instruction files, AI sessions and docs you add."
+                            : project.kind == .other
+                                ? "Nothing remembered yet. It fills from AI sessions and the notes and docs you add."
+                                : "Nothing remembered yet. It fills from the repos’ instruction files, AI sessions and docs you add."
                     )
                     .fixedSize(horizontal: false, vertical: true).foregroundStyle(GlassInk.secondary)
                 }
@@ -249,7 +272,7 @@ struct Overview: View {
 
     private var servicesIsland: some View {
         Island(
-            title: "Services", sub: live?.runner ?? model.coreName,
+            title: project.kind == .app ? "Build and run" : "Services", sub: live?.runner ?? model.coreName,
             accessory: {
                 if let l = live, !l.services.isEmpty {
                     Button {
@@ -264,7 +287,9 @@ struct Overview: View {
     }
 
     @ViewBuilder private var services: some View {
-        if let l = live, !l.services.isEmpty {
+        if project.kind == .app, let steps = live?.steps, !steps.isEmpty {
+            StartStepsList(steps: steps)
+        } else if let l = live, !l.services.isEmpty {
             VStack(alignment: .leading, spacing: Space.s1) {
                 ForEach(Array(l.services.enumerated()), id: \.offset) { _, s in
                     HStack(spacing: Space.s3) {

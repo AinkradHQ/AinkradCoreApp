@@ -15,7 +15,7 @@ struct ProjectSpaceView: View {
         VStack(spacing: Space.s2) {
             TopBar(model: model, project: project, onBack: onBack).coreRise(settled, 0)
             HStack(alignment: .top, spacing: Space.s2) {
-                Rail(model: model).coreRise(settled, 1)
+                Rail(model: model, kind: project.kind).coreRise(settled, 1)
                 // Switching pages cross-fades; each page's islands then settle in one after another.
                 ZStack { page.id(model.section).transition(.opacity) }
                     .animation(Motion.out(Motion.ui), value: model.section)
@@ -34,6 +34,8 @@ struct ProjectSpaceView: View {
     @ViewBuilder private var page: some View {
         switch model.section {
         case .overview:
+            Overview(model: model, project: project)
+        case .run where project.kind == .other:
             Overview(model: model, project: project)
         case .run:
             RunsPage(model: model, project: project).id(project.id)
@@ -71,15 +73,17 @@ private struct TopBar: View {
             Text(project.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
             ProjectStateBadge(project: project)
         } actions: {
-            Text("Public link").foregroundStyle(GlassInk.secondary)
-            CoreSwitch(
-                "",
-                isOn: Binding(
-                    get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
-            )
-            .disabled(model.readOnly).accessibilityLabel("Public link")
-            .help("While this project runs, anyone with \(project.link) can open it")
-            runButtons
+            if project.kind.hasPublicLink {
+                Text("Public link").foregroundStyle(GlassInk.secondary)
+                CoreSwitch(
+                    "",
+                    isOn: Binding(
+                        get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
+                )
+                .disabled(model.readOnly).accessibilityLabel("Public link")
+                .help("While this project runs, anyone with \(project.link) can open it")
+            }
+            if project.kind.runs { runButtons }
             // No terminal button: a project's clone lives inside an AI session's folder, and Terminals has no project folder
             // of the Core's to open yet (proposal in the lane report).
             Button {
@@ -144,10 +148,11 @@ private struct TopBar: View {
 /// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘7 from anywhere in the space.
 private struct Rail: View {
     let model: ProjectsModel
+    let kind: ProjectKind
     var body: some View {
         VStack(spacing: Space.s1) {
             // Docs (R6-06) is the last case, so it follows Brain; Project Settings stays at the bottom.
-            ForEach(ProjectSection.allCases.filter { $0 != .settings }) { tile($0) }
+            ForEach(ProjectSection.allCases.filter { $0 != .settings && ($0 != .run || kind.runs) }) { tile($0) }
             Spacer(minLength: 0)
             tile(.settings)
         }

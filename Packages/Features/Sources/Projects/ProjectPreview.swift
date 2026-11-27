@@ -80,7 +80,7 @@ struct ProjectPicture: View {
     var illustrate = true
     var body: some View {
         let running = project.tag == .running
-        if let img = PreviewStore.shared.image(project.id) {
+        if project.kind == .web, let img = PreviewStore.shared.image(project.id) {
             Image(nsImage: img).resizable().scaledToFill()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .grayscale(running ? 0 : 1).opacity(running ? 1 : 0.45)

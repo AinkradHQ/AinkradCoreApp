@@ -32,15 +32,19 @@ struct LiveApp: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            HStack(spacing: Space.s2) {
-                Text(project.link).lineLimit(1)
-                Text(note).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                Spacer(minLength: 0)
-                CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { copyLink() }
-                CoreIconButton(symbol: "arrow.up.forward.square", label: "Open in the browser") { openLink() }
-                    .disabled(!running)
+            if project.kind != .web {
+                KindHeader(project: project)
+            } else {
+                HStack(spacing: Space.s2) {
+                    Text(project.link).lineLimit(1)
+                    Text(note).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    Spacer(minLength: 0)
+                    CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { copyLink() }
+                    CoreIconButton(symbol: "arrow.up.forward.square", label: "Open in the browser") { openLink() }
+                        .disabled(!running)
+                }
+                .padding(.leading, Space.s2)
             }
-            .padding(.leading, Space.s2)
             if project.stale {
                 CoreNotice(
                     symbol: "wifi.exclamationmark", title: "The Core is not answering.",
@@ -49,7 +53,7 @@ struct LiveApp: View {
             }
             ZStack {
                 Color.clear.coreCard(GlassInk.well, radius: Radius.cardMac)
-                if hasPicture { picture }
+                if hasPicture, project.kind == .web { picture }
                 overlay
             }
             .clipShape(coreShape(Radius.cardMac))
@@ -158,7 +162,9 @@ struct LiveApp: View {
 
     /// What sits over the picture: the state in words. A running app needs none, unless it cannot be opened from here.
     @ViewBuilder private var overlay: some View {
-        if running {
+        if running, project.kind != .web {
+            KindRunningStage(model: model, project: project).padding(Space.s5)
+        } else if running {
             if previewURL == nil {
                 note(
                     symbol: "eye.slash", title: "\(project.name) is running",
@@ -178,7 +184,7 @@ struct LiveApp: View {
                     .frame(height: MacSize.controlMd).background(.regularMaterial, in: coreShape(Radius.control))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading).padding(Space.s2)
             }
-        } else if hasPicture {
+        } else if hasPicture, project.kind == .web {
             stage.padding(Space.s5).background(.regularMaterial, in: coreShape(Radius.cardMac)).padding(Space.s5)
         } else {
             stage.padding(Space.s5)
@@ -218,6 +224,7 @@ struct LiveApp: View {
     private var stoppedStage: some View {
         let n = project.draft?.services.count ?? 0
         let where_ = project.live?.runner ?? model.coreName
+        let kind = project.kind
         return VStack(spacing: Space.s2) {
             Text("\(project.name) is stopped").coreFont(size: MacTextSize.large, weight: .semibold)
                 .accessibilityAddTraits(.isHeader)
@@ -226,10 +233,14 @@ struct LiveApp: View {
                 line("Last visited \(runsAgo(at, now: model.now())).")
             }
             line(
-                n > 0
-                    ? "Start it to run \(ProjectItem.count(n, "service")) on \(where_) and open it at \(project.link)."
-                    : "Start it to run it on \(where_) and open it at \(project.link).")
-            start("Start").padding(.top, Space.s1)
+                kind == .app
+                    ? "Build and run it on \(where_)."
+                    : kind == .infra
+                        ? "Start it to bring up \(n > 0 ? ProjectItem.count(n, "service") : "its services") on \(where_)."
+                        : n > 0
+                            ? "Start it to run \(ProjectItem.count(n, "service")) on \(where_) and open it at \(project.link)."
+                            : "Start it to run it on \(where_) and open it at \(project.link).")
+            start(kind == .app ? "Build and Run" : "Start").padding(.top, Space.s1)
         }
     }
 
