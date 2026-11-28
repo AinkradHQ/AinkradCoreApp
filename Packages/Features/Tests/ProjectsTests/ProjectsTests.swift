@@ -162,7 +162,13 @@ final class FakeService: ProjectsService, @unchecked Sendable {
             list.removeAll { $0.id == project }
         }
     }
-    func run(project: Int64) async throws -> ProjectRunState? { lock.withLock { runState } }
+    var runError: (any Error)?
+    func run(project: Int64) async throws -> ProjectRunState? {
+        try lock.withLock {
+            if let runError { throw runError }
+            return runState
+        }
+    }
     func control(project: Int64, _ action: RunAction) async throws -> ProjectRunState {
         lock.withLock {
             calls.append("run \(action)")

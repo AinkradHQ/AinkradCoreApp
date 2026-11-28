@@ -403,7 +403,7 @@ struct Core110ModelTests {
         let p = m.project(1)!
         #expect(p.crash?.service == "api" && p.badge.label == "Crashed" && p.subtitle.hasPrefix("api crashed"))
         t?.undo?()
-        #expect(m.section == .run)
+        #expect(m.moduleOf(1) == .logs)
         // It ran again after the crash: the badge goes.
         m.runStates[1] = ProjectRunState(summary: RunSummary(state: .running), startedAt: Date().addingTimeInterval(60))
         m.reapply(1)

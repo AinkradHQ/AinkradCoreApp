@@ -26,6 +26,7 @@ struct ProjectsView: View {
         ZStack {
             if let project = model.open {
                 ProjectSpaceView(model: model, project: project)
+                    .id(project.id)
                     .transition(.asymmetric(insertion: spaceIn, removal: .opacity.animation(Motion.exit(0.15))))
             } else {
                 GalleryView(model: model)
@@ -43,8 +44,8 @@ struct ProjectsView: View {
         .onAppear { paneFocus = true }
         .retakeFocus(after: model.host.shell, pane: "projects") { paneFocus = true }
         .onKeyPress(.escape) {
-            if model.openID != nil {
-                model.closeProject()
+            if let id = model.openID {
+                model.leaveSpace(id) { model.closeProject() }
                 return .handled
             }
             return model.clearGalleryState() ? .handled : .ignored

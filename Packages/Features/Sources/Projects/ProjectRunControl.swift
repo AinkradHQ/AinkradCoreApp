@@ -141,6 +141,10 @@ extension ProjectsModel {
         guard let service else { return }
         let answer: ProjectRunState?
         do { answer = try await service.run(project: id) } catch {
+            // Only a Core that cannot be reached is "not answering"; a cancelled read or a refusal says nothing of the Core.
+            guard !(error is CancellationError), !Task.isCancelled, let net = LiveProjectsService.network(error),
+                net.code != .cancelled
+            else { return }
             // A Core that cannot be asked is not "running": what is shown is marked as how it last looked.
             markSilent(true)
             return
@@ -153,7 +157,7 @@ extension ProjectsModel {
 
     /// Keeps the open project's run fresh while it starts (every 2 s) or runs (every minute; while its Overview or Run page is
     /// up that also tells the Core a viewer is there, which pushes the idle stop back). Returns once it is neither.
-    func watch(_ id: Int64) async {
+    func watch(_ id: Int64, viewing: @MainActor () -> Bool = { true }) async {
         while !Task.isCancelled, let service {
             await refreshRun(id)
             await refreshLive(id)
@@ -161,7 +165,7 @@ extension ProjectsModel {
             case .some(.starting):
                 try? await Task.sleep(for: .seconds(2))
             case .some(.running):
-                if section == .overview || section == .run, let r = try? await service.touch(project: id) {
+                if viewing(), let r = try? await service.touch(project: id) {
                     runStates[id] = r
                     if let i = projects.firstIndex(where: { $0.id == id }) { projects[i] = applying(projects[i]) }
                 }

@@ -8,7 +8,7 @@ struct InfraStage: View {
     let project: ProjectItem
     /// Seven nodes are legible in the stage; the rest are one click away in Services.
     static let limit = 7
-    static let nodeSize = CGSize(width: 132, height: 58)
+    static let nodeSize = CGSize(width: 168, height: 58)
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     struct Node: Identifiable {
@@ -66,28 +66,7 @@ struct InfraStage: View {
             let pts = Self.layout(count: list.count, in: CGSize(width: g.size.width, height: g.size.height - Space.s6))
             let running = project.tag == .running
             ZStack(alignment: .topLeading) {
-                TimelineView(.animation(paused: reduce || !running)) { ctx in
-                    Canvas { c, _ in
-                        let t = ctx.date.timeIntervalSinceReferenceDate
-                        for i in 1..<max(list.count, 1) {
-                            let a = pts[Self.parent(i)]
-                            let b = pts[i]
-                            var p = Path()
-                            p.move(to: a)
-                            p.addLine(to: b)
-                            c.stroke(
-                                p, with: .color(GlassInk.secondary.opacity(0.5)),
-                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 5]))
-                            guard running, !reduce else { continue }
-                            let f = (t / (2 + Double(i) * 0.4) + Double(i) * 0.19).truncatingRemainder(dividingBy: 1)
-                            let q = CGPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f)
-                            c.fill(
-                                Path(
-                                    roundedRect: CGRect(x: q.x - 3, y: q.y - 3, width: 6, height: 6), cornerRadius: 1.5),
-                                with: .color(GlassInk.blue))
-                        }
-                    }
-                }
+                // No lines: the Core does not say how services connect, and a guessed tree would claim it does.
                 ForEach(list) { n in
                     NodeView(node: n, beat: running).position(pts[n.id])
                 }
@@ -95,9 +74,6 @@ struct InfraStage: View {
                     Text("+\(total - list.count) more in Services").foregroundStyle(GlassInk.secondary)
                         .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }
-                Text("Drawn in the order the run lists them. The Core does not say how they connect.")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
-                    .padding(Space.s3).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
         }
         .accessibilityElement(children: .contain)
@@ -115,13 +91,14 @@ struct InfraStage: View {
                     Text(node.name).coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
                 }
                 Text(node.line).coreFont(size: MacTextSize.meta)
-                    .foregroundStyle(node.tone == .bad ? GlassInk.redInk : GlassInk.secondary).lineLimit(1)
+                    .foregroundStyle(node.tone == .bad ? GlassInk.redInk : GlassInk.secondary).lineLimit(2)
             }
             .padding(.horizontal, Space.s3 - 1).frame(
                 width: InfraStage.nodeSize.width, height: InfraStage.nodeSize.height, alignment: .leading
             )
             .coreCard(GlassInk.card, radius: Radius.cardMac)
             .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+            .help("\(node.name): \(node.line)")
             .accessibilityElement(children: .combine)
         }
         private var colour: Color {

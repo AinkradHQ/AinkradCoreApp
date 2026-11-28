@@ -7,15 +7,18 @@ struct ProjectRail: View {
     let model: ProjectsModel
     let project: ProjectItem
 
+    @Environment(\.spacePane) private var pane
     private var modules: [ProjectModule] { ProjectModule.rail(for: project.allKinds) }
+    /// Only the space in front owns the ⌘ keys: two panes showing projects would both claim ⌘1.
+    private var owns: Bool { model.host.shell.activePane.map { $0 == pane } ?? true }
     private var needsYou: Bool { project.live?.sessions.contains { $0.state == .needsYou } ?? false }
 
     var body: some View {
         let order = modules + [.settings]
         VStack(spacing: Space.s1) {
-            ForEach(Array(modules.enumerated()), id: \.element) { i, m in tile(m, key: i + 1) }
+            ForEach(Array(modules.enumerated()), id: \.element) { i, m in tile(m, key: ProjectModule.key(at: i)) }
             Spacer(minLength: 0)
-            tile(.settings, key: order.count)
+            tile(.settings, key: ProjectModule.key(at: order.count - 1))
         }
         .padding(Space.s2)
         // The approved details v2 rail: 56 pt wide, 40 pt tiles, 4 pt apart, 8 pt in from every edge.
@@ -24,16 +27,18 @@ struct ProjectRail: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func tile(_ m: ProjectModule, key: Int) -> some View {
+    private func tile(_ m: ProjectModule, key: Int?) -> some View {
         RailTile(
-            module: m, key: key, selected: model.module == m, marked: m == .ai && needsYou
-        ) { model.module = m }
+            module: m, key: key, ownsKeys: owns, selected: model.moduleOf(project.id) == m,
+            marked: m == .ai && needsYou
+        ) { model.go(m, in: project.id) }
     }
 }
 
 private struct RailTile: View {
     let module: ProjectModule
-    let key: Int
+    let key: Int?
+    let ownsKeys: Bool
     let selected: Bool
     let marked: Bool
     let action: () -> Void
@@ -60,8 +65,10 @@ private struct RailTile: View {
         .onHover { hovering = $0 }
         .animation(Motion.out(Motion.hover), value: hovering)
         .animation(Motion.out(Motion.ui), value: selected)
-        .keyboardShortcut(key <= 9 ? KeyEquivalent(Character("\(key)")) : "0", modifiers: .command)
-        .help("\(module.title)  ⌘\(key). \(module.help)\(marked ? ". A session needs you" : "")")
+        .keyboardShortcut(
+            ownsKeys ? key.map { KeyboardShortcut(KeyEquivalent(Character("\($0)")), modifiers: .command) } : nil
+        )
+        .help("\(module.title)\(key.map { "  ⌘\($0)" } ?? ""). \(module.help)\(marked ? ". A session needs you" : "")")
         .accessibilityLabel(module.title + (marked ? ", needs you" : ""))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("project-rail-\(module.title)")

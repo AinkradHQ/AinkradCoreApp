@@ -62,8 +62,12 @@ struct Overview: View {
                             ForEach(row, id: \.1.module) { c, cell in
                                 cell.view.coreRise(settled, 1 + r * Self.columns + c)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    // A last row of one card spans the grid instead of leaving a hole.
+                                    .gridCellColumns(row.count == 1 && rows.count > 1 ? Self.columns : 1)
                             }
-                            ForEach(0..<(Self.columns - row.count), id: \.self) { _ in Color.clear }
+                            if !(row.count == 1 && rows.count > 1) {
+                                ForEach(0..<(Self.columns - row.count), id: \.self) { _ in Color.clear }
+                            }
                         }
                     }
                 }
@@ -74,12 +78,18 @@ struct Overview: View {
         .scrollIndicators(.never)
         // The tail of the log while it runs (the Core's stream, else a page every 3 s), and the last run's log after it ends,
         // so a failed project keeps the lines that say why.
-        .task(id: "\(project.id) \(project.tag) \(model.runTick)") {
+        // One reader per run state (not per tick of the Core's events), so the lines already read stay.
+        .task(id: "\(project.id) \(project.run?.state == .running || project.run?.state == .starting) \(project.run == nil)") {
             guard project.run != nil, !project.stale, let source = model.logSources(project.id, nil) else {
                 if project.run == nil { logs = nil }
                 return
             }
             let m = RunLogsModel(source: source)
+            let id = project.id
+            m.keepReading = { [model] in
+                let state = model.project(id)?.run?.state
+                return state == .running || state == .starting
+            }
             logs = m
             await m.run()
         }

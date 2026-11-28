@@ -83,7 +83,10 @@ struct ModuleRepos: View {
                     line: "Add a repo and the Core keeps a copy of it here. AI sessions and runs get a clone of it.")
             } else {
                 ModuleSplit(pickID: current.map { String($0.id) }) {
-                    ModuleList(ids: ids, pick: $pick, onOpen: {}) {
+                    ModuleList(
+                        ids: ids, pick: $pick,
+                        onOpen: { if let r = current, let u = RepoWords.web(r.remoteURL) { NSWorkspace.shared.open(u) } }
+                    ) {
                         ForEach(project.repos) { r in
                             ModuleRow(
                                 id: String(r.id), title: r.name, sub: RepoWords.line(r, now: model.now()),

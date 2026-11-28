@@ -30,7 +30,7 @@ extension ProjectsModel {
         get {
             switch module {
             case .overview, .activity: .overview
-            case .live, .builds, .services, .logs: .run
+            case .live, .builds, .services, .logs, .run: .run
             case .docs: .docs
             case .ai: .sessions
             case .brain: .brain
@@ -38,17 +38,18 @@ extension ProjectsModel {
             case .settings: .settings
             }
         }
-        set {
-            module =
-                switch newValue {
-                case .overview: .overview
-                case .run: .logs
-                case .repos: .repos
-                case .sessions: .ai
-                case .brain: .brain
-                case .settings: .settings
-                case .docs: .docs
-                }
+        set { module = Self.module(of: newValue) }
+    }
+
+    static func module(of section: ProjectSection) -> ProjectModule {
+        switch section {
+        case .overview: .overview
+        case .run: .run
+        case .repos: .repos
+        case .sessions: .ai
+        case .brain: .brain
+        case .settings: .settings
+        case .docs: .docs
         }
     }
 }
