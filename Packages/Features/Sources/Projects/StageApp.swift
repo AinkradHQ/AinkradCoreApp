@@ -63,7 +63,12 @@ private struct MacFrame: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 // The traffic lights are the one place circles belong.
-                ForEach([Color(red: 1, green: 0.37, blue: 0.34), Color(red: 1, green: 0.74, blue: 0.18), Color(red: 0.16, green: 0.78, blue: 0.25)], id: \.self) {
+                ForEach(
+                    [
+                        Color(red: 1, green: 0.37, blue: 0.34), Color(red: 1, green: 0.74, blue: 0.18),
+                        Color(red: 0.16, green: 0.78, blue: 0.25),
+                    ], id: \.self
+                ) {
                     Circle().fill($0).frame(width: 8, height: 8)
                 }
                 Spacer()

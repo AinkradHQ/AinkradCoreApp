@@ -91,7 +91,8 @@ struct StageCover: View {
                     ? "Build and run it on \(where_)."
                     : kind == .infra
                         ? "Start the stack to bring \(n > 0 ? "all \(n) services" : "its services") up on \(where_)."
-                        : "Start it to see the live site here. It stops by itself after \(project.idleNever ? "no idle time" : "\(project.idleMinutes) idle minutes").")
+                        : "Start it to see the live site here. It stops by itself after \(project.idleNever ? "no idle time" : "\(project.idleMinutes) idle minutes")."
+            )
             startButton(prominent: true)
         }
     }
@@ -110,7 +111,9 @@ struct StageCover: View {
                 }
                 .multilineTextAlignment(.leading)
             }
-            .padding(.horizontal, Space.s3 + 2).padding(.vertical, Space.s3).frame(maxWidth: Space.s8 * 15, alignment: .leading)
+            .padding(.horizontal, Space.s3 + 2).padding(.vertical, Space.s3).frame(
+                maxWidth: Space.s8 * 15, alignment: .leading
+            )
             .coreCard(GlassInk.card, radius: Radius.cardMac)
             .accessibilityElement(children: .combine)
             HStack(spacing: Space.s2) {
@@ -146,7 +149,8 @@ struct StageCover: View {
         Button {
             model.control(.start, project)
         } label: {
-            Label(project.mainAction(view: kind).title, systemImage: project.tag == .failed ? "arrow.clockwise" : "play")
+            Label(
+                project.mainAction(view: kind).title, systemImage: project.tag == .failed ? "arrow.clockwise" : "play")
         }
         .buttonStyle(CoreButtonStyle(prominent ? .prominent : .secondary)).disabled(!can)
         .help(

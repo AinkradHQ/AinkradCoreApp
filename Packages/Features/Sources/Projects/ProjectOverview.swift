@@ -23,7 +23,9 @@ struct Overview: View {
     }
 
     /// For the module stubs that still show the Overview (their lanes replace them).
-    init(model: ProjectsModel, project: ProjectItem) { self.init(model: model, project: project, stageKind: .constant(nil)) }
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.init(model: model, project: project, stageKind: .constant(nil))
+    }
 
     static let columns = 3
     var live: ProjectLive? { project.live }

@@ -13,7 +13,9 @@ struct ProjectHeader: View {
     let onBack: (() -> Void)?
     @State private var run: RunPageModel?
 
-    private var view: ProjectKind { stageKind.flatMap { project.allKinds.contains($0) ? $0 : nil } ?? project.allKinds[0] }
+    private var view: ProjectKind {
+        stageKind.flatMap { project.allKinds.contains($0) ? $0 : nil } ?? project.allKinds[0]
+    }
 
     var body: some View {
         let can = model.canControl(project)
@@ -55,7 +57,9 @@ struct ProjectHeader: View {
                 if compact { Image(systemName: "sparkles") } else { Label("New AI Session", systemImage: "sparkles") }
             }
             .buttonStyle(CoreButtonStyle(.secondary)).disabled(!model.canStartSession(project))
-            .help(model.canStartSession(project) ? "Start an AI session in \(project.name)" : model.sessionBlock(project))
+            .help(
+                model.canStartSession(project) ? "Start an AI session in \(project.name)" : model.sessionBlock(project)
+            )
             .accessibilityLabel("New AI Session").accessibilityIdentifier("project-new-session")
             Button {
                 perform(main)
@@ -80,7 +84,10 @@ struct ProjectHeader: View {
                 out.append(p.isEmpty ? "Platform not known yet" : p.joined(separator: " · "))
             case .infra:
                 let n = project.live?.services.count ?? project.draft?.services.count ?? 0
-                out.append(n > 0 ? "\(ProjectItem.count(n, "service")) · \(project.live?.runner ?? model.coreName)" : model.coreName)
+                out.append(
+                    n > 0
+                        ? "\(ProjectItem.count(n, "service")) · \(project.live?.runner ?? model.coreName)"
+                        : model.coreName)
             case .other: out.append(project.description.isEmpty ? "Notes and documents" : project.description)
             }
         }

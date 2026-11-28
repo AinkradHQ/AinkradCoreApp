@@ -19,7 +19,7 @@ struct OverviewStage: View {
             header.frame(height: Space.s8 + Space.s4).padding(.leading, Space.s4).padding(.trailing, Space.s2 + 2)
             ZStack {
                 layer.id(view).transition(.opacity)
-                    .blur(radius: covered ? 6 : 0).opacity(covered ? 0.65 : 1)
+                    .blur(radius: covered ? 6 : 0).opacity(covered ? 0.9 : 1)
                 if covered {
                     StageCover(model: model, project: project, kind: view).transition(.opacity)
                 }
@@ -74,10 +74,12 @@ struct OverviewStage: View {
 
     private var subtitle: String {
         switch view {
-        case .web: return project.expose ? "\(project.link) · public while running" : "\(project.link) · only your devices"
+        case .web:
+            return project.expose ? "\(project.link) · public while running" : "\(project.link) · only your devices"
         case .infra:
             let s = project.live?.services ?? []
-            return s.isEmpty ? "" : "\(s.filter { $0.state == .up && $0.health != "unhealthy" }.count) of \(s.count) healthy"
+            return s.isEmpty
+                ? "" : "\(s.filter { $0.state == .up && $0.health != "unhealthy" }.count) of \(s.count) healthy"
         default: return ""
         }
     }
@@ -87,7 +89,9 @@ struct OverviewStage: View {
             CoreSegmented(
                 "Width", segments: SiteWidth.allCases.map { CoreSegment($0, $0.title) },
                 selection: Binding(get: { width }, set: { width = $0 }))
-            if project.expose { CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { model.copyLink(project) } }
+            if project.expose {
+                CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { model.copyLink(project) }
+            }
             CoreIconButton(symbol: "arrow.up.forward.square", label: "Open in the browser") {
                 if let url = URL(string: "https://\(project.link)") { NSWorkspace.shared.open(url) }
             }

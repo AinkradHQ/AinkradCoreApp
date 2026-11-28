@@ -62,7 +62,9 @@ struct WebStage: View {
 
     private var bar: some View {
         HStack(spacing: Space.s2) {
-            HStack(spacing: 3) { ForEach(0..<3, id: \.self) { _ in coreShape(2).fill(.black.opacity(0.18)).frame(width: 7, height: 7) } }
+            HStack(spacing: 3) {
+                ForEach(0..<3, id: \.self) { _ in coreShape(2).fill(.black.opacity(0.18)).frame(width: 7, height: 7) }
+            }
             HStack(spacing: 6) {
                 Image(systemName: "lock").coreFont(size: 9)
                 Text("\(project.link)/").lineLimit(1)

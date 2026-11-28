@@ -33,7 +33,7 @@ struct InfraStage: View {
                     s.state == .exited ? .bad : s.state == .up ? (s.health == "unhealthy" ? .warn : .ok) : .off
                 let line =
                     s.state == .up
-                    ? "\(Overview.serviceLine(s))\(s.memory == "–" ? "" : " · \(s.memory)")"
+                    ? "\(s.health == "unhealthy" ? "Not healthy" : "Up")\(s.memory == "–" ? "" : " · \(s.memory)")"
                     : (running || s.state == .exited ? Overview.serviceLine(s) : "Stopped")
                 return Node(id: i, name: s.name, line: line, tone: tone)
             }
@@ -70,7 +70,8 @@ struct InfraStage: View {
                     Canvas { c, _ in
                         let t = ctx.date.timeIntervalSinceReferenceDate
                         for i in 1..<max(list.count, 1) {
-                            let a = pts[Self.parent(i)], b = pts[i]
+                            let a = pts[Self.parent(i)]
+                            let b = pts[i]
                             var p = Path()
                             p.move(to: a)
                             p.addLine(to: b)
@@ -81,7 +82,8 @@ struct InfraStage: View {
                             let f = (t / (2 + Double(i) * 0.4) + Double(i) * 0.19).truncatingRemainder(dividingBy: 1)
                             let q = CGPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f)
                             c.fill(
-                                Path(roundedRect: CGRect(x: q.x - 3, y: q.y - 3, width: 6, height: 6), cornerRadius: 1.5),
+                                Path(
+                                    roundedRect: CGRect(x: q.x - 3, y: q.y - 3, width: 6, height: 6), cornerRadius: 1.5),
                                 with: .color(GlassInk.blue))
                         }
                     }

@@ -191,7 +191,8 @@ extension Overview {
     private func serviceTile(_ s: ProjectLive.Service) -> some View {
         VStack(alignment: .leading, spacing: Space.s1 + 2) {
             HStack(spacing: Space.s2) {
-                StatusDot(colour: s.state == .up ? GlassInk.green : s.state == .exited ? GlassInk.red : GlassInk.secondary)
+                StatusDot(
+                    colour: s.state == .up ? GlassInk.green : s.state == .exited ? GlassInk.red : GlassInk.secondary)
                 Text(s.name).coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
                 Spacer(minLength: 0)
                 if s.state == .up { Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit() }
@@ -201,7 +202,9 @@ extension Overview {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text(s.state == .up ? Self.serviceLine(s) : s.state == .exited ? Self.serviceLine(s) : "Not started")
-                    .coreFont(size: MacTextSize.meta).foregroundStyle(s.state == .exited ? GlassInk.redInk : GlassInk.secondary)
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(
+                        s.state == .exited ? GlassInk.redInk : GlassInk.secondary
+                    )
                     .lineLimit(1)
             }
         }
@@ -230,7 +233,8 @@ extension Overview {
     /// Each run is a build: a bar per run (its length in time), red where it failed.
     var buildsCard: some View {
         let list = runs.sorted { ($0.startedAt ?? .distantPast) < ($1.startedAt ?? .distantPast) }.suffix(12)
-        let longest = list.compactMap { r in r.startedAt.flatMap { s in r.stoppedAt.map { $0.timeIntervalSince(s) } } }
+        let longest =
+            list.compactMap { r in r.startedAt.flatMap { s in r.stoppedAt.map { $0.timeIntervalSince(s) } } }
             .max() ?? 0
         return ModuleCard(model: model, module: .builds, sub: list.isEmpty ? nil : "last \(list.count)") {
             if let last = list.last {
