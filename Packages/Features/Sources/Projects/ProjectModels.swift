@@ -168,6 +168,8 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var kindName: String?
     /// What it is, as shown: the Core's kind, else the one chosen on this Mac, else web (set by `ProjectsModel.applying`).
     var kind = ProjectKind.web
+    /// All of its kinds when the Core keeps several (API 112); empty on an older Core (`allKinds` falls back to `kind`).
+    var kinds: [ProjectKind] = []
     /// A service of it crashed (`project.service_crashed`) and it has not run again since.
     var crash: ServiceCrash?
 

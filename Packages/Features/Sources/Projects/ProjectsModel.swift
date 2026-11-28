@@ -59,6 +59,8 @@ public final class ProjectsModel {
     var openID: Int64?
     /// The page of the open project's space.
     var section = ProjectSection.overview
+    /// Details v2: the module the space shows (the rail's selection). Replaces `section` once the space moves to it.
+    var module = ProjectModule.overview
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
     /// The gallery's All · Running · Archived switch.
