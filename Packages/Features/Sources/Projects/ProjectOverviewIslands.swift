@@ -42,7 +42,7 @@ struct ModuleCard<Content: View>: View {
 }
 
 /// A row of a module: its words, an optional second line, and what sits at the end.
-private struct ModuleRow<Trailing: View>: View {
+private struct OverviewRow<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
     var action: (() -> Void)? = nil
@@ -98,7 +98,7 @@ extension Overview {
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(Array(ordered.prefix(3).enumerated()), id: \.offset) { _, s in
-                    ModuleRow(
+                    OverviewRow(
                         title: s.title, subtitle: "\(s.harness) · \(s.when)",
                         action: s.id.map { id in { model.sessionOpener?(id) } }
                     ) { SessionBadge.badge(s.state) }
@@ -249,7 +249,7 @@ extension Overview {
                         }
                     }
                     .frame(height: 44, alignment: .bottom)
-                    ModuleRow(
+                    OverviewRow(
                         title: "Built \(runsAgo(last.startedAt, now: model.now()))",
                         subtitle: [last.runner, last.environment].compactMap { $0 }.joined(separator: " · "),
                         action: { model.module = .builds }
@@ -285,7 +285,7 @@ extension Overview {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(ordered.prefix(ordered.count > Self.repoRows ? Self.repoRows - 1 : Self.repoRows)) { r in
-                        ModuleRow(title: r.name, subtitle: repoLine(r), action: { model.module = .repos }) {
+                        OverviewRow(title: r.name, subtitle: repoLine(r), action: { model.module = .repos }) {
                             if r.fetchError != nil {
                                 StateBadge("Copy failed", tone: .fail, symbol: "exclamationmark.triangle")
                             } else if r.primary, project.repos.count > 1 {
