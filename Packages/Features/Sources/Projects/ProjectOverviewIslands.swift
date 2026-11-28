@@ -20,8 +20,6 @@ struct ModuleCard<Content: View>: View {
                     Text(title ?? module.title).coreFont(size: MacTextSize.headline, weight: .semibold)
                     if let sub { Text(sub).foregroundStyle(GlassInk.secondary).lineLimit(1) }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
-                        .foregroundStyle(GlassInk.secondary).opacity(hovering ? 1 : 0.6).accessibilityHidden(true)
                 }
                 .padding(.horizontal, Space.s2).frame(height: Space.s8 + Space.s2)
                 .background(hovering ? GlassInk.lift(0.07) : .clear, in: coreShape(Radius.control))

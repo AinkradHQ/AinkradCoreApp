@@ -17,8 +17,9 @@ struct ProjectRail: View {
             Spacer(minLength: 0)
             tile(.settings, key: order.count)
         }
-        .padding(.vertical, Space.s2).padding(.horizontal, Space.s1 + 2)
-        .frame(width: Space.s8 + Space.s8 + Space.s6).frame(maxHeight: .infinity)
+        .padding(Space.s2)
+        // The approved details v2 rail: 56 pt wide, 40 pt tiles, 4 pt apart, 8 pt in from every edge.
+        .frame(width: Space.s8 + Space.s6).frame(maxHeight: .infinity)
         .coreWell(radius: Radius.pane)
         .accessibilityElement(children: .contain)
     }

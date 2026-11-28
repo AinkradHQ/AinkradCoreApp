@@ -705,7 +705,8 @@ extension ProjectsModel {
 struct DemoSitePage: View {
     let name: String
     let colour: ProjectColour
-    private let design = CGSize(width: 1100, height: 680)
+    // Drawn as a wide desktop page, so a frame shows it as a compact preview (details v2 mockup).
+    private let design = CGSize(width: 1680, height: 1040)
 
     var body: some View {
         GeometryReader { g in
