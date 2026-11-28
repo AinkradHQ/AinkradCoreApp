@@ -64,13 +64,22 @@ extension ProjectsModel {
             parts.services = []
             parts.metrics = [:]
         }
-        if let s = try? await service?.sessions(project: id) { parts.sessions = s }
+        do {
+            if let s = try await service?.sessions(project: id) { parts.sessions = s }
+            liveFailures[id, default: [:]]["sessions"] = nil
+        } catch { liveFailures[id, default: [:]]["sessions"] = words(error) }
         if let ins = insightsService, let t = try? await ins.tuning(project: id) {
             parts.roomID = t.roomID
-            if let room = t.roomID, let o = try? await ins.roomOverview(room: room) {
-                parts.room = Self.room(o, now: now())
-            } else {
+            do {
+                if let room = t.roomID, let o = try await ins.roomOverview(room: room) {
+                    parts.room = Self.room(o, now: now())
+                } else {
+                    parts.room = nil
+                }
+                liveFailures[id, default: [:]]["room"] = nil
+            } catch {
                 parts.room = nil
+                liveFailures[id, default: [:]]["room"] = words(error)
             }
         }
         if let cfg = configsService {
@@ -113,7 +122,7 @@ extension ProjectsModel {
     // MARK: AI sessions
 
     func canStartSession(_ p: ProjectItem) -> Bool {
-        sessionStarter != nil && (!p.repos.isEmpty || core111) && !p.archived && !readOnly
+        sessionStarter != nil && (!p.repos.isEmpty || core111) && !p.archived && !readOnly && !startingSession.contains(p.id)
     }
 
     func sessionBlock(_ p: ProjectItem) -> String {
@@ -126,15 +135,25 @@ extension ProjectsModel {
         if readOnly { return "This device can look at projects but not change them." }
         if sessionStarter == nil { return "Connect to a Core to start an AI session." }
         return p.repos.isEmpty
-            ? "Start an AI session in its own folder, with \(p.name)'s Brain place"
+            ? "Start an AI session in its own folder, with \(p.name)'s Brain room"
             : "Start an AI session in its own copy of \(p.name)'s repos"
     }
 
+    /// The first message of an "Ask AI to Fix" session: what failed and what the Core said, so it starts from the failure.
+    static func fixPrompt(project: String, what: String, details: [String?]) -> String {
+        let facts = details.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+        return "\(what) of \(project) failed." + (facts.isEmpty ? "" : "\n\n\(facts)")
+            + "\n\nLook at why it failed and propose a fix."
+    }
+
     /// New AI Session in the project: a session in its own clone, opened in AI Sessions.
-    func newSession(in p: ProjectItem) {
+    /// `prompt` is the session's first message (Ask AI to Fix says what failed); one start per project at a time.
+    func newSession(in p: ProjectItem, prompt: String = "") {
         guard canStartSession(p), let start = sessionStarter else { return }
+        startingSession.insert(p.id)
         Task {
-            if let why = await start(p.id) {
+            defer { startingSession.remove(p.id) }
+            if let why = await start(p.id, prompt) {
                 host.shell.showToast(why, kind: .warn)
             } else {
                 await refreshLive(p.id)

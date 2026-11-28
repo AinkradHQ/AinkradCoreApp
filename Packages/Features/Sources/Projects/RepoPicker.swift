@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -30,6 +31,9 @@ struct RepoPicker: View {
             list
         }
         .task { await model.loadCatalog() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await model.recheckCatalog() }
+        }
         // What is typed filters the list at once; after a pause the Core also searches GitHub, and adds what it finds.
         .task(id: query) {
             try? await Task.sleep(for: .milliseconds(400))

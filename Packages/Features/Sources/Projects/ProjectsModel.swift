@@ -27,6 +27,7 @@ public final class ProjectsModel {
     /// Every repo the picker listed this session, in the order first seen, so a pick survives a new search.
     @ObservationIgnored private var catalogSeen: [PickRepo] = []
     @ObservationIgnored private var catalogQuery = ""
+    @ObservationIgnored private var catalogGeneration = 0
     @ObservationIgnored private var catalogPage = 1
     /// Runners the Core has, for "Where it runs".
     private(set) var runners: [RunnerInfo] = []
@@ -131,10 +132,18 @@ public final class ProjectsModel {
     /// Bumps, per project, when the Core says a run or its setup changed, so that project's pages read again at once.
     internal(set) var runTicks: [Int64: Int] = [:]
     func tick(_ id: Int64) -> Int { runTicks[id] ?? 0 }
+    /// Projects whose New Doc or New AI Session is being made now: a second click waits for the first.
+    internal(set) var creatingDoc: Set<Int64> = []
+    internal(set) var startingSession: Set<Int64> = []
+    /// What could not be read for a project's pages, by name (`sessions`, `room`), in words; cleared when the read works.
+    internal(set) var liveFailures: [Int64: [String: String]] = [:]
+    /// The service the Logs page shows first (Show Logs on a service); read once when the page opens.
+    internal(set) var logService: String?
     /// The last read of the Core failed: what is shown is how it last looked.
     @ObservationIgnored var coreSilent = false
-    /// Starts an AI session in a project (the app wires it to the AI Sessions app); returns the refusal in words.
-    @ObservationIgnored public var sessionStarter: (@MainActor (Int64) async -> String?)?
+    /// Starts an AI session in a project, with a first message when given (the app wires it to the AI Sessions app); returns the
+    /// refusal in words.
+    @ObservationIgnored public var sessionStarter: (@MainActor (Int64, String) async -> String?)?
     /// Opens an AI session in the AI Sessions app.
     @ObservationIgnored public var sessionOpener: (@MainActor (String) -> Void)?
     /// A run's log: the Core's routes for a project (and one run by id). The Debug demo brings its own.
@@ -501,12 +510,7 @@ public final class ProjectsModel {
         var refused: [MissedRepo] = []
         await withTaskGroup(of: MissedRepo?.self) { group in
             for r in todo {
-                group.addTask {
-                    do { try await service.fetch(project: project.id, repo: r.id) } catch {
-                        return await MissedRepo(name: r.name, why: self.words(error))
-                    }
-                    return nil
-                }
+                group.addTask { await self.fetchOne(r, in: project, service) }
             }
             for await m in group { if let m { refused.append(m) } }
         }
@@ -528,6 +532,20 @@ public final class ProjectsModel {
         }
     }
 
+    /// One repo's fetch, behind Touch ID when the Core wants it (it fails with `unlock_required` otherwise); nil when it worked.
+    private func fetchOne(_ r: RepoItem, in project: ProjectItem, _ service: any ProjectsService) async -> MissedRepo? {
+        do {
+            try await host.elevated("Fetch \(r.name) of \(project.name).", done: "fetched", keepsEdit: false) {
+                try await service.fetch(project: project.id, repo: r.id)
+            }
+        } catch is AdminDeclined {
+            return MissedRepo(name: r.name, why: "Touch ID was not given")
+        } catch {
+            return MissedRepo(name: r.name, why: words(error))
+        }
+        return nil
+    }
+
     /// Opens the Connections flow (GitHub).
     func connectGithub() { host.shell.launcher.entry("connections")?.run() }
 
@@ -536,6 +554,14 @@ public final class ProjectsModel {
         // Once per wizard: a second open of the picker (or both of its tasks firing) must not reload and flash the list.
         if case .ready = catalogState { return }
         await readCatalog(query: "", page: 1)
+    }
+
+    /// The picker is on screen again with no list (GitHub was not connected): ask once more, a connection may exist now.
+    func recheckCatalog() async {
+        switch catalogState {
+        case .unavailable, .failed: await readCatalog(query: "", page: 1)
+        default: break
+        }
     }
 
     /// A search typed in the picker, asked of the Core (it matches owner/name over all of GitHub's repos).
@@ -553,11 +579,30 @@ public final class ProjectsModel {
         await readCatalog(query: catalogQuery, page: catalogPage + 1)
     }
 
-    private func readCatalog(query: String, page: Int) async {
+    /// Reads one page. Only the newest read may answer: a slow search that finishes after a newer one is dropped.
+    private func readCatalog(query: String, page: Int, adopting: Bool = false) async {
+        catalogGeneration += 1
+        let gen = catalogGeneration
         catalogBusy = true
-        defer { catalogBusy = false }
+        defer { if gen == catalogGeneration { catalogBusy = false } }
         do {
-            guard let r = try await catalog.page(query: query, page: page) else {
+            let answer: RepoPage?
+            do { answer = try await catalog.page(query: query, page: page) } catch let need as CatalogNeedsDefault {
+                guard !adopting else { throw need }
+                do {
+                    try await host.elevated(
+                        "Use your GitHub connection to list your repos.", done: "connected", keepsEdit: true
+                    ) { try await catalog.makeDefault(connection: need.connection) }
+                } catch is AdminDeclined {
+                    if gen == catalogGeneration { catalogState = .unavailable }
+                    return
+                }
+                guard gen == catalogGeneration else { return }
+                await readCatalog(query: query, page: page, adopting: true)
+                return
+            }
+            guard gen == catalogGeneration else { return }
+            guard let r = answer else {
                 catalogState = .unavailable
                 return
             }
@@ -569,6 +614,7 @@ public final class ProjectsModel {
             // Never replace the list: everything found so far stays, in place, and new repos join it.
             catalogState = .ready(catalogSeen)
         } catch {
+            guard gen == catalogGeneration else { return }
             // A failed extra page or search keeps the list on screen; only the first read can fail the picker.
             if case .ready = catalogState, page > 1 || !query.isEmpty { return }
             let problem = CatalogProblem(error)

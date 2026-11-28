@@ -131,6 +131,7 @@ struct ModuleServices: View {
             title: r.name
         ) {
             Button {
+                model.logService = r.name
                 model.go(.logs, in: project.id)
             } label: {
                 Label("Show Logs", systemImage: "text.alignleft")
@@ -174,7 +175,7 @@ struct ModuleServices: View {
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
-                        Text(l.text).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1)
+                        Text(LogText.plain(l.text)).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1)
                             .truncationMode(.tail)
                     }
                 }

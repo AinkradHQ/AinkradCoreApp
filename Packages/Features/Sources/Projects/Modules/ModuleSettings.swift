@@ -12,6 +12,10 @@ struct ModuleSettings: View {
     @State private var limitsDraft: ProjectLimits?
     @State private var runnerDraft: String?
     @State private var insights: ProjectInsightsModel
+    /// The section the person worked in last: its Save is the Return key's, so only one is ever the default action.
+    @State private var touched = SettingsSave.name
+    /// A refusal under the section's own field, not in whichever block comes first.
+    @State private var errors: [SettingsSave: String] = [:]
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
@@ -25,10 +29,18 @@ struct ModuleSettings: View {
         #endif
     }
 
-    private var changed: Bool {
-        name.trimmingCharacters(in: .whitespaces) != project.name || description != project.description || slug != project.slug
+    private var changed: Bool { name.trimmingCharacters(in: .whitespaces) != project.name || description != project.description }
+    /// The Core's reason when the link name cannot change now (`slug_locked`); a running project is locked even on an older Core.
+    private var linkLock: String? {
+        SettingsSave.linkLock(project.slugLocked, running: project.tag == .running || project.tag == .starting)
     }
-    private var linkLocked: Bool { project.tag == .running || project.tag == .starting }
+    private var linkLocked: Bool { linkLock != nil }
+    private var defaultSection: SettingsSave {
+        SettingsSave.defaultAction(
+            touched: touched, showing: [
+                .name: changed, .running: !runningPatch.isEmpty, .link: slug != project.slug,
+            ])
+    }
     private var nameProblem: String? { ProjectRules.nameProblem(name) }
     private var slugProblem: String? { slug == project.slug ? nil : ProjectRules.slugProblem(slug) }
     private var limitsNow: ProjectLimits { limitsDraft ?? project.limits }
@@ -47,6 +59,7 @@ struct ModuleSettings: View {
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         whatItIs
+                        if insights.supported { fetching }
                         link
                     }
                 }
@@ -56,13 +69,18 @@ struct ModuleSettings: View {
         .task(id: project.id) { await insights.loadTuning() }
         .task { await model.loadRunners() }
         // Leaving the space (Esc, Back) asks first while there is something unsaved here.
-        .onChange(of: changed || limitsDraft != nil || runnerDraft != nil, initial: true) { _, dirty in
+        .onChange(of: changed || slug != project.slug || limitsDraft != nil || runnerDraft != nil, initial: true) { _, dirty in
             model.setDraft(project.id, dirty: dirty)
         }
         .onDisappear { model.setDraft(project.id, dirty: false) }
         .onChange(of: project.name) { old, new in if name == old { name = new } }
         .onChange(of: project.description) { old, new in if description == old { description = new } }
         .onChange(of: project.slug) { old, new in if slug == old { slug = new } }
+        .onChange(of: name) { _, _ in touched = .name }
+        .onChange(of: description) { _, _ in touched = .name }
+        .onChange(of: slug) { _, _ in touched = .link }
+        .onChange(of: limitsDraft) { _, _ in touched = .running }
+        .onChange(of: runnerDraft) { _, _ in touched = .running }
         .onChange(of: project.limits) { _, new in if limitsDraft == new { limitsDraft = nil } }
         .onChange(of: project.runner) { _, new in if runnerDraft == new { runnerDraft = nil } }
         .accessibilityIdentifier("project-page-Settings")
@@ -74,38 +92,59 @@ struct ModuleSettings: View {
         PgBlock("Name and look") {
             VStack(alignment: .leading, spacing: Space.s3) {
                 CoreTextField(
-                    "Name", placeholder: "Project name", text: $name, error: changed ? nameProblem : nil, onSubmit: save)
-                CoreTextField("Description", placeholder: "What it is, in a line", text: $description, onSubmit: save)
+                    "Name", placeholder: "Project name", text: $name, error: changed ? nameProblem : nil,
+                    onSubmit: saveName)
+                CoreTextField("Description", placeholder: "What it is, in a line", text: $description, onSubmit: saveName)
                 VStack(alignment: .leading, spacing: Space.s1) {
                     CoreFieldLabel("Colour")
                     ColourSwatches(
                         selection: Binding(get: { model.colour(project) }, set: { model.setColour($0, for: project) }),
                         compact: true)
                 }
-                if let e = model.writeError { CoreFieldError(e) }
-                saveBar(show: changed, disabled: nameProblem != nil || slugProblem != nil) {
+                if let e = errors[.name] { CoreFieldError(e) }
+                saveBar(.name, show: changed, disabled: nameProblem != nil) {
                     name = project.name
                     description = project.description
-                    slug = project.slug
-                    model.clearWriteError()
-                } save: { save() }
+                    errors[.name] = nil
+                } save: { saveName() }
             }
         }
-        .onChange(of: name) { _, _ in model.clearWriteError() }
+        .onChange(of: name) { _, _ in errors[.name] = nil }
     }
 
-    private func save() {
-        guard changed, nameProblem == nil, slugProblem == nil, !model.busy else { return }
-        Task { await model.saveGeneral(project, name: name, description: description, slug: slug) }
+    private func saveName() {
+        guard changed, nameProblem == nil, !model.busy else { return }
+        Task {
+            model.clearWriteError()
+            if await model.saveGeneral(project, name: name, description: description) { errors[.name] = nil } else {
+                errors[.name] = model.writeError
+                model.clearWriteError()
+            }
+        }
     }
 
-    private func saveBar(show: Bool, disabled: Bool, revert: @escaping () -> Void, save: @escaping () -> Void) -> some View {
+    private func saveLink() {
+        guard slug != project.slug, slugProblem == nil, !linkLocked, !model.busy else { return }
+        Task {
+            model.clearWriteError()
+            if await model.saveGeneral(project, name: project.name, description: project.description, slug: slug) {
+                errors[.link] = nil
+            } else {
+                errors[.link] = model.writeError
+                model.clearWriteError()
+            }
+        }
+    }
+
+    private func saveBar(
+        _ section: SettingsSave, show: Bool, disabled: Bool, revert: @escaping () -> Void, save: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: Space.s2) {
             if show {
-                Spacer(minLength: 0)
                 Button("Revert", action: revert).buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 Button("Save", action: save).buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: model.busy))
-                    .disabled(disabled || model.busy || model.readOnly).keyboardShortcut(.defaultAction)
+                    .disabled(disabled || model.busy || model.readOnly)
+                    .keyboardShortcut(defaultSection == section ? .defaultAction : nil)
                     .help("Saves the changes above with one Touch ID")
             }
         }
@@ -130,6 +169,26 @@ struct ModuleSettings: View {
                             .disabled(model.readOnly || model.busy)
                     }
                 }
+                if let e = model.writeError { CoreFieldError(e) }
+            }
+        }
+    }
+
+    // MARK: Fetching
+
+    /// How often the Core fetches the repos by itself (the Core's own setting, per project).
+    private var fetching: some View {
+        PgBlock("Fetch interval") {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                CoreSelect(
+                    nil,
+                    selection: Binding(
+                        get: { insights.tuning.fetchInterval },
+                        set: { v in Task { await insights.set(fetchInterval: v) } }),
+                    options: FetchInterval.options.map { CoreSelectOption($0.minutes, $0.title) }
+                )
+                .disabled(model.readOnly || !insights.tuningLoaded).frame(width: Space.s8 * 5)
+                PgQuiet("The Core copies each repo by itself. Fetch Now on the Code page does it at once.")
             }
         }
     }
@@ -187,7 +246,7 @@ struct ModuleSettings: View {
                         }
                     }
                 }
-                saveBar(show: !runningPatch.isEmpty, disabled: false) {
+                saveBar(.running, show: !runningPatch.isEmpty, disabled: false) {
                     limitsDraft = nil
                     runnerDraft = nil
                 } save: {
@@ -246,17 +305,18 @@ struct ModuleSettings: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: Space.s1) {
-                    CoreTextField("Link name", placeholder: "atlas-notes", text: $slug, error: slugProblem, onSubmit: save)
-                        .disabled(model.readOnly || linkLocked)
-                        .help(linkLocked ? "Stop the project to change its link name." : "")
-                    PgQuiet(
-                        linkLocked
-                            ? "Stop the project to change its link name."
-                            : "\(ProjectRules.host(slug)). It can change while the project is stopped.")
+                    CoreTextField(
+                        "Link name", placeholder: "atlas-notes", text: $slug, error: slugProblem ?? errors[.link],
+                        onSubmit: saveLink
+                    )
+                    .disabled(model.readOnly || linkLocked)
+                    .help(linkLock ?? "")
+                    PgQuiet(linkLock ?? "\(ProjectRules.host(slug)). It can change while the project is stopped.")
                 }
-                saveBar(show: slug != project.slug, disabled: slugProblem != nil || nameProblem != nil) {
+                saveBar(.link, show: slug != project.slug, disabled: slugProblem != nil || linkLocked) {
                     slug = project.slug
-                } save: { save() }
+                    errors[.link] = nil
+                } save: { saveLink() }
             }
         }
     }

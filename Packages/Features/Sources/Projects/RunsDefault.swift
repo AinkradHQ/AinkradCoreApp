@@ -2,8 +2,8 @@ import CoreUI
 import SwiftUI
 
 /// The Default of the Runs page: the project's own setup (the run spec) as the first configuration. The header Start runs the
-/// same thing; here it has its services, its history of versions and Edit Setup. The Core lays no environment over it (only a
-/// configuration gets variables), which the note says in one line.
+/// same thing; here it has its services, its history of versions and Edit Setup. Its variables are in the Environment tab (API
+/// 112); an older Core keeps variables on configurations only, which the note says in one line.
 struct DefaultDetail: View {
     let runs: RunConfigsModel
     let project: ProjectItem
@@ -59,7 +59,10 @@ struct DefaultDetail: View {
                         text: s.error ?? ProjectsModel.reason(s.stopReason), tone: .fail)
                 }
                 if setup.drafted, let spec = setup.spec { DraftLine(project: project, run: setup, spec: spec) }
-                SetupContent(project: project, run: setup, showLogs: { _ in runs.tab = .live })
+                SetupContent(project: project, run: setup, showLogs: { name in
+                    runs.model.logService = name
+                    runs.model.go(.logs, in: project.id)
+                })
                 note
             }
         }
@@ -70,9 +73,17 @@ struct DefaultDetail: View {
     private var note: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
             Image(systemName: "info.circle").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-            Text("Starts the setup as saved. Variables belong to configurations; the secrets it uses are in Environment.")
-                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            Button("Secrets") { runs.tab = .environment }.buttonStyle(CoreButtonStyle(.plain, size: .small))
+            Text(
+                runs.model.core112
+                    ? "Starts the setup as saved. Its variables and the secrets they use are in Environment."
+                    : "Starts the setup as saved. This Core keeps variables on configurations only; update it to give the Default its own."
+            )
+            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            Button(runs.model.core112 ? "Variables" : "Secrets") {
+                runs.tab = .environment
+                if runs.model.core112 { Task { await runs.pickConfig(RunConfigsModel.defaultID) } }
+            }
+            .buttonStyle(CoreButtonStyle(.plain, size: .small))
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .coreCard(GlassInk.well, radius: Radius.cardMac)

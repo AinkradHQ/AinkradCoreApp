@@ -49,7 +49,7 @@ struct BrainPage: View {
                             symbol: "brain", title: linked ? "\(project.name) room is empty" : "No room yet",
                             line: emptyLine,
                             primary: linked
-                                ? CoreAction("Open Room in Brain") { model.host.shell.launcher.entry("brain")?.run() }
+                                ? CoreAction("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
                                 : nil
                         )
                         if !linked { NoRoomActions(model: model, project: project) }
@@ -89,7 +89,8 @@ struct BrainPage: View {
             title: "What Core remembers", sub: insights.knowledge == nil ? nil : "\(items.count) shown",
             accessory: {
                 Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }.buttonStyle(
-                    CoreButtonStyle(.secondary, size: .small))
+                    CoreButtonStyle(.secondary, size: .small)
+                ).help("Opens the Brain. It does not pick this project’s room for you.")
             }
         ) {
             if insights.knowledge == nil {
@@ -107,8 +108,8 @@ struct BrainPage: View {
         Island(
             title: "Summary", sub: "\(project.name) room · updated \(room.updated)",
             accessory: {
-                Button("Open Room") { model.host.shell.launcher.entry("brain")?.run() }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Opens the Brain. It does not pick this project’s room for you.")
                 Button("Rewrite") { Task { await model.rewriteRoom(project) } }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                     .disabled(model.readOnly || project.live?.roomID == nil)

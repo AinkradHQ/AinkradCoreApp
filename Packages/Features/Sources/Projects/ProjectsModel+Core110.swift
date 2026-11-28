@@ -143,7 +143,7 @@ extension ProjectsModel {
         reapply(id)
         let name = project(id)?.name ?? "A project"
         host.shell.showToast(
-            "\(name): \(crash.words)", kind: .warn, actionTitle: "Open logs", lifetime: 12,
+            "\(name): \(crash.words)", kind: .warn, actionTitle: "Open Logs", lifetime: 12,
             undo: { [weak self] in self?.openLogs(id) })
     }
 
@@ -170,11 +170,9 @@ struct ServiceCrash: Equatable, Sendable {
     let environment: String?
     let at: Date
 
-    /// "api crashed (exit code 1, restarted 3 times)".
+    /// "api kept crashing and was stopped" once it was restarted several times; the exit code is in the logs.
     var words: String {
-        var bits: [String] = []
-        if let exitCode { bits.append("exit code \(exitCode)") }
-        if restarts > 0 { bits.append("restarted \(restarts) \(restarts == 1 ? "time" : "times")") }
-        return "\(service) crashed" + (bits.isEmpty ? "" : " (\(bits.joined(separator: ", ")))")
+        if restarts >= 3 { return "\(service) kept crashing and was stopped" }
+        return restarts > 0 ? "\(service) crashed and was restarted" : "\(service) crashed"
     }
 }

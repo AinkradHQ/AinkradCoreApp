@@ -1,6 +1,26 @@
 import CoreUI
 import SwiftUI
 
+/// The three blocks of Settings that each have their own Save, and which one Return belongs to.
+enum SettingsSave: Hashable, Sendable {
+    case name, running, link
+
+    /// The section whose Save is the default action: the one worked in last while it has changes, else the first with some.
+    static func defaultAction(touched: SettingsSave, showing: [SettingsSave: Bool]) -> SettingsSave {
+        if showing[touched] == true { return touched }
+        return [SettingsSave.name, .link, .running].first { showing[$0] == true } ?? touched
+    }
+
+    /// The words for a locked link name, from the Core's `slug_locked` (`running` or `has_secrets`); nil when it can change.
+    static func linkLock(_ locked: String?, running: Bool) -> String? {
+        switch locked {
+        case "running": "Stop the project to change its link name."
+        case "has_secrets": "The link name is part of this project’s secrets, so it cannot change. Delete the secrets first."
+        default: running ? "Stop the project to change its link name." : nil
+        }
+    }
+}
+
 /// A type tile of "What it is": the kind's icon, name and what it adds, with a check box. Several may be on.
 struct SettingsKindTile: View {
     let kind: ProjectKind
@@ -13,7 +33,7 @@ struct SettingsKindTile: View {
         case .web: "Web"
         case .app: "App"
         case .infra: "Infra"
-        case .other: "Not software"
+        case .other: "Docs"
         }
     }
 
@@ -22,7 +42,7 @@ struct SettingsKindTile: View {
         case .web: "Live site, link"
         case .app: "Builds, devices"
         case .infra: "Services, health"
-        case .other: "Documents only"
+        case .other: "Docs and notes"
         }
     }
 
@@ -69,7 +89,7 @@ struct ArchiveDeleteBlock: View {
                     model.insightsService == nil
                         ? "Stops it and hides it. Repos, secrets and the Brain room stay. This Core cannot bring it back from here."
                         : "Stops it and hides it. Repos, secrets and the Brain room stay. Undo for a few seconds.",
-                    button: "Archive…", symbol: "archivebox", danger: false
+                    button: model.insightsService == nil ? "Archive…" : "Archive", symbol: "archivebox", danger: false
                 ) {
                     if model.insightsService == nil {
                         model.confirmArchive(project)
@@ -123,7 +143,7 @@ struct ArchiveDeleteBlock: View {
                 }
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 Button("Delete Permanently") { Task { await model.deleteForever(project) } }
-                    .buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: model.busy))
+                    .buttonStyle(CoreButtonStyle(.danger, size: .small, busy: model.busy))
                     .disabled(!matches || model.busy)
                     .help(matches ? "Delete \(project.name) for good" : "Type the project’s name first")
             }

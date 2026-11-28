@@ -303,6 +303,8 @@ final class ProjectInsightsModel {
     private(set) var tuning = ProjectTuning()
     private(set) var tuningLoaded = false
     private(set) var environments: [String] = []
+    /// Why a read failed, by what was read (`changes`, `knowledge`); empty when they all worked.
+    private(set) var failures: [String: String] = [:]
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
@@ -314,16 +316,23 @@ final class ProjectInsightsModel {
 
     func loadCode() async { if let s = service { code = try? await s.code(project: project.id) } }
     func loadUsage() async { if let s = service { usage = try? await s.usage(project: project.id) } }
-    func loadChanges() async { if let s = service { changes = try? await s.changes(project: project.id) } }
+    func loadChanges() async {
+        guard let s = service else { return }
+        do {
+            changes = try await s.changes(project: project.id)
+            failures["changes"] = nil
+        } catch { failures["changes"] = model.words(error) }
+    }
 
     func loadKnowledge() async {
         guard let s = service else { return }
         let room = (try? await s.tuning(project: project.id))?.roomID
-        async let k = try? s.area("knowledge", room: room)
-        async let r = try? s.area("rules", room: room)
-        let (kk, rr) = await (k, r)
-        knowledge = kk.map { ProjectKnowledge.records($0, room: room) }
-        rules = rr.map { ProjectKnowledge.records($0, room: room) }
+        failures["knowledge"] = nil
+        do { knowledge = ProjectKnowledge.records(try await s.area("knowledge", room: room), room: room) } catch {
+            knowledge = nil
+            failures["knowledge"] = model.words(error)
+        }
+        rules = (try? await s.area("rules", room: room)).map { ProjectKnowledge.records($0, room: room) }
     }
 
     func loadDocs() async {
@@ -344,18 +353,27 @@ final class ProjectInsightsModel {
         tuningLoaded = true
     }
 
-    /// Saves one knob; the page shows the change at once and the Core's answer replaces it on the next load.
+    /// Saves one knob; the page shows the change at once and the Core's answer replaces it on the next load. The fetch interval
+    /// saves quietly; the default environment is a change to the project like any other, so it asks for Touch ID and reloads.
     func set(fetchInterval: Int? = nil, defaultEnvironment: String? = nil) async {
-        guard let s = service, model.mayWrite() else { return }
         let was = tuning
+        if let defaultEnvironment {
+            tuning.defaultEnvironment = defaultEnvironment
+            let patch = ProjectPatch(defaultEnvironment: defaultEnvironment)
+            if await model.change(project, patch, why: "Change the default environment of \(project.name).") {
+                await loadTuning()
+            } else {
+                tuning = was
+            }
+            return
+        }
+        guard let s = service, model.mayWrite() else { return }
         if let fetchInterval { tuning.fetchInterval = fetchInterval }
-        if let defaultEnvironment { tuning.defaultEnvironment = defaultEnvironment }
         do {
-            try await s.setTuning(
-                project: project.id, fetchInterval: fetchInterval, defaultEnvironment: defaultEnvironment)
+            try await s.setTuning(project: project.id, fetchInterval: fetchInterval, defaultEnvironment: nil)
         } catch {
             tuning = was
-            model.host.shell.showToast("Could not save that. Try again.", kind: .warn)
+            model.host.shell.showToast("Could not save that: \(model.words(error))", kind: .warn)
         }
     }
 }

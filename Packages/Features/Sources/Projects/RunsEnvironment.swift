@@ -57,12 +57,14 @@ struct EnvironmentTab: View {
                         ? "\(runs.env) is the project's default; pick another default in Project Settings first"
                         : "Remove the \(runs.env) environment")
             Spacer(minLength: 0)
-            if runs.configs.count > 1 {
+            if runs.configs.count > 1 || (runs.model.core112 && !runs.configs.isEmpty) {
                 CoreSelect(
                     nil,
                     selection: Binding(
-                        get: { runs.envConfigItem?.id ?? 0 }, set: { id in Task { await runs.pickConfig(id) } }),
-                    options: runs.configs.map { CoreSelectOption($0.id, $0.name) }
+                        get: { runs.envIsDefault ? RunConfigsModel.defaultID : runs.envConfigItem?.id ?? 0 },
+                        set: { id in Task { await runs.pickConfig(id) } }),
+                    options: (runs.model.core112 ? [CoreSelectOption(RunConfigsModel.defaultID, RunConfigsModel.defaultName)] : [])
+                        + runs.configs.map { CoreSelectOption($0.id, $0.name) }
                 )
                 .frame(width: Space.s8 * 5)
             }
@@ -73,23 +75,28 @@ struct EnvironmentTab: View {
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             .disabled(runs.model.readOnly || runs.envConfigItem == nil)
+            .help(runs.envIsDefault ? "Import is for configurations. Add the Default's variables one by one." : "")
             Button {
                 Task { await runs.toggleCompare() }
             } label: {
                 Label("Compare", systemImage: "arrow.left.arrow.right")
             }
             .buttonStyle(CoreButtonStyle(runs.comparing ? .prominent : .secondary, size: .small))
-            .disabled(runs.envs.count < 2)
+            .disabled(runs.envs.count < 2 || runs.envIsDefault)
+            .help(runs.envIsDefault ? "Compare is for configurations." : "")
         }
     }
 
     private var variables: some View {
         Island(
-            title: "\(runs.env) variables for \(runs.envConfigItem?.name ?? "")",
+            title: "\(runs.env) variables for \(runs.envOwnerName)",
             accessory: { Text(runs.varsLine).foregroundStyle(GlassInk.secondary) }
         ) {
-            if runs.envConfigItem == nil {
-                Text("Add a configuration first.").foregroundStyle(GlassInk.secondary)
+            if !runs.envReady {
+                Text(runs.envIsDefault ? "Update the Core to give the Default its own variables." : "Add a configuration first.")
+                    .foregroundStyle(GlassInk.secondary)
+            } else if let why = runs.varsError {
+                LoadFailed(what: "the variables", why: why) { Task { await runs.loadVars() } }
             } else {
                 ScrollView {
                     VStack(spacing: Space.s1) {
@@ -194,7 +201,7 @@ private struct VarRow: View {
             Spacer(minLength: 0)
             Text(v.secret.map { "From Secrets: \($0)" } ?? "Plain value").foregroundStyle(GlassInk.secondary)
                 .coreFont(size: MacTextSize.meta)
-            if v.secret == nil {
+            if v.secret == nil, !runs.envIsDefault {
                 CoreIconButton(
                     symbol: shown == nil ? "eye" : "eye.slash",
                     label: shown == nil ? "Show the value" : "Hide the value"
@@ -215,10 +222,12 @@ private struct VarRow: View {
     private var items: [CoreDropdownItem] {
         var out: [CoreDropdownItem] = []
         if v.secret == nil {
-            out.append(
-                CoreDropdownItem(shown == nil ? "Show the value" : "Hide the value", symbol: "eye") {
-                    Task { await runs.toggleReveal(v) }
-                })
+            if !runs.envIsDefault {
+                out.append(
+                    CoreDropdownItem(shown == nil ? "Show the value" : "Hide the value", symbol: "eye") {
+                        Task { await runs.toggleReveal(v) }
+                    })
+            }
             out.append(
                 CoreDropdownItem(
                     "Link to a Secret", symbol: "key", enabled: !runs.secretNames.isEmpty && !runs.model.readOnly,

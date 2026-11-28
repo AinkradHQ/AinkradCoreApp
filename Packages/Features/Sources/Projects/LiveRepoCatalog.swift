@@ -18,24 +18,24 @@ struct LiveRepoCatalog: RepoCatalog {
             guard case CoreError.http(409, "no_connection", _)? = CoreFailure.of(error) else {
                 throw CoreFailure.of(error) ?? error
             }
-            // Connected, but never made the default (Connections does not set one): with exactly one GitHub
-            // connection the choice is not ambiguous, so make it the default and ask once more.
-            guard try await adoptOnlyGithub() else { return nil }
-            list = try await connection.client.listGithubRepos(
-                query: .init(q: query.isEmpty ? nil : query, page: Int64(page), perPage: 30)
-            ).ok.body.json
+            // Connected, but never made the default (Connections does not set one): with exactly one GitHub connection the
+            // choice is not ambiguous, so the model makes it the default (behind Touch ID) and asks again.
+            guard let only = try await onlyGithub() else { return nil }
+            throw CatalogNeedsDefault(connection: only)
         }
         return Self.page(list)
     }
 
-    /// Makes the workspace's one usable GitHub connection its default; false when it has none or several.
-    private func adoptOnlyGithub() async throws -> Bool {
+    /// The workspace's one usable GitHub connection; nil when it has none or several.
+    private func onlyGithub() async throws -> Int64? {
         let all = try await connection.client.listConnections().ok.body.json
         let github = all.filter { $0.kind == "github" && !$0.disabled && $0.status != "disabled" }
-        guard github.count == 1 else { return false }
-        let body = try JSONSerialization.data(withJSONObject: ["connection": github[0].id])
+        return github.count == 1 ? github[0].id : nil
+    }
+
+    func makeDefault(connection id: Int64) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["connection": id])
         _ = try await connection.signedRequest(method: "PUT", target: "/api/v1/connection-defaults/github", body: body)
-        return true
     }
 
     /// The Core's answer as JSON, for tests.

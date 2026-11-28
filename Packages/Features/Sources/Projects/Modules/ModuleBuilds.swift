@@ -57,10 +57,7 @@ struct ModuleBuilds: View {
 
     @ViewBuilder private var content: some View {
         if let e = runs.loadError {
-            CoreNotice(symbol: "exclamationmark.triangle", title: "Unable to load the builds", text: e, tone: .fail) {
-                Button("Try Again") { Task { await runs.load() } }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            }
-            .padding(.horizontal, Space.s5)
+            LoadFailed(what: "the builds", why: e) { Task { await runs.load() } }.padding(.horizontal, Space.s5)
         } else if runs.history.isEmpty {
             ModuleQuiet(symbol: "hammer", title: "No builds yet", line: "Build and Run makes the first one.") {
                 Button("Build and Run") { model.control(.start, project) }.buttonStyle(CoreButtonStyle(.prominent))
@@ -111,17 +108,25 @@ struct ModuleBuilds: View {
         PgHead(kicker: "Built \(runsAgo(r.startedAt, now: model.now())) on \(runs.runnerName(r.runner))" + (took(r).map { " · \($0)" } ?? ""), title: title(r)) {
             if r.state == "failed" {
                 Button {
-                    model.newSession(in: project)
+                    model.newSession(
+                        in: project,
+                        prompt: ProjectsModel.fixPrompt(
+                            project: project.name, what: "The build of \(title(r))",
+                            details: [
+                                r.error, r.environment.map { "Environment: \($0)" }, "Ran on \(runs.runnerName(r.runner)).",
+                                r.stopReason.map { "Stopped because: \(ProjectsModel.reason($0))" },
+                            ]))
                 } label: {
                     Label("Ask AI to Fix", systemImage: "sparkles")
                 }
-                .buttonStyle(CoreButtonStyle(.secondary)).disabled(!model.canStartSession(project))
-                .help(model.sessionBlock(project))
+                .buttonStyle(CoreButtonStyle(.secondary, busy: model.startingSession.contains(project.id)))
+                .disabled(!model.canStartSession(project))
+                .help("Start an AI session that begins with this failure")
             }
             Button {
                 Task {
                     if let c = runs.configs.first(where: { $0.id == r.configID }) {
-                        await runs.start(c, project: project)
+                        await runs.start(c, project: project, environment: r.environment)
                     } else {
                         await runs.startDefault(project)
                     }

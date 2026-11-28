@@ -47,7 +47,7 @@ struct ProjectsEmptyHero: View {
         (.web, "Web", "A site or web app, with a live preview."),
         (.app, "App", "A Mac, phone or desktop app you build and run."),
         (.infra, "Infra", "Servers, a platform or an operating system."),
-        (.other, "Anything else", "A book, research or a business. No code needed."),
+        (.other, "Docs", "A book, research or a business. No code needed."),
     ]
 }
 

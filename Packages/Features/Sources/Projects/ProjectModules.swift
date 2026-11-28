@@ -14,7 +14,7 @@ enum ProjectModule: String, CaseIterable, Identifiable, Sendable {
         case .live: "Live site"
         case .builds: "Builds"
         case .services: "Services"
-        case .docs: "Documents"
+        case .docs: "Docs"
         case .logs: "Logs"
         case .run: "Run setup"
         case .ai: "AI Sessions"

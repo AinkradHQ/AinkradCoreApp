@@ -134,12 +134,20 @@ struct ModuleBrain: View {
                 Button {
                     open()
                 } label: {
-                    Label("Open in Brain", systemImage: "arrow.up.forward.square")
+                    Label("Open Brain", systemImage: "arrow.up.forward.square")
                 }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Open this room in the Brain")
+                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Opens the Brain. It does not pick this room for you.")
             }
         } content: {
-            if linked {
+            if linked, let why = insights.failures["knowledge"] ?? model.liveFailures[project.id]?["room"] {
+                LoadFailed(what: "the room", why: why) {
+                    Task {
+                        await model.refreshLive(project.id)
+                        await insights.loadKnowledge()
+                    }
+                }
+                .padding(Space.s4)
+            } else if linked {
                 let c = content
                 ModuleSplit(pickID: section.rawValue) {
                     ModuleList(ids: ids, pick: $pick, onOpen: open) {
@@ -181,7 +189,7 @@ struct ModuleBrain: View {
                 } label: {
                     Label("Add in Brain", systemImage: "plus")
                 }
-                .buttonStyle(CoreButtonStyle(.prominent)).help("Open the Brain to write a decision in this room")
+                .buttonStyle(CoreButtonStyle(.prominent)).help("Opens the Brain, where decisions are written. It does not pick this room for you.")
             case .about:
                 if project.live?.room != nil {
                     Button("Edit Instructions…") { model.openInstructions(project) }

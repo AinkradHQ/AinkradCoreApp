@@ -164,7 +164,9 @@ struct HistoryTab: View {
         Island(title: "History", accessory: { Text("Latest 30").foregroundStyle(GlassInk.secondary) }) {
             ScrollView {
                 VStack(spacing: Space.s1) {
-                    if runs.history.isEmpty {
+                    if let why = runs.historyError {
+                        LoadFailed(what: "the history", why: why) { Task { await runs.refreshHistory() } }
+                    } else if runs.history.isEmpty {
                         Text("Nothing has run yet.").foregroundStyle(GlassInk.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -179,7 +181,7 @@ struct HistoryTab: View {
                                 Button {
                                     Task {
                                         if let c = runs.configs.first(where: { $0.id == r.configID }) {
-                                            await runs.start(c, project: project)
+                                            await runs.start(c, project: project, environment: r.environment)
                                         } else {
                                             await runs.startDefault(project)
                                         }

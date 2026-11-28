@@ -173,7 +173,7 @@ struct ModuleRepos: View {
         let short = r.head.map { String($0.prefix(7)) } ?? "–"
         var branch = r.branch
         if let i = info, i.ahead > 0 || i.behind > 0 { branch += " · \(i.ahead) ahead, \(i.behind) behind" }
-        var out = [("Branch", branch), ("Core copy", "\(short) · \(copyAge(r))")]
+        var out = [("Branch", branch), ("Core copy", r.head == nil ? copyAge(r) : "\(short) · \(copyAge(r))")]
         if let i = info { out.append(("Files", i.files.formatted())) }
         if let e = extra { out += [("Used by", e.usedBy), ("Size", e.size)] }
         return out

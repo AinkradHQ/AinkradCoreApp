@@ -76,7 +76,7 @@ struct OverviewStage: View {
         case .web: "Live site"
         case .app: "Latest build"
         case .infra: "Service map"
-        case .other: "Documents"
+        case .other: "Docs"
         }
     }
 

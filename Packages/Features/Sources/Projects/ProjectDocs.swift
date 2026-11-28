@@ -148,14 +148,11 @@ final class ProjectDocs {
 
     /// A blank note in this project, opened in Lore at once.
     func newDoc() {
-        guard let service = model.lore else { return }
         Task {
-            do {
-                let n = try await service.create(text: "", project: pid)
+            if let why = await model.createDoc(in: project) { notice = why } else {
                 notice = nil
-                open(n.id)
                 await load()
-            } catch { notice = "Unable to create the doc." }
+            }
         }
     }
 
@@ -197,7 +194,7 @@ struct DocsPage: View {
             ScrollView {
                 VStack(spacing: Space.s1) {
                     if list.isEmpty {
-                        Text("None yet. Documents an AI session writes show up here.").foregroundStyle(
+                        Text("None yet. Docs an AI session writes show up here.").foregroundStyle(
                             GlassInk.secondary)
                     }
                     ForEach(list) { d in
@@ -236,7 +233,8 @@ struct DocsPage: View {
                 } label: {
                     Label("New Doc", systemImage: "plus")
                 }
-                .buttonStyle(CoreButtonStyle(.prominent)).disabled(model.readOnly || model.lore == nil)
+                .buttonStyle(CoreButtonStyle(.prominent, busy: model.creatingDoc.contains(project.id)))
+                .disabled(model.readOnly || model.lore == nil || model.creatingDoc.contains(project.id))
                 .help("Write a new doc in \(project.name)")
             }
         ) {
@@ -253,13 +251,13 @@ struct DocsPage: View {
             Text("Loading docs…").foregroundStyle(GlassInk.secondary)
         case .failed(let why):
             CoreStateCard(
-                symbol: "exclamationmark.triangle", title: "Unable to Load Docs", line: why,
+                symbol: "exclamationmark.triangle", title: "Unable to load docs", line: why,
                 primary: CoreAction("Try Again") { Task { await docs.load() } }
             )
             .frame(maxWidth: .infinity)
         case .ready where docs.docs.isEmpty:
             CoreStateCard(
-                symbol: "doc.text", title: "No Docs Yet",
+                symbol: "doc.text", title: "No docs yet",
                 line: "Import the Markdown docs from this project’s repos, or write the first one.",
                 secondary: CoreAction("New Doc") { docs.newDoc() },
                 primary: docs.canImport ? CoreAction("Import from Repo…") { docs.importFromRepo() } : nil

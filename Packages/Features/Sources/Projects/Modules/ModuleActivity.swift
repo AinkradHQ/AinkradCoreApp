@@ -101,6 +101,7 @@ struct ModuleActivity: View {
     @State private var kind = ActivityKind.all
     @State private var runs: [RunRecord] = []
     @State private var names: [Int64: String] = [:]
+    @State private var runsFailure: String?
     @State private var insights: ProjectInsightsModel
 
     init(model: ProjectsModel, project: ProjectItem) {
@@ -120,7 +121,9 @@ struct ModuleActivity: View {
                 "Show", segments: ActivityKind.allCases.map { CoreSegment($0, $0.rawValue) }, selection: $kind)
         } content: {
             ModuleWell {
-                if shown.isEmpty {
+                if let why = insights.failures["changes"] ?? runsFailure {
+                    LoadFailed(what: "the activity", why: why) { Task { await load() } }.padding(Space.s4)
+                } else if shown.isEmpty {
                     ModuleQuiet(
                         symbol: "waveform.path.ecg",
                         title: kind == .all ? "Nothing has happened yet" : "No \(kind.rawValue) activity",
@@ -146,15 +149,18 @@ struct ModuleActivity: View {
             }
         }
         .animation(Motion.out(Motion.ui), value: kind)
-        .task(id: project.id) {
-            await insights.loadChanges()
-            if let svc = model.configsService {
-                runs = (try? await svc.history(project: project.id)) ?? []
-                names = Dictionary(
-                    uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) }
-                )
-            }
-        }
+        .task(id: project.id) { await load() }
+    }
+
+    private func load() async {
+        await insights.loadChanges()
+        guard let svc = model.configsService else { return }
+        do {
+            runs = try await svc.history(project: project.id)
+            names = Dictionary(
+                uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) })
+            runsFailure = nil
+        } catch { runsFailure = model.words(error) }
     }
 
     private func event(_ e: ActivityEvent) -> some View {
