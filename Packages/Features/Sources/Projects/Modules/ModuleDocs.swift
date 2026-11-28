@@ -34,9 +34,9 @@ struct ModuleDocs: View {
     }
 
     var body: some View {
-        Island(
+        ModulePage(
             title: "Documents", sub: docs.phase == .ready && !docs.docs.isEmpty ? "\(docs.docs.count) in this project" : nil,
-            accessory: {
+            tools: {
                 if !docs.docs.isEmpty { FilterField(text: Bindable(docs).query, label: "Search documents") }
                 if docs.canImport {
                     Button {
@@ -65,21 +65,23 @@ struct ModuleDocs: View {
 
     @ViewBuilder private var content: some View {
         switch docs.phase {
-        case .loading: PgQuiet("Loading documents…")
+        case .loading: PgQuiet("Loading documents…").padding(.horizontal, Space.s5)
         case .failed(let why):
-            CoreStateCard(
-                symbol: "exclamationmark.triangle", title: "Unable to Load Documents", line: why,
-                primary: CoreAction("Try Again") { Task { await docs.load() } }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ModuleQuiet(symbol: "exclamationmark.triangle", title: "Unable to Load Documents", line: why) {
+                Button("Try Again") { Task { await docs.load() } }.buttonStyle(CoreButtonStyle(.prominent))
+            }
         case .ready where docs.docs.isEmpty && aiDocs.isEmpty:
-            CoreStateCard(
+            ModuleQuiet(
                 symbol: "doc.text", title: "No Documents Yet",
-                line: "Write the first one, or import the Markdown docs from this project’s repos.",
-                secondary: docs.canImport ? CoreAction("Import from Repo…") { docs.importFromRepo() } : nil,
-                primary: CoreAction("New Doc") { docs.newDoc() }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                line: "Write the first one, or import the Markdown docs from this project’s repos."
+            ) {
+                HStack(spacing: Space.s2) {
+                    if docs.canImport {
+                        Button("Import from Repo…") { docs.importFromRepo() }.buttonStyle(CoreButtonStyle(.secondary))
+                    }
+                    Button("New Doc") { docs.newDoc() }.buttonStyle(CoreButtonStyle(.prominent))
+                }
+            }
         case .ready:
             PgSplit(key: currentID ?? "") {
                 if let hits = docs.hits {

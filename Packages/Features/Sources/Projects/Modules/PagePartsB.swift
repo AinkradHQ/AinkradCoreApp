@@ -4,60 +4,29 @@ import SwiftUI
 // Shared pieces of the focused pages (details v2): a list left at 340 pt with the selected row marked, the detail in a plain
 // well on the right, and the small blocks the detail is made of. Each page is one Island whose title row carries its tools.
 
-/// 340 pt list left, plain well right. The detail crossfades when `key` changes (its row is picked).
+/// The shared split (ModuleKit): the list of rows left, the detail right. The detail crossfades when `key` changes.
 struct PgSplit<List: View, Detail: View>: View {
     let key: AnyHashable
     @ViewBuilder var list: List
     @ViewBuilder var detail: Detail
 
-    static var listWidth: CGFloat { 340 }
-
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s3) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.s1) { list }.frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(width: Self.listWidth)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) { detail }.id(key).transition(.opacity).padding(Space.s4)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .coreCard(GlassInk.well, radius: Radius.cardMac)
-            .animation(Motion.out(Motion.ui), value: key)
+        ModuleSplit(pickID: "\(key)") {
+            ScrollView { VStack(alignment: .leading, spacing: Space.s1) { list }.frame(maxWidth: .infinity, alignment: .leading) }
+        } detail: {
+            VStack(alignment: .leading, spacing: 0) { detail }
         }
-        .frame(maxHeight: .infinity)
     }
 }
 
-/// A group title in a list: "Today", "Yesterday".
-struct PgGroup: View {
-    let title: String
-    init(_ title: String) { self.title = title }
-    var body: some View {
-        Text(title).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
-            .padding(.top, Space.s3).padding(.bottom, Space.s1).padding(.horizontal, Space.s3)
-            .accessibilityAddTraits(.isHeader)
-    }
-}
+typealias PgGroup = ModuleGroup
 
-/// The detail's head: a quiet line over the title, the tools on the right.
+/// The detail's head (ModuleKit's ModuleHead with the caption first).
 struct PgHead<Tools: View>: View {
     let kicker: String
     let title: String
     @ViewBuilder var tools: Tools
-    var body: some View {
-        HStack(alignment: .top, spacing: Space.s2) {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                Text(kicker).foregroundStyle(GlassInk.secondary).lineLimit(1)
-                Text(title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(2)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            Spacer(minLength: 0)
-            tools
-        }
-        .padding(.bottom, Space.s4)
-    }
+    var body: some View { ModuleHead(caption: kicker, title: title) { tools } }
 }
 
 /// A block of the detail or of Settings: a small title (and tools), then its content.
@@ -86,20 +55,9 @@ extension PgBlock where Tools == EmptyView {
     }
 }
 
-/// Label and value pairs, two columns.
 struct PgFacts: View {
     let rows: [(String, String)]
-    var body: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s4, verticalSpacing: Space.s2) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
-                GridRow {
-                    Text(r.0).foregroundStyle(GlassInk.secondary).gridColumnAlignment(.leading)
-                    Text(r.1).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-        .padding(.bottom, Space.s2)
-    }
+    var body: some View { ModuleFacts(facts: rows) }
 }
 
 /// A quiet line: what is missing and when it will be there.

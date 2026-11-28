@@ -39,6 +39,12 @@ protocol ProjectsService: Sendable {
     func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem
     /// A project made from GitHub repos (`owner/name`) in one step: the Core reads each repo's real default branch.
     func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem
+    /// API 112: the Brain room to link and every kind, in the create itself (no room race, no second write).
+    func create(
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?
+    ) async throws -> ProjectItem
+    func createFromGithub(slug: String, name: String, repos: [String], room: String?, kinds: [String]?) async throws
+        -> ProjectItem
     /// The Brain's places; nil when this Core has no Brain.
     func places() async throws -> [BrainPlace]?
     /// Links the project to an existing place, so the Brain makes no new one for it.
@@ -112,6 +118,16 @@ extension ProjectsService {
     func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem {
         try await create(slug: slug, name: name)
     }
+    func create(
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?
+    ) async throws -> ProjectItem {
+        try await create(slug: slug, name: name, description: description, runner: runner)
+    }
+    func createFromGithub(slug: String, name: String, repos: [String], room: String?, kinds: [String]?) async throws
+        -> ProjectItem
+    {
+        try await createFromGithub(slug: slug, name: name, repos: repos)
+    }
     /// Stand-ins and tests: a project, then its repos (the live service makes them in one call).
     func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem {
         let p = try await create(slug: slug, name: name)
@@ -167,10 +183,31 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem {
+        try await createFromGithub(slug: slug, name: name, repos: repos, room: nil, kinds: nil)
+    }
+
+    func createFromGithub(slug: String, name: String, repos: [String], room: String?, kinds: [String]?) async throws
+        -> ProjectItem
+    {
         try await run {
             Self.item(
-                try await client.createProjectFromGithub(body: .json(.init(name: name, repos: repos, slug: slug))).ok
-                    .body.json)
+                try await client.createProjectFromGithub(
+                    body: .json(.init(kinds: kinds, name: name, repos: repos, room: room, slug: slug))
+                ).ok.body.json)
+        }
+    }
+
+    func create(
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?
+    ) async throws -> ProjectItem {
+        try await run {
+            Self.item(
+                try await client.createProject(
+                    body: .json(
+                        .init(
+                            description: description.isEmpty ? nil : description, kinds: kinds, name: name,
+                            room: room, runner: runner == "auto" ? nil : runner, slug: slug))
+                ).ok.body.json)
         }
     }
 
@@ -456,7 +493,7 @@ struct LiveProjectsService: ProjectsService {
     }
 
     static func item(_ p: Components.Schemas.ProjectInfo) -> ProjectItem {
-        ProjectItem(
+        var it = ProjectItem(
             id: p.id, slug: p.slug, name: p.name, description: p.description, expose: p.expose,
             repos: p.repos.map {
                 RepoItem(
@@ -467,6 +504,10 @@ struct LiveProjectsService: ProjectsService {
             }, updatedAt: p.updatedAt, cpuLimit: p.cpuLimit, memLimitMb: p.memLimitMb,
             idleMinutes: Int(p.idleMinutes), idleNever: p.idleNever ?? false, runner: p.runner ?? "auto",
             source: p.source, createdAt: p.createdAt, roomID: p.room?.roomId, archived: p.state == "archived")
+        // The Core's kinds (API 111 one, 112 several), read straight from the answer.
+        if let k = p.kind, !k.isEmpty { it.kindName = k }
+        it.kinds = (p.kinds ?? []).compactMap(ProjectKind.init(rawValue:))
+        return it
     }
 
     /// The decoder for the Core's JSON: dates read as the client reads them.

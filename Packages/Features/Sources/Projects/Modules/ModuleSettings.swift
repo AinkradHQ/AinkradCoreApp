@@ -37,7 +37,7 @@ struct ModuleSettings: View {
     private var kinds: [ProjectKind] { project.allKinds }
 
     var body: some View {
-        Island("Settings") {
+        ModulePage(title: "Settings", tools: { EmptyView() }) {
             ScrollView {
                 HStack(alignment: .top, spacing: Space.s6) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -50,7 +50,7 @@ struct ModuleSettings: View {
                         link
                     }
                 }
-                .padding(.bottom, Space.s4)
+                .padding(.horizontal, Space.s5).padding(.bottom, Space.s4)
             }
         }
         .task(id: project.id) { await insights.loadTuning() }

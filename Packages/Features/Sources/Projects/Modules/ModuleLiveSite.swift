@@ -52,9 +52,9 @@ struct ModuleLiveSite: View {
     // MARK: stage
 
     private var stageIsland: some View {
-        Island(
+        ModulePage(
             title: project.link, sub: project.expose ? "public" : "only your devices",
-            accessory: {
+            tools: {
                 CoreSegmented(
                     "Width", segments: Device.allCases.map { CoreSegment($0, $0.rawValue) },
                     selection: Binding(get: { device }, set: { device = $0 })
@@ -83,7 +83,7 @@ struct ModuleLiveSite: View {
                 .animation(Motion.out(Motion.ui), value: coverKey)
                 .frame(width: geo.size.width, height: geo.size.height)
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: .infinity).padding(.horizontal, Space.s2).padding(.bottom, Space.s2)
         }
         .animation(Motion.out(Motion.ui), value: device)
     }
@@ -226,7 +226,7 @@ struct ModuleLiveSite: View {
     // MARK: inspector
 
     private var inspector: some View {
-        Island("Live site") {
+        ModulePage(title: "Live site", tools: { EmptyView() }) {
             VStack(alignment: .leading, spacing: 0) {
                 PgBlock("Link") {
                     HStack(spacing: Space.s2) {
@@ -252,7 +252,7 @@ struct ModuleLiveSite: View {
                 PgBlock("Stops by itself") { idle }
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.horizontal, Space.s5).frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 

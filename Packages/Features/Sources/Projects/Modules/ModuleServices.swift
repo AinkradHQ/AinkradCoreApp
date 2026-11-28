@@ -44,9 +44,9 @@ struct ModuleServices: View {
     private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
     var body: some View {
-        Island(
+        ModulePage(
             title: "Services",
-            accessory: {
+            tools: {
                 FilterField(text: $filter, label: "Filter services")
                 Button {
                     model.control(.restart, project)
@@ -58,13 +58,12 @@ struct ModuleServices: View {
             }
         ) {
             if rows.isEmpty {
-                CoreStateCard(
+                ModuleQuiet(
                     symbol: "server.rack",
                     title: filter.isEmpty ? "No Services Yet" : "No Service Matches",
                     line: filter.isEmpty
                         ? "The services appear once \(project.name) has a setup and runs."
                         : "No service is called “\(filter)”.")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 PgSplit(key: current?.id ?? "") {
                     ForEach(rows) { r in

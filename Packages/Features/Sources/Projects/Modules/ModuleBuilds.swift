@@ -23,9 +23,9 @@ struct ModuleBuilds: View {
     private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
     var body: some View {
-        Island(
+        ModulePage(
             title: "Builds",
-            accessory: {
+            tools: {
                 CoreSegmented(
                     "Builds shown",
                     segments: [CoreSegment(false, "All"), CoreSegment(true, "Failed")],
@@ -60,15 +60,14 @@ struct ModuleBuilds: View {
             CoreNotice(symbol: "exclamationmark.triangle", title: "Unable to load the builds", text: e, tone: .fail) {
                 Button("Try Again") { Task { await runs.load() } }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
             }
+            .padding(.horizontal, Space.s5)
         } else if runs.history.isEmpty {
-            CoreStateCard(
-                symbol: "hammer", title: "No builds yet",
-                line: "Build and Run makes the first one.",
-                primary: CoreAction("Build and Run") { model.control(.start, project) }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ModuleQuiet(symbol: "hammer", title: "No builds yet", line: "Build and Run makes the first one.") {
+                Button("Build and Run") { model.control(.start, project) }.buttonStyle(CoreButtonStyle(.prominent))
+                    .disabled(!can).help(can ? "Build \(project.name) and run it" : project.startBlock ?? ProjectSpaceCopy.cannot)
+            }
         } else if all.isEmpty {
-            PgQuiet("No build failed. Every build in the list passed.")
+            PgQuiet("No build failed. Every build in the list passed.").padding(.horizontal, Space.s5)
         } else {
             PgSplit(key: current?.id ?? "") {
                 ForEach(days, id: \.title) { day in

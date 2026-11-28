@@ -131,7 +131,7 @@ public final class ProjectsDemo {
             // One run model (the Default and its configurations), Environment with secrets, Repos, Settings.
             "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
             "page-repos-many", "page-repos-failed", "page-settings-limits-edit", "page-settings-colour-more",
-        ] + kindScenes + wizardScenes + spaceScenes + pagesBScenes
+        ] + kindScenes + wizardScenes + spaceScenes + overviewScenes + moduleScenes + pagesBScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -368,6 +368,8 @@ public final class ProjectsDemo {
         }
         Self.kindSample(scene, &list)
         Self.spaceSample(scene, &list)
+        Self.overviewSample(scene, &list)
+        Self.moduleSample(scene, &list)
         Self.pagesBSample(scene, &list)
         await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
@@ -531,6 +533,8 @@ public final class ProjectsDemo {
         await showKind(scene)
         await showWizard(scene)
         await showSpace(scene)
+        await showOverviewScene(scene)
+        await showModules(scene)
         await showPagesB(scene)
     }
 }
