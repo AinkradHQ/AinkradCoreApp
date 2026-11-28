@@ -409,7 +409,8 @@ struct CatalogTests {
             Issue.record("not ready")
             return
         }
-        #expect(hits.map(\.name) == ["zed-hit"])
+        // The search adds what the Core found; what was listed before stays (the picker filters it on screen).
+        #expect(hits.map(\.name).contains("zed-hit") && hits.map(\.name).contains("a"))
         // "a" was picked before the search; it is still a repo the wizard can create with.
         #expect(m.chosen([gh("a").id, gh("zed-hit").id], pasted: []).map(\.name) == ["a", "zed-hit"])
     }
