@@ -5,7 +5,7 @@ import Foundation
 extension ProjectsDemo {
     static let wizardScenes = [
         "new-name", "new-link-name", "new-kind", "new-kind-picked", "new-kind-other", "new-code", "new-code-corrected",
-        "new-code-other", "new-code-no-github", "new-paste-link", "new-paste-link-ssh", "new-review",
+        "new-code-other", "new-code-no-github", "new-paste-link", "new-review",
         "new-review-brain",
         "new-review-runs", "new-review-runs-app", "new-review-link", "new-review-app", "new-review-infra",
         "new-review-other", "new-setting-up", "new-copying", "new-failed-repos", "new-finished",
@@ -37,7 +37,10 @@ extension ProjectsDemo {
         case "new-code": open("Tidepool", two, .code)
         case "new-code-corrected": open("Tidepool Mobile", [Self.iosURL], .code)
         case "new-code-other": open("Harbour Book", [], .code, kind: .other)
-        case "new-code-no-github", "new-paste-link", "new-paste-link-ssh": open("Tidepool", [], .code)
+        // No GitHub connected: the step offers "Connect GitHub"; the second scene has a repo link pasted in.
+        case "new-code-no-github": open("Tidepool", [], .code)
+        case "new-paste-link":
+            open("Tidepool", [Self.apiURL], .code, pasted: Self.pastedRepos(["tidepool-api"]))
         case "new-review": open("Tidepool", two, .review)
         case "new-review-brain": open("Tidepool", two, .review, editing: .brain)
         case "new-review-runs": open("Tidepool", two, .review, editing: .runs)

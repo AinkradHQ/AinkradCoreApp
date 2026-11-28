@@ -77,19 +77,20 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
 
 /// A run's log lines on made-up data: the same few lines for every run.
 struct DemoLogSource: RunLogSource {
+    var lines: [(service: String, text: String)] = [
+        ("web", "ready on http://localhost:3000"), ("api", "listening on :8000"),
+        ("api", "GET /health 200 3 ms"), ("queue", "worker started, 2 jobs waiting"),
+        ("web", "GET /products 200 41 ms"), ("api", "GET /api/products 200 18 ms"),
+        ("queue", "processed SendReceipt in 120 ms"), ("web", "GET /cart 200 36 ms"),
+    ]
     func page(after: Int, service: String?) async throws -> RunLogPage {
         guard after == 0 else { return RunLogPage(next: after) }
-        let lines = [
-            ("web", "ready on http://localhost:3000"), ("api", "listening on :8000"),
-            ("api", "GET /health 200 3 ms"), ("queue", "worker started, 2 jobs waiting"),
-            ("web", "GET /products 200 41 ms"), ("api", "GET /api/products 200 18 ms"),
-            ("queue", "processed SendReceipt in 120 ms"), ("web", "GET /cart 200 36 ms"),
-        ].filter { service == nil || $0.0 == service }
+        let lines = lines.filter { service == nil || $0.service == service }
         let now = Date()
         return RunLogPage(
             lines: lines.enumerated().map {
                 ProjectLive.LogLine(
-                    service: $0.element.0, text: $0.element.1, seq: $0.offset + 1,
+                    service: $0.element.service, text: $0.element.text, seq: $0.offset + 1,
                     at: now.addingTimeInterval(Double($0.offset - lines.count) * 7))
             }, next: lines.count)
     }
