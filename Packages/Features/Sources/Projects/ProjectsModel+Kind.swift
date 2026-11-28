@@ -23,3 +23,32 @@ extension ProjectsModel {
         }
     }
 }
+
+/// The old page names, kept so callers and the demo that say `section` keep working: the page is `module` (details v2).
+extension ProjectsModel {
+    var section: ProjectSection {
+        get {
+            switch module {
+            case .overview, .activity: .overview
+            case .live, .builds, .services, .logs: .run
+            case .docs: .docs
+            case .ai: .sessions
+            case .brain: .brain
+            case .repos: .repos
+            case .settings: .settings
+            }
+        }
+        set {
+            module =
+                switch newValue {
+                case .overview: .overview
+                case .run: .logs
+                case .repos: .repos
+                case .sessions: .ai
+                case .brain: .brain
+                case .settings: .settings
+                case .docs: .docs
+                }
+        }
+    }
+}

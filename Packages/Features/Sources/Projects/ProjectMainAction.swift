@@ -6,7 +6,7 @@ import SwiftUI
 /// Pure on purpose: the top bar and the tests read the same table.
 struct MainAction: Equatable {
     enum Kind: Equatable {
-        case addRepos, reviewRepos, waiting, setUp, setSecrets, start, starting, open, newDoc, unarchive
+        case addRepos, reviewRepos, waiting, setUp, setSecrets, start, starting, open, runAgain, openServices, newDoc, unarchive
     }
     var kind: Kind
     var title: String
@@ -17,7 +17,9 @@ struct MainAction: Equatable {
 
 extension ProjectItem {
     /// `starting`: a Start of this project is in flight (the Core has not said "starting" yet).
-    func mainAction(starting: Bool = false) -> MainAction {
+    /// `view`: the kind the stage shows when the project has several (web + app); the action follows it.
+    func mainAction(starting: Bool = false, view: ProjectKind? = nil) -> MainAction {
+        let kind = view ?? self.kind
         if archived { return MainAction(kind: .unarchive, title: "Unarchive", symbol: "arrow.uturn.backward") }
         if kind == .other { return MainAction(kind: .newDoc, title: "New Doc…", symbol: "square.and.pencil") }
         let start = MainAction(
@@ -25,7 +27,8 @@ extension ProjectItem {
             title: tag == .failed
                 ? (kind == .app ? "Build Again" : "Start Again") : kind == .app ? "Build and Run" : "Start",
             symbol: "play")
-        let busyStart = MainAction(kind: .starting, title: "Starting…", symbol: "play", busy: true)
+        let busyStart = MainAction(
+            kind: .starting, title: kind == .app ? "Building…" : "Starting…", symbol: "play", busy: true)
         switch setup {
         case .noRepos: return MainAction(kind: .addRepos, title: "Add Repos…", symbol: "plus")
         case .copying, .checking:
@@ -37,7 +40,12 @@ extension ProjectItem {
         case .ready: return starting ? busyStart : start
         case .ran:
             switch run?.state ?? .stopped {
-            case .running: return MainAction(kind: .open, title: "Open", symbol: "arrow.up.forward.square")
+            case .running:
+                switch kind {
+                case .app: return MainAction(kind: .runAgain, title: "Run Again", symbol: "play")
+                case .infra: return MainAction(kind: .openServices, title: "Open Services", symbol: "server.rack")
+                default: return MainAction(kind: .open, title: "Open", symbol: "arrow.up.forward.square")
+                }
             case .starting: return busyStart
             case .stopped, .failed: return starting ? busyStart : start
             }
@@ -55,7 +63,7 @@ extension ProjectItem {
     /// read as running. A project that is not software has no state, only when it was last edited.
     func spaceBadge(now: Date) -> (label: String, tone: Tone, symbol: String) {
         if archived { return ("Archived", .queue, "archivebox") }
-        if kind == .other { return ("Edited \(runsAgo(updatedAt, now: now))", .queue, "doc.text") }
+        if allKinds == [.other] { return ("Edited \(runsAgo(updatedAt, now: now))", .queue, "doc.text") }
         if crash != nil, !stale { return ("Crashed", .fail, "exclamationmark.triangle") }
         if stale, tag == .running || tag == .starting { return ("Status unknown", .queue, "questionmark.circle") }
         if run == nil {
