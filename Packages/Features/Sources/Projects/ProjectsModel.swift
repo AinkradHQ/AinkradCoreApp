@@ -797,7 +797,7 @@ public final class ProjectsModel {
                 // after it is made, so linking before the repos keeps it from making a second.
                 if let place, room == nil {
                     do { try await service.linkPlace(project: p.id, room: place.id) } catch {
-                        fatal.append("the Brain place \(place.name) could not be linked (\(self.words(error)))")
+                        fatal.append("the Brain room \(place.name) could not be linked (\(self.words(error)))")
                     }
                 }
                 self.creating = CreateProgress(stage: .repos, added: batch.count, total: repos.count)

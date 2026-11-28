@@ -194,7 +194,7 @@ struct CreateWritesTests {
         await m.loadPlaces()
         #expect(m.places?.map(\.id) == ["r3"])
         let c = ProjectConflict(code: "room_linked", message: "room is linked")
-        #expect(c == .roomLinked && c.words.contains("Brain place"))
+        #expect(c == .roomLinked && c.words.contains("Brain room"))
     }
 }
 

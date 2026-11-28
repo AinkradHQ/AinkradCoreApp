@@ -6,11 +6,24 @@ import SwiftUI
 struct AppStage: View {
     let model: ProjectsModel
     let project: ProjectItem
+    @State private var target: String?
+
+    /// The devices the repos are named for; with more than one, a switch picks the frame shown.
+    private var platforms: [String] { ProjectKind.platforms(project.repos) }
+    private var picked: String? { platforms.count > 1 ? (target.flatMap { platforms.contains($0) ? $0 : nil } ?? platforms[0]) : nil }
+    private static let desktop: Set<String> = ["macOS", "Windows", "Linux", "Desktop"]
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            content(mac: true)
-            content(mac: false)
+        VStack(spacing: Space.s4) {
+            if let picked {
+                CoreSegmented(
+                    "Target", segments: platforms.map { CoreSegment($0, $0 == "iOS" ? "iPhone" : $0) },
+                    selection: Binding(get: { picked }, set: { target = $0 }))
+            }
+            ViewThatFits(in: .horizontal) {
+                content(mac: true)
+                content(mac: false)
+            }
         }
         .padding(.horizontal, Space.s6).padding(.vertical, Space.s4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -19,8 +32,9 @@ struct AppStage: View {
     private func content(mac: Bool) -> some View {
         HStack(alignment: .center, spacing: Space.s8 + Space.s6) {
             HStack(alignment: .bottom, spacing: Space.s4 + 2) {
-                PhoneFrame(name: project.name, colour: model.colour(project))
-                if mac { MacFrame(colour: model.colour(project)) }
+                let desktop = picked.map(Self.desktop.contains)
+                if desktop != true { PhoneFrame(name: project.name, colour: model.colour(project)) }
+                if desktop == true || (desktop == nil && mac) { MacFrame(colour: model.colour(project)) }
             }
             BuildCard(model: model, project: project).frame(maxWidth: Space.s8 * 13)
         }

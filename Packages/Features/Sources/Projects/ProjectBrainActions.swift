@@ -46,7 +46,7 @@ extension ProjectsModel {
         return nil
     }
 
-    /// Link Room…: an existing Brain place becomes this project's room. The Brain makes a place of its own for a new project a
+    /// Link Room…: an existing Brain room becomes this project's room. The Brain makes a room of its own for a new project a
     /// few seconds after it is made, so there is no "create" here.
     func linkRoom(_ project: ProjectItem, _ place: BrainPlace) async {
         guard let service, mayWrite() else { return }
@@ -135,11 +135,11 @@ struct NoRoomActions: View {
             } label: {
                 Label("Link Room…", systemImage: "link")
             }
-            .menuStyle(.button).buttonStyle(CoreButtonStyle(.secondary)).fixedSize()
+            .menuStyle(.button).buttonStyle(CoreButtonStyle((model.places ?? []).isEmpty ? .secondary : .prominent)).fixedSize()
             .disabled(model.readOnly || (model.places ?? []).isEmpty)
             .help(
                 (model.places ?? []).isEmpty
-                    ? "There is no free Brain room to link. The Brain makes one for a new project by itself."
+                    ? "There is no free Brain room to link. The Brain makes a room for a new project by itself, a few seconds after it is made."
                     : "Link an existing Brain room to \(project.name)")
             Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
                 .buttonStyle(CoreButtonStyle(.secondary)).help("Opens the Brain. It does not pick this project’s room for you.")
