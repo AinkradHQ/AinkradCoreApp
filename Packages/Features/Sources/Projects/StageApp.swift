@@ -117,21 +117,13 @@ private struct BuildCard: View {
                     ForEach(Array(steps.enumerated()), id: \.offset) { _, s in BuildStep(step: s) }
                 }
             }
-            HStack(spacing: Space.s2) {
-                Soon(prominent: false, help: "Available when the Core reports the build file") {
-                    Label("Reveal .app", systemImage: "folder")
-                }
-                .controlSize(.small)
-                Soon(prominent: false, help: "Available when the Core reports the build file") {
-                    Label("Download", systemImage: "arrow.down.to.line")
-                }
-                .controlSize(.small)
-            }
+            // Reveal .app and Download appear once the Core reports the build file; until then there is nothing to press.
         }
     }
 
     private var title: String {
-        if steps.isEmpty { return "No build yet" }
+        // The same builds the Builds island lists: a run that happened is a build, whatever its steps say.
+        if steps.isEmpty { return project.run?.lastRun.map { "Built \($0)" } ?? "No build yet" }
         if failed { return "The last build failed" }
         return project.tag == .starting ? "Building \(project.name)" : "\(project.name) is built"
     }
@@ -139,7 +131,7 @@ private struct BuildCard: View {
     @ViewBuilder private func fact(_ k: String, _ v: String) -> some View {
         if !v.isEmpty {
             HStack(alignment: .firstTextBaseline, spacing: Space.s4) {
-                Text(k).foregroundStyle(GlassInk.secondary).frame(width: Space.s8 + Space.s2, alignment: .leading)
+                Text(k).foregroundStyle(GlassInk.secondary).lineLimit(1).frame(width: Space.s8 * 2, alignment: .leading)
                 Text(v).lineLimit(1)
             }
         }

@@ -8,18 +8,26 @@ struct OverviewStage: View {
     let project: ProjectItem
     @Binding var kind: ProjectKind?
     @State private var width = SiteWidth.desktop
-    @State private var web = LiveWebModel()
+    private var web: LiveWebModel { model.liveWeb(for: project.id) }
 
     private var kinds: [ProjectKind] { project.allKinds }
     private var view: ProjectKind { kind.flatMap { kinds.contains($0) ? $0 : nil } ?? kinds[0] }
-    private var covered: Bool { view != .other && project.tag != .running }
+    private var crashed: Bool { project.crash != nil && !project.stale }
+    private var covered: Bool { view != .other && (project.tag != .running || crashed) }
 
     var body: some View {
         VStack(spacing: 0) {
             header.frame(height: Space.s8 + Space.s4).padding(.leading, Space.s4).padding(.trailing, Space.s2 + 2)
             ZStack {
                 layer.id(view).transition(.opacity)
-                    .blur(radius: covered ? 6 : 0).opacity(covered ? 0.9 : 1)
+                    .blur(radius: covered ? 6 : 0).opacity(covered ? 0.9 : project.stale ? 0.6 : 1)
+                if project.stale, !covered {
+                    Text("Last known \(model.listAge() ?? "a while ago")").foregroundStyle(GlassInk.secondary)
+                        .padding(.horizontal, Space.s3).padding(.vertical, Space.s1 + 1)
+                        .coreCard(GlassInk.card, radius: Radius.control)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        .padding(Space.s3).allowsHitTesting(false)
+                }
                 if covered {
                     StageCover(model: model, project: project, kind: view).transition(.opacity)
                 }
@@ -92,11 +100,11 @@ struct OverviewStage: View {
             if project.expose {
                 CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { model.copyLink(project) }
             }
-            CoreIconButton(symbol: "arrow.up.forward.square", label: "Open in the browser") {
-                if let url = URL(string: "https://\(project.link)") { NSWorkspace.shared.open(url) }
+            CoreIconButton(symbol: "arrow.up.forward.square", label: project.expose ? "Open in the browser" : "Open the live site") {
+                model.openSite(project)
             }
-            .disabled(project.tag != .running || !project.expose)
-            .help(project.expose ? "Open the public link" : "Turn the public link on to open it in the browser")
+            .disabled(project.tag != .running)
+            .help(project.expose ? "Open the public link" : "Open the live site page, the private preview")
         }
     }
 }

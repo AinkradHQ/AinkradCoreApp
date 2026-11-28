@@ -101,14 +101,14 @@ struct ModuleLogs: View {
             }
         }
         .task(id: project.id) { await run.watch() }
-        .task(id: model.runTick) {
+        .task(id: model.tick(project.id)) {
             if run.loaded {
                 await run.load()
                 await run.refreshRun()
             }
         }
         // The Core's stream while it runs; the stand-in's lines (Debug) or nothing otherwise.
-        .task(id: "\(project.id) \(live) \(model.runTick)") {
+        .task(id: "\(project.id) \(live) \(model.tick(project.id))") {
             guard live, let m = run.makeLogs() else {
                 logs = nil
                 if fixed == nil, project.live?.logs.isEmpty == false {

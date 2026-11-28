@@ -45,6 +45,15 @@ extension ProjectsModel {
 
     // MARK: live parts
 
+    /// An AI session started, changed state or ended: only the sessions are read again.
+    func refreshSessions(_ id: Int64) async {
+        guard var parts = liveParts[id] else { return await refreshLive(id) }
+        guard let s = try? await service?.sessions(project: id) else { return }
+        parts.sessions = s
+        liveParts[id] = parts
+        reapply(id)
+    }
+
     /// Reads the open project's services (while it runs), AI sessions, Brain room and crash history.
     func refreshLive(_ id: Int64) async {
         var parts = liveParts[id] ?? LiveParts()

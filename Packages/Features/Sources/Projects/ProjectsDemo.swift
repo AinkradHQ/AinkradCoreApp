@@ -243,7 +243,7 @@ public final class ProjectsDemo {
         model.cursor = nil
         model.openID = nil
         model.section = .overview
-        model.module = .overview
+        model.modules = [:]
         model.core112 = false
         model.debugHover = nil
         model.stale = nil
@@ -651,7 +651,7 @@ enum DemoLive {
         }
         if state == .failed {
             live.failure = "api stopped 40 s after start."
-            live.failureFix = "STRIPE_SECRET is not set. Set it in Run › Secrets, then start again."
+            live.failureFix = "STRIPE_SECRET is not set. Set it in Run setup › Environment, then start again."
         }
         return live
     }

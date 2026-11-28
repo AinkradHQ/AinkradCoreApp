@@ -19,7 +19,7 @@ struct ProjectHeader: View {
 
     var body: some View {
         let can = model.canControl(project)
-        let block = project.controlBlock(canControl: can)
+        let block = project.controlBlock(canControl: can, busy: model.controlling.contains(project.id))
         let main = project.mainAction(starting: model.controlling.contains(project.id), view: view)
         ViewThatFits(in: .horizontal) {
             row(compact: false, can: can, block: block, main: main)
@@ -33,7 +33,7 @@ struct ProjectHeader: View {
     private func row(compact: Bool, can: Bool, block: String?, main: MainAction) -> some View {
         HStack(spacing: Space.s3) {
             Button {
-                if let onBack { onBack() } else { model.closeProject() }
+                if let onBack { onBack() } else { model.leaveSpace(project.id) { model.closeProject() } }
             } label: {
                 Label("Projects", systemImage: "chevron.left")
             }
@@ -72,8 +72,8 @@ struct ProjectHeader: View {
                 Label(main.title, systemImage: main.symbol)
             }
             .buttonStyle(CoreButtonStyle(.prominent, busy: main.busy))
-            .disabled(!enabled(main, can: can))
-            .help(why(main, can: can)).accessibilityIdentifier("project-main-action")
+            .disabled(!enabled(main, can: can, block: block))
+            .help(why(main, can: can, block: block)).accessibilityIdentifier("project-main-action")
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -86,7 +86,7 @@ struct ProjectHeader: View {
             case .web: out.append(project.link)
             case .app:
                 let p = ProjectKind.platforms(project.repos)
-                out.append(p.isEmpty ? "Platform not known yet" : p.joined(separator: " · "))
+                if !p.isEmpty { out.append(p.joined(separator: " · ")) }
             case .infra:
                 let n = project.live?.services.count ?? project.draft?.services.count ?? 0
                 out.append(
@@ -100,17 +100,18 @@ struct ProjectHeader: View {
         return out.joined(separator: " · ")
     }
 
-    private func enabled(_ a: MainAction, can: Bool) -> Bool {
+    private func enabled(_ a: MainAction, can: Bool, block: String?) -> Bool {
         switch a.kind {
-        case .start, .runAgain: can && (a.kind == .runAgain || project.startBlock == nil)
+        // Not while the Core is not answering (what is shown may be old) or while another start or stop is under way.
+        case .start, .runAgain: block == nil && (a.kind == .runAgain || project.startBlock == nil)
         case .addRepos, .setUp, .setSecrets, .unarchive: can
         case .newDoc: !model.readOnly && model.lore != nil
         case .reviewRepos, .open, .openServices, .starting, .waiting: true
         }
     }
 
-    private func why(_ a: MainAction, can: Bool) -> String {
-        if !enabled(a, can: can) { return project.startBlock ?? Self.cannot }
+    private func why(_ a: MainAction, can: Bool, block: String?) -> String {
+        if !enabled(a, can: can, block: block) { return block ?? project.startBlock ?? Self.cannot }
         switch a.kind {
         case .start: return "\(a.title) \(project.name)"
         case .runAgain: return "Build and run \(project.name) again"
@@ -119,7 +120,7 @@ struct ProjectHeader: View {
         case .setUp: return "Draft the setup from the repo, or write it by hand"
         case .setSecrets: return "Set the secrets the setup needs before the first start"
         case .newDoc: return "Write a new doc in \(project.name)"
-        case .open: return "Open \(project.link) in the browser"
+        case .open: return project.expose ? "Open \(project.link) in the browser" : "Open the live site of \(project.name)"
         case .unarchive: return "Bring \(project.name) back to the Projects list"
         case .reviewRepos: return "A repo could not be copied. See why in Repos."
         case .starting, .waiting: return a.title
@@ -132,13 +133,12 @@ struct ProjectHeader: View {
         switch a.kind {
         case .start: model.control(.start, project)
         case .runAgain: model.control(.restart, project)
-        case .openServices: model.module = .services
+        case .openServices: model.go(.services, in: project.id)
         case .addRepos: NewProjectDialogs.openAddRepos(model, project)
-        case .reviewRepos: model.module = .repos
+        case .reviewRepos: model.go(.repos, in: project.id)
         case .unarchive: Task { await model.unarchive(project) }
         case .newDoc: model.newDoc(in: project)
-        case .open:
-            if let url = URL(string: "https://\(project.link)") { NSWorkspace.shared.open(url) }
+        case .open: model.openSite(project)
         case .setUp, .setSecrets:
             let r = run ?? RunPageModel(model: model, projectID: project.id)
             run = r

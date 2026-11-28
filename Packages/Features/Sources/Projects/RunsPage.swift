@@ -45,7 +45,7 @@ struct RunsPage: View {
             .onAppear { settled = true }
             .task(id: project.id) { await runs.load() }
             // The Core says a run changed: the runs are read again now.
-            .task(id: model.runTick) {
+            .task(id: model.tick(project.id)) {
                 if runs.loaded {
                     await runs.refreshHistory()
                     await runs.setup.refreshRun()
