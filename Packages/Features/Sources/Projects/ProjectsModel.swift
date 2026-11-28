@@ -416,13 +416,19 @@ public final class ProjectsModel {
     func connectGithub() { host.shell.launcher.entry("connections")?.run() }
 
     /// Reads the picker's first page at once (once per open of a sheet); search and "Show more" read the rest.
-    func loadCatalog() async { await readCatalog(query: "", page: 1) }
+    func loadCatalog() async {
+        // Once per wizard: a second open of the picker (or both of its tasks firing) must not reload and flash the list.
+        if case .ready = catalogState { return }
+        await readCatalog(query: "", page: 1)
+    }
 
     /// A search typed in the picker, asked of the Core (it matches owner/name over all of GitHub's repos).
     func searchCatalog(_ query: String) async {
+        // The picker filters what it has at once; the Core's search only adds what it finds. An empty or one-letter
+        // query asks nothing, so clearing the field never reloads.
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard q != catalogQuery || catalogState == .loading else { return }
-        if case .unavailable = catalogState { return }
+        guard q.count >= 2, q != catalogQuery, !ProjectRules.looksLikeLink(q) else { return }
+        guard case .ready = catalogState else { return }
         await readCatalog(query: q, page: 1)
     }
 
@@ -444,13 +450,11 @@ public final class ProjectsModel {
             catalogHasMore = r.hasMore
             catalogTruncated = r.truncated
             for p in r.repos where !catalogSeen.contains(where: { $0.id == p.id }) { catalogSeen.append(p) }
-            if page == 1 {
-                catalogState = .ready(r.repos)
-            } else if case .ready(let have) = catalogState {
-                catalogState = .ready(have + r.repos.filter { n in !have.contains { $0.id == n.id } })
-            }
+            // Never replace the list: everything found so far stays, in place, and new repos join it.
+            catalogState = .ready(catalogSeen)
         } catch {
-            if case .ready = catalogState, page > 1 { return }
+            // A failed extra page or search keeps the list on screen; only the first read can fail the picker.
+            if case .ready = catalogState, page > 1 || !query.isEmpty { return }
             let problem = CatalogProblem(error)
             if problem == .rateLimited { host.rateLimited(retryAfter: nil) }
             catalogState = problem == .noConnection ? .unavailable : .failed(problem)

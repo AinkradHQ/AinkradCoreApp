@@ -21,21 +21,69 @@ struct RepoPicker: View {
     /// The repos the project already has: shown as such and left out of the picks.
     var existing: [RepoItem] = []
     @State private var query = ""
+    @FocusState private var searching: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            CoreTextField(
-                picked.isEmpty ? "Repos from GitHub" : "Repos from GitHub · \(picked.count) selected",
-                placeholder: "Search your repos or paste a link", text: $query, onSubmit: addTypedLink)
+            searchField
+            selectionLine
             list
         }
         .task { await model.loadCatalog() }
-        // The Core searches all of GitHub's repos for what is typed, once typing pauses.
+        // What is typed filters the list at once; after a pause the Core also searches GitHub, and adds what it finds.
         .task(id: query) {
-            try? await Task.sleep(for: .milliseconds(300))
+            try? await Task.sleep(for: .milliseconds(400))
             if !Task.isCancelled { await model.searchCatalog(query) }
         }
     }
+
+    /// A search field like Finder's: magnifier, the text, then what it found (or that GitHub is being asked), and a clear.
+    private var searchField: some View {
+        HStack(spacing: Space.s2) {
+            Image(systemName: "magnifyingglass").coreFont(size: MacTextSize.body, weight: .medium)
+                .foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+            TextField(
+                "", text: $query, prompt: Text("Search your repos or paste a link").foregroundStyle(GlassInk.secondary)
+            )
+            .textFieldStyle(.plain).focused($searching).onSubmit(addTypedLink)
+            .accessibilityLabel("Search repos")
+            if !trimmed.isEmpty {
+                Text(searchNote).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+                    .monospacedDigit().contentTransition(.opacity).lineLimit(1).fixedSize()
+                CoreIconButton(symbol: "xmark", label: "Clear the search") { query = "" }
+            }
+        }
+        .padding(.horizontal, Space.s3).frame(height: MacSize.controlLg)
+        .coreFieldSurface(focused: searching)
+        .onExitCommand { if query.isEmpty { searching = false } else { query = "" } }
+        .animation(Motion.out(Motion.hover), value: trimmed.isEmpty)
+        .onAppear { searching = true }
+    }
+
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
+    private var shownCount: Int { groups.reduce(0) { $0 + $1.repos.count } }
+    private var searchNote: String {
+        if model.catalogBusy { return "Searching GitHub…" }
+        return shownCount == 1 ? "1 repo" : "\(shownCount) repos"
+    }
+
+    /// How many are picked, with a way to clear them; the line keeps its height so nothing below jumps.
+    private var selectionLine: some View {
+        HStack(spacing: Space.s2) {
+            Text(picked.isEmpty ? "Pick one or more" : picked.count == 1 ? "1 selected" : "\(picked.count) selected")
+                .coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
+                .contentTransition(.numericText()).monospacedDigit()
+            if !picked.isEmpty {
+                Button("Clear") { picked.removeAll() }.buttonStyle(CoreButtonStyle(.plain, size: .small))
+                    .transition(.opacity)
+            }
+            Spacer()
+        }
+        .frame(height: MacSize.controlSm)
+        .animation(Motion.out(Motion.ui), value: picked.count)
+    }
+
+    private var shownIDs: [String] { groups.flatMap { $0.repos.map(\.id) } }
 
     private func has(_ r: PickRepo) -> Bool { existing.contains { ProjectRules.same($0.remoteURL, r.url) } }
 
@@ -108,22 +156,32 @@ struct RepoPicker: View {
                         }
                     }
                     .padding(Space.s2)
-                case .ready where groups.isEmpty && typedLink == nil && !model.catalogBusy:
-                    Text("No repo matches “\(query)”.").foregroundStyle(GlassInk.secondary).padding(Space.s2)
+                case .ready where groups.isEmpty && typedLink == nil:
+                    Text(model.catalogBusy ? "Searching GitHub for “\(trimmed)”…" : "No repo matches “\(trimmed)”.")
+                        .foregroundStyle(GlassInk.secondary).padding(Space.s3)
                 default: EmptyView()
                 }
                 ForEach(groups, id: \.org) { g in
                     Text(g.org).coreFont(size: MacTextSize.meta, weight: .semibold).foregroundStyle(GlassInk.secondary)
                         .padding(.horizontal, Space.s3).padding(.top, Space.s3).padding(.bottom, Space.s1)
                         .accessibilityAddTraits(.isHeader)
-                    ForEach(g.repos) { r in row(r) }
+                    ForEach(g.repos) { r in row(r).transition(.opacity) }
                 }
                 more
             }
             .padding(Space.s1)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollIndicators(.never)
+        .scrollIndicators(.automatic)
+        // Soft edges: a row half out of view fades instead of being cut.
+        .mask(
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Space.s2)
+                Color.black
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Space.s5)
+            }
+        )
+        .animation(Motion.out(Motion.ui), value: shownIDs)
         .frame(minHeight: height ?? Space.s8 * 4, maxHeight: height ?? .infinity)
         .coreCard(GlassInk.well, radius: Radius.cardMac)
         .clipShape(coreShape(Radius.cardMac))
@@ -188,7 +246,7 @@ private struct RepoPickRow: View {
                     .foregroundStyle(on ? GlassInk.accent(accent) : GlassInk.secondary)
                     .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(repo.name).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
+                    Text(repo.name).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1)
                     if !detail.isEmpty {
                         Text(detail).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary).lineLimit(1)
                     }

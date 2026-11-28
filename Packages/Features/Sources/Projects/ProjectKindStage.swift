@@ -5,12 +5,13 @@ import SwiftUI
 /// project shows its link.
 struct KindHeader: View {
     let project: ProjectItem
+    @Environment(\.coreAccent) private var paneAccent
 
     var body: some View {
         let kind = project.kind
         let platforms = kind == .app ? ProjectKind.platforms(project.repos) : []
         HStack(spacing: Space.s3) {
-            IconTile(kind.symbol, hue: GlassInk.blue, size: Space.s8 + Space.s3)
+            IconTile(kind.symbol, hue: GlassInk.accent(paneAccent), size: Space.s8 + Space.s3)
             VStack(alignment: .leading, spacing: 0) {
                 Text(kind.title).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                 Text(project.description.isEmpty ? kind.line : project.description)

@@ -216,7 +216,7 @@ struct ProjectWizard: View {
             if needsGithub {
                 githubCard.task { await model.loadCatalog() }
             } else {
-                RepoPicker(model: model, picked: $d.picked, pasted: $d.pasted, height: Space.s8 * 8)
+                RepoPicker(model: model, picked: $d.picked, pasted: $d.pasted, height: nil)
             }
         }
     }
