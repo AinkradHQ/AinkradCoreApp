@@ -35,7 +35,7 @@ struct ProjectsEmptyHero: View {
                     .accessibilityIdentifier("projects-empty-new")
             }
         }
-        .frame(maxWidth: Space.s8 * 28)
+        .frame(maxWidth: Space.s8 * 32)
         .padding(Space.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { shown = true }
@@ -49,7 +49,7 @@ struct ProjectsEmptyHero: View {
             KindTile(kind: t.kind, title: t.title, line: t.line, hue: GlassInk.accent(paneAccent)) {
                 model.newProject(kind: t.kind)
             }
-            .frame(width: Space.s8 * 6 + Space.s1, height: Space.s8 * 7)
+            .frame(width: Space.s8 * 7, height: Space.s8 * 7)
             .coreRise(shown, rise + i - r.lowerBound)
         }
     }

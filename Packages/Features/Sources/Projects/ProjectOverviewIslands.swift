@@ -343,7 +343,14 @@ extension Overview {
     // MARK: Activity
 
     var activityCard: some View {
-        let lines = ActivityLine.timeline(repos: project.repos, runs: runs, names: names, limit: 4)
+        // The same source as the Activity page (runs, repo copies, edits, links, imports), newest four.
+        let lines = ActivityFeed.events(repos: project.repos, runs: runs, names: names, changes: insights.changes)
+            .sorted { $0.at > $1.at }.prefix(4).map { e in
+                ActivityLine(
+                    title: e.title,
+                    symbol: e.tone == .fail ? "exclamationmark.triangle" : e.kind == .runs && e.tone == .run ? "bolt" : "checkmark",
+                    at: e.at)
+            }
         return ModuleCard(model: model, module: .activity) {
             if lines.isEmpty {
                 Text("Nothing yet.").foregroundStyle(GlassInk.secondary)
