@@ -119,8 +119,7 @@ public final class ProjectsDemo {
             "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
             "gallery-stale", "gallery-archived", "gallery-running", "gallery-no-match", "gallery-starting",
             "gallery-cursor", "gallery-copy-failed-hover", "gallery-kinds-hover", "new-from-tile",
-            "gallery-copy-failed", "settings-runner", "settings-limits",
-            "repo-menu",
+            "gallery-copy-failed",
             "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop",
             "overview-stopped-real",
             "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
@@ -130,7 +129,7 @@ public final class ProjectsDemo {
             "dialog-branch-error", "gallery-crashed", "overview-crashed",
             // One run model (the Default and its configurations), Environment with secrets, Repos, Settings.
             "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
-            "page-repos-many", "page-repos-failed", "page-settings-limits-edit", "page-settings-colour-more",
+            "page-repos-many", "page-repos-failed", "page-settings-limits-edit",
         ] + kindScenes + wizardScenes + spaceScenes + overviewScenes + moduleScenes + pagesBScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
@@ -233,6 +232,7 @@ public final class ProjectsDemo {
         shell.overlay = nil
         shell.launcherOpen = false
         shell.linkNotice = nil
+        shell.toast = nil
         shell.coreLink = .live
         shell.home.coreName = "core-oracle"
         model.host.clearElevationNotice()
@@ -262,6 +262,7 @@ public final class ProjectsDemo {
         model.liveParts = [:]
         model.runStates = [:]
         model.core110 = Self.core110Scenes.contains(scene)
+        model.core112 = scene == "page-settings-kind"
         model.core111 = Self.core111Scenes.contains(scene)
         model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
         // Every scene starts from the standard Look; the look scenes change it below.
@@ -270,6 +271,7 @@ public final class ProjectsDemo {
         PreviewStore.shared.forget()
         for (id, name, colour) in [
             (1, "Lanterna", ProjectColour.green), (2, "Northwind Ledger", .violet), (3, "Quill", .copper),
+            (4, "Harbor CRM", .teal),
         ] {
             let r = ImageRenderer(content: DemoSitePage(name: name, colour: colour).frame(width: 1100, height: 680))
             r.scale = 1
@@ -363,7 +365,13 @@ public final class ProjectsDemo {
             list[0].live?.metrics = DemoLive.metrics()
         case "page-settings-core-colour": list[0].colourName = "teal"
         case "overview-never-opened":
+            // Never started, never opened: the setup is read ("Ready to start") and there is no picture yet.
             PreviewStore.shared.forget()
+            list[3].run = nil
+            list[3].live = nil
+            list[3].draft = RunDraft(source: "docker-compose.yml", services: ["web", "api", "db"], secrets: [])
+        case "dialog-branch-error": list[0].repos[2] = Self.lanternaRepo(2, "lanterna-admin", branch: "release/9", head: "91aa0c4", minutes: 180, failing: true)
+        case "page-settings-kind": list[0].kinds = [.app, .web]
         default: break
         }
         Self.kindSample(scene, &list)
@@ -371,10 +379,14 @@ public final class ProjectsDemo {
         Self.overviewSample(scene, &list)
         Self.moduleSample(scene, &list)
         Self.pagesBSample(scene, &list)
+        for i in list.indices { DemoData.adapt(&list[i]) }
         await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
-        model.configsService = scene == "page-run-old-core" ? nil : DemoConfigsService()
-        model.logSources = { _, _ in DemoLogSource() }
+        let configs = DemoConfigsService()
+        configs.kinds = Dictionary(uniqueKeysWithValues: list.map { ($0.id, DemoData.kinds($0)[0]) })
+        model.configsService = scene == "page-run-old-core" ? nil : configs
+        let byProject = Dictionary(uniqueKeysWithValues: list.map { ($0.id, DemoLogSource(lines: DemoData.source($0))) })
+        model.logSources = { id, _ in byProject[id] ?? DemoLogSource() }
         model.demoRunTab = nil
         model.demoRunSelected = nil
         // The running Lanterna reports its services, as a Core with the run engine does.
@@ -425,34 +437,17 @@ public final class ProjectsDemo {
         case "new-empty": model.newProject()
         case "space-no-repos", "space-copying", "space-setting-up", "space-ready", "space-needs-setup": model.openID = 7
         case "overview-running": model.openID = 1
-        case "page-run":
-            model.openID = 1
-            model.section = .run
-        case "page-run-failed":
-            model.openID = 3
-            model.section = .run
-        case "page-run-draft":
-            model.openID = 2
-            model.section = .run
-        case "page-run-logs", "page-run-live":
-            model.openID = 1
-            model.section = .run
-            model.demoRunTab = .live
-        case "page-run-config":
-            model.openID = 1
-            model.section = .run
-            model.demoRunSelected = 1
-        case "page-run-env":
-            model.openID = 1
-            model.section = .run
-            model.demoRunTab = .environment
-        case "page-run-history":
-            model.openID = 1
-            model.section = .run
-            model.demoRunTab = .history
-        case "page-run-old-core":
-            model.openID = 1
-            model.section = .run
+        // Run setup (the .run module, RunsPage): each scene is its own tab, project or state.
+        case "page-run", "page-run-draft", "page-run-failed", "page-run-logs", "page-run-config", "page-run-env",
+            "page-run-live", "page-run-history", "page-run-old-core":
+            model.openID = ["page-run-draft": 2, "page-run-failed": 3, "page-run-logs": 3][scene] ?? 1
+            model.module = .run
+            let tabs: [String: RunConfigsModel.Tab] = [
+                "page-run-failed": .live, "page-run-logs": .history, "page-run-env": .environment,
+                "page-run-live": .live, "page-run-history": .history,
+            ]
+            model.demoRunTab = tabs[scene] ?? .configs
+            if scene == "page-run-config" { model.demoRunSelected = 1 }
         case "page-repos-many", "page-repos-failed":
             model.openID = scene == "page-repos-many" ? 1 : 7
             model.section = .repos
@@ -490,7 +485,7 @@ public final class ProjectsDemo {
                 ])
         case "page-run-metrics":
             model.openID = 1
-            model.section = .run
+            model.module = .services
         case "page-settings-core-colour":
             model.openID = 1
             model.section = .settings
@@ -498,11 +493,11 @@ public final class ProjectsDemo {
             model.openID = 1
             model.section = .repos
             try? await Task.sleep(for: .milliseconds(500))
-            if scene != "page-repos-branch", let p = model.open, let r = p.repos.first {
+            if scene != "page-repos-branch", let p = model.open, let r = p.repos.first(where: { $0.fetchError != nil }) ?? p.repos.first {
                 RepoDialogs.openBranch(model, p, r)
                 if scene == "dialog-branch-error" {
                     model.writeError = model.branchWords(
-                        CoreError.badRequest(message: "no such branch"), branch: "release/9", repo: r.name)
+                        CoreError.badRequest(message: "no such branch"), branch: r.branch, repo: r.name)
                 }
             }
         case "overview-stale":
@@ -522,8 +517,8 @@ public final class ProjectsDemo {
         case "page-brain", "page-brain-empty":
             model.openID = scene == "page-brain" ? 1 : 4
             model.section = .brain
-        case "overview-starting", "overview-starting-honest": model.openID = 2
-        case "overview-failed", "overview-crash-loop": model.openID = 3
+        case "overview-starting", "overview-starting-honest", "overview-starting-steps": model.openID = 2
+        case "overview-failed", "overview-crash-loop", "overview-failed-step": model.openID = 3
         case "overview-stopped", "overview-real-core", "overview-stopped-real": model.openID = 4
         case "space-add-repos":
             model.openID = 7
@@ -705,60 +700,3 @@ extension ProjectsModel {
     func setRunnerSupported(_ on: Bool) { runnerSupported = on }
 }
 #endif
-
-/// A made-up web page: the stand-in for the running app's live view and for the pictures behind the cards.
-struct DemoSitePage: View {
-    let name: String
-    let colour: ProjectColour
-    // Drawn as a wide desktop page, so a frame shows it as a compact preview (details v2 mockup).
-    private let design = CGSize(width: 1680, height: 1040)
-
-    var body: some View {
-        GeometryReader { g in
-            page.frame(width: design.width, height: design.height)
-                .scaleEffect(g.size.width / design.width, anchor: .topLeading)
-                .frame(width: g.size.width, height: g.size.height, alignment: .topLeading).clipped()
-        }
-        .accessibilityHidden(true)
-    }
-
-    private var page: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 28) {
-                Text(name).font(.system(size: 22, weight: .bold))
-                ForEach(["Shop", "Stories", "About"], id: \.self) { Text($0).font(.system(size: 16)).opacity(0.6) }
-                Spacer()
-                Text("Cart (2)").font(.system(size: 16))
-            }
-            .padding(.horizontal, 48).frame(height: 76)
-            ZStack(alignment: .leading) {
-                LinearGradient(
-                    colors: [colour.fill.opacity(0.9), colour.fill.opacity(0.45)], startPoint: .topLeading,
-                    endPoint: .bottomTrailing)
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Light for every room").font(.system(size: 54, weight: .bold))
-                    Text("Handmade lamps, shipped in three days.").font(.system(size: 22)).opacity(0.85)
-                    Text("Shop the collection").font(.system(size: 17, weight: .semibold))
-                        .padding(.horizontal, 22).frame(height: 44)
-                        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 8)).foregroundStyle(.black)
-                }
-                .foregroundStyle(.white).padding(.horizontal, 48)
-            }
-            .frame(height: 340)
-            HStack(spacing: 20) {
-                ForEach(0..<4, id: \.self) { i in
-                    VStack(alignment: .leading, spacing: 8) {
-                        RoundedRectangle(cornerRadius: 10).fill(colour.fill.opacity(0.18 + Double(i) * 0.06)).frame(
-                            height: 130)
-                        Text(["Dune", "Halo", "Moth", "Ember"][i]).font(.system(size: 16, weight: .semibold))
-                        Text("$\(80 + i * 15)").font(.system(size: 14)).opacity(0.6)
-                    }
-                }
-            }
-            .padding(48)
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.12))
-        .background(Color(red: 0.98, green: 0.97, blue: 0.95))
-    }
-}

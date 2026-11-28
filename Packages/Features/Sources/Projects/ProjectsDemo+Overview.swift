@@ -119,7 +119,13 @@ extension ProjectsDemo {
         } else {
             (model.runService as? DemoRunService)?.services[1] = svc
         }
-        if kind == "other" { model.lore = DemoDocsLore(DemoDocsLore.harbour) }
+        if kind == "other" {
+            // A docs project has no run: its four states are what the Docs hold (many, a few, none, unreadable).
+            let docs = DemoDocsLore(
+                state == .running ? DemoDocsLore.harbour : state == .starting ? Array(DemoDocsLore.harbour.prefix(2)) : [])
+            docs.failing = state == .failed
+            model.lore = docs
+        }
         model.openID = 1
         await model.refreshLive(1)
     }
