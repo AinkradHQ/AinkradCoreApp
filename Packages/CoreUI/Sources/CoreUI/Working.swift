@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Thinking and running tools: a short blue bar whose segment slides along its track, never a spinner or bouncing dots.
-/// Under Reduce Motion the segment rests in the middle. Decorative: put the words ("Thinking") beside it.
+/// Under Reduce Motion the segment rests in the middle and the bar breathes in opacity. Decorative: put the words ("Thinking") beside it.
 public struct CoreWorkingBar: View {
     @Environment(\.coreAccent) private var accent
     let width: CGFloat
@@ -23,6 +23,7 @@ public struct CoreWorkingBar: View {
         }
         .frame(width: width, height: Space.s1)
         .clipShape(coreShape(Space.s1 / 2))
+        .coreBreathing(reduce)
         .accessibilityHidden(true)
     }
 }

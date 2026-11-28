@@ -313,16 +313,7 @@ struct ProjectWizard: View {
     // MARK: footer
 
     private var footer: some View {
-        footerButtons
-            .frame(height: Space.s8)
-            .overlay(alignment: .center) {
-                if let why = whyNotNext {
-                    Text(why).foregroundStyle(palette.text2).lineLimit(1).padding(.horizontal, Space.s8 * 3)
-                        .transition(.opacity)
-                }
-            }
-            .animation(Motion.out(Motion.ui), value: whyNotNext)
-            .help(whyNotNext ?? "")
+        footerButtons.frame(height: Space.s8)
     }
 
     @ViewBuilder private var footerButtons: some View {
@@ -339,12 +330,13 @@ struct ProjectWizard: View {
             case .what:
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", run: close),
-                    primary: CoreAction("Next", key: .primary) { go(d.next(.what)) }, enabled: d.nameReady)
+                    primary: CoreAction("Next", key: .primary) { go(d.next(.what)) }, enabled: d.nameReady,
+                    why: whyNotNext)
             case .code:
                 CoreDialogFooter(
                     cancel: CoreAction("Back") { go(.what) },
                     primary: CoreAction("Next", key: .primary) { go(.review) },
-                    enabled: whyNotNext == nil)
+                    enabled: whyNotNext == nil, why: whyNotNext)
             case .review:
                 CoreDialogFooter(
                     cancel: CoreAction("Back") { go(d.previous(.review)) },

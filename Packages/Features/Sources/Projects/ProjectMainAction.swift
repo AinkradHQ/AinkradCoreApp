@@ -90,27 +90,8 @@ struct SpaceStateBadge: View {
             .id(b.label)
             .transition(.opacity)
             .animation(Motion.out(Motion.ui), value: b.label)
-            .breathing(project.tag == .starting && !project.archived && project.kind != .other)
+            .coreBreathing(project.tag == .starting && !project.archived && project.kind != .other)
             .accessibilityLabel("State: \(b.label)")
-    }
-}
-
-extension View {
-    /// An opacity breathe (1 to 0.7) while `on`. Opacity only, so it is also the Reduce Motion form of any pulse.
-    func breathing(_ on: Bool) -> some View { modifier(Breathing(on: on)) }
-}
-
-private struct Breathing: ViewModifier {
-    let on: Bool
-    @State private var dim = false
-    func body(content: Content) -> some View {
-        content.opacity(on && dim ? 0.7 : 1)
-            .task(id: on) {
-                withAnimation(nil) { dim = false }
-                guard on else { return }
-                try? await Task.sleep(for: .milliseconds(60))
-                withAnimation(.easeInOut(duration: Motion.tick).repeatForever(autoreverses: true)) { dim = true }
-            }
     }
 }
 

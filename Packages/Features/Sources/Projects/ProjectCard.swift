@@ -21,23 +21,13 @@ struct ProjectMark: View {
 struct ProjectStateBadge: View {
     let project: ProjectItem
     var starting = false
-    @State private var beat = false
 
     private var isStarting: Bool { starting || (project.tag == .starting && !project.archived) }
 
     var body: some View {
         let b = starting ? ("Starting…", Tone.warn, "gearshape") : project.badge
         StateBadge(b.0, tone: b.1, symbol: b.2)
-            // Starting breathes between full and 0.7 opacity (also under Reduce Motion: it is only a fade).
-            .opacity(isStarting && beat ? 0.7 : 1)
-            .animation(isStarting ? .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true) : .default, value: beat)
-            .task(id: isStarting) {
-                beat = false
-                if isStarting {
-                    try? await Task.sleep(for: .milliseconds(30))
-                    beat = true
-                }
-            }
+            .coreBreathing(isStarting)
             .contentTransition(.opacity)
             .accessibilityLabel("State: \(b.0)")
     }
@@ -106,7 +96,9 @@ struct ProjectCard: View {
                 if lit { hoverActions.transition(.opacity) }
             }
             .padding(Space.s2)
-            if starting { StartingLine().padding(.horizontal, Space.s2).padding(.bottom, Space.s1).transition(.opacity) }
+            if starting {
+                StartingLine().padding(.horizontal, Space.s2).padding(.bottom, Space.s1).transition(.opacity)
+            }
         }
         .frame(height: ProjectCard.thumbHeight)
         .clipShape(coreShape(Radius.control))
@@ -143,11 +135,11 @@ struct StartingLine: View {
                 .overlay(alignment: .leading) {
                     coreShape(2).fill(Color.white.opacity(0.9)).frame(width: reduce ? g.size.width : g.size.width * 0.3)
                         .offset(x: reduce || !on ? 0 : g.size.width * 0.7)
-                        .opacity(reduce ? (on ? 1 : 0.5) : 1)
                 }
         }
         .frame(height: 3).clipShape(coreShape(2))
-        .animation(.easeInOut(duration: reduce ? Motion.tick : 1.2).repeatForever(autoreverses: true), value: on)
+        .animation(reduce ? nil : .easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: on)
+        .coreBreathing(reduce)
         .onAppear { on = true }
         .accessibilityHidden(true)
     }

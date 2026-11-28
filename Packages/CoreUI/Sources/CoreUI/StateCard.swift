@@ -51,7 +51,8 @@ public struct CoreStateCard: View {
 
 /// The one dialog footer: the way back on the left (`Cancel esc` unless the caller names another action), the main action on
 /// the right with its key. `danger` makes the primary the red button; `enabled: false` dims it and stops its key (and
-/// Return) from running it; `busy` shows the spinner and ignores a second press. Keys: `.cancel` (esc), `.primary` (⏎),
+/// Return) from running it; `busy` keeps the label and breathes the button, and ignores a second press. `why` is the reason a disabled primary is
+/// disabled: a quiet line beside it and its hover help. `enabled` only governs the primary; `alternate` stays usable. Keys: `.cancel` (esc), `.primary` (⏎),
 /// `.command` (⌘⏎, for an action that removes something), `.escape` (esc without the keycap, for "Keep it").
 public struct CoreDialogFooter: View {
     let cancel: CoreAction?
@@ -60,11 +61,14 @@ public struct CoreDialogFooter: View {
     let danger: Bool
     let busy: Bool
     let enabled: Bool
+    let why: String?
     /// `alternate` is a second, quieter action just left of the primary (for example "Try again" beside the real fix).
     public init(
         cancel: CoreAction?, primary: CoreAction?, alternate: CoreAction? = nil, danger: Bool = false,
-        busy: Bool = false, enabled: Bool = true
+        busy: Bool = false, enabled: Bool = true,
+        why: String? = nil
     ) {
+        self.why = why
         self.alternate = alternate
         self.cancel = cancel
         self.primary = primary
@@ -79,17 +83,22 @@ public struct CoreDialogFooter: View {
                     .modifier(OptionalKey(key: cancel.key))
             }
             Spacer(minLength: Space.s3)
+            if let why, !enabled, !busy {
+                Text(why).foregroundStyle(GlassInk.secondary).lineLimit(1).truncationMode(.tail)
+                    .transition(.opacity).accessibilityLabel(why)
+            }
             if let alternate {
                 Button(alternate.title) { if !busy { alternate.run() } }.buttonStyle(CoreButtonStyle(.secondary))
-                    .modifier(OptionalKey(key: alternate.key)).disabled(!enabled)
+                    .modifier(OptionalKey(key: alternate.key))
             }
             if let primary {
                 Button(primary.title) { if !busy { primary.run() } }
                     .buttonStyle(CoreButtonStyle(danger ? .danger : .prominent, busy: busy))
                     .modifier(OptionalKey(key: primary.key))
-                    .disabled(!enabled)
+                    .disabled(!enabled).help(!enabled ? why ?? "" : "")
             }
         }
+        .animation(Motion.out(Motion.ui), value: why)
     }
 }
 
@@ -101,7 +110,7 @@ private struct OptionalKey: ViewModifier {
 }
 
 /// A placeholder block for content on its way: a soft well in whatever shape you pass, breathing between 0.5 and 1 opacity
-/// (still at 0.75 under Reduce Motion). Size it with a frame.
+/// (under Reduce Motion it breathes 1 to 0.6 on the slower fade instead). Size it with a frame.
 public struct CoreSkeleton<S: Shape>: View {
     let shape: S
     @State private var beat = false
@@ -109,9 +118,10 @@ public struct CoreSkeleton<S: Shape>: View {
     public init(_ shape: S) { self.shape = shape }
     public var body: some View {
         shape.fill(GlassInk.wellHover)
-            .opacity(reduce ? 0.75 : beat ? 1 : 0.5)
+            .opacity(reduce || beat ? 1 : 0.5)
             .animation(reduce ? nil : .easeInOut(duration: Motion.tick).repeatForever(autoreverses: true), value: beat)
             .onAppear { beat = true }
+            .coreBreathing(reduce)
             .accessibilityHidden(true)
     }
 }
