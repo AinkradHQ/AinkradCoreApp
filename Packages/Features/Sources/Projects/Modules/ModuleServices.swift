@@ -36,7 +36,9 @@ struct ModuleServices: View {
             out.append(Row(name: s.name, state: nil, live: nil, spec: s))
         }
         let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty ? out : out.filter { $0.name.lowercased().contains(q) || ($0.spec?.image.lowercased().contains(q) ?? false) }
+        return q.isEmpty
+            ? out
+            : out.filter { $0.name.lowercased().contains(q) || ($0.spec?.image.lowercased().contains(q) ?? false) }
     }
 
     private var current: Row? { rows.first { $0.id == selected } ?? rows.first }
@@ -67,8 +69,13 @@ struct ModuleServices: View {
             } else {
                 PgSplit(key: current?.id ?? "") {
                     ForEach(rows) { r in
-                        CoreRow(r.name, subtitle: line(r), symbol: nil, selected: current?.id == r.id, action: { selected = r.id }) {
-                            if let m = r.live?.memory, r.live?.state == .up { Text(m).foregroundStyle(GlassInk.secondary).monospacedDigit() }
+                        CoreRow(
+                            r.name, subtitle: line(r), symbol: nil, selected: current?.id == r.id,
+                            action: { selected = r.id }
+                        ) {
+                            if let m = r.live?.memory, r.live?.state == .up {
+                                Text(m).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                            }
                             StatusDot(colour: tint(r))
                         }
                     }
@@ -118,7 +125,9 @@ struct ModuleServices: View {
         let s = r.live
         let up = s?.state == .up
         PgHead(
-            kicker: [health(s), s.map { "\($0.restarts) \($0.restarts == 1 ? "restart" : "restarts")" }].compactMap { $0 }.joined(separator: " · "),
+            kicker: [health(s), s.map { "\($0.restarts) \($0.restarts == 1 ? "restart" : "restarts")" }].compactMap {
+                $0
+            }.joined(separator: " · "),
             title: r.name
         ) {
             Button {
@@ -129,11 +138,15 @@ struct ModuleServices: View {
             .buttonStyle(CoreButtonStyle(.secondary)).help("Read the log of \(r.name)")
             if let port = r.spec?.port {
                 let open = r.spec?.isPublic == true && project.expose && running
-                Button("Open Port \(port)") {
+                Button("Open Port \(String(port))") {
                     if let u = URL(string: "https://\(project.link)") { NSWorkspace.shared.open(u) }
                 }
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(!open)
-                .help(open ? "Open the public link" : "Only a public port of a running project opens from here. This port is on \(project.live?.runner ?? model.coreName).")
+                .help(
+                    open
+                        ? "Open the public link"
+                        : "Only a public port of a running project opens from here. This port is on \(project.live?.runner ?? model.coreName)."
+                )
             }
             Button {
                 model.control(.restart, project)
@@ -146,8 +159,12 @@ struct ModuleServices: View {
         PgFacts(rows: facts(r))
         if up, let m = project.live?.metrics[r.name] {
             HStack(alignment: .top, spacing: Space.s3) {
-                PgChart(title: "CPU · last hour", values: m.cpu, latest: m.cpu.last.map { String(format: "%.0f %%", $0) } ?? "–", floor: 10)
-                PgChart(title: "Memory", values: m.memory, latest: m.memory.last.map(Self.bytes) ?? "–", tint: GlassInk.green, floor: 1)
+                PgChart(
+                    title: "CPU · last hour", values: m.cpu,
+                    latest: m.cpu.last.map { String(format: "%.0f %%", $0) } ?? "–", floor: 10)
+                PgChart(
+                    title: "Memory", values: m.memory, latest: m.memory.last.map(Self.bytes) ?? "–",
+                    tint: GlassInk.green, floor: 1)
             }
         } else if up {
             PgQuiet("CPU and memory appear once the Core has readings.")
@@ -159,7 +176,8 @@ struct ModuleServices: View {
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
-                        Text(l.text).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1).truncationMode(.tail)
+                        Text(l.text).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
