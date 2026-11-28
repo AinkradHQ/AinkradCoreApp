@@ -1,48 +1,110 @@
 import CoreUI
 import SwiftUI
 
-/// The Overview's islands: AI Sessions, Brain, Notes, Services (or Build history), Repos and Logs, and what a kind adds.
+/// A module of the Overview: a plain well whose header (icon, name, a count, an arrow) opens the module's focused page.
+struct ModuleCard<Content: View>: View {
+    let model: ProjectsModel
+    let module: ProjectModule
+    var title: String? = nil
+    var sub: String? = nil
+    @ViewBuilder let content: Content
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            Button {
+                model.module = module
+            } label: {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: module.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
+                    Text(title ?? module.title).coreFont(size: MacTextSize.headline, weight: .semibold)
+                    if let sub { Text(sub).foregroundStyle(GlassInk.secondary).lineLimit(1) }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").coreFont(size: MacTextSize.meta, weight: .semibold)
+                        .foregroundStyle(GlassInk.secondary).opacity(hovering ? 1 : 0.6).accessibilityHidden(true)
+                }
+                .padding(.horizontal, Space.s2).frame(height: Space.s8 + Space.s2)
+                .background(hovering ? GlassInk.lift(0.07) : .clear, in: coreShape(Radius.control))
+                .contentShape(coreShape(Radius.control))
+            }
+            .buttonStyle(.plain).onHover { hovering = $0 }
+            .animation(Motion.out(Motion.hover), value: hovering)
+            .help(module.help).accessibilityLabel("Open \(module.title)")
+            content.padding(.horizontal, Space.s2)
+            Spacer(minLength: 0)
+        }
+        .padding(Space.s2).padding(.bottom, Space.s1)
+        .frame(maxWidth: .infinity, minHeight: Space.s8 * 7, maxHeight: .infinity, alignment: .topLeading)
+        .coreWell(radius: Radius.pane)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("project-module-\(module.title)")
+    }
+}
+
+/// A row of a module: its words, an optional second line, and what sits at the end.
+private struct ModuleRow<Trailing: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    var action: (() -> Void)? = nil
+    @ViewBuilder let trailing: Trailing
+    @State private var hovering = false
+
+    var body: some View {
+        let row = HStack(spacing: Space.s2) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).lineLimit(1)
+                if let subtitle { Text(subtitle).foregroundStyle(GlassInk.secondary).lineLimit(1) }
+            }
+            Spacer(minLength: Space.s2)
+            trailing
+        }
+        .padding(.horizontal, Space.s2).padding(.vertical, Space.s1 + 1).frame(minHeight: Space.s8 + Space.s2)
+        .background(hovering && action != nil ? GlassInk.lift(0.07) : .clear, in: coreShape(Radius.control))
+        .contentShape(coreShape(Radius.control))
+        if let action {
+            Button(action: action) { row }.buttonStyle(.plain).onHover { hovering = $0 }
+                .animation(Motion.out(Motion.hover), value: hovering)
+        } else {
+            row
+        }
+    }
+}
+
+/// A button under a module's rows: quiet, small.
+private func moreButton(_ title: String, symbol: String? = nil, _ action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+        if let symbol { Label(title, systemImage: symbol) } else { Text(title) }
+    }
+    .buttonStyle(CoreButtonStyle(.plain, size: .small))
+}
+
 extension Overview {
     // MARK: AI Sessions
 
     var sessions: some View {
         let list = live?.sessions ?? []
-        // One source: the list the Overview reads is the number on the card; when only the count is known, say so.
         let counted = project.run?.sessions ?? 0
-        return Island(
-            title: "AI Sessions", sub: list.isEmpty && counted == 0 ? nil : "\(max(list.count, counted))",
-            accessory: {
-                if !list.isEmpty || counted > 0 {
-                    CoreIconButton(symbol: "ellipsis", label: "All AI sessions") { model.section = .sessions }
-                }
-            }
+        let ordered = list.filter { $0.state == .needsYou } + list.filter { $0.state != .needsYou }
+        return ModuleCard(
+            model: model, module: .ai, sub: list.isEmpty && counted == 0 ? nil : "\(max(list.count, counted)) this week"
         ) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                if list.isEmpty, counted > 0 {
-                    Text("\(ProjectItem.count(counted, "AI session")) in this project.")
-                    Button("Show All") { model.section = .sessions }.buttonStyle(
-                        CoreButtonStyle(.secondary, size: .small))
-                } else if list.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                if list.isEmpty {
                     Text(
-                        project.repos.isEmpty
-                            ? (model.core111
-                                ? "No AI sessions yet. New ones start in their own folder, with this project's Brain place."
-                                : "No AI sessions yet. This Core runs them in a repo, so add a repo to start one.")
+                        counted > 0
+                            ? "\(ProjectItem.count(counted, "AI session")) in this project."
                             : "No AI sessions yet. New ones start in their own clone of this project's repos."
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                } else {
-                    // Sessions that need you come first.
-                    let ordered = list.filter { $0.state == .needsYou } + list.filter { $0.state != .needsYou }
-                    VStack(alignment: .leading, spacing: Space.s1) {
-                        ForEach(Array(ordered.prefix(3).enumerated()), id: \.offset) { _, s in
-                            CoreRow(
-                                s.title, subtitle: "\(s.harness) · \(s.when)",
-                                action: s.id.map { id in { model.sessionOpener?(id) } }
-                            ) { SessionBadge.badge(s.state) }
-                        }
-                    }
                 }
+                ForEach(Array(ordered.prefix(3).enumerated()), id: \.offset) { _, s in
+                    ModuleRow(
+                        title: s.title, subtitle: "\(s.harness) · \(s.when)",
+                        action: s.id.map { id in { model.sessionOpener?(id) } }
+                    ) { SessionBadge.badge(s.state) }
+                }
+                moreButton("New AI Session", symbol: "plus") { model.newSession(in: project) }
+                    .disabled(!model.canStartSession(project)).padding(.top, Space.s1)
             }
         }
     }
@@ -52,23 +114,19 @@ extension Overview {
     var hasRoom: Bool { live?.room != nil || live?.roomID != nil || project.roomID != nil }
 
     var brain: some View {
-        Island(
-            title: "Brain", sub: hasRoom ? "\(project.name) room" : "No room yet",
-            accessory: {
-                if hasRoom {
-                    Button("Open Brain") { model.section = .brain }.buttonStyle(
-                        CoreButtonStyle(.secondary, size: .small))
-                }
-            }
-        ) {
-            VStack(alignment: .leading, spacing: Space.s3) {
+        ModuleCard(model: model, module: .brain, sub: hasRoom ? "\(project.name) room" : "No room yet") {
+            VStack(alignment: .leading, spacing: Space.s2) {
                 if let room = live?.room {
-                    Text(room.summary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                    Text("\(room.rules) rules · from \(room.items.formatted()) items").foregroundStyle(
-                        GlassInk.secondary)
+                    fact(room.summary)
+                    if room.approved.isEmpty == false || room.instructionsInUse {
+                        fact("Instructions in use\(room.approved.isEmpty ? "" : " since \(room.approved)").")
+                    }
+                    Text("\(ProjectItem.count(room.rules, "rule")) · \(room.items.formatted()) items · Open Brain")
+                        .foregroundStyle(GlassInk.secondary)
                 } else if let n = insights.knowledge?.count, n > 0 {
-                    Text("Core remembers \(ProjectItem.count(n, "thing")) about this project.")
                     ForEach(insights.knowledge?.prefix(2).map { $0 } ?? []) { KnownRow(r: $0) }
+                    Text("Core remembers \(ProjectItem.count(n, "thing")) about this project.")
+                        .foregroundStyle(GlassInk.secondary)
                 } else if !hasRoom {
                     Text("This project has no Brain room yet. Link one and it fills from AI sessions and docs.")
                         .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
@@ -85,90 +143,74 @@ extension Overview {
         }
     }
 
-    // MARK: Notes
-
-    var notesCard: some View {
-        let notes = insights.notes ?? []
-        let docs = insights.docs ?? []
-        return Island(
-            title: "Notes", sub: notes.isEmpty && docs.isEmpty ? nil : "\(notes.count + docs.count)",
-            accessory: {
-                Button("Open Notes") { model.section = .docs }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
-            }
-        ) {
-            VStack(spacing: Space.s1) {
-                if notes.isEmpty && docs.isEmpty { Text("No notes yet.").foregroundStyle(GlassInk.secondary) }
-                ForEach(notes.prefix(2)) { n in CoreRow(n.title, symbol: "doc.text") { model.openNote?(n.id) } }
-                ForEach(docs.prefix(2)) { d in
-                    CoreRow(
-                        d.title.isEmpty ? d.path : d.title, subtitle: d.sessionTitle.map { "From “\($0)”" },
-                        symbol: "sparkles"
-                    ) {
-                        model.openNote?(d.note)
-                    }
-                }
-            }
-        }
+    private func fact(_ s: String) -> some View {
+        Text(s).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, Space.s3).padding(.vertical, Space.s2).frame(maxWidth: .infinity, alignment: .leading)
+            .coreCard(GlassInk.well, radius: Radius.cardMac - 2)
     }
 
     // MARK: Services
 
-    var servicesIsland: some View {
-        Island(
-            title: "Services", sub: live?.runner ?? model.coreName,
-            accessory: {
-                if let l = live, !l.services.isEmpty {
-                    Button {
-                        model.section = .run
-                    } label: {
-                        Label("Secrets", systemImage: "key")
+    var servicesCard: some View {
+        let list = live?.services ?? []
+        let up = list.filter { $0.state == .up }.count
+        let ordered = list.filter { $0.state == .exited } + list.filter { $0.state != .exited }
+        let shown = Array(ordered.prefix(4))
+        return ModuleCard(
+            model: model, module: .services,
+            sub: list.isEmpty ? nil : project.tag == .running || up > 0 ? "\(up) up" : "not running"
+        ) {
+            if list.isEmpty {
+                Text(servicesWords).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2
+                    ) {
+                        ForEach(Array(shown.enumerated()), id: \.offset) { _, s in serviceTile(s) }
                     }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    if ordered.count > shown.count {
+                        moreButton("+\(ordered.count - shown.count) more · Open Services") { model.module = .services }
+                    }
                 }
             }
-        ) { services }
+        }
     }
 
-    @ViewBuilder private var services: some View {
-        if let l = live, !l.services.isEmpty {
-            // State, health and memory of each; a row opens the Runs page.
-            // Two rows fit with a way to the rest; a service that needs a look (exited) comes first. Nothing is clipped.
-            let ordered = l.services.filter { $0.state == .exited } + l.services.filter { $0.state != .exited }
-            let shown = ordered.count > 2 ? Array(ordered.prefix(2)) : ordered
-            VStack(alignment: .leading, spacing: Space.s1) {
-                ForEach(Array(shown.enumerated()), id: \.offset) { _, s in
-                    CoreRow(s.name, subtitle: Self.serviceLine(s), action: { model.section = .run }) {
-                        if s.state == .up, let m = live?.metrics[s.name], m.memory.count > 1 {
-                            Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes")
-                        }
-                        if s.state == .exited {
-                            StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
-                        } else if s.state == .up {
-                            Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit()
-                        }
-                    }
-                    .help("Open the runs of \(project.name)")
-                }
-                if ordered.count > shown.count {
-                    Button("+\(ordered.count - shown.count) more") { model.section = .run }
-                        .buttonStyle(CoreButtonStyle(.plain, size: .small))
-                }
-            }
-        } else if !project.repos.isEmpty, let draft = project.draft {
-            let live = project.tag == .running || project.tag == .starting
-            Text(
-                live
-                    ? "\(ProjectItem.count(draft.services.count, "service")), waiting for the Core to list them"
-                    : "\(ProjectItem.count(draft.services.count, "service")), not started"
-            )
-            .foregroundStyle(GlassInk.secondary)
-        } else {
-            Text(
-                project.repos.isEmpty
-                    ? "Drafted once you add repos."
-                    : project.setup == .needsSetup ? "No setup yet. Use Set Up… at the top." : "Reading the setup…"
-            ).foregroundStyle(GlassInk.secondary)
+    private var servicesWords: String {
+        if let d = project.draft {
+            let n = ProjectItem.count(d.services.count, "service")
+            return project.tag == .running || project.tag == .starting
+                ? "\(n), waiting for the Core to list them" : "\(n), not started"
         }
+        return project.repos.isEmpty
+            ? "Drafted once you add repos."
+            : project.setup == .needsSetup ? "No setup yet. Use Set Up… at the top." : "Reading the setup…"
+    }
+
+    private func serviceTile(_ s: ProjectLive.Service) -> some View {
+        VStack(alignment: .leading, spacing: Space.s1 + 2) {
+            HStack(spacing: Space.s2) {
+                StatusDot(
+                    colour: s.state == .up ? GlassInk.green : s.state == .exited ? GlassInk.red : GlassInk.secondary)
+                Text(s.name).coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
+                Spacer(minLength: 0)
+                if s.state == .up { Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit() }
+            }
+            if s.state == .up, let m = live?.metrics[s.name], m.memory.count > 1 {
+                Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes", tint: GlassInk.blue)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(s.state == .up ? Self.serviceLine(s) : s.state == .exited ? Self.serviceLine(s) : "Not started")
+                    .coreFont(size: MacTextSize.meta).foregroundStyle(
+                        s.state == .exited ? GlassInk.redInk : GlassInk.secondary
+                    )
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, Space.s3).padding(.vertical, Space.s2 + 2).frame(maxWidth: .infinity, alignment: .leading)
+        .coreCard(GlassInk.well, radius: Radius.cardMac - 2)
+        .accessibilityElement(children: .combine)
     }
 
     /// "Up · healthy", "Exited · restarted 3 times", "Down".
@@ -186,54 +228,81 @@ extension Overview {
         }
     }
 
-    // MARK: Repos
+    // MARK: Builds
 
-    var reposIsland: some View {
-        Island(
-            title: "Repos", sub: project.repos.isEmpty ? nil : "\(project.repos.count)",
-            accessory: {
-                CoreIconButton(symbol: "plus", label: "Add repos to \(project.name)") {
-                    NewProjectDialogs.openAddRepos(model, project)
+    /// Each run is a build: a bar per run (its length in time), red where it failed.
+    var buildsCard: some View {
+        let list = runs.sorted { ($0.startedAt ?? .distantPast) < ($1.startedAt ?? .distantPast) }.suffix(12)
+        let longest =
+            list.compactMap { r in r.startedAt.flatMap { s in r.stoppedAt.map { $0.timeIntervalSince(s) } } }
+            .max() ?? 0
+        return ModuleCard(model: model, module: .builds, sub: list.isEmpty ? nil : "last \(list.count)") {
+            if let last = list.last {
+                VStack(alignment: .leading, spacing: Space.s2) {
+                    HStack(alignment: .bottom, spacing: Space.s1) {
+                        ForEach(Array(list.enumerated()), id: \.offset) { _, r in
+                            let failed = r.state == "failed"
+                            let d = r.startedAt.flatMap { s in r.stoppedAt.map { $0.timeIntervalSince(s) } } ?? 0
+                            coreShape(3).fill(failed ? GlassInk.red : GlassInk.green)
+                                .frame(height: failed ? 18 : longest > 0 && d > 0 ? 14 + 30 * CGFloat(d / longest) : 36)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .frame(height: 44, alignment: .bottom)
+                    ModuleRow(
+                        title: "Built \(runsAgo(last.startedAt, now: model.now()))",
+                        subtitle: [last.runner, last.environment].compactMap { $0 }.joined(separator: " · "),
+                        action: { model.module = .builds }
+                    ) { Self.runBadge(last.state) }
                 }
-                .disabled(model.readOnly)
+            } else {
+                Text("No builds yet. Build and Run makes the first one.").foregroundStyle(GlassInk.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-        ) { repos }
+        }
     }
+
+    static func runBadge(_ state: String) -> StateBadge {
+        switch state {
+        case "running": StateBadge("Running", tone: .run, symbol: "play.circle")
+        case "starting": StateBadge("Starting", tone: .warn, symbol: "gearshape")
+        case "failed": StateBadge("Failed", tone: .fail, symbol: "exclamationmark.triangle")
+        default: StateBadge("Finished", tone: .queue, symbol: "stop.circle")
+        }
+    }
+
+    // MARK: Repos
 
     /// Three rows at most, the ones that need a look first; the rest are one click away.
     static let repoRows = 3
 
-    @ViewBuilder private var repos: some View {
-        if project.repos.isEmpty {
-            Text(project.kind == .other ? "No code attached. Add a repo if the docs live in one." : "No repos yet.")
-                .foregroundStyle(GlassInk.secondary)
-        } else {
-            let ordered = project.repos.filter { $0.copy.isFailed } + project.repos.filter { !$0.copy.isFailed }
-            VStack(alignment: .leading, spacing: Space.s1) {
-                // Up to three rows fit; more than three show two and a way to the rest, so the island never grows.
-                ForEach(ordered.prefix(ordered.count > Self.repoRows ? Self.repoRows - 1 : Self.repoRows)) { r in
-                    CoreRow(
-                        r.name, subtitle: repoLine(r), symbol: "arrow.triangle.branch",
-                        action: { model.section = .repos }
-                    ) {
-                        if r.fetchError != nil {
-                            StateBadge("Copy failed", tone: .fail, symbol: "exclamationmark.triangle")
-                        } else if r.primary, project.repos.count > 1 {
-                            StateBadge("Primary", tone: .queue, symbol: "star")
+    var reposCard: some View {
+        let ordered = project.repos.filter { $0.copy.isFailed } + project.repos.filter { !$0.copy.isFailed }
+        return ModuleCard(model: model, module: .repos, sub: project.repos.isEmpty ? nil : "\(project.repos.count)") {
+            if project.repos.isEmpty {
+                Text(project.kind == .other ? "No code attached. Add a repo if the docs live in one." : "No repos yet.")
+                    .foregroundStyle(GlassInk.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(ordered.prefix(ordered.count > Self.repoRows ? Self.repoRows - 1 : Self.repoRows)) { r in
+                        ModuleRow(title: r.name, subtitle: repoLine(r), action: { model.module = .repos }) {
+                            if r.fetchError != nil {
+                                StateBadge("Copy failed", tone: .fail, symbol: "exclamationmark.triangle")
+                            } else if r.primary, project.repos.count > 1 {
+                                KindChipText("Primary")
+                            }
                         }
+                        .help(r.remoteURL)
                     }
-                    .help(r.remoteURL)
-                }
-                if ordered.count > Self.repoRows {
-                    Button("Show all \(ordered.count)") { model.section = .repos }
-                        .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                    if ordered.count > Self.repoRows {
+                        moreButton("Show all \(ordered.count)") { model.module = .repos }
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func repoLine(_ r: RepoItem) -> String {
+    func repoLine(_ r: RepoItem) -> String {
         switch r.copy {
         case .failed(_, let e): return "\(r.branch) · \(e)"
         case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
@@ -242,31 +311,60 @@ extension Overview {
         }
     }
 
+    // MARK: Activity
+
+    var activityCard: some View {
+        let lines = ActivityLine.timeline(repos: project.repos, runs: runs, names: names, limit: 4)
+        return ModuleCard(model: model, module: .activity) {
+            if lines.isEmpty {
+                Text("Nothing yet.").foregroundStyle(GlassInk.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(lines) { l in
+                        HStack(alignment: .top, spacing: Space.s3) {
+                            coreShape(3).fill(tint(l)).frame(width: 10, height: 10).padding(.top, 4)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(l.title).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1)
+                                Text(runsAgo(l.at, now: model.now())).foregroundStyle(GlassInk.secondary)
+                                    .coreFont(size: MacTextSize.meta)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(height: Space.s8 + Space.s2, alignment: .top)
+                    }
+                }
+                .background(alignment: .topLeading) {
+                    coreShape(1).fill(GlassInk.lift(0.13)).frame(width: 2).padding(.leading, 4).padding(.vertical, 8)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    private func tint(_ l: ActivityLine) -> Color {
+        l.symbol == "exclamationmark.triangle" ? GlassInk.red : l.symbol == "bolt" ? GlassInk.blue : GlassInk.green
+    }
+
     // MARK: Logs
 
-    var logsIsland: some View {
+    var logsCard: some View {
         let real = logs.map { $0.lineCount > 0 } ?? false
         let demo = live?.logs ?? []
-        return Island(
-            title: "Logs", sub: real || !demo.isEmpty ? LogWords.caption(project) : nil,
-            accessory: {
-                if real || !demo.isEmpty {
-                    CoreIconButton(symbol: "arrow.up.right.square", label: "Show Log in Runs") { model.section = .run }
-                }
-            }
+        return ModuleCard(
+            model: model, module: .logs, sub: real || !demo.isEmpty ? LogWords.caption(project) : nil
         ) {
             if let logs, real {
-                RunLogView(logs: logs, compact: true)
+                RunLogView(logs: logs, compact: true).frame(height: Space.s8 * 4)
             } else if !demo.isEmpty {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    ForEach(Array(demo.enumerated()), id: \.offset) { _, l in
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(Array(demo.suffix(6).enumerated()), id: \.offset) { _, l in
                         HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
                             Text(l.service).foregroundStyle(GlassInk.secondary).frame(
-                                width: Space.s8 * 2, alignment: .leading)
+                                width: Space.s8 + Space.s6, alignment: .leading)
                             Text(LogText.plain(l.text)).lineLimit(1)
-                                .foregroundStyle(LogWords.isError(l.text) ? GlassInk.redInk : GlassInk.primary)
+                                .foregroundStyle(LogWords.isError(l.text) ? GlassInk.redInk : GlassInk.secondary)
                         }
-                        .font(.system(size: MacTextSize.body, design: .monospaced))
+                        .font(.system(size: MacTextSize.body - 1, design: .monospaced))
                     }
                 }
             } else {
@@ -278,6 +376,17 @@ extension Overview {
                 .foregroundStyle(GlassInk.secondary)
             }
         }
+    }
+}
+
+/// A word on a small quiet chip ("Primary").
+struct KindChipText: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).coreFont(size: MacTextSize.meta + 1, weight: .medium)
+            .padding(.horizontal, Space.s2).frame(height: MacSize.controlSm)
+            .coreCard(GlassInk.well, radius: Radius.chip).fixedSize()
     }
 }
 

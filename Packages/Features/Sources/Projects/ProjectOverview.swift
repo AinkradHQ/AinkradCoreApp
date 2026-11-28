@@ -1,29 +1,33 @@
 import CoreUI
 import SwiftUI
 
-/// The Overview: the live app, then AI Sessions, Brain, Services, Repos and Logs as islands. They settle in one after another
-/// (`coreRise`; Reduce Motion fades only). What the Core does not serve yet (run state, services, logs, sessions, the room)
-/// comes from `ProjectLive`, which only the Debug demo fills; see its TODOs.
+/// The Overview (details v2): the stage across the full width, then the modules in three columns. The stage shows the
+/// project live per kind; each module's header opens its focused page. What the Core does not serve yet (services, logs,
+/// sessions, the room) comes from `ProjectLive`, which only the Debug demo fills.
 struct Overview: View {
     let model: ProjectsModel
     let project: ProjectItem
+    @Binding var stageKind: ProjectKind?
     @Environment(\.spaceSettled) var settled
     @State var runs: [RunRecord] = []
-    @State private var names: [Int64: String] = [:]
+    @State var names: [Int64: String] = [:]
     @State var insights: ProjectInsightsModel
-    /// The running project's log, live (Overview's Logs island).
+    /// The running project's log, live (the Logs module).
     @State var logs: RunLogsModel?
 
-    init(model: ProjectsModel, project: ProjectItem) {
+    init(model: ProjectsModel, project: ProjectItem, stageKind: Binding<ProjectKind?>) {
         self.model = model
         self.project = project
+        _stageKind = stageKind
         _insights = State(initialValue: ProjectInsightsModel(model: model, project: project))
     }
 
-    static let columnWidth: CGFloat = 420
-    static let cardWidth: CGFloat = 316
-    static let bottomHeight: CGFloat = 220
+    /// For the module stubs that still show the Overview (their lanes replace them).
+    init(model: ProjectsModel, project: ProjectItem) {
+        self.init(model: model, project: project, stageKind: .constant(nil))
+    }
 
+    static let columns = 3
     var live: ProjectLive? { project.live }
     var settingUp: Bool {
         switch project.setup {
@@ -32,31 +36,42 @@ struct Overview: View {
         }
     }
 
+    /// The modules under the stage, chosen by what the project is.
+    var cells: [(module: ProjectModule, view: AnyView)] {
+        let k = project.allKinds
+        var out: [(ProjectModule, AnyView)] = [(.ai, AnyView(sessions)), (.brain, AnyView(brain))]
+        if k.contains(.web) || k.contains(.infra) { out.append((.services, AnyView(servicesCard))) }
+        if k.contains(.app) { out.append((.builds, AnyView(buildsCard))) }
+        out.append((.repos, AnyView(reposCard)))
+        out.append((.activity, AnyView(activityCard)))
+        if k.contains(where: \.runs) { out.append((.logs, AnyView(logsCard))) }
+        return out
+    }
+
     var body: some View {
-        VStack(spacing: Space.s2) {
-            if project.kind == .other {
-                docsFirst
-            } else {
-                if model.configsService != nil { statRow.coreRise(settled, 0) }
-                HStack(alignment: .top, spacing: Space.s2) {
-                    LiveApp(model: model, project: project).coreRise(settled, 0)
-                    rightColumn.frame(width: Self.columnWidth)
+        ScrollView {
+            VStack(spacing: Space.s4) {
+                OverviewStage(model: model, project: project, kind: $stageKind).frame(height: 440)
+                    .coreRise(settled, 0)
+                let rows = stride(from: 0, to: cells.count, by: Self.columns).map {
+                    Array(cells[$0..<min($0 + Self.columns, cells.count)].enumerated())
                 }
-                .frame(maxHeight: .infinity)
-                // The bottom row: 220 tall whatever the state, Services (or Build history) and Repos 316 wide, Logs the rest.
-                // Infrastructure shows its services in the big island, so its bottom row is Repos and Logs.
-                HStack(spacing: Space.s2) {
-                    switch project.kind {
-                    case .web: servicesIsland.coreRise(settled, 3).frame(width: Self.cardWidth)
-                    case .app: buildHistoryIsland.coreRise(settled, 3).frame(width: Self.cardWidth)
-                    default: EmptyView()
+                Grid(horizontalSpacing: Space.s4, verticalSpacing: Space.s4) {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { r, row in
+                        GridRow {
+                            ForEach(row, id: \.1.module) { c, cell in
+                                cell.view.coreRise(settled, 1 + r * Self.columns + c)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                            ForEach(0..<(Self.columns - row.count), id: \.self) { _ in Color.clear }
+                        }
                     }
-                    reposIsland.coreRise(settled, 4).frame(width: Self.cardWidth)
-                    logsIsland.coreRise(settled, 5)
                 }
-                .frame(height: Self.bottomHeight)
+                .frame(minHeight: 0)
             }
+            .padding(.bottom, Space.s1)
         }
+        .scrollIndicators(.never)
         // The tail of the log while it runs (the Core's stream, else a page every 3 s), and the last run's log after it ends,
         // so a failed project keeps the lines that say why.
         .task(id: "\(project.id) \(project.tag) \(model.runTick)") {
@@ -72,87 +87,14 @@ struct Overview: View {
             await model.refreshSetup(project.id)
             await model.refreshLive(project.id)
             await loadRuns()
-            await insights.loadUsage()
             await insights.loadKnowledge()
-            await insights.loadDocs()
         }
     }
-
-    /// AI Sessions on top (300 tall), Brain under it taking what is left; anything more (changes, notes, designs) scrolls
-    /// below, so nothing is ever pushed off the pane.
-    private var rightColumn: some View {
-        GeometryReader { g in
-            ScrollView {
-                VStack(spacing: Space.s2) {
-                    // AI Sessions is up to 300 tall but gives way (56 %) when the stat row takes room, so Brain is never cut.
-                    let top = min(Space.s8 * 9 + Space.s3, (g.size.height - Space.s2) * 0.56)
-                    sessions.frame(height: top).coreRise(settled, 1)
-                    brain.frame(minHeight: max(g.size.height - top - Space.s2, 120))
-                        .coreRise(settled, 2)
-                    if project.kind == .infra { changesPlanIsland.coreRise(settled, 2) }
-                    if project.kind == .app { testsIsland.coreRise(settled, 2) }
-                    if insights.supported {
-                        ChangesCard(insights: insights, now: model.now()).coreRise(settled, 2)
-                        notesCard.coreRise(settled, 3)
-                    }
-                    if let designs = model.designsIsland {
-                        designs(ProjectRef(id: String(project.id), name: project.name)).coreRise(settled, 3)
-                    }
-                }
-            }
-            .scrollIndicators(.never)
-        }
-    }
-
-    // MARK: Stats and activity (Core 0.10)
 
     func loadRuns() async {
         guard let svc = model.configsService else { return }
         runs = (try? await svc.history(project: project.id)) ?? []
         names = Dictionary(
             uniqueKeysWithValues: ((try? await svc.configs(project: project.id)) ?? []).map { ($0.id, $0.name) })
-    }
-
-    private var stats: ProjectStats { ProjectStats(repos: project.repos, runs: runs, now: model.now()) }
-
-    private var statRow: some View {
-        let s = stats
-        let u = insights.usage
-        let known = insights.knowledge?.count
-        return HStack(spacing: Space.s2) {
-            InsightTile(title: "Code", value: s.health, line: s.healthLine, meter: s.healthFraction)
-            InsightTile(
-                title: "Runs this week", value: "\(s.runsThisWeek)",
-                line: s.runningNow > 0 ? "\(s.runningNow) running now" : "None running")
-            if insights.supported {
-                InsightTile(
-                    title: "AI usage", value: u.map { CostWords.money($0.weekCost) } ?? "–",
-                    line: u.map { "This week, \(ProjectItem.count($0.sessionsWeek, "session"))" } ?? "Not available",
-                    spark: u?.byDay)
-                InsightTile(
-                    title: "Things Core knows", value: known.map(String.init) ?? "–",
-                    line: known == nil ? "Not available" : "In the \(project.name) room")
-            }
-            activity
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var activity: some View {
-        let lines = ActivityLine.timeline(repos: project.repos, runs: runs, names: names, limit: 3)
-        return VStack(alignment: .leading, spacing: Space.s1) {
-            Text("Activity").foregroundStyle(GlassInk.secondary)
-            if lines.isEmpty { Text("Nothing yet.").foregroundStyle(GlassInk.secondary) }
-            ForEach(lines) { l in
-                HStack(spacing: Space.s2) {
-                    Image(systemName: l.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-                    Text(l.title).lineLimit(1)
-                    Spacer(minLength: 0)
-                    Text(runsAgo(l.at, now: model.now())).foregroundStyle(GlassInk.secondary)
-                }
-            }
-        }
-        .padding(Space.s3).frame(maxWidth: .infinity, alignment: .topLeading).frame(maxHeight: .infinity)
-        .coreCard(GlassInk.well, radius: Radius.cardMac)
     }
 }
