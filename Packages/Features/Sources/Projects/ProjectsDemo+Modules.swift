@@ -5,7 +5,7 @@ import Foundation
 extension ProjectsDemo {
     static let moduleScenes = [
         "mod-ai", "mod-ai-empty", "mod-brain", "mod-brain-empty", "mod-repos", "mod-repos-failed", "mod-repos-empty",
-        "mod-activity", "mod-activity-empty", "mod-logs", "mod-logs-failed", "mod-logs-empty",
+        "mod-activity", "mod-activity-docs", "mod-activity-empty", "mod-logs", "mod-logs-failed", "mod-logs-empty",
     ]
 
     private static func lanterna(_ i: Int64, _ name: String, _ branch: String, minutes: Double, broken: Bool = false)
@@ -36,7 +36,17 @@ extension ProjectsDemo {
             }
         case "mod-repos-empty": list[3].repos = []
         case "mod-activity-empty": list[3].repos = []
-        case "mod-logs-empty": list[3].live?.logs = []
+        case "mod-logs-empty":
+            list[3].live?.logs = []
+            // Never run, so no "Last run" line above an empty log.
+            list[3].run = RunSummary(state: .stopped, services: 0, sessions: 0, lastRun: nil)
+        case "mod-activity-docs":
+            list[3].kindName = ProjectKind.other.rawValue
+            list[3].name = "Harbour Book"
+            list[3].description = "Research and chapters for the harbour book"
+            list[3].repos = []
+            list[3].run = nil
+            list[3].live = nil
         default: break
         }
     }
@@ -45,7 +55,7 @@ extension ProjectsDemo {
         let pages: [String: (Int64, ProjectModule)] = [
             "mod-ai": (1, .ai), "mod-ai-empty": (4, .ai), "mod-brain": (1, .brain), "mod-brain-empty": (4, .brain),
             "mod-repos": (1, .repos), "mod-repos-failed": (1, .repos), "mod-repos-empty": (4, .repos),
-            "mod-activity": (1, .activity), "mod-activity-empty": (4, .activity), "mod-logs": (1, .logs),
+            "mod-activity": (1, .activity), "mod-activity-docs": (4, .activity), "mod-activity-empty": (4, .activity), "mod-logs": (1, .logs),
             "mod-logs-failed": (3, .logs), "mod-logs-empty": (4, .logs),
         ]
         guard let (id, page) = pages[scene] else { return }

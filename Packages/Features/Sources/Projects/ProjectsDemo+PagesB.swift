@@ -70,7 +70,7 @@ extension ProjectsDemo {
                 scene == "v2b-builds"
                 ? [
                     Self.build("b1", "stopped", minutes: 4, took: 192, why: "user"),
-                    Self.build("b2", "failed", minutes: 70, took: 41, error: "error: no such module ‘Tidepool’"),
+                    Self.build("b2", "failed", minutes: 70, took: 41, error: "error: no such module ‘Lanterna’"),
                     Self.build("b3", "stopped", minutes: 1_500, took: 280, why: "user"),
                     Self.build("b4", "stopped", minutes: 1_560, took: 182, why: "user"),
                 ] : []

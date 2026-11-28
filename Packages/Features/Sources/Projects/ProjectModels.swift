@@ -7,7 +7,7 @@ struct RepoItem: Identifiable, Equatable, Sendable {
     let id: Int64
     let name: String
     let remoteURL: String
-    let branch: String
+    var branch: String
     let primary: Bool
     let fetchedAt: Date?
     let fetchError: String?
@@ -133,7 +133,7 @@ struct RunDraft: Equatable, Sendable {
 
 struct ProjectItem: Identifiable, Equatable, Sendable {
     let id: Int64
-    let slug: String
+    var slug: String
     var name: String
     var description: String
     var expose: Bool

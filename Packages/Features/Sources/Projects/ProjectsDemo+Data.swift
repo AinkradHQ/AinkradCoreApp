@@ -179,13 +179,39 @@ enum DemoData {
 
     // MARK: Apply
 
+    /// The name a project's code goes by ("Lanterna", "Tidepool"): the module an app build cannot find.
+    static func module(_ p: ProjectItem) -> String { String(p.name.split(separator: " ").first ?? "App") }
+
+    /// A failed start names the step that broke; the log shows that step's own lines, never another failure's.
+    static func failedStepLogs(_ p: ProjectItem, _ live: ProjectLive) -> [Line]? {
+        guard let d = live.steps.first(where: { $0.state == .failed })?.detail else { return nil }
+        let m = module(p)
+        if d.contains("npm ci") {
+            return [
+                ("web", "> npm ci"), ("web", "npm ERR! code EUSAGE"),
+                ("web", "npm ERR! `npm ci` can only install with an existing package-lock.json"),
+                ("web", "npm ERR! A complete log of this run can be found in the npm cache"),
+                ("web", "npm ci exited with code 1"),
+            ]
+        }
+        if d.contains("no such module") {
+            return [
+                ("xcodebuild", "Resolve Package Graph"),
+                ("xcodebuild", "CompileSwift normal arm64 \(m == "Tidepool" ? "CourierMap" : "LampList").swift"),
+                ("xcodebuild", "error: no such module ‘\(m)’"), ("xcodebuild", "** BUILD FAILED **"),
+            ]
+        }
+        return nil
+    }
+
     static func adapt(_ p: inout ProjectItem) {
+        p.slug = ProjectRules.slug(from: p.name)
         guard var live = p.live else { return }
         let k = kinds(p)
         let failed = p.run?.state == .failed
         if !live.logs.isEmpty {
             let t = Date()
-            let lines = logs(k, failed: failed)
+            let lines = (failed ? failedStepLogs(p, live) : nil) ?? logs(k, failed: failed)
             live.logs = lines.enumerated().map {
                 .init(
                     service: $0.element.service, text: $0.element.text,
@@ -219,8 +245,8 @@ enum DemoData {
     /// The log lines the stand-in Core serves for a project's run (the Overview island and the Logs page).
     static func source(_ p: ProjectItem?) -> [Line] {
         guard let p else { return logs([.web], failed: false) }
-        let l = logs(kinds(p), failed: p.run?.state == .failed)
-        return l
+        let failed = p.run?.state == .failed
+        return (failed ? p.live.flatMap { failedStepLogs(p, $0) } : nil) ?? logs(kinds(p), failed: failed)
     }
 }
 #endif
