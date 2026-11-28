@@ -47,6 +47,13 @@ struct WizardReview<Panel: View>: View {
                 }
                 attention
             } else {
+                // A create that failed comes back here: say why, plainly, above the choices that can fix it.
+                if let e = model.writeError {
+                    CoreNotice(
+                        symbol: "exclamationmark.triangle", title: "\(name) was not created", text: e, tone: .warn
+                    )
+                    .transition(.opacity)
+                }
                 VStack(spacing: Space.s1) {
                     ForEach(rows) { r in
                         VStack(spacing: 0) {

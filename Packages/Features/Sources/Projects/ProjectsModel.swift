@@ -566,12 +566,17 @@ public final class ProjectsModel {
             creating = nil
         }
         var made: ProjectItem?
-        var missed: [MissedRepo] = []
+        let missed: [MissedRepo] = []
         var issues: [String] = []
+        /// Why the create cannot be finished: any of these rolls the project back.
+        var fatal: [String] = []
+        var triedSlugs: [String] = []
         let runner = runnerSupported ? runner : nil
         do {
+            // Touch ID once, before anything is written: nothing below may be re-run halfway by a proof request.
             try await host.elevated(
-                "Create the project \(name) and its link \(ProjectRules.host(slug)).", done: "created", keepsEdit: true
+                "Create the project \(name) and its link \(ProjectRules.host(slug)).", done: "created", keepsEdit: true,
+                force: true
             ) {
                 var patch = ProjectPatch(expose: expose)
                 if self.core110 { patch.colour = colour.rawValue }
@@ -580,54 +585,75 @@ public final class ProjectsModel {
                 // branches); the rest are added one by one, each counted on the wizard's setup list.
                 let ordered = github + repos.filter { $0.fullName == nil }
                 let batch = ordered.prefix(while: { $0.fullName != nil }).prefix(10)
-                let p: ProjectItem
                 if !batch.isEmpty {
-                    p = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
-                        try await service.createFromGithub(slug: $0, name: name, repos: batch.compactMap(\.fullName))
-                    }
                     patch.description = description.isEmpty ? nil : description
                     patch.runner = runner == nil || runner == "auto" ? nil : runner
-                } else {
-                    p = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
-                        try await service.create(slug: $0, name: name, description: description, runner: runner)
+                }
+                if made == nil {
+                    do {
+                        made = try await self.createRetrying(slug: slug, suffix: autoSuffix) { candidate in
+                            triedSlugs.append(candidate)
+                            if !batch.isEmpty {
+                                return try await service.createFromGithub(
+                                    slug: candidate, name: name, repos: batch.compactMap(\.fullName))
+                            }
+                            return try await service.create(
+                                slug: candidate, name: name, description: description, runner: runner)
+                        }
+                    } catch {
+                        // The Core may have made it and only the answer was lost (a timeout, an answer this app could
+                        // not read): find it, so it is finished or rolled back, never left behind.
+                        let all = (try? await service.projects()) ?? []
+                        guard let found = all.first(where: { triedSlugs.contains($0.slug) }) else { throw error }
+                        made = found
                     }
                 }
-                made = p
+                guard let p = made else { return }
                 // The chosen Brain place first: the Brain gives a project with no place its own new one a few seconds
                 // after it is made, so linking before the repos keeps it from making a second.
                 if let place {
                     do { try await service.linkPlace(project: p.id, room: place.id) } catch {
-                        issues.append(
-                            "Could not link the Brain place \(place.name): \(self.words(error)) It has a new place instead."
-                        )
+                        fatal.append("the Brain place \(place.name) could not be linked (\(self.words(error)))")
                     }
                 }
                 self.creating = CreateProgress(stage: .repos, added: batch.count, total: repos.count)
-                for (i, r) in ordered.enumerated().dropFirst(batch.count) {
+                for (i, r) in ordered.enumerated().dropFirst(batch.count) where fatal.isEmpty {
                     do {
                         try await service.addRepo(
                             project: p.id, name: r.name, url: r.url, branch: r.defaultBranch ?? "main", primary: i == 0)
-                    } catch { missed.append(MissedRepo(name: r.name, why: self.words(error))) }
+                    } catch {
+                        fatal.append("\(r.name) could not be added (\(self.words(error)))")
+                    }
                     self.creating?.added += 1
                 }
                 self.creating?.stage = .finishing
-                if let made, !patch.isEmpty {
-                    do { try await service.update(project: made.id, patch: patch) } catch {
-                        let what =
-                            patch.expose != nil
-                            ? "the public link" : patch.runner != nil ? "the runner" : "the colour or kind"
-                        issues.append("Could not set \(what): \(self.words(error)) Change it in Settings.")
+                if fatal.isEmpty, !patch.isEmpty {
+                    do { try await service.update(project: p.id, patch: patch) } catch {
+                        fatal.append("its settings could not be saved (\(self.words(error)))")
                     }
                 }
             }
         } catch is AdminDeclined {
-            // Nothing was written if the project is still nil; if it exists the person saw Touch ID succeed.
-            if made == nil { return false }
+            if made == nil {
+                writeError = "Touch ID was not given, so nothing was made."
+                return false
+            }
+            fatal.append("Touch ID was not given")
         } catch {
             if made == nil {
                 writeError = words(error)
                 return false
             }
+            fatal.append(words(error))
+        }
+        if let half = made, !fatal.isEmpty {
+            // All or nothing: a create that could not be finished leaves no project, repos, copies or room behind.
+            let gone = await rollBack(half)
+            writeError =
+                fatal.joined(separator: "; ") + "."
+                + (gone ? " Nothing was left behind." : " It was archived; delete it from Archived.")
+            await reload()
+            return false
         }
         guard let made else { return false }
         colours.set(colour, for: made.slug)
@@ -668,6 +694,16 @@ public final class ProjectsModel {
             }
         }
         return try await make(candidate)
+    }
+
+    /// Undoes a half-made project: archive, then delete for good where the Core can (API 112). True when it is gone.
+    private func rollBack(_ p: ProjectItem) async -> Bool {
+        guard let service else { return false }
+        try? await service.archive(project: p.id)
+        do {
+            try await service.delete(project: p.id)
+            return true
+        } catch { return false }
     }
 
     /// "Add Repos…" in a project: adds the picked repos behind one Touch ID. Repos the project has are left out.

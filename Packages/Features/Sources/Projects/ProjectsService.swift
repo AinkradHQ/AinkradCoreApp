@@ -17,6 +17,8 @@ protocol ProjectsService: Sendable {
     func setExpose(project: Int64, _ on: Bool) async throws
     func update(project: Int64, name: String, description: String) async throws
     func archive(project: Int64) async throws
+    /// Deletes an archived project for good, with its repos, copies and room link (`DELETE /projects/{id}`, API 112).
+    func delete(project: Int64) async throws
     /// The archived projects (the Options tab's "Show archived projects").
     func archivedProjects() async throws -> [ProjectItem]
     func unarchive(project: Int64) async throws
@@ -93,6 +95,7 @@ extension ProjectsService {
     // Stand-ins and tests that do not run projects need not answer these.
     func update(project: Int64, name: String, description: String) async throws {}
     func archive(project: Int64) async throws {}
+    func delete(project: Int64) async throws { throw CoreError.protocolViolation("This Core cannot delete a project.") }
     func archivedProjects() async throws -> [ProjectItem] { [] }
     func unarchive(project: Int64) async throws {}
     func limits() async throws -> ProjectLimits? { nil }
@@ -287,6 +290,13 @@ struct LiveProjectsService: ProjectsService {
     // and only when the Core speaks API minor 95.
     func unarchive(project: Int64) async throws {
         _ = try await signed("POST", "/api/v1/projects/\(project)/unarchive")
+    }
+
+    func delete(project: Int64) async throws {
+        guard await connection.serverSupports(minor: 112) else {
+            throw CoreError.protocolViolation("This Core cannot delete a project.")
+        }
+        _ = try await signed("DELETE", "/api/v1/projects/\(project)")
     }
 
     func limits() async throws -> ProjectLimits? {
