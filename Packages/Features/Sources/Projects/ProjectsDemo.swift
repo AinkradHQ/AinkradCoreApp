@@ -62,6 +62,7 @@ public final class ProjectsDemo {
                 if let v = p.idleMinutes { list[i].idleMinutes = Int(v) }
                 if let v = p.idleNever { list[i].idleNever = v }
                 if let v = p.slug { list[i] = ProjectItem.renamed(list[i], slug: v) }
+                if let v = p.kinds { list[i].kinds = v.compactMap(ProjectKind.init(rawValue:)) }
             }
         }
         func setBranch(project: Int64, repo: Int64, branch: String) async throws {
@@ -130,7 +131,7 @@ public final class ProjectsDemo {
             // One run model (the Default and its configurations), Environment with secrets, Repos, Settings.
             "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
             "page-repos-many", "page-repos-failed", "page-settings-limits-edit", "page-settings-colour-more",
-        ] + kindScenes + wizardScenes + spaceScenes
+        ] + kindScenes + wizardScenes + spaceScenes + pagesBScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -242,6 +243,8 @@ public final class ProjectsDemo {
         model.cursor = nil
         model.openID = nil
         model.section = .overview
+        model.module = .overview
+        model.core112 = false
         model.debugHover = nil
         model.stale = nil
         model.wizardMissed = []
@@ -365,6 +368,7 @@ public final class ProjectsDemo {
         }
         Self.kindSample(scene, &list)
         Self.spaceSample(scene, &list)
+        Self.pagesBSample(scene, &list)
         await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
         model.configsService = scene == "page-run-old-core" ? nil : DemoConfigsService()
@@ -527,6 +531,7 @@ public final class ProjectsDemo {
         await showKind(scene)
         await showWizard(scene)
         await showSpace(scene)
+        await showPagesB(scene)
     }
 }
 

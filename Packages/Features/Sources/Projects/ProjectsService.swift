@@ -74,6 +74,8 @@ struct ProjectPatch: Equatable, Sendable {
     var colour: String?
     /// One of `web`, `app`, `infra`, `other` (API 111).
     var kind: String?
+    /// Every kind of the project, first one first (API 112).
+    var kinds: [String]?
 
     var isEmpty: Bool { self == ProjectPatch() }
 }
@@ -187,7 +189,7 @@ struct LiveProjectsService: ProjectsService {
 
     func update(project: Int64, patch p: ProjectPatch) async throws {
         // `color` is not in the synced client: a patch that sets it goes as raw JSON.
-        if p.colour != nil || p.kind != nil {
+        if p.colour != nil || p.kind != nil || p.kinds != nil {
             _ = try await signed("PATCH", "/api/v1/projects/\(project)", body: Self.patchBody(p))
             return
         }
@@ -239,6 +241,7 @@ struct LiveProjectsService: ProjectsService {
         if let v = p.idleNever { o["idle_never"] = v }
         if let v = p.colour { o["color"] = v }
         if let v = p.kind { o["kind"] = v }
+        if let v = p.kinds { o["kinds"] = v }
         return try JSONSerialization.data(withJSONObject: o)
     }
 
@@ -482,11 +485,15 @@ struct LiveProjectsService: ProjectsService {
         let json = try? JSONSerialization.jsonObject(with: data)
         var colours: [Int64: String] = [:]
         var kinds: [Int64: String] = [:]
+        var kindLists: [Int64: [ProjectKind]] = [:]
         for o in (json as? [[String: Any]]) ?? (json as? [String: Any]).map({ [$0] }) ?? [] {
             if let id = (o["id"] as? NSNumber)?.int64Value, let c = o["color"] as? String, !c.isEmpty {
                 colours[id] = c
             }
             if let id = (o["id"] as? NSNumber)?.int64Value, let k = o["kind"] as? String, !k.isEmpty { kinds[id] = k }
+            if let id = (o["id"] as? NSNumber)?.int64Value, let ks = o["kinds"] as? [String] {
+                kindLists[id] = ks.compactMap(ProjectKind.init(rawValue:))
+            }
         }
         let infos: [Components.Schemas.ProjectInfo] =
             json is [Any]
@@ -496,6 +503,7 @@ struct LiveProjectsService: ProjectsService {
             var p = item($0)
             p.colourName = colours[$0.id]
             p.kindName = kinds[$0.id]
+            p.kinds = kindLists[$0.id] ?? []
             return p
         }
     }

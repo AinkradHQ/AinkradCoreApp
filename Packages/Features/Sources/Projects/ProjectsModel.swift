@@ -109,6 +109,8 @@ public final class ProjectsModel {
     internal(set) var core110 = false
     /// The Core speaks API minor 111 (the project kind). Older, the kind is kept on this Mac.
     internal(set) var core111 = false
+    /// API 112: several kinds per project and `DELETE /projects/{id}`.
+    internal(set) var core112 = false
     @ObservationIgnored let kinds: ProjectKinds
     /// Sends one signed request to the project preview route, and the Core's host (for redirects). Set with the connection.
     @ObservationIgnored var previewFetch: PreviewFetch?
@@ -196,6 +198,11 @@ public final class ProjectsModel {
                 self.core111 = has111
                 if has111 { await self.reload() }
             }
+            let has112 = await connection.serverSupports(minor: 112)
+            if let self, has112 != self.core112 {
+                self.core112 = has112
+                if has112 { await self.reload() }
+            }
             let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
@@ -217,6 +224,7 @@ public final class ProjectsModel {
         previewFetch = nil
         core110 = false
         core111 = false
+        core112 = false
         crashes = [:]
         configsService = nil
         insightsService = nil
