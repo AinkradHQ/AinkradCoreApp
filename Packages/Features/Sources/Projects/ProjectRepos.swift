@@ -35,6 +35,8 @@ struct ReposPage: View {
                 }
             }
             .id(current?.id)
+            .transition(.opacity)
+            .animation(Motion.out(Motion.ui), value: current?.id)
             .coreRise(settled, 1)
         }
         .onAppear { settled = true }
@@ -63,12 +65,17 @@ struct ReposPage: View {
             }
         ) {
             VStack(alignment: .leading, spacing: Space.s3) {
-                VStack(spacing: Space.s1) {
+                ScrollView {
+                    VStack(spacing: Space.s1) {
                     ForEach(project.repos) { r in
                         CoreRow(
                             r.name, subtitle: line(r), symbol: "arrow.triangle.branch", selected: r.id == current?.id,
                             action: { pick = r.id }
                         ) {
+                            if r.primary, project.repos.count > 1 {
+                                StateBadge("Primary", tone: .queue, symbol: "star")
+                                    .help("Sessions and runs start in the primary repo")
+                            }
                             switch r.copy {
                             case .failed: StateBadge("Can’t fetch", tone: .fail, symbol: "exclamationmark.triangle")
                             case .fetching: StateBadge("Copying", tone: .warn, symbol: "gearshape")
@@ -88,6 +95,7 @@ struct ReposPage: View {
                         }
                         .help(r.remoteURL)
                     }
+                    }
                 }
                 Text(
                     "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes \(insights.supported ? FetchInterval.line(insights.tuning.fetchInterval) : "every 15 minutes") by itself; every AI session and run gets its own clone."
@@ -99,7 +107,8 @@ struct ReposPage: View {
 
     private func line(_ r: RepoItem) -> String {
         switch r.copy {
-        case .failed(let why, let text): return why.needsConnection ? "\(r.branch) · private" : "\(r.branch) · \(text)"
+        // One line: the reason, in words, is in the detail beside it.
+        case .failed(let why, _): return why.needsConnection ? "\(r.branch) · private" : "\(r.branch) · could not be copied"
         case .fetching(let since): return "\(r.branch) · \(RepoCopy.elapsed(since: since, now: model.now()))"
         case .ready: return "\(r.branch) · fetched \(PickRepo.ago(r.fetchedAt ?? model.now(), model.now()))"
         case .unknown: return "\(r.branch) · not copied yet"

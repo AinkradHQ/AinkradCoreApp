@@ -22,28 +22,51 @@ struct StatusDot: View {
 /// The project's colour: one small rounded square per accent, the picked one carries a tick.
 struct ColourSwatches: View {
     @Binding var selection: ProjectColour
+    /// Eight swatches and a "More…" that shows the rest in a second row (Settings); false shows all of them in one row.
+    var compact = false
+    @State private var more = false
+    private static let first = 8
+
+    private var all: [ProjectColour] { ProjectColour.allCases }
+    private var shown: Bool { !compact || more || all.firstIndex(of: selection).map { $0 >= Self.first } == true }
+
     var body: some View {
-        HStack(spacing: Space.s2) {
-            ForEach(ProjectColour.allCases, id: \.self) { c in
-                Button {
-                    selection = c
-                } label: {
-                    coreShape(Radius.chip).fill(c.fill).frame(width: Space.s6, height: Space.s6)
-                        .overlay {
-                            if selection == c {
-                                Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold)
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                        .contentShape(coreShape(Radius.chip))
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                ForEach(compact ? Array(all.prefix(Self.first)) : all, id: \.self) { swatch($0) }
+                if compact && !shown {
+                    Button("More…") { withAnimation(Motion.out(Motion.ui)) { more = true } }
+                        .buttonStyle(CoreButtonStyle(.plain, size: .small))
+                        .help("Show the other colours")
                 }
-                .buttonStyle(.plain)
-                .help(c.title)
-                .accessibilityLabel(c.title)
-                .accessibilityAddTraits(selection == c ? .isSelected : [])
+            }
+            if compact && shown {
+                HStack(spacing: Space.s2) {
+                    ForEach(Array(all.dropFirst(Self.first)), id: \.self) { swatch($0) }
+                }
+                .transition(.opacity)
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Colour")
+    }
+
+    private func swatch(_ c: ProjectColour) -> some View {
+        Button {
+            selection = c
+        } label: {
+            coreShape(Radius.chip).fill(c.fill).frame(width: Space.s6, height: Space.s6)
+                .overlay {
+                    if selection == c {
+                        Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold)
+                            .foregroundStyle(.white)
+                    }
+                }
+                .contentShape(coreShape(Radius.chip))
+        }
+        .buttonStyle(.plain)
+        .help(c.title)
+        .accessibilityLabel(c.title)
+        .accessibilityAddTraits(selection == c ? .isSelected : [])
     }
 }

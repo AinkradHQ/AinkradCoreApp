@@ -62,19 +62,24 @@ extension View {
 
 // Motion that loops or scales, gated once here so a call site never forgets Reduce Motion.
 extension View {
+    /// Opacity breathing between 1 and 0.6 while `on`, `Motion.tick * 2` each way, ease in and out. The one Reduce Motion
+    /// form of every loop: opacity only, never scale or offset. Safe to use on its own for a state that should breathe.
+    public func coreBreathing(_ on: Bool = true) -> some View { modifier(Breathing(on: on)) }
     /// `scaleEffect` that stays at 1 under Reduce Motion.
     public func coreScaleEffect(_ scale: CGFloat, anchor: UnitPoint = .center) -> some View {
         modifier(ReducedScale(scale: scale, anchor: anchor))
     }
-    /// A repeating symbol pulse while `active`; still under Reduce Motion.
+    /// A repeating symbol pulse while `active`; under Reduce Motion it breathes in opacity instead (never still).
     public func corePulse(_ active: Bool = true) -> some View {
         modifier(LoopingSymbol(active: active, iterate: false))
     }
-    /// A repeating colour sweep through a symbol while `active`; still under Reduce Motion.
+    /// A repeating colour sweep through a symbol while `active`; under Reduce Motion it breathes in opacity instead.
     public func coreIterate(_ active: Bool = true) -> some View {
         modifier(LoopingSymbol(active: active, iterate: true))
     }
-    /// An animation (usually a repeating one) that does not run under Reduce Motion.
+    /// An animation (usually a repeating one). Under Reduce Motion it does not run; the view breathes in opacity instead
+    /// (only when `animation` is not nil), so a loop is never frozen. A caller that draws its own dim state from `value`
+    /// should leave it undimmed under Reduce Motion (`@Environment(\.accessibilityReduceMotion)`).
     public func coreLoop<V: Equatable>(_ animation: Animation?, value: V) -> some View {
         modifier(ReducedAnimation(animation: animation, value: value))
     }
@@ -94,9 +99,25 @@ private struct LoopingSymbol: ViewModifier {
     func body(content: Content) -> some View {
         if iterate {
             content.symbolEffect(.variableColor.iterative, options: .repeating, isActive: active && !reduce)
+                .coreBreathing(active && reduce)
         } else {
             content.symbolEffect(.pulse, options: .repeating, isActive: active && !reduce)
+                .coreBreathing(active && reduce)
         }
+    }
+}
+
+private struct Breathing: ViewModifier {
+    let on: Bool
+    @State private var dim = false
+    func body(content: Content) -> some View {
+        content.opacity(on && dim ? 0.6 : 1)
+            .task(id: on) {
+                withAnimation(nil) { dim = false }
+                guard on else { return }
+                try? await Task.sleep(for: .milliseconds(60))
+                withAnimation(.easeInOut(duration: Motion.tick * 2).repeatForever(autoreverses: true)) { dim = true }
+            }
     }
 }
 
@@ -104,7 +125,9 @@ private struct ReducedAnimation<V: Equatable>: ViewModifier {
     let animation: Animation?
     let value: V
     @Environment(\.accessibilityReduceMotion) private var reduce
-    func body(content: Content) -> some View { content.animation(reduce ? nil : animation, value: value) }
+    func body(content: Content) -> some View {
+        content.animation(reduce ? nil : animation, value: value).coreBreathing(reduce && animation != nil)
+    }
 }
 
 // Right-to-left readiness.

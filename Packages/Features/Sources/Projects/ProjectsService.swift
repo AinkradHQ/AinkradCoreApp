@@ -5,6 +5,8 @@ import OpenAPIRuntime
 
 /// The API minor that brought the private preview, project colours, metrics, start steps, branch change and crash alerts.
 let coreMinorProjects: Int32 = 110
+/// The API minor that brought the project kind (`web`, `app`, `infra`, `other`).
+let coreMinorKinds: Int32 = 111
 
 /// The Core as the Projects screens use it (`/api/v1/projects`, AinkradCore PR #279). Reads need `read`; every write is
 /// `admin` and step-up, so the model runs them through the host's Touch ID. Tests and the demo bring their own.
@@ -15,6 +17,8 @@ protocol ProjectsService: Sendable {
     func setExpose(project: Int64, _ on: Bool) async throws
     func update(project: Int64, name: String, description: String) async throws
     func archive(project: Int64) async throws
+    /// Deletes an archived project for good, with its repos, copies and room link (`DELETE /projects/{id}`, API 112).
+    func delete(project: Int64) async throws
     /// The archived projects (the Options tab's "Show archived projects").
     func archivedProjects() async throws -> [ProjectItem]
     func unarchive(project: Int64) async throws
@@ -35,6 +39,10 @@ protocol ProjectsService: Sendable {
     func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem
     /// A project made from GitHub repos (`owner/name`) in one step: the Core reads each repo's real default branch.
     func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem
+    /// The Brain's places; nil when this Core has no Brain.
+    func places() async throws -> [BrainPlace]?
+    /// Links the project to an existing place, so the Brain makes no new one for it.
+    func linkPlace(project: Int64, room: String) async throws
     func addRepo(project: Int64, name: String, url: String, branch: String, primary: Bool) async throws
     /// Changes the fields set in the patch (`PATCH /projects/{id}`); the rest is kept.
     func update(project: Int64, patch: ProjectPatch) async throws
@@ -64,6 +72,8 @@ struct ProjectPatch: Equatable, Sendable {
     var idleNever: Bool?
     /// One of the accent names; "" clears it (API 110).
     var colour: String?
+    /// One of `web`, `app`, `infra`, `other` (API 111).
+    var kind: String?
 
     var isEmpty: Bool { self == ProjectPatch() }
 }
@@ -85,6 +95,7 @@ extension ProjectsService {
     // Stand-ins and tests that do not run projects need not answer these.
     func update(project: Int64, name: String, description: String) async throws {}
     func archive(project: Int64) async throws {}
+    func delete(project: Int64) async throws { throw CoreError.protocolViolation("This Core cannot delete a project.") }
     func archivedProjects() async throws -> [ProjectItem] { [] }
     func unarchive(project: Int64) async throws {}
     func limits() async throws -> ProjectLimits? { nil }
@@ -117,6 +128,8 @@ extension ProjectsService {
     func setPrimary(project: Int64, repo: Int64) async throws {}
     func project(id: Int64) async throws -> ProjectItem? { nil }
     func runners() async throws -> [RunnerInfo] { [] }
+    func places() async throws -> [BrainPlace]? { nil }
+    func linkPlace(project: Int64, room: String) async throws {}
 }
 
 struct LiveProjectsService: ProjectsService {
@@ -174,7 +187,7 @@ struct LiveProjectsService: ProjectsService {
 
     func update(project: Int64, patch p: ProjectPatch) async throws {
         // `color` is not in the synced client: a patch that sets it goes as raw JSON.
-        if p.colour != nil {
+        if p.colour != nil || p.kind != nil {
             _ = try await signed("PATCH", "/api/v1/projects/\(project)", body: Self.patchBody(p))
             return
         }
@@ -225,6 +238,7 @@ struct LiveProjectsService: ProjectsService {
         if let v = p.idleMinutes { o["idle_minutes"] = v }
         if let v = p.idleNever { o["idle_never"] = v }
         if let v = p.colour { o["color"] = v }
+        if let v = p.kind { o["kind"] = v }
         return try JSONSerialization.data(withJSONObject: o)
     }
 
@@ -278,6 +292,13 @@ struct LiveProjectsService: ProjectsService {
         _ = try await signed("POST", "/api/v1/projects/\(project)/unarchive")
     }
 
+    func delete(project: Int64) async throws {
+        guard await connection.serverSupports(minor: 112) else {
+            throw CoreError.protocolViolation("This Core cannot delete a project.")
+        }
+        _ = try await signed("DELETE", "/api/v1/projects/\(project)")
+    }
+
     func limits() async throws -> ProjectLimits? {
         guard await connection.serverSupports(minor: coreMinorV010) else { return nil }
         return try ProjectLimits.decode(try await signed("GET", "/api/v1/projects/defaults"))
@@ -316,6 +337,29 @@ struct LiveProjectsService: ProjectsService {
                 when: PickRepo.ago(s.updatedAt, now), runner: s.placedOn ?? s.runner,
                 branch: s.workspace?.value["branch"] as? String ?? "–",
                 cost: micros.map { CostWords.money(Double($0) / 1_000_000) } ?? "–", id: s.id)
+        }
+    }
+
+    func places() async throws -> [BrainPlace]? {
+        struct Room: Decodable {
+            let id: String
+            let name: String
+            let state: String?
+        }
+        let data: Data
+        do { data = try await signed("GET", "/modules/brain/v1/rooms") } catch CoreError.http(404, _, _) { return nil }
+        return try JSONDecoder().decode([Room].self, from: data).filter { $0.state != "archived" }
+            .map { BrainPlace(id: $0.id, name: $0.name) }
+    }
+
+    /// The Brain gives a new project its own place a few seconds after it is made, unless one was linked first. If it
+    /// was quicker, its new place is let go (it stays in the Brain, empty) and the chosen one linked.
+    func linkPlace(project: Int64, room: String) async throws {
+        let path = "/modules/brain/v1/projects/\(project)/room"
+        let body = try JSONSerialization.data(withJSONObject: ["room": room])
+        do { _ = try await signed("PUT", path, body: body) } catch CoreError.http(409, "project_linked", _) {
+            _ = try await signed("DELETE", path)
+            _ = try await signed("PUT", path, body: body)
         }
     }
 
@@ -387,7 +431,25 @@ struct LiveProjectsService: ProjectsService {
 
     /// Whatever the generated client threw, as the `CoreError` inside it.
     private func run<T>(_ body: () async throws -> T) async throws -> T {
-        do { return try await body() } catch { throw CoreFailure.of(error) ?? Self.unknown }
+        do { return try await body() } catch {
+            if let core = CoreFailure.of(error) { throw core }
+            // A slow or dropped connection is said as such, never as an answer the app "does not know".
+            if let net = Self.network(error) { throw net }
+            throw Self.unknown
+        }
+    }
+
+    /// The URLError inside whatever the generated client wrapped, if the request never got its answer.
+    static func network(_ error: any Error) -> URLError? {
+        var current: (any Error)? = error
+        for _ in 0..<6 {
+            guard let e = current else { return nil }
+            if let u = e as? URLError { return u }
+            current =
+                (e as NSError).userInfo[NSUnderlyingErrorKey] as? any Error
+                ?? Mirror(reflecting: e).children.lazy.compactMap { $0.value as? any Error }.first
+        }
+        return nil
     }
 
     static func item(_ p: Components.Schemas.ProjectInfo) -> ProjectItem {
@@ -401,7 +463,7 @@ struct LiveProjectsService: ProjectsService {
                     startedAt: $0.mirror?.startedAt, hasMirror: $0.mirror != nil)
             }, updatedAt: p.updatedAt, cpuLimit: p.cpuLimit, memLimitMb: p.memLimitMb,
             idleMinutes: Int(p.idleMinutes), idleNever: p.idleNever ?? false, runner: p.runner ?? "auto",
-            source: p.source, createdAt: p.createdAt, archived: p.state == "archived")
+            source: p.source, createdAt: p.createdAt, roomID: p.room?.roomId, archived: p.state == "archived")
     }
 
     /// The decoder for the Core's JSON: dates read as the client reads them.
@@ -419,10 +481,12 @@ struct LiveProjectsService: ProjectsService {
     static func decode(_ data: Data) throws -> [ProjectItem] {
         let json = try? JSONSerialization.jsonObject(with: data)
         var colours: [Int64: String] = [:]
+        var kinds: [Int64: String] = [:]
         for o in (json as? [[String: Any]]) ?? (json as? [String: Any]).map({ [$0] }) ?? [] {
             if let id = (o["id"] as? NSNumber)?.int64Value, let c = o["color"] as? String, !c.isEmpty {
                 colours[id] = c
             }
+            if let id = (o["id"] as? NSNumber)?.int64Value, let k = o["kind"] as? String, !k.isEmpty { kinds[id] = k }
         }
         let infos: [Components.Schemas.ProjectInfo] =
             json is [Any]
@@ -431,43 +495,8 @@ struct LiveProjectsService: ProjectsService {
         return infos.map {
             var p = item($0)
             p.colourName = colours[$0.id]
+            p.kindName = kinds[$0.id]
             return p
         }
-    }
-}
-
-/// GitHub's repos as the Core lists them for the workspace's connection, a page at a time and searched on the Core (`q`);
-/// nil while no connection is set up (409 `no_connection`), so the picker says "Connect GitHub".
-struct LiveRepoCatalog: RepoCatalog {
-    let connection: CoreConnection
-
-    func page(query: String, page: Int) async throws -> RepoPage? {
-        let list: Components.Schemas.GithubRepoList
-        do {
-            list = try await connection.client.listGithubRepos(
-                query: .init(q: query.isEmpty ? nil : query, page: Int64(page), perPage: 30)
-            ).ok.body.json
-        } catch {
-            if case CoreError.http(409, "no_connection", _)? = CoreFailure.of(error) { return nil }
-            throw CoreFailure.of(error) ?? error
-        }
-        return Self.page(list)
-    }
-
-    /// The Core's answer as JSON, for tests.
-    static func decode(_ data: Data) throws -> RepoPage {
-        try Self.page(JSONDecoder().decode(Components.Schemas.GithubRepoList.self, from: data))
-    }
-
-    static func page(_ list: Components.Schemas.GithubRepoList) -> RepoPage {
-        RepoPage(
-            repos: list.owners.flatMap { o in
-                o.repos.map {
-                    PickRepo(
-                        org: o.owner, name: $0.name, url: "https://github.com/\($0.fullName)", fullName: $0.fullName,
-                        defaultBranch: $0.defaultBranch.isEmpty ? nil : $0.defaultBranch, isPrivate: $0._private,
-                        blurb: $0.description)
-                }
-            }, hasMore: list.hasMore, truncated: list.truncated)
     }
 }

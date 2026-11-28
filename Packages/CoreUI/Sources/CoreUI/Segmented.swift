@@ -157,7 +157,7 @@ public struct GlassToggleTile: View {
                     .coreFont(size: sub == nil ? MacTextSize.body : MacTextSize.headline + 2, weight: .semibold)
                     .contentTransition(.symbolEffect(.replace))
                     .coreBounce(isOn)
-                    .symbolEffect(.pulse, options: .repeating, isActive: isOn && !reduce && sub == nil)
+                    .corePulse(isOn && sub == nil)
                     .frame(width: sub == nil ? nil : 28)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {

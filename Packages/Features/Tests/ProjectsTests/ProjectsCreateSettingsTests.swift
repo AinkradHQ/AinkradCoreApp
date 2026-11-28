@@ -167,8 +167,9 @@ struct CreateTests {
             PickRepo(org: "p", name: "api", url: "https://example.com/o/api"),
             PickRepo(org: "p", name: "web", url: "https://example.com/o/web"),
         ]
-        _ = await m.create(name: "Atlas", slug: "atlas", colour: .blue, repos: pasted, wizard: true)
-        #expect(m.wizardMissed.map(\.name) == ["web"] && !m.wizardMissed[0].why.isEmpty)
+        let ok = await m.create(name: "Atlas", slug: "atlas", colour: .blue, repos: pasted, wizard: true)
+        // A refused repo rolls the project back; the reason names the repo.
+        #expect(!ok && m.wizardProjectID == nil && m.writeError?.contains("web could not be added") == true)
     }
 
     @Test func aTakenLinkMadeFromTheNameGetsANumberAndAnExplicitOneIsAnError() async {
@@ -189,7 +190,8 @@ struct CreateTests {
             status: 400, code: "bad_request", message: "the runner is auto, this_mac or home_server")
         let ok = await m.create(
             name: "Atlas", slug: "atlas", colour: .blue, expose: true, runner: "this_mac", wizard: true)
-        #expect(ok && m.wizardIssues.contains { $0.contains("public link") && $0.contains("runner is auto") })
+        // Settings the Core refuses roll the project back too, with the Core's words.
+        #expect(!ok && m.writeError?.contains("runner is auto") == true)
     }
 
     @Test func aPickedGithubRepoNeedsNoLinkCheck() async {
@@ -409,7 +411,8 @@ struct CatalogTests {
             Issue.record("not ready")
             return
         }
-        #expect(hits.map(\.name) == ["zed-hit"])
+        // The search adds what the Core found; what was listed before stays (the picker filters it on screen).
+        #expect(hits.map(\.name).contains("zed-hit") && hits.map(\.name).contains("a"))
         // "a" was picked before the search; it is still a repo the wizard can create with.
         #expect(m.chosen([gh("a").id, gh("zed-hit").id], pasted: []).map(\.name) == ["a", "zed-hit"])
     }
@@ -443,6 +446,6 @@ struct WizardChoiceTests {
                 id: 1, name: "r", remoteURL: "x", branch: "main", primary: true, fetchedAt: nil, fetchError: nil,
                 hasMirror: false)
         ])
-        #expect(p.settled && p.waiting == 1 && p.title(name: "A") == "Almost there")
+        #expect(p.settled && p.waiting == 1 && p.title(name: "A") == "A is ready, 1 repo needs you")
     }
 }

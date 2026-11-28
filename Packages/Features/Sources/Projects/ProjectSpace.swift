@@ -1,3 +1,4 @@
+import AppKit
 import CoreUI
 import SwiftUI
 
@@ -15,13 +16,20 @@ struct ProjectSpaceView: View {
         VStack(spacing: Space.s2) {
             TopBar(model: model, project: project, onBack: onBack).coreRise(settled, 0)
             HStack(alignment: .top, spacing: Space.s2) {
-                Rail(model: model).coreRise(settled, 1)
+                Rail(model: model, kind: project.kind).coreRise(settled, 1)
                 // Switching pages cross-fades; each page's islands then settle in one after another.
-                ZStack { page.id(model.section).transition(.opacity) }
-                    .animation(Motion.out(Motion.ui), value: model.section)
+                // Pages fade; their islands do not rise again (they rise once, with the space).
+                ZStack {
+                    page.id(model.section).transition(
+                        .asymmetric(
+                            insertion: .opacity.animation(Motion.out(Motion.ui)),
+                            removal: .opacity.animation(Motion.exit(0.12))))
+                }
+                .animation(Motion.out(Motion.ui), value: model.section)
             }
         }
         .onAppear { settled = true }
+        .environment(\.spaceSettled, settled)
         .padding(Space.s2)
         .foregroundStyle(GlassInk.primary)
         .coreFont(size: MacTextSize.body)
@@ -34,6 +42,8 @@ struct ProjectSpaceView: View {
     @ViewBuilder private var page: some View {
         switch model.section {
         case .overview:
+            Overview(model: model, project: project)
+        case .run where project.kind == .other:
             Overview(model: model, project: project)
         case .run:
             RunsPage(model: model, project: project).id(project.id)
@@ -61,34 +71,44 @@ private struct TopBar: View {
     let model: ProjectsModel
     let project: ProjectItem
     let onBack: (() -> Void)?
+    @State private var run: RunPageModel?
 
     var body: some View {
+        let can = model.canControl(project)
+        let block = project.controlBlock(canControl: can)
+        let main = project.mainAction(starting: model.controlling.contains(project.id))
         AppHeader {
             BackButton("Projects") {
                 if let onBack { onBack() } else { model.closeProject() }
             }
             ProjectMark(name: project.name, colour: model.colour(project), size: MacSize.controlMd)
             Text(project.name).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
-            ProjectStateBadge(project: project)
+            SpaceStateBadge(project: project, now: model.now())
         } actions: {
-            Text("Public link").foregroundStyle(GlassInk.secondary)
-            CoreSwitch(
-                "",
-                isOn: Binding(
-                    get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
-            )
-            .disabled(model.readOnly).accessibilityLabel("Public link")
-            .help("While this project runs, anyone with \(project.link) can open it")
-            runButtons
-            // No terminal button: a project's clone lives inside an AI session's folder, and Terminals has no project folder
-            // of the Core's to open yet (proposal in the lane report).
+            // Stop and Restart sit quietly beside the one main action; they ask the Core's run routes behind Touch ID.
+            if !project.archived, project.kind.runs {
+                if project.tag == .running {
+                    secondary("Restart", "arrow.clockwise", .restart, block: block)
+                }
+                if project.tag == .running || project.tag == .starting {
+                    secondary("Stop", "stop", .stop, block: block)
+                }
+            }
             Button {
                 model.newSession(in: project)
             } label: {
-                Label("New AI Session", systemImage: "plus")
+                Label("New AI Session", systemImage: "sparkles")
             }
-            .buttonStyle(CoreButtonStyle(.prominent)).disabled(!model.canStartSession(project))
+            .buttonStyle(CoreButtonStyle(.secondary)).disabled(!model.canStartSession(project))
             .help(model.sessionBlock(project)).accessibilityIdentifier("project-new-session")
+            Button {
+                perform(main)
+            } label: {
+                Label(main.title, systemImage: main.symbol)
+            }
+            .buttonStyle(CoreButtonStyle(.prominent, busy: main.busy))
+            .disabled(!enabled(main, can: can))
+            .help(why(main, can: can)).accessibilityIdentifier("project-main-action")
         }
         .frame(maxWidth: .infinity)
         .coreWell(radius: Radius.pane)
@@ -97,57 +117,86 @@ private struct TopBar: View {
 
     static let cannot = "Not available while this device cannot change projects or the Core is unreachable"
 
-    /// Restart and Stop while it runs, Stop while it starts, Start otherwise. Each asks the Core's run routes behind Touch ID.
-    @ViewBuilder private var runButtons: some View {
-        let can = model.canControl(project)
-        if project.archived {
-            Button {
-                Task { await model.unarchive(project) }
-            } label: {
-                Label("Unarchive", systemImage: "arrow.uturn.backward")
-            }
-            .buttonStyle(CoreButtonStyle(.secondary)).disabled(!can)
-            .help("Bring \(project.name) back to the Projects list")
-        } else {
-            switch project.tag {
-            case .running:
-                run("Restart", "arrow.clockwise", .restart, enabled: can)
-                run("Stop", "stop", .stop, enabled: can)
-            case .starting:
-                run("Stop", "stop", .stop, enabled: can)
-            case .stopped, .failed:
-                run(
-                    "Start", "play", .start, enabled: can && project.startBlock == nil,
-                    why: project.startBlock ?? Self.cannot)
-            case .settingUp, .new:
-                run(
-                    "Start", "play", .start, enabled: false,
-                    why: project.startBlock ?? "Start is ready once the repos are copied and the setup is read")
-            }
+    private func enabled(_ a: MainAction, can: Bool) -> Bool {
+        switch a.kind {
+        case .start: can && project.startBlock == nil
+        case .addRepos, .setUp, .setSecrets, .unarchive: can
+        case .newDoc: !model.readOnly && model.lore != nil
+        case .reviewRepos, .open, .starting, .waiting: true
         }
     }
 
-    private func run(
-        _ title: String, _ symbol: String, _ action: RunAction, enabled: Bool,
-        why: String = TopBar.cannot
-    ) -> some View {
+    private func why(_ a: MainAction, can: Bool) -> String {
+        if !enabled(a, can: can) { return project.startBlock ?? Self.cannot }
+        switch a.kind {
+        case .start: return "\(a.title) \(project.name)"
+        case .addRepos: return "Pick the repos \(project.name) is made of"
+        case .setUp: return "Draft the setup from the repo, or write it by hand"
+        case .setSecrets: return "Set the secrets the setup needs before the first start"
+        case .newDoc: return "Write a new doc in \(project.name)"
+        case .open:
+            return project.kind == .web ? "Open \(project.link) in the browser" : "Open the runs of \(project.name)"
+        case .unarchive: return "Bring \(project.name) back to the Projects list"
+        case .reviewRepos: return "A repo could not be copied. See why in Repos."
+        case .starting, .waiting: return a.title
+        }
+    }
+
+    private func perform(_ a: MainAction) {
+        switch a.kind {
+        case .start: model.control(.start, project)
+        case .addRepos: NewProjectDialogs.openAddRepos(model, project)
+        case .reviewRepos: model.section = .repos
+        case .unarchive: Task { await model.unarchive(project) }
+        case .newDoc:
+            Task {
+                guard let n = try? await model.lore?.create(text: "", project: String(project.id)) else {
+                    model.host.shell.showToast("Could not create the doc. Try again.", kind: .warn)
+                    return
+                }
+                model.openNote?(n.id)
+            }
+        case .open:
+            if project.kind == .web, let url = URL(string: "https://\(project.link)") {
+                NSWorkspace.shared.open(url)
+            } else {
+                model.section = .run
+            }
+        case .setUp, .setSecrets:
+            let r = run ?? RunPageModel(model: model, projectID: project.id)
+            run = r
+            Task {
+                await r.load()
+                if a.kind == .setUp {
+                    RunDialogs.openSetup(r, project: project)
+                } else {
+                    RunDialogs.openSecret(
+                        r, project: project, name: project.draft?.secrets.first, replacing: false)
+                }
+            }
+        case .starting, .waiting: break
+        }
+    }
+
+    private func secondary(_ title: String, _ symbol: String, _ action: RunAction, block: String?) -> some View {
         Button {
             model.control(action, project)
         } label: {
             Label(title, systemImage: symbol)
         }
-        .buttonStyle(CoreButtonStyle(.secondary)).disabled(!enabled)
-        .help(enabled ? "\(title) \(project.name)" : why)
+        .buttonStyle(CoreButtonStyle(.secondary)).disabled(block != nil)
+        .help(block ?? "\(title) \(project.name)")
     }
 }
 
 /// The thin rail of the space: one icon per page, its name and key on hover, ⌘1 to ⌘7 from anywhere in the space.
 private struct Rail: View {
     let model: ProjectsModel
+    let kind: ProjectKind
     var body: some View {
         VStack(spacing: Space.s1) {
             // Docs (R6-06) is the last case, so it follows Brain; Project Settings stays at the bottom.
-            ForEach(ProjectSection.allCases.filter { $0 != .settings }) { tile($0) }
+            ForEach(ProjectSection.allCases.filter { $0 != .settings && ($0 != .run || kind.runs) }) { tile($0) }
             Spacer(minLength: 0)
             tile(.settings)
         }

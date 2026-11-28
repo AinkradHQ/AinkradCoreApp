@@ -33,13 +33,14 @@ public struct StatusDot: View {
     let color: Color
     var live = false
     @State private var dim = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
     public init(color: Color, live: Bool = false) {
         self.color = color
         self.live = live
     }
     public var body: some View {
         coreShape(2).fill(color).frame(width: Space.s2, height: Space.s2)
-            .opacity(live && dim ? 0.45 : 1)
+            .opacity(live && dim && !reduce ? 0.45 : 1)
             .coreLoop(live ? .easeInOut(duration: 1.1).repeatForever() : nil, value: dim)
             .onAppear { if live { dim = true } }
             .accessibilityHidden(true)

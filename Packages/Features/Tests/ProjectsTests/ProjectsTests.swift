@@ -249,17 +249,19 @@ struct ModelTests {
         let (m, s, _) = await make(host)
         #expect(await m.create(name: "Tidepool", slug: "tidepool", colour: .blue) == false)
         #expect(s.calls.isEmpty)
-        #expect(m.writeError == nil)
+        // Declining says so: the wizard never comes back without a reason.
+        #expect(m.writeError?.contains("Touch ID") == true)
     }
 
-    @Test func oneRepoThatFailsDoesNotUndoTheProject() async {
-        let (m, s, host) = await make()
+    @Test func aRepoThatFailsRollsTheWholeProjectBack() async {
+        let (m, s, _) = await make()
         s.refuseRepo = "tidepool-web"
         let ok = await m.create(
             name: "Tidepool", slug: "tidepool", colour: .blue, repos: [pick("tidepool-api"), pick("tidepool-web")])
-        #expect(ok)
-        #expect(m.projects[0].repos.map(\.name) == ["tidepool-api"])
-        #expect(host.shell.toast?.message.contains("tidepool-web") == true)
+        // All or nothing: the half-made project is archived (deleted on a Core that can), and the reason is said.
+        #expect(!ok)
+        #expect(s.calls.contains { $0.hasPrefix("archive") })
+        #expect(m.writeError?.contains("tidepool-web") == true)
     }
 
     @Test func pausedWritesAreRefusedWithAToast() async {

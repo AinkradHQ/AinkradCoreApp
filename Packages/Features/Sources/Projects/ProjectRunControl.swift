@@ -17,6 +17,7 @@ extension ProjectsModel {
             p.setupChecked = true
         }
         p.stale = isStale
+        p.kind = kind(p)
         var live = p.live ?? ProjectLive()
         let parts = liveParts[p.id]
         if let parts {
@@ -24,6 +25,11 @@ extension ProjectsModel {
             live.sessions = parts.sessions
             live.room = parts.room
             live.roomID = parts.roomID
+            #if DEBUG
+            // The demo's stand-in room stays when the stand-in Core serves none.
+            if demoPage, parts.room == nil { live.room = p.live?.room }
+            if demoPage, parts.roomID == nil { live.roomID = p.live?.roomID }
+            #endif
             live.metrics = parts.metrics
         }
         live.stale = p.stale
@@ -85,13 +91,6 @@ extension ProjectsModel {
         case nil: "The last start failed."
         case let other?: "It ended (\(other))."
         }
-    }
-
-    /// The gallery's cards after the Filter field.
-    var shown: [ProjectItem] {
-        let q = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        return q.isEmpty
-            ? projects : projects.filter { $0.name.lowercased().contains(q) || $0.slug.contains(q) }
     }
 
     /// A refusal of a run route, in words (`words` reads a 409 as a taken link name, which is not what a run says).

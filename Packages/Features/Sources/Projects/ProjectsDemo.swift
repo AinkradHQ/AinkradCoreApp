@@ -16,7 +16,11 @@ public final class ProjectsDemo {
         private let lock = NSLock()
         private var list: [ProjectItem]
         private var next: Int64 = 100
-        init(_ list: [ProjectItem]) { self.list = list }
+        private let hasArchived: Bool
+        init(_ list: [ProjectItem], archived: Bool = true) {
+            self.list = list
+            hasArchived = archived
+        }
         func projects() async throws -> [ProjectItem] { lock.withLock { list } }
         func create(slug: String, name: String) async throws -> ProjectItem {
             lock.withLock {
@@ -65,7 +69,8 @@ public final class ProjectsDemo {
             // The demo keeps the repo as it is: the branch dialog is what is shown.
         }
         func archivedProjects() async throws -> [ProjectItem] {
-            [
+            guard hasArchived else { return [] }
+            return [
                 ProjectItem(
                     id: 90, slug: "old-quill", name: "Old Quill", description: "", expose: false,
                     repos: [DemoRepo.make(900, "old-quill-web", "old-quill-co")],
@@ -73,6 +78,16 @@ public final class ProjectsDemo {
             ]
         }
         func unarchive(project: Int64) async throws {}
+        /// The sessions the sample project carries, so the Overview, the card and the Sessions page say the same.
+        func sessions(project: Int64) async throws -> [ProjectLive.Session] {
+            lock.withLock { list.first { $0.id == project }?.live?.sessions ?? [] }
+        }
+        func places() async throws -> [BrainPlace]? {
+            [
+                BrainPlace(id: "r1", name: "Tidepool research"), BrainPlace(id: "r2", name: "Client notes"),
+                BrainPlace(id: "r3", name: "Side ideas"),
+            ]
+        }
         func runners() async throws -> [RunnerInfo] {
             [
                 RunnerInfo(id: "d_mac", name: "Studio Mac", os: "macos", online: true),
@@ -89,24 +104,33 @@ public final class ProjectsDemo {
         }
     }
 
-    public static let scenes = [
-        "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
-        "gallery-failed", "new-quick-empty", "new-quick", "new-quick-error", "new-advanced", "space-no-repos",
-        "space-add-repos", "space-copying", "space-setting-up", "space-ready", "overview-running", "overview-starting",
-        "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
-        "page-settings-stopped", "page-repos", "page-sessions",
-        "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
-        // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
-        "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
-        "gallery-stale", "gallery-archived", "gallery-copy-failed", "new-link-name", "new-paste-link",
-        "new-paste-link-ssh", "new-failed-repos", "settings-runner", "settings-limits", "repo-menu",
-        "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop", "overview-stopped-real",
-        "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
-        // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
-        "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
-        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
-        "dialog-branch-error", "gallery-crashed", "overview-crashed",
-    ]
+    public static let scenes =
+        [
+            "gallery", "gallery-hover", "gallery-filtered", "gallery-empty", "gallery-loading", "gallery-offline",
+            "gallery-failed", "new-empty", "space-no-repos",
+            "space-add-repos", "space-copying", "space-many-repos", "space-setting-up", "space-ready",
+            "overview-running",
+            "overview-starting",
+            "overview-stopped", "overview-failed", "overview-real-core", "page-run", "page-settings",
+            "page-settings-stopped", "page-repos", "page-sessions",
+            "page-brain", "page-brain-empty", "page-run-failed", "page-run-draft",
+            // Look: Settings, Appearance with strong blur and low opacity (and Solid), on the gallery and a space.
+            "gallery-look", "gallery-look-solid", "overview-look", "overview-private", "overview-never-opened",
+            "gallery-stale", "gallery-archived", "gallery-running", "gallery-no-match", "gallery-starting",
+            "gallery-cursor", "gallery-copy-failed-hover", "gallery-kinds-hover", "new-from-tile",
+            "gallery-copy-failed", "settings-runner", "settings-limits",
+            "repo-menu",
+            "space-needs-setup", "space-ready-secrets", "overview-stale", "overview-crash-loop",
+            "overview-stopped-real",
+            "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
+            // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
+            "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
+            "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+            "dialog-branch-error", "gallery-crashed", "overview-crashed",
+            // One run model (the Default and its configurations), Environment with secrets, Repos, Settings.
+            "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
+            "page-repos-many", "page-repos-failed", "page-settings-limits-edit", "page-settings-colour-more",
+        ] + kindScenes + wizardScenes + spaceScenes
 
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
@@ -115,7 +139,7 @@ public final class ProjectsDemo {
         "dialog-branch-error", "gallery-crashed", "overview-crashed",
     ]
 
-    private let model: ProjectsModel
+    let model: ProjectsModel
     public init(model: ProjectsModel) { self.model = model }
 
     private static func repo(_ id: Int64, _ name: String, fetched: Bool = true) -> RepoItem {
@@ -193,8 +217,8 @@ public final class ProjectsDemo {
                     secrets: missing ? ["jwt_secret"] : []) : nil)
     }
 
-    private static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
-    private static let webURL = "https://github.com/tidepool-labs/tidepool-web"
+    static let apiURL = "https://github.com/tidepool-labs/tidepool-api"
+    static let webURL = "https://github.com/tidepool-labs/tidepool-web"
 
     /// The sample projects on the model without opening the pane (other apps' demos name them).
     public func loadSample() async { await model.useNow(Service(Self.sample())) }
@@ -211,9 +235,10 @@ public final class ProjectsDemo {
         shell.coreLink = .live
         shell.home.coreName = "core-oracle"
         model.host.clearElevationNotice()
-        model.quickOpen = false
-        model.quickName = ""
         model.filter = ""
+        model.segment = .all
+        model.galleryRisen = true
+        model.loadedAt = Date()
         model.cursor = nil
         model.openID = nil
         model.section = .overview
@@ -221,13 +246,20 @@ public final class ProjectsDemo {
         model.stale = nil
         model.wizardMissed = []
         model.wizardIssues = []
+        model.wizardDraft = nil
+        model.wizardProjectID = nil
+        model.creating = nil
         model.catalog = SampleRepoCatalog()
         ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, false)
         model.clearWriteError()
         model.demoPage = true
         model.demoPreviewProblem = nil
         model.crashes = [:]
+        model.setupStates = [:]
+        model.liveParts = [:]
+        model.runStates = [:]
         model.core110 = Self.core110Scenes.contains(scene)
+        model.core111 = Self.core111Scenes.contains(scene)
         model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
         // Every scene starts from the standard Look; the look scenes change it below.
         let look = LookPrefs.shared
@@ -244,9 +276,12 @@ public final class ProjectsDemo {
         switch scene {
         case "gallery-empty": list = []
         case "space-no-repos", "space-add-repos": list.insert(Self.tidepool(repos: 0), at: 0)
-        case "gallery-copy-failed", "new-failed-repos": list.insert(Self.copyFailed(), at: 0)
-        case "gallery-archived": ProjectsOptions.options.set(ProjectsOptions.showArchivedKey, true)
-        case "new-paste-link", "new-paste-link-ssh": model.catalog = NoRepoCatalog()
+        case "gallery-copy-failed", "gallery-copy-failed-hover", "new-failed-repos", "page-repos-failed":
+            list.insert(Self.copyFailed(), at: 0)
+        case "gallery-starting": list[1].run = RunSummary(state: .starting, services: 5)
+        case "new-paste-link", "new-paste-link-ssh", "new-code-no-github": model.catalog = NoRepoCatalog()
+        case "new-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
+        case "new-finished": list.insert(Self.tidepool(repos: 2), at: 0)
         case "settings-runner", "settings-limits":
             list[0].runner = "this_mac"
             list[0].cpuLimit = 4
@@ -254,6 +289,11 @@ public final class ProjectsDemo {
             list[0].idleNever = scene == "settings-limits"
             list[0].source = "github"
             list[0].createdAt = Date().addingTimeInterval(-86_400 * 12)
+        case "space-many-repos", "page-repos-many":
+            list[0].repos = (0..<14).map {
+                Self.lanternaRepo(
+                    Int64($0), "lanterna-\($0)", branch: "main", head: "4e1c9a2", minutes: 4, failing: $0 == 9)
+            }
         case "space-copying": list.insert(Self.tidepool(repos: 2, fetched: false), at: 0)
         case "space-setting-up": list.insert(Self.tidepool(repos: 2), at: 0)
         case "space-ready": list.insert(Self.tidepool(repos: 2, draft: true), at: 0)
@@ -323,8 +363,21 @@ public final class ProjectsDemo {
             PreviewStore.shared.forget()
         default: break
         }
-        await model.useNow(Service(list))
+        Self.kindSample(scene, &list)
+        Self.spaceSample(scene, &list)
+        await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
+        model.configsService = scene == "page-run-old-core" ? nil : DemoConfigsService()
+        model.logSources = { _, _ in DemoLogSource() }
+        model.demoRunTab = nil
+        model.demoRunSelected = nil
+        // The running Lanterna reports its services, as a Core with the run engine does.
+        (model.runService as? DemoRunService)?.services[1] = DemoLive.make(.running).services
+        model.demoLimitsDraft = nil
+        Self.configureRun(scene, model.runService as? DemoRunService)
+        // The list was read with the last scene's run service: forget what it said of each project's setup.
+        model.setupStates = [:]
+        for p in model.projects { model.reapply(p.id) }
         model.setRunnerSupported(true)
         await model.loadRunners()
         model.show()
@@ -334,7 +387,8 @@ public final class ProjectsDemo {
             (look.mode, look.opacity, look.blur) = (.blurred, 0.12, 1)
             if scene == "overview-look" { model.openID = 1 }
         case "gallery-look-solid": (look.mode, look.opacity, look.blur) = (.solid, 1, 1)
-        case "overview-private", "overview-running", "overview-private-live", "overview-preview-busy",
+        case "overview-private", "overview-running", "space-many-repos", "overview-private-live",
+            "overview-preview-busy",
             "overview-metrics", "overview-crashed":
             model.openID = 1
         case "overview-never-opened": model.openID = 4
@@ -342,24 +396,16 @@ public final class ProjectsDemo {
         }
         switch scene {
         case "gallery-hover": model.debugHover = 1
-        case "gallery-stale": model.stale = "The Core did not answer in time (timeout)."
-        case "new-link-name":
-            NewProjectDialogs.openAdvanced(model, name: "2048 game")
-        case "new-paste-link":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
-        case "new-paste-link-ssh":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .code)
-        case "new-failed-repos":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", step: .review)
-            try? await Task.sleep(for: .milliseconds(300))
-            model.wizardMissed = [
-                MissedRepo(name: "tidepool-docs", why: "This project already has that repo."),
-                MissedRepo(
-                    name: "tidepool-ops", why: "SSH addresses are not supported yet. Use the https address of the repo."
-                ),
-            ]
-            model.wizardIssues = ["The link is tidepool-2.ainkrad.io: tidepool was taken."]
-            model.wizardProjectID = 7
+        case "gallery-archived": model.segment = .archived
+        case "gallery-running": model.segment = .running
+        case "gallery-no-match": model.filter = "xyzzy"
+        case "gallery-cursor": model.cursor = 2
+        case "gallery-copy-failed-hover": model.debugHover = 7
+        case "gallery-kinds-hover": model.debugHover = 4
+        case "new-from-tile": NewProjectDialogs.openWizard(model, name: "", kind: .app)
+        case "gallery-stale":
+            model.stale = "The Core did not answer in time (timeout)."
+            model.loadedAt = Date().addingTimeInterval(-240)
         case "settings-runner", "settings-limits":
             model.openID = 1
             model.section = .settings
@@ -370,15 +416,7 @@ public final class ProjectsDemo {
         case "gallery-loading": model.setLoad(.loading)
         case "gallery-offline": model.setLoad(.notConnected)
         case "gallery-failed": model.setLoad(.failed("The Core did not answer in time (timeout)."))
-        case "new-quick-empty": model.quickOpen = true
-        case "new-quick":
-            model.quickName = "Tidepool"
-            model.quickOpen = true
-        case "new-quick-error":
-            model.quickName = "7 seas"
-            model.quickOpen = true
-        case "new-advanced":
-            NewProjectDialogs.openAdvanced(model, name: "Tidepool", picked: [Self.apiURL, Self.webURL])
+        case "new-empty": model.newProject()
         case "space-no-repos", "space-copying", "space-setting-up", "space-ready", "space-needs-setup": model.openID = 7
         case "overview-running": model.openID = 1
         case "page-run":
@@ -390,9 +428,39 @@ public final class ProjectsDemo {
         case "page-run-draft":
             model.openID = 2
             model.section = .run
-        case "page-run-logs":
+        case "page-run-logs", "page-run-live":
             model.openID = 1
             model.section = .run
+            model.demoRunTab = .live
+        case "page-run-config":
+            model.openID = 1
+            model.section = .run
+            model.demoRunSelected = 1
+        case "page-run-env":
+            model.openID = 1
+            model.section = .run
+            model.demoRunTab = .environment
+        case "page-run-history":
+            model.openID = 1
+            model.section = .run
+            model.demoRunTab = .history
+        case "page-run-old-core":
+            model.openID = 1
+            model.section = .run
+        case "page-repos-many", "page-repos-failed":
+            model.openID = scene == "page-repos-many" ? 1 : 7
+            model.section = .repos
+        case "page-settings-limits-edit":
+            model.openID = 4
+            model.section = .settings
+            var l = ProjectLimits.standard
+            l.cpus = 4
+            l.memoryMb = 8192
+            model.demoLimitsDraft = l
+        case "page-settings-colour-more":
+            model.openID = 1
+            model.section = .settings
+            model.setColour(.orange, for: model.open ?? list[0])
         case "dialog-history", "dialog-secret-file", "dialog-instructions":
             model.openID = 1
             model.section = scene == "dialog-instructions" ? .brain : .run
@@ -456,6 +524,9 @@ public final class ProjectsDemo {
             if let p = model.open { NewProjectDialogs.openAddRepos(model, p, picked: [Self.apiURL]) }
         default: break
         }
+        await showKind(scene)
+        await showWizard(scene)
+        await showSpace(scene)
     }
 }
 
@@ -545,7 +616,7 @@ enum DemoLive {
                     state: .written,
                     overview: OverviewBody(
                         summary:
-                            "Lanterna is an online shop for handmade lighting. A Laravel API handles catalogue, orders and payments; a Next.js storefront sells to customers and a small admin manages stock.",
+                            "What this project is, how its parts fit together, and the rules an AI session follows here. Written from the repos, the docs and past sessions.",
                         facts: OverviewFacts(stack: "Laravel 11, Next.js 15, MySQL, Redis"),
                         rules: OverviewRules(
                             workflow: [

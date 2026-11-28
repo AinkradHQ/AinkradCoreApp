@@ -4,9 +4,11 @@ import SwiftUI
 
 /// The Environment tab: one environment's variables for one configuration. A value is hidden (dots) until Show is pressed on a
 /// plain one; a variable linked to Secrets shows where it comes from and has no value to show. Compare lists what differs
-/// between two environments, by name only.
+/// between two environments, by name only. The project's secrets are listed beside the variables: a variable can link to one,
+/// and this is where they are added, replaced and deleted.
 struct EnvironmentTab: View {
     let runs: RunConfigsModel
+    let project: ProjectItem
     @State private var newKey = ""
     @State private var newValue = ""
     @State private var removing = false
@@ -14,7 +16,10 @@ struct EnvironmentTab: View {
     var body: some View {
         VStack(spacing: Space.s2) {
             controls
-            if runs.comparing { compare } else { variables }
+            HStack(alignment: .top, spacing: Space.s2) {
+                if runs.comparing { compare } else { variables }
+                SecretsIsland(model: runs.model, project: project, run: runs.setup).frame(width: Space.s8 * 11)
+            }
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .coreConfirm(
@@ -59,7 +64,7 @@ struct EnvironmentTab: View {
                         get: { runs.envConfigItem?.id ?? 0 }, set: { id in Task { await runs.pickConfig(id) } }),
                     options: runs.configs.map { CoreSelectOption($0.id, $0.name) }
                 )
-                .frame(width: Space.s8 * 4)
+                .frame(width: Space.s8 * 5)
             }
             Button {
                 RunsDialogs.openImport(runs)

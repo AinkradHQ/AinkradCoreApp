@@ -7,6 +7,13 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
     private let lock = NSLock()
     private var versions: [Int64: [SpecVersionItem]] = [:]
     private var stored: [Int64: [SecretItem]] = [:]
+    /// Services a running project reports (only the scenes that set them show any; the others keep reading none).
+    var services: [Int64: [ProjectLive.Service]] = [:]
+    /// Scenes: projects the Core holds no setup for, projects whose setup it cannot read yet, and ones with their secrets set.
+    var noSpec: Set<Int64> = []
+    var unreadable: Set<Int64> = []
+    var secretsSet: Set<Int64> = []
+    func services(project: Int64) async throws -> [ProjectLive.Service] { lock.withLock { services[project] ?? [] } }
 
     static let full = """
         {"services": {
@@ -49,7 +56,7 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
         let day = 86_400.0
         let s: [SecretItem] =
             id == 7
-            ? []
+            ? (secretsSet.contains(7) ? [SecretItem(name: "jwt_secret", version: 1, updatedAt: Date())] : [])
             : [
                 SecretItem(name: "app_key", version: 1, updatedAt: Date().addingTimeInterval(-3 * day)),
                 SecretItem(name: "db_password", version: 1, updatedAt: Date().addingTimeInterval(-3 * day)),
@@ -62,7 +69,11 @@ final class DemoRunService: ProjectRunService, @unchecked Sendable {
         return s
     }
 
-    func spec(project: Int64) async throws -> SpecVersionItem? { lock.withLock { history(project).last } }
+    func spec(project: Int64) async throws -> SpecVersionItem? {
+        if unreadable.contains(project) { throw CancellationError() }
+        if noSpec.contains(project) { return nil }
+        return lock.withLock { history(project).last }
+    }
 
     func specVersion(project: Int64, _ version: Int) async throws -> SpecVersionItem {
         try lock.withLock {

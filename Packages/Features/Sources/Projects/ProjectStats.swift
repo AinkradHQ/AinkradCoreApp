@@ -20,12 +20,12 @@ struct ProjectStats: Equatable {
         runningNow = runs.filter(\.live).count
     }
 
-    /// "Good", or what needs the person.
-    var health: String { needsYou > 0 ? "Needs you" : total == 0 ? "No code yet" : "Good" }
+    /// The repo copies: all copied, or what needs the person.
+    var health: String { needsYou > 0 ? "Needs you" : total == 0 ? "No code yet" : "All copied" }
     var healthLine: String {
         needsYou > 0
             ? "\(ProjectItem.count(needsYou, "repo")) could not be copied"
-            : total == 0 ? "Add a repo" : "Everything is ready"
+            : total == 0 ? "Add a repo" : "\(ProjectItem.count(total, "repo")) ready to use"
     }
     var healthFraction: Double { total == 0 ? 0 : Double(ready) / Double(total) }
 }

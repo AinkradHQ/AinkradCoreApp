@@ -5,15 +5,29 @@ import SwiftUI
 /// The dialogs of Projects, shown over the shell like the other apps' dialogs.
 @MainActor
 enum NewProjectDialogs {
-    static func openAdvanced(
-        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .name, pasted: [PickRepo] = []
+    /// Opens the New Project wizard. With nothing preset it picks up the draft the last one left (or the project it made,
+    /// not opened yet); anything preset starts a new one. `kind` preselects that kind's tile; `editing` opens a review row.
+    static func openWizard(
+        _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .what, pasted: [PickRepo] = [],
+        kind: ProjectKind? = nil, editing: WizardRow? = nil
     ) {
-        m.quickOpen = false
         m.clearWriteError()
+        let fresh = name.isEmpty && picked.isEmpty && pasted.isEmpty && kind == nil && step == .what
+        var draft: WizardDraft
+        if fresh, let kept = m.wizardDraft {
+            draft = kept
+        } else {
+            draft = WizardDraft(name: name, picked: picked, pasted: pasted, kind: kind)
+            draft.step = step
+            draft.wantsCode = step == .code
+            m.wizardDraft = nil
+            m.wizardProjectID = nil
+        }
         let shell = m.host.shell
+        // Not dismissible by the shell: the wizard owns Esc and the close, and gives neither while it is making the project.
         shell.present(
-            ShellDialog(id: "project-new", onClose: { [weak m] in m?.clearWriteError() }) {
-                ProjectWizard(model: m, name: name, picked: picked, step: step, pasted: pasted) { shell.closeDialog() }
+            ShellDialog(id: "project-new", dismissible: false, onClose: { [weak m] in m?.clearWriteError() }) {
+                ProjectWizard(model: m, draft: draft, editing: editing) { shell.closeDialog() }
             })
     }
 
@@ -40,65 +54,6 @@ struct DialogHead: View {
     }
 }
 
-/// What a new project will make, in one line each: the Brain room and the link.
-private func promise(_ name: String, _ link: String?) -> AttributedString {
-    let t = name.trimmingCharacters(in: .whitespaces)
-    guard !t.isEmpty, let link else {
-        return AttributedString("Creates a Brain room and a link from the name. Add repos next.")
-    }
-    var out = AttributedString("Creates the Brain room “\(t)” and the link ")
-    var l = AttributedString(link)
-    l.font = .system(size: MacTextSize.body, design: .monospaced)
-    out += l
-    out += AttributedString(". Add repos next.")
-    return out
-}
-
-/// ⌘N: a small pop-over under the New Project button. A name and Return is all it asks; it says what it will create.
-struct QuickNewProject: View {
-    let model: ProjectsModel
-    @Environment(\.corePalette) private var palette
-
-    private var slug: String { ProjectRules.slug(from: model.quickName) }
-    private var typed: Bool { !model.quickName.trimmingCharacters(in: .whitespaces).isEmpty }
-    /// The problem to show: the Core's refusal, else what is wrong with the name (only once something is typed).
-    private var problem: String? {
-        if let e = model.writeError { return e }
-        guard typed else { return nil }
-        return ProjectRules.nameProblem(model.quickName) ?? ProjectRules.slugProblem(slug)
-    }
-    private var ready: Bool {
-        typed && ProjectRules.nameProblem(model.quickName) == nil && ProjectRules.slugProblem(slug) == nil
-    }
-
-    var body: some View {
-        CoreDialogPanel("", width: Space.s8 * 12) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                DialogHead(title: "New Project", line: nil)
-                CoreTextField(
-                    "Name", placeholder: "Project name",
-                    text: Binding(get: { model.quickName }, set: { model.quickName = $0 }), error: problem,
-                    autofocus: true, onSubmit: create
-                )
-                .accessibilityIdentifier("project-quick-name")
-                Text(promise(model.quickName, ready ? ProjectRules.host(slug) : nil))
-                    .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
-                CoreDialogFooter(
-                    cancel: CoreAction("Advanced…") { NewProjectDialogs.openAdvanced(model, name: model.quickName) },
-                    primary: CoreAction("Create", key: .primary, run: create), busy: model.busy, enabled: ready)
-            }
-        }
-        .onChange(of: model.quickName) { _, _ in model.clearWriteError() }
-        .onExitCommand { model.quickOpen = false }
-        .accessibilityIdentifier("project-quick")
-    }
-
-    private func create() {
-        guard ready, !model.busy else { return }
-        Task { await model.create(name: model.quickName, slug: slug, colour: .standard(for: slug), autoSuffix: true) }
-    }
-}
-
 /// "Add a repo" in a project: the picker alone, with the Core's copy-and-draft promise.
 struct AddReposSheet: View {
     let model: ProjectsModel
@@ -119,7 +74,7 @@ struct AddReposSheet: View {
             VStack(alignment: .leading, spacing: Space.s4) {
                 DialogHead(title: "Add Repos", line: "The Core keeps a copy of each one and drafts how to run them.")
                 RepoPicker(
-                    model: model, picked: $picked, pasted: $pasted, height: Space.s8 * 5, existing: project.repos)
+                    model: model, picked: $picked, pasted: $pasted, height: Space.s8 * 10, existing: project.repos)
                 if let e = model.writeError { CoreFieldError(e) }
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),

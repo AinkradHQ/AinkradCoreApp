@@ -21,7 +21,7 @@ struct ProjectStatsTests {
             repos: [repo("a", failed: false)],
             runs: [run("1", "running", daysAgo: 1), run("2", "stopped", daysAgo: 3), run("3", "stopped", daysAgo: 9)],
             now: now)
-        #expect(s.runsThisWeek == 2 && s.runningNow == 1 && s.health == "Good" && s.healthFraction == 1)
+        #expect(s.runsThisWeek == 2 && s.runningNow == 1 && s.health == "All copied" && s.healthFraction == 1)
     }
 
     @Test func aFailedCopyNeedsYou() {

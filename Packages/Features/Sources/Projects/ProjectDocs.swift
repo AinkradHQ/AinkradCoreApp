@@ -172,7 +172,7 @@ struct DocsPage: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var docs: ProjectDocs
-    @State private var settled = false
+    @Environment(\.spaceSettled) private var settled
     @State private var insights: ProjectInsightsModel
 
     init(model: ProjectsModel, project: ProjectItem) {
@@ -243,7 +243,6 @@ struct DocsPage: View {
             content
         }
         .coreRise(settled, 0)
-        .onAppear { settled = true }
         .task(id: project.id) { await docs.load() }
         .accessibilityIdentifier("project-page-Docs")
     }

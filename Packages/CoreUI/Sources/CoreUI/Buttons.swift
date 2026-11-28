@@ -74,10 +74,7 @@ private struct CoreButtonBody: View {
         let solid = kind == .prominent || kind == .danger
         let ink: Color = kind == .quietDanger ? GlassInk.redInk : solid ? .white : GlassInk.primary
         HStack(spacing: Space.s2) {
-            ZStack {
-                configuration.label.opacity(busy ? 0 : 1)
-                if busy { ProgressView().controlSize(.small).tint(ink) }
-            }
+            configuration.label
             // The key that runs this button, shown on it (Ahmed, 2026-11-05 and again 2026-11-21: every action keyboard
             // driven, the key visible).
             if let keycap {
@@ -104,6 +101,8 @@ private struct CoreButtonBody: View {
         .animation(Motion.out(Motion.hover), value: hover)
         .onHover { hovering = $0 }
         .contentShape(.focusEffect, coreShape(size.radius))
+        // Busy keeps its label ("Starting…") and breathes, in opacity only, so it also works under Reduce Motion.
+        .coreBreathing(busy)
         .allowsHitTesting(!busy)
         .accessibilityAddTraits(busy ? .updatesFrequently : [])
         .accessibilityValue(busy ? "Busy" : "")

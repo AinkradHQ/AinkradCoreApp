@@ -13,7 +13,8 @@ struct InsightTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             Text(title).foregroundStyle(GlassInk.secondary)
-            Text(value).coreFont(size: MacTextSize.title, weight: .semibold)
+            Text(value).coreFont(size: MacTextSize.title, weight: .semibold).contentTransition(.numericText())
+                .animation(Motion.out(Motion.ui), value: value)
             Text(line).foregroundStyle(GlassInk.secondary).lineLimit(1)
             if let spark, !spark.isEmpty { CoreSpark(spark).frame(height: Space.s4) }
             if let meter { CoreMeter(meter, low: false, label: title).frame(height: Space.s2) }
@@ -70,7 +71,7 @@ struct KnownRow: View {
             Image(systemName: "externaldrive").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
             Text(r.body).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            StateBadge(r.kind.isEmpty ? "Note" : r.kind.capitalized, tone: .queue, symbol: "circle")
+            StateBadge(r.kind.isEmpty ? "Note" : r.kind.capitalized, tone: .queue, symbol: "square")
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)
         .coreCard(GlassInk.well, radius: Radius.row)

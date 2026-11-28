@@ -44,6 +44,12 @@ public final class ProjectsModel {
     internal(set) var runnerSupported = false
     /// The project the New Project wizard just made: its review step shows that project's repos copying.
     internal(set) var wizardProjectID: Int64?
+    /// What the wizard held when its dialog closed, so New Project opens where it stopped (nil: nothing to keep).
+    internal(set) var wizardDraft: WizardDraft?
+    /// What a create in progress has done, for the wizard's setup list; nil when none runs.
+    internal(set) var creating: CreateProgress?
+    /// What the wizard's Brain step offers (`loadPlaces`).
+    internal(set) var places: [BrainPlace]?
 
     internal(set) var projects: [ProjectItem] = []
     var load: ProjectsLoad = .notConnected
@@ -55,9 +61,18 @@ public final class ProjectsModel {
     var section = ProjectSection.overview
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
-    /// ⌘N and the New Project button: the quick pop-over under the button.
-    var quickOpen = false
-    var quickName = ""
+    /// The gallery's All · Running · Archived switch.
+    var segment = GallerySegment.all
+    /// Archived projects the Core holds, read with every list (the Archived segment shows them).
+    internal(set) var archivedList: [ProjectItem] = []
+    /// When the list on screen was last read from the Core ("Showing the list from 4 min ago").
+    internal(set) var loadedAt: Date?
+    /// The cards have risen once: later visits to the gallery just fade in.
+    var galleryRisen = false
+    /// How many cards fit in a gallery row now (the arrow keys move by a row).
+    var galleryColumns = 3
+    /// Counts up to ask the gallery's Filter field for focus (⌘F, typing).
+    var filterFocus = 0
     /// What a run gets unless a project says otherwise (Settings > Projects > Options); nil until read, or on a Core without it.
     internal(set) var limits: ProjectLimits?
     internal(set) var limitsState = LimitsState.loading
@@ -90,6 +105,9 @@ public final class ProjectsModel {
     /// The Core speaks API minor 110 (private preview, colour, metrics, start steps, branch change, crash alerts): every one of
     /// those is gated on this, so an older Core behaves exactly as before.
     internal(set) var core110 = false
+    /// The Core speaks API minor 111 (the project kind). Older, the kind is kept on this Mac.
+    internal(set) var core111 = false
+    @ObservationIgnored let kinds: ProjectKinds
     /// Sends one signed request to the project preview route, and the Core's host (for redirects). Set with the connection.
     @ObservationIgnored var previewFetch: PreviewFetch?
     @ObservationIgnored var previewCoreHost: String?
@@ -111,6 +129,10 @@ public final class ProjectsModel {
     var demoPage = false
     /// Snapshots only: the words of a live view the Core could not show.
     var demoPreviewProblem: String?
+    /// Snapshots only: the Runs tab and the configuration the page opens on (nil is the Default), and Settings' unsaved limits.
+    var demoRunTab: RunConfigsModel.Tab?
+    var demoRunSelected: Int64?
+    var demoLimitsDraft: ProjectLimits?
     #endif
 
     /// The notes of the Docs page (R6-06): the Lore routes of the same Core.
@@ -141,6 +163,7 @@ public final class ProjectsModel {
     init(host: any AdminHost, defaults: UserDefaults) {
         self.host = host
         colours = ProjectColours(defaults: defaults)
+        kinds = ProjectKinds(defaults: defaults)
         #if DEBUG
         catalog = SampleRepoCatalog()
         #else
@@ -166,6 +189,11 @@ public final class ProjectsModel {
                 self.core110 = new
                 if new { await self.reload() }
             }
+            let has111 = await connection.serverSupports(minor: coreMinorKinds)
+            if let self, has111 != self.core111 {
+                self.core111 = has111
+                if has111 { await self.reload() }
+            }
             let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
@@ -186,6 +214,7 @@ public final class ProjectsModel {
         runService = nil
         previewFetch = nil
         core110 = false
+        core111 = false
         crashes = [:]
         configsService = nil
         insightsService = nil
@@ -199,7 +228,6 @@ public final class ProjectsModel {
         load = .notConnected
         openID = nil
         cursor = nil
-        quickOpen = false
         readOnly = false
     }
 
@@ -225,7 +253,8 @@ public final class ProjectsModel {
         do {
             var all = try await service.projects()
             // "Show archived projects" (Settings > Projects > Options): they come after the active ones in the same order.
-            if ProjectsOptions.showArchived { all += (try? await service.archivedProjects()) ?? [] }
+            let archived = (try? await service.archivedProjects()) ?? []
+            if ProjectsOptions.showArchived { all += archived }
             let list = all.sorted { ($0.archived ? 1 : 0, $1.updatedAt) < ($1.archived ? 1 : 0, $0.updatedAt) }
             // One read of each run, in parallel: the gallery's tags and the top bar need them.
             let runs = await withTaskGroup(of: (Int64, ProjectRunState?).self) { group in
@@ -249,6 +278,8 @@ public final class ProjectsModel {
             for (id, r) in reads { setupStates[id] = r }
             coreSilent = false
             projects = list.map(applying)
+            archivedList = archived.map(applying)
+            loadedAt = Date()
             load = .ready
             stale = nil
             syncLauncherProjects()
@@ -270,7 +301,7 @@ public final class ProjectsModel {
 
     /// The twelve most recently touched projects as launcher entries (⌘K → Projects).
     private func syncLauncherProjects() {
-        let recent = projects.prefix(12)
+        let recent = projects.filter { !$0.archived }.prefix(12)
         let ids = Set(recent.map { "project-\($0.id)" })
         for gone in registeredProjects.subtracting(ids) { host.shell.launcher.unregister(gone) }
         for p in recent {
@@ -385,13 +416,19 @@ public final class ProjectsModel {
     func connectGithub() { host.shell.launcher.entry("connections")?.run() }
 
     /// Reads the picker's first page at once (once per open of a sheet); search and "Show more" read the rest.
-    func loadCatalog() async { await readCatalog(query: "", page: 1) }
+    func loadCatalog() async {
+        // Once per wizard: a second open of the picker (or both of its tasks firing) must not reload and flash the list.
+        if case .ready = catalogState { return }
+        await readCatalog(query: "", page: 1)
+    }
 
     /// A search typed in the picker, asked of the Core (it matches owner/name over all of GitHub's repos).
     func searchCatalog(_ query: String) async {
+        // The picker filters what it has at once; the Core's search only adds what it finds. An empty or one-letter
+        // query asks nothing, so clearing the field never reloads.
         let q = query.trimmingCharacters(in: .whitespaces)
-        guard q != catalogQuery || catalogState == .loading else { return }
-        if case .unavailable = catalogState { return }
+        guard q.count >= 2, q != catalogQuery, !ProjectRules.looksLikeLink(q) else { return }
+        guard case .ready = catalogState else { return }
         await readCatalog(query: q, page: 1)
     }
 
@@ -413,13 +450,11 @@ public final class ProjectsModel {
             catalogHasMore = r.hasMore
             catalogTruncated = r.truncated
             for p in r.repos where !catalogSeen.contains(where: { $0.id == p.id }) { catalogSeen.append(p) }
-            if page == 1 {
-                catalogState = .ready(r.repos)
-            } else if case .ready(let have) = catalogState {
-                catalogState = .ready(have + r.repos.filter { n in !have.contains { $0.id == n.id } })
-            }
+            // Never replace the list: everything found so far stays, in place, and new repos join it.
+            catalogState = .ready(catalogSeen)
         } catch {
-            if case .ready = catalogState, page > 1 { return }
+            // A failed extra page or search keeps the list on screen; only the first read can fail the picker.
+            if case .ready = catalogState, page > 1 || !query.isEmpty { return }
             let problem = CatalogProblem(error)
             if problem == .rateLimited { host.rateLimited(retryAfter: nil) }
             catalogState = problem == .noConnection ? .unavailable : .failed(problem)
@@ -453,6 +488,9 @@ public final class ProjectsModel {
 
     func words(_ error: any Error) -> String {
         if case .rateLimited(let after)? = CoreError.unwrapping(error) { host.rateLimited(retryAfter: after) }
+        if let net = LiveProjectsService.network(error) {
+            return net.code == .timedOut ? "the Core took too long to answer" : "the connection to the Core dropped"
+        }
         guard let e = CoreFailure.of(error) ?? CoreError.unwrapping(error) else { return error.localizedDescription }
         // Any write the Core refuses for scope marks this device read-only, wherever it came from.
         if e == .forbiddenScope {
@@ -477,10 +515,20 @@ public final class ProjectsModel {
     func clearWriteError() { writeError = nil }
 
     /// The wizard's "Open project": closes it and opens the new project's space.
+    /// The Brain places the wizard offers, without the ones another project has; nil when the Core has no Brain.
+    func loadPlaces() async {
+        guard let service else { return }
+        let taken = Set(projects.compactMap(\.roomID))
+        places = (try? await service.places())?.map { $0.filter { !taken.contains($0.id) } }
+    }
+
     func openWizardProject() {
         host.shell.closeDialog()
         if let id = wizardProjectID { openProject(id) }
         wizardProjectID = nil
+        wizardDraft = nil
+        wizardMissed = []
+        wizardIssues = []
     }
 
     // MARK: writes
@@ -494,7 +542,8 @@ public final class ProjectsModel {
     @discardableResult
     func create(
         name: String, slug: String, colour: ProjectColour, repos: [PickRepo] = [], expose: Bool? = nil,
-        runner: String? = nil, description: String = "", autoSuffix: Bool = false, wizard: Bool = false
+        runner: String? = nil, description: String = "", autoSuffix: Bool = false, wizard: Bool = false,
+        place: BrainPlace? = nil, kind: ProjectKind = .web
     ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
         guard let service, !busy, mayWrite() else { return false }
@@ -514,58 +563,101 @@ public final class ProjectsModel {
         writeError = nil
         wizardMissed = []
         wizardIssues = []
-        defer { busy = false }
+        creating = CreateProgress(stage: .project, total: repos.count)
+        defer {
+            busy = false
+            creating = nil
+        }
         var made: ProjectItem?
-        var missed: [MissedRepo] = []
+        let missed: [MissedRepo] = []
         var issues: [String] = []
+        /// Why the create cannot be finished: any of these rolls the project back.
+        var fatal: [String] = []
+        var triedSlugs: [String] = []
         let runner = runnerSupported ? runner : nil
         do {
+            // Touch ID once, before anything is written: nothing below may be re-run halfway by a proof request.
             try await host.elevated(
-                "Create the project \(name) and its link \(ProjectRules.host(slug)).", done: "created", keepsEdit: true
+                "Create the project \(name) and its link \(ProjectRules.host(slug)).", done: "created", keepsEdit: true,
+                force: true
             ) {
                 var patch = ProjectPatch(expose: expose)
                 if self.core110 { patch.colour = colour.rawValue }
-                let viaGithub = !github.isEmpty && github.count == repos.count && repos.count <= 10
-                if viaGithub {
-                    made = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
-                        try await service.createFromGithub(slug: $0, name: name, repos: github.compactMap(\.fullName))
-                    }
+                if self.core111 { patch.kind = kind.rawValue }
+                // GitHub repos first: the Core's from-github route takes up to 10 in one call (with GitHub's own default
+                // branches); the rest are added one by one, each counted on the wizard's setup list.
+                let ordered = github + repos.filter { $0.fullName == nil }
+                let batch = ordered.prefix(while: { $0.fullName != nil }).prefix(10)
+                if !batch.isEmpty {
                     patch.description = description.isEmpty ? nil : description
                     patch.runner = runner == nil || runner == "auto" ? nil : runner
-                } else {
-                    let p = try await self.createRetrying(slug: slug, suffix: autoSuffix) {
-                        try await service.create(slug: $0, name: name, description: description, runner: runner)
-                    }
-                    made = p
-                    for (i, r) in repos.enumerated() {
-                        do {
-                            try await service.addRepo(
-                                project: p.id, name: r.name, url: r.url, branch: r.defaultBranch ?? "main",
-                                primary: i == 0)
-                        } catch { missed.append(MissedRepo(name: r.name, why: self.words(error))) }
+                }
+                if made == nil {
+                    do {
+                        made = try await self.createRetrying(slug: slug, suffix: autoSuffix) { candidate in
+                            triedSlugs.append(candidate)
+                            if !batch.isEmpty {
+                                return try await service.createFromGithub(
+                                    slug: candidate, name: name, repos: batch.compactMap(\.fullName))
+                            }
+                            return try await service.create(
+                                slug: candidate, name: name, description: description, runner: runner)
+                        }
+                    } catch {
+                        // The Core may have made it and only the answer was lost (a timeout, an answer this app could
+                        // not read): find it, so it is finished or rolled back, never left behind.
+                        let all = (try? await service.projects()) ?? []
+                        guard let found = all.first(where: { triedSlugs.contains($0.slug) }) else { throw error }
+                        made = found
                     }
                 }
-                if let made, !patch.isEmpty {
-                    do { try await service.update(project: made.id, patch: patch) } catch {
-                        let what =
-                            patch.expose != nil ? "the public link" : patch.runner != nil ? "the runner" : "the colour"
-                        issues.append("Could not set \(what): \(self.words(error)) Change it in Settings.")
+                guard let p = made else { return }
+                // The chosen Brain place first: the Brain gives a project with no place its own new one a few seconds
+                // after it is made, so linking before the repos keeps it from making a second.
+                if let place {
+                    do { try await service.linkPlace(project: p.id, room: place.id) } catch {
+                        fatal.append("the Brain place \(place.name) could not be linked (\(self.words(error)))")
+                    }
+                }
+                self.creating = CreateProgress(stage: .repos, added: batch.count, total: repos.count)
+                for (i, r) in ordered.enumerated().dropFirst(batch.count) where fatal.isEmpty {
+                    if let why = await self.addRepoPatiently(service, project: p.id, r, primary: i == 0) {
+                        fatal.append("\(r.name) could not be added (\(why))")
+                    }
+                    self.creating?.added += 1
+                }
+                self.creating?.stage = .finishing
+                if fatal.isEmpty, !patch.isEmpty {
+                    do { try await service.update(project: p.id, patch: patch) } catch {
+                        fatal.append("its settings could not be saved (\(self.words(error)))")
                     }
                 }
             }
         } catch is AdminDeclined {
-            // Nothing was written if the project is still nil; if it exists the person saw Touch ID succeed.
-            if made == nil { return false }
+            if made == nil {
+                writeError = "Touch ID was not given, so nothing was made."
+                return false
+            }
+            fatal.append("Touch ID was not given")
         } catch {
             if made == nil {
                 writeError = words(error)
                 return false
             }
+            fatal.append(words(error))
+        }
+        if let half = made, !fatal.isEmpty {
+            // All or nothing: a create that could not be finished leaves no project, repos, copies or room behind.
+            let gone = await rollBack(half)
+            writeError =
+                fatal.joined(separator: "; ") + "."
+                + (gone ? " Nothing was left behind." : " It was archived; delete it from Archived.")
+            await reload()
+            return false
         }
         guard let made else { return false }
         colours.set(colour, for: made.slug)
-        quickOpen = false
-        quickName = ""
+        kinds.set(kind, for: made.slug)
         pollAttempt = 0
         await reload()
         if made.slug != slug { issues.append("The link is \(ProjectRules.host(made.slug)): \(slug) was taken.") }
@@ -602,6 +694,44 @@ public final class ProjectsModel {
             }
         }
         return try await make(candidate)
+    }
+
+    /// Adds one repo, riding out a busy Core: a timeout or dropped connection is tried again (3 tries, 2 s then 4 s apart),
+    /// and a repo the Core turns out to have added anyway counts as added. Nil when it is in the project; else why not.
+    func addRepoPatiently(_ service: any ProjectsService, project: Int64, _ r: PickRepo, primary: Bool) async -> String?
+    {
+        var last: (any Error)?
+        for attempt in 0..<3 {
+            if attempt > 0 { try? await Task.sleep(for: .seconds(Double(attempt) * 2)) }
+            do {
+                try await service.addRepo(
+                    project: project, name: r.name, url: r.url, branch: r.defaultBranch ?? "main", primary: primary)
+                return nil
+            } catch {
+                last = error
+                // Already there (an earlier try landed after its answer was lost): done.
+                if let now = try? await service.project(id: project),
+                    now.repos.contains(where: { ProjectRules.same($0.remoteURL, r.url) })
+                {
+                    return nil
+                }
+                let transient =
+                    LiveProjectsService.network(error) != nil
+                    || CoreError.unwrapping(error).map { if case .rateLimited = $0 { true } else { false } } == true
+                if !transient { break }
+            }
+        }
+        return last.map(words) ?? "unknown"
+    }
+
+    /// Undoes a half-made project: archive, then delete for good where the Core can (API 112). True when it is gone.
+    private func rollBack(_ p: ProjectItem) async -> Bool {
+        guard let service else { return false }
+        try? await service.archive(project: p.id)
+        do {
+            try await service.delete(project: p.id)
+            return true
+        } catch { return false }
     }
 
     /// "Add Repos…" in a project: adds the picked repos behind one Touch ID. Repos the project has are left out.
@@ -694,14 +824,19 @@ public final class ProjectsModel {
 
     /// What this project may use; a value out of the Core's range is refused with the Core's words.
     func setLimits(_ project: ProjectItem, _ l: ProjectLimits) async {
-        let old = project.limits
-        guard l != old else { return }
+        let p = Self.limitsPatch(from: project.limits, to: l)
+        _ = await change(project, p, why: "Change what \(project.name) may use while it runs.")
+    }
+
+    /// One change with every limit that differs (CPU, memory, idle stop), so they save together behind one Touch ID. Empty
+    /// when nothing differs.
+    static func limitsPatch(from old: ProjectLimits, to l: ProjectLimits) -> ProjectPatch {
         var p = ProjectPatch()
         if l.cpus != old.cpus { p.cpuLimit = l.cpus }
         if l.memoryMb != old.memoryMb { p.memLimitMb = l.memoryMb }
         if l.idleMinutes != old.idleMinutes { p.idleMinutes = Int64(l.idleMinutes) }
         if l.idleNever != old.idleNever { p.idleNever = l.idleNever }
-        _ = await change(project, p, why: "Change what \(project.name) may use while it runs.")
+        return p
     }
 
     /// Make a repo the primary one of its project.
@@ -774,7 +909,7 @@ public final class ProjectsModel {
 
     static func paneID(_ id: Int64) -> String { "project-\(id)" }
 
-    private func openInOwnPane(_ p: ProjectItem) {
+    func openInOwnPane(_ p: ProjectItem) {
         let id = p.id
         host.shell.openPane(
             PaneSpec(id: Self.paneID(id), title: p.name, sub: "Project", symbol: "square.grid.2x2", minWidth: 720) {
@@ -797,15 +932,14 @@ public final class ProjectsModel {
         }
     }
 
-    func newProject() {
+    /// `kind` opens the wizard with that kind chosen (the empty gallery's tiles); `name` starts it with a name typed.
+    func newProject(kind: ProjectKind? = nil, name: String = "") {
         if let why = newProjectBlock {
             host.shell.showToast(why, kind: .warn)
             return
         }
         show()
-        quickName = ""
-        writeError = nil
-        quickOpen = true
+        NewProjectDialogs.openWizard(self, name: name, kind: kind)
     }
 
     /// ⌘N while the gallery is up: the same as the New Project button.
@@ -863,7 +997,7 @@ public final class ProjectsModel {
             ["create", "project", "repo", "github"], action: true
         ) {
             $0.show()
-            NewProjectDialogs.openAdvanced($0, name: "")
+            NewProjectDialogs.openWizard($0, name: "")
         }
     }
 }
@@ -883,6 +1017,7 @@ struct SampleRepoCatalog: RepoCatalog {
             r("tidepool-labs", "tidepool-api", "Go", hoursAgo: 2, priv: true),
             r("tidepool-labs", "tidepool-web", "Next.js", hoursAgo: 1),
             r("tidepool-labs", "tidepool-docs", "Markdown", hoursAgo: 24 * 8),
+            r("tidepool-labs", "tidepool-ios", "Swift", hoursAgo: 6),
             r("lanterna-co", "design-tokens", "TypeScript", hoursAgo: 24 * 3),
             r("lanterna-co", "storefront", "Next.js", hoursAgo: 5),
             r("northwind-books", "ledger", "Rust", hoursAgo: 24 * 20, priv: true),

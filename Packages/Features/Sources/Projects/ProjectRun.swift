@@ -53,47 +53,13 @@ private struct ServicesIsland: View {
     let project: ProjectItem
     let run: RunPageModel
 
-    private struct Row: Identifiable {
-        let name: String
-        let image: String
-        let port: String
-        let state: ProjectLive.Service.State?
-        let health: String
-        let cpu: Int?
-        let memory: String?
-        let restarts: Int
-        var series: ServiceSeries?
-        var id: String { name }
-    }
-
-    /// The spec's services with whatever the run reports of each; without a spec, the run's own list.
-    private var rows: [Row] {
-        let live = run.services.isEmpty ? (project.live?.services ?? []) : run.services
-        if let spec = run.spec {
-            return spec.services.map { s in
-                let l = live.first { $0.name == s.name }
-                return Row(
-                    name: s.name, image: s.image,
-                    port: s.port.map { "\($0)\(s.isPublic ? " · public" : "")" } ?? "–", state: l?.state,
-                    health: l?.health ?? "none",
-                    cpu: l?.cpu, memory: l?.memory, restarts: l?.restarts ?? 0, series: project.live?.metrics[s.name])
-            }
-        }
-        return live.map {
-            Row(
-                name: $0.name, image: "–", port: "–", state: $0.state, health: $0.health, cpu: $0.cpu,
-                memory: $0.memory,
-                restarts: $0.restarts, series: project.live?.metrics[$0.name])
-        }
-    }
-
     private var sub: String {
-        "\(rows.count) · \(project.live?.runner ?? model.coreName) · up to \(ProjectRules.limits(cpu: project.cpuLimit, memMb: project.memLimitMb))"
+        "\(ServicesTable(project: project, run: run).rows.count) · \(project.live?.runner ?? model.coreName) · up to \(ProjectRules.limits(cpu: project.cpuLimit, memMb: project.memLimitMb))"
     }
 
     var body: some View {
         Island(
-            title: "Services", sub: rows.isEmpty ? model.coreName : sub,
+            title: "Services", sub: sub,
             accessory: {
                 HStack(spacing: Space.s2) {
                     // Where the project's latest heavy job ran (E15); nothing for a Core run or before hardware.
@@ -119,12 +85,19 @@ private struct ServicesIsland: View {
                         text: s.error ?? ProjectsModel.reason(s.stopReason), tone: .fail)
                 }
                 if run.drafted, let spec = run.spec { DraftLine(project: project, run: run, spec: spec) }
-                content
+                SetupContent(project: project, run: run)
             }
         }
     }
+}
 
-    @ViewBuilder private var content: some View {
+/// The setup's table, or why there is none: the same words on the earlier Run page and in the Default of the Runs page.
+struct SetupContent: View {
+    let project: ProjectItem
+    let run: RunPageModel
+    var showLogs: ((String) -> Void)?
+
+    var body: some View {
         if let e = run.loadError {
             CoreNotice(symbol: "exclamationmark.triangle", title: "Unable to load the setup", text: e, tone: .fail) {
                 Button("Try Again") { Task { await run.load() } }
@@ -137,79 +110,18 @@ private struct ServicesIsland: View {
                 }
             }
             .accessibilityLabel("Loading the setup")
-        } else if rows.isEmpty {
+        } else if run.spec == nil && run.services.isEmpty && (project.live?.services.isEmpty ?? true) {
             Text("Not set up yet. It is drafted from your repos once you add them.")
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
         } else {
-            ScrollView { table }
-        }
-    }
-
-    private var table: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Space.s5, verticalSpacing: Space.s3) {
-            GridRow {
-                ForEach(["Service", "Image", "Port", "Health", "CPU", "Memory", "Restarts"], id: \.self) {
-                    Text($0).foregroundStyle(GlassInk.secondary).frame(
-                        maxWidth: $0 == "Image" ? .infinity : nil, alignment: .leading)
-                }
-            }
-            ForEach(rows) { r in
-                GridRow {
-                    Text(r.name).coreFont(size: MacTextSize.headline, weight: .semibold)
-                    mono(r.image).frame(maxWidth: .infinity, alignment: .leading)
-                    mono(r.port)
-                    health(r)
-                    cpu(r)
-                    HStack(spacing: Space.s2) {
-                        Text(r.state == .up ? (r.memory ?? "–") : "–").monospacedDigit()
-                        if r.state == .up, let m = r.series?.memory, m.count > 1 {
-                            Sparkline(values: m, label: "\(r.name) memory, recent minutes", floor: 1)
-                        }
-                    }
-                    Text("\(r.restarts)").monospacedDigit()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func mono(_ s: String) -> some View {
-        Text(s).font(.system(size: MacTextSize.body, design: .monospaced)).foregroundStyle(GlassInk.secondary)
-            .lineLimit(1).truncationMode(.middle).help(s)
-    }
-
-    @ViewBuilder private func health(_ r: Row) -> some View {
-        switch r.state {
-        case .up? where r.health == "unhealthy":
-            StateBadge("Unhealthy", tone: .fail, symbol: "exclamationmark.triangle")
-        case .up? where r.health == "starting": StateBadge("Starting", tone: .queue, symbol: "clock")
-        case .up? where r.health == "none": StateBadge("Running", tone: .done, symbol: "checkmark.circle")
-        case .up?: StateBadge("Healthy", tone: .done, symbol: "checkmark.circle")
-        case .exited?: StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
-        case .down?: StateBadge("Stopped", tone: .queue, symbol: "stop.circle")
-        case nil: Text("–").foregroundStyle(GlassInk.secondary)
-        }
-    }
-
-    @ViewBuilder private func cpu(_ r: Row) -> some View {
-        if r.state == .up, let cpu = r.cpu {
-            HStack(spacing: Space.s2) {
-                CoreMeter(Double(cpu) / 100, low: cpu >= 90, height: Space.s2, label: "\(r.name) CPU")
-                    .frame(width: Space.s8 * 3)
-                Text("\(cpu)%").monospacedDigit().lineLimit(1).fixedSize()
-                if let c = r.series?.cpu, c.count > 1 {
-                    Sparkline(values: c, label: "\(r.name) CPU, recent minutes", floor: 25)
-                }
-            }
-        } else {
-            Text("–").foregroundStyle(GlassInk.secondary)
+            ScrollView { ServicesTable(project: project, run: run, showLogs: showLogs) }
         }
     }
 }
 
 /// "Run drafted from docker-compose.yml: 3 services (web, api, postgres). See Changes · Undo". Undo makes the version before
 /// the draft the newest again; the first version has nothing before it, so Undo is off there and Edit Setup… changes it.
-private struct DraftLine: View {
+struct DraftLine: View {
     let project: ProjectItem
     let run: RunPageModel
     let spec: SpecVersionItem
@@ -298,78 +210,6 @@ private struct PublicLinkIsland: View {
     }
 }
 
-// MARK: Secrets
-
-private struct SecretsIsland: View {
-    let model: ProjectsModel
-    let project: ProjectItem
-    let run: RunPageModel
-
-    var body: some View {
-        let rows = run.secretRows
-        Island(
-            title: "Secrets", sub: rows.isEmpty ? nil : "\(rows.count)",
-            accessory: {
-                Button {
-                    RunDialogs.openSecret(run, project: project, name: nil, replacing: false)
-                } label: {
-                    Label("Add…", systemImage: "plus")
-                }
-                .buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                .disabled(model.readOnly || !run.loaded)
-                .help("Add a secret the setup can use as ${secret:NAME}")
-                .accessibilityIdentifier("project-add-secret")
-            }
-        ) {
-            VStack(alignment: .leading, spacing: Space.s3) {
-                if rows.isEmpty {
-                    Text("No secrets yet. The setup asks for one by writing ${secret:NAME}; add it here.")
-                        .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                ScrollView {
-                    VStack(spacing: Space.s1) {
-                        ForEach(rows) { r in
-                            HStack(spacing: Space.s3) {
-                                Image(systemName: "key").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
-                                Text(r.name).font(.system(size: MacTextSize.body, design: .monospaced)).lineLimit(1)
-                                    .truncationMode(.middle)
-                                Spacer(minLength: 0)
-                                if let at = r.item?.updatedAt {
-                                    Text("Set \(PickRepo.ago(at, model.now()))").foregroundStyle(GlassInk.secondary)
-                                        .lineLimit(1).fixedSize()
-                                } else if r.item == nil {
-                                    Text("Not set").foregroundStyle(GlassInk.redInk).lineLimit(1).fixedSize()
-                                }
-                                if let k = r.item?.kind, k != "text" {
-                                    Text(SecretSheet.kinds.first { $0.value == k }?.title ?? k)
-                                        .foregroundStyle(GlassInk.secondary).lineLimit(1).fixedSize()
-                                }
-                                Button(r.item == nil ? "Set…" : "Replace…") {
-                                    RunDialogs.openSecret(
-                                        run, project: project, name: r.name, replacing: r.item != nil,
-                                        kind: r.item?.kind ?? "text")
-                                }
-                                .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
-                                .fixedSize()
-                                .accessibilityLabel("\(r.item == nil ? "Set" : "Replace") \(r.name)")
-                                if r.item != nil {
-                                    CoreIconButton(symbol: "trash", label: "Delete \(r.name)") {
-                                        RunDialogs.confirmDelete(run, project: project, name: r.name)
-                                    }
-                                    .disabled(model.readOnly)
-                                }
-                            }
-                            .padding(.horizontal, Space.s2).frame(minHeight: MacSize.controlLg)
-                        }
-                    }
-                }
-                Text("Sealed in the Core and given to the run at start. Never shown again.")
-                    .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
 // MARK: Logs
 
 private struct LogsIsland: View {
@@ -380,14 +220,24 @@ private struct LogsIsland: View {
 
     private var names: [String] { run.spec?.services.map(\.name) ?? project.live?.services.map(\.name) ?? [] }
     private var live: Bool { run.status?.state == "running" || run.status?.state == "starting" }
+    /// The Debug stand-in's lines, made once so the search and the times setting survive a redraw.
+    @State private var fixed: RunLogsModel?
 
     var body: some View {
-        Island("Logs", sub: logs?.service ?? "all services") {
+        Island(
+            title: "Logs", sub: logs?.service ?? "all services",
+            accessory: {
+                if let logs, live {
+                    RunLogToolbar(logs: logs, services: names, toast: { model.host.shell.showToast($0) })
+                } else if let fixed {
+                    RunLogToolbar(logs: fixed)
+                }
+            }
+        ) {
             if let logs, live {
-                RunLogView(logs: logs, services: names, toast: { model.host.shell.showToast($0) })
-            } else if !(project.live?.logs.isEmpty ?? true) {
-                // The Debug stand-in's lines.
-                RunLogView(logs: RunLogsModel.fixed(project.live?.logs ?? [], lost: 12, times: true))
+                RunLogView(logs: logs, toolbar: false)
+            } else if let fixed {
+                RunLogView(logs: fixed, toolbar: false)
             } else {
                 Text("No logs yet. They appear while the project runs.").foregroundStyle(GlassInk.secondary)
             }
@@ -396,6 +246,9 @@ private struct LogsIsland: View {
         .task(id: "\(project.id) \(live) \(model.runTick)") {
             guard live, let m = run.makeLogs() else {
                 logs = nil
+                if fixed == nil, project.live?.logs.isEmpty == false {
+                    fixed = RunLogsModel.fixed(project.live?.logs ?? [], lost: 12, times: true)
+                }
                 return
             }
             logs = m
