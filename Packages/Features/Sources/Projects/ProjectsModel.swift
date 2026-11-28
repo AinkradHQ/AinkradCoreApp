@@ -219,6 +219,7 @@ public final class ProjectsModel {
         previewFetch = nil
         core110 = false
         core111 = false
+        core112 = false
         crashes = [:]
         configsService = nil
         insightsService = nil

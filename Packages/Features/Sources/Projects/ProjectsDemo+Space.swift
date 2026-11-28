@@ -109,12 +109,16 @@ extension ProjectsDemo {
 /// A Lore service with a few made-up docs of the demo's book project, for the docs-first Overview.
 final class DemoDocsLore: LoreService, @unchecked Sendable {
     let notes: [LoreNote]
+    /// Scenes: a Core that cannot list the docs.
+    var failing = false
     init(_ notes: [LoreNote]) { self.notes = notes }
 
     static let harbour: [LoreNote] = [
-        ("Chapter 1 · The harbour at dawn", "#plan"), ("Chapter 2 · The ferry crossing", "#plan"),
-        ("Research · tide tables", ""), ("Outline of the whole book", "#spec"),
-        ("Interview notes · harbour master", ""),
+        ("Chapter 1 · The harbour at dawn", "#plan\n\nThe fog lifted slowly over the breakwater, and the first ferry slid out of it as if it had been waiting all night. Mira counted the gulls on the rail and stopped at forty."),
+        ("Chapter 2 · The ferry crossing", "#plan\n\nMira counted the gulls as the ferry pulled away from the quay. By the second bell the town was a line of roofs."),
+        ("Research · tide tables", "Spring tides peak two days after the new moon. The harbour floods at the lower quay first."),
+        ("Outline of the whole book", "#spec\n\nPart one: arrival. Part two: the storm. Part three: the long way home."),
+        ("Interview notes · harbour master", "“Forty years on these docks, and I still check the sky before the clock.”"),
         ("How to publish the book", "#runbook"),
     ].enumerated().map { LoreNote(id: "d\($0.offset)", project: "4", title: $0.element.0, text: $0.element.1) }
 
@@ -129,7 +133,10 @@ final class DemoDocsLore: LoreService, @unchecked Sendable {
     }
     func save(_ id: String, baseRev: Int, text: String) async throws -> LoreSaveResult { throw CancellationError() }
     func projectNames() async throws -> [String: String] { [:] }
-    func list(filter: LoreFilter) async throws -> [LoreNote] { notes }
+    func list(filter: LoreFilter) async throws -> [LoreNote] {
+        if failing { throw CancellationError() }
+        return notes
+    }
     func backlinks(_ id: String) async throws -> [LoreBacklink] { [] }
     func versions(_ id: String) async throws -> [LoreVersion] { [] }
     func versionText(_ id: String, version: String) async throws -> String { "" }

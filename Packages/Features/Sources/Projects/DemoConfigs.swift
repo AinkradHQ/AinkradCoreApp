@@ -1,4 +1,5 @@
 #if DEBUG
+import CoreKit
 import Foundation
 
 /// Debug only: the Runs page's configurations, environments, variables and runs on made-up data (two configurations beside the
@@ -13,7 +14,14 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
             runner: "automatic", port: nil, restart: false),
     ]
 
-    func configs(project: Int64) async throws -> [RunConfigItem] { items }
+    /// Scenes of the Builds page: a history of its own, or a Core that cannot answer.
+    var historyOverride: [RunRecord]?
+    var failing = false
+
+    func configs(project: Int64) async throws -> [RunConfigItem] {
+        if failing { throw CoreError.protocolViolation("The Core did not answer in time (timeout).") }
+        return items
+    }
     func createConfig(project: Int64, name: String, command: String) async throws -> RunConfigItem { items[0] }
     func updateConfig(project: Int64, id: Int64, _ patch: RunConfigPatch) async throws -> RunConfigItem { items[0] }
     func deleteConfig(project: Int64, id: Int64) async throws {}
@@ -41,7 +49,7 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
     func diff(project: Int64, config: Int64, a: String, b: String) async throws -> [EnvDiffItem] { [] }
     func runners() async throws -> [RunnerOption] { [RunnerOption(id: "core-oracle", name: "core-oracle")] }
 
-    private static func record(
+    static func record(
         _ id: String, _ state: String, _ config: Int64?, minutes: Double, error: String? = nil, why: String? = nil
     ) -> RunRecord {
         RunRecord(
@@ -52,7 +60,8 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
     }
 
     func history(project: Int64) async throws -> [RunRecord] {
-        switch project {
+        if let historyOverride { return historyOverride }
+        return switch project {
         case 1:
             [
                 Self.record("r_1", "running", nil, minutes: 120), Self.record("r_2", "running", 1, minutes: 40),

@@ -1,0 +1,113 @@
+import CoreUI
+import SwiftUI
+
+// Shared pieces of the focused pages (details v2): a list left at 340 pt with the selected row marked, the detail in a plain
+// well on the right, and the small blocks the detail is made of. Each page is one Island whose title row carries its tools.
+
+/// The shared split (ModuleKit): the list of rows left, the detail right. The detail crossfades when `key` changes.
+struct PgSplit<List: View, Detail: View>: View {
+    let key: AnyHashable
+    @ViewBuilder var list: List
+    @ViewBuilder var detail: Detail
+
+    var body: some View {
+        ModuleSplit(pickID: "\(key)") {
+            ScrollView { VStack(alignment: .leading, spacing: Space.s1) { list }.frame(maxWidth: .infinity, alignment: .leading) }
+        } detail: {
+            VStack(alignment: .leading, spacing: 0) { detail }
+        }
+    }
+}
+
+typealias PgGroup = ModuleGroup
+
+/// The detail's head (ModuleKit's ModuleHead with the caption first).
+struct PgHead<Tools: View>: View {
+    let kicker: String
+    let title: String
+    @ViewBuilder var tools: Tools
+    var body: some View { ModuleHead(caption: kicker, title: title) { tools } }
+}
+
+/// A block of the detail or of Settings: a small title (and tools), then its content.
+struct PgBlock<Tools: View, Content: View>: View {
+    let title: String
+    @ViewBuilder var tools: Tools
+    @ViewBuilder var content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack(spacing: Space.s2) {
+                Text(title).coreFont(size: MacTextSize.body, weight: .semibold).foregroundStyle(GlassInk.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                tools
+            }
+            content
+        }
+        .padding(.top, Space.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension PgBlock where Tools == EmptyView {
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.init(title: title, tools: { EmptyView() }, content: content)
+    }
+}
+
+struct PgFacts: View {
+    let rows: [(String, String)]
+    var body: some View { ModuleFacts(facts: rows) }
+}
+
+/// A quiet line: what is missing and when it will be there.
+struct PgQuiet: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A calm area chart with the latest value over it: no axes, the words say the rest.
+struct PgChart: View {
+    let title: String
+    let values: [Double]
+    let latest: String
+    var tint: Color = GlassInk.blue
+    var floor = 1.0
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s2) {
+            HStack {
+                Text(title).foregroundStyle(GlassInk.secondary)
+                Spacer(minLength: 0)
+                Text(latest).monospacedDigit()
+            }
+            let points = Sparkline.normalized(values, floor: floor)
+            Canvas { ctx, size in
+                guard points.count > 1 else { return }
+                let step = size.width / CGFloat(points.count - 1)
+                func at(_ i: Int) -> CGPoint {
+                    CGPoint(x: CGFloat(i) * step, y: size.height - 1 - CGFloat(points[i]) * (size.height - 2))
+                }
+                var line = Path()
+                line.move(to: at(0))
+                for i in 1..<points.count { line.addLine(to: at(i)) }
+                var area = line
+                area.addLine(to: CGPoint(x: size.width, y: size.height))
+                area.addLine(to: CGPoint(x: 0, y: size.height))
+                area.closeSubpath()
+                ctx.fill(area, with: .color(tint.opacity(0.16)))
+                ctx.stroke(line, with: .color(tint), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            }
+            .frame(height: Space.s8 * 2)
+            .overlay {
+                if points.count < 2 { Text("No readings yet").foregroundStyle(GlassInk.secondary) }
+            }
+        }
+        .padding(Space.s3)
+        .frame(maxWidth: .infinity)
+        .coreCard(GlassInk.well, radius: Radius.row)
+        .accessibilityElement(children: .combine)
+    }
+}
