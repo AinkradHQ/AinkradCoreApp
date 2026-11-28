@@ -57,6 +57,10 @@ enum WizardRunner: String, CaseIterable {
         if !runners.isEmpty, !runners.contains(where: { $0.os == os }) {
             return "No \(self == .this_mac ? "Mac" : "Linux") runner is paired yet."
         }
+        // Paired but offline: it cannot take a project now, so it is not offered as a choice.
+        if !runners.isEmpty, !runners.contains(where: { $0.os == os && $0.online }) {
+            return "The \(self == .this_mac ? "Mac" : "Linux") runner is offline."
+        }
         return nil
     }
 }
@@ -114,7 +118,7 @@ struct WizardPreviewCard: View {
 
     private var shownName: String {
         let t = name.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? "Your project" : t
+        return t.isEmpty ? "Atlas notes" : t
     }
 
     var body: some View {
@@ -127,6 +131,7 @@ struct WizardPreviewCard: View {
                     tone: kind.hasPublicLink && publicLink ? .run : .queue,
                     symbol: kind.hasPublicLink ? (publicLink ? "link" : "lock") : kind.symbol
                 )
+                .fixedSize()
                 .padding(.horizontal, Space.s2).frame(height: MacSize.controlMd)
                 .coreCard(GlassInk.card, radius: Radius.control)
                 .padding(Space.s2)
@@ -146,6 +151,9 @@ struct WizardPreviewCard: View {
                 }
             }
             .opacity(lit(.what))
+            section("Kind", lit: lit(.what)) {
+                Label(kind.title, systemImage: kind.symbol).lineLimit(1).contentTransition(.opacity)
+            }
             section("Code", lit: lit(.code)) {
                 if repos.isEmpty {
                     Text("No repos yet").foregroundStyle(palette.text2)
@@ -158,16 +166,19 @@ struct WizardPreviewCard: View {
                     if repos.count > 3 { Text("and \(repos.count - 2) more").foregroundStyle(palette.text2) }
                 }
             }
-            section("Kind", lit: lit(.what)) {
-                Label(kind.title, systemImage: kind.symbol).lineLimit(1).contentTransition(.opacity)
-            }
             section("Brain", lit: lit(.review)) {
-                Label(place ?? "New place “\(shownName)”", systemImage: place == nil ? "plus.square" : "square.stack")
+                Label(place ?? "New room “\(shownName)”", systemImage: place == nil ? "plus.square" : "square.stack")
                     .lineLimit(1).contentTransition(.opacity)
             }
             if kind.runs {
                 section(kind == .app ? "Builds on" : "Runs on", lit: lit(.review)) {
                     Label(runner.title, systemImage: runner.symbol).contentTransition(.opacity)
+                }
+            }
+            if kind.hasPublicLink {
+                section("Link", lit: lit(.review)) {
+                    Label(publicLink ? "Public" : "Private", systemImage: publicLink ? "link" : "lock")
+                        .contentTransition(.opacity)
                 }
             }
             Spacer(minLength: 0)

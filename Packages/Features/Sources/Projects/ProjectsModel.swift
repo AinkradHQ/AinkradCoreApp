@@ -109,8 +109,12 @@ public final class ProjectsModel {
     internal(set) var limits: ProjectLimits?
     internal(set) var limitsState = LimitsState.loading
     enum LimitsState: Equatable { case loading, ready, unsupported, failed }
-    /// A refusal from the Core for the write in flight, in words.
+    /// A refusal from the Core for the write in flight, in words (settings, repos, branch dialogs).
     internal(set) var writeError: String?
+    /// Why the New Project wizard's create failed. Apart from `writeError`, so one screen's refusal never shows in another.
+    internal(set) var wizardError: String?
+    /// "Open project" was pressed: the wizard that closes must not keep its draft.
+    internal(set) var wizardFinished = false
     internal(set) var busy = false
     /// A write came back `forbidden_scope`: this device can read but not change.
     internal(set) var readOnly = false
@@ -396,7 +400,6 @@ public final class ProjectsModel {
             stale = nil
             syncLauncherProjects()
             pollWhileCopying()
-            if core110 { Task { await migrateColours() } }
         } catch {
             guard epoch == self.epoch else { return }
             // A list already on screen stays, marked as old; only a first load that failed shows the failure.
@@ -629,16 +632,19 @@ public final class ProjectsModel {
     }
 
     func clearWriteError() { writeError = nil }
+    func clearWizardError() { wizardError = nil }
 
     /// The wizard's "Open project": closes it and opens the new project's space.
     /// The Brain places the wizard offers, without the ones another project has; nil when the Core has no Brain.
     func loadPlaces() async {
         guard let service else { return }
-        let taken = Set(projects.compactMap(\.roomID))
+        // A room of an archived project is taken too: the Core refuses to link it again (`room_linked`).
+        let taken = Set((projects + archivedList).compactMap(\.roomID))
         places = (try? await service.places())?.map { $0.filter { !taken.contains($0.id) } }
     }
 
     func openWizardProject() {
+        wizardFinished = true
         host.shell.closeDialog()
         if let id = wizardProjectID { openProject(id) }
         wizardProjectID = nil
@@ -662,21 +668,21 @@ public final class ProjectsModel {
         place: BrainPlace? = nil, kind: ProjectKind = .web
     ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
-        guard let service, !busy, mayWrite() else { return false }
+        guard let service, mayWrite(), writeFree() else { return false }
         if let problem = ProjectRules.nameProblem(name) ?? ProjectRules.slugProblem(slug) {
-            writeError = problem
+            wizardError = problem
             return false
         }
         // A link the Core would refuse (ssh, a password in it) is said now, before Touch ID.
         let github = repos.filter { $0.fullName != nil }
         for r in repos where r.fullName == nil {
             if let why = ProjectRules.repoLinkProblem(r.url) {
-                writeError = "\(r.name): \(why)"
+                wizardError = "\(r.name): \(why)"
                 return false
             }
         }
         busy = true
-        writeError = nil
+        wizardError = nil
         wizardMissed = []
         wizardIssues = []
         creating = CreateProgress(stage: .project, total: repos.count)
@@ -689,7 +695,10 @@ public final class ProjectsModel {
         var issues: [String] = []
         /// Why the create cannot be finished: any of these rolls the project back.
         var fatal: [String] = []
-        var triedSlugs: [String] = []
+        let started = now()
+        /// The link name of the attempt in flight: the only one a lost answer may be looked up by.
+        var lastTried: String?
+        var rollbackTail: String?
         let runner = runnerSupported ? runner : nil
         do {
             // Touch ID once, before anything is written: nothing below may be re-run halfway by a proof request.
@@ -697,9 +706,9 @@ public final class ProjectsModel {
                 "Create the project \(name) and its link \(ProjectRules.host(slug)).", done: "created", keepsEdit: true,
                 force: true
             ) {
-                var patch = ProjectPatch(expose: expose)
-                if self.core110 { patch.colour = colour.rawValue }
-                if self.core111 { patch.kind = kind.rawValue }
+                // Only what differs from the Core's defaults (public link on, kind web) is written after the create. API 112
+                // takes the colour (plain route), the kind and the room in the create itself.
+                var patch = ProjectPatch(expose: expose == false ? false : nil)
                 // GitHub repos first: the Core's from-github route takes up to 10 in one call (with GitHub's own default
                 // branches); the rest are added one by one, each counted on the wizard's setup list.
                 let ordered = github + repos.filter { $0.fullName == nil }
@@ -707,6 +716,9 @@ public final class ProjectsModel {
                 let batch = ordered.prefix(while: { $0.fullName != nil }).prefix(self.core112 ? 50 : 10)
                 let room = self.core112 ? place?.id : nil
                 let kindList = self.core112 ? [kind.rawValue] : nil
+                let colourInCreate = self.core112 && batch.isEmpty
+                if self.core110, !colourInCreate { patch.colour = colour.rawValue }
+                if self.core111, !self.core112, kind != .web { patch.kind = kind.rawValue }
                 if !batch.isEmpty {
                     patch.description = description.isEmpty ? nil : description
                     patch.runner = runner == nil || runner == "auto" ? nil : runner
@@ -714,7 +726,7 @@ public final class ProjectsModel {
                 if made == nil {
                     do {
                         made = try await self.createRetrying(slug: slug, suffix: autoSuffix) { candidate in
-                            triedSlugs.append(candidate)
+                            lastTried = candidate
                             if !batch.isEmpty {
                                 return try await service.createFromGithub(
                                     slug: candidate, name: name, repos: batch.compactMap(\.fullName), room: room,
@@ -722,13 +734,15 @@ public final class ProjectsModel {
                             }
                             return try await service.create(
                                 slug: candidate, name: name, description: description, runner: runner, room: room,
-                                kinds: kindList)
+                                kinds: kindList, color: colourInCreate ? colour.rawValue : nil)
                         }
                     } catch {
                         // The Core may have made it and only the answer was lost (a timeout, an answer this app could
-                        // not read): find it, so it is finished or rolled back, never left behind.
-                        let all = (try? await service.projects()) ?? []
-                        guard let found = all.first(where: { triedSlugs.contains($0.slug) }) else { throw error }
+                        // not read): find it, so it is finished or rolled back, never left behind. Never after a refusal.
+                        guard
+                            let found = await self.recoverLostCreate(
+                                error, slug: lastTried, name: name, since: started, service)
+                        else { throw error }
                         made = found
                     }
                 }
@@ -750,33 +764,46 @@ public final class ProjectsModel {
                 self.creating?.stage = .finishing
                 if fatal.isEmpty, !patch.isEmpty {
                     do { try await service.update(project: p.id, patch: patch) } catch {
-                        fatal.append("its settings could not be saved (\(self.words(error)))")
+                        // The colour and kind are looks: a failed save of those alone does not undo the project.
+                        let essential = patch.expose != nil || patch.description != nil || patch.runner != nil
+                        if essential {
+                            fatal.append("its settings could not be saved (\(self.words(error)))")
+                        } else {
+                            issues.append("Its colour or kind could not be saved (\(self.words(error))).")
+                        }
                     }
                 }
+                // All or nothing, inside the same Touch ID: a create that could not be finished is undone here.
+                if !fatal.isEmpty { rollbackTail = await self.rollBack(p) }
             }
         } catch is AdminDeclined {
             if made == nil {
-                writeError = "Touch ID was not given, so nothing was made."
+                wizardError = "Touch ID was not given, so nothing was made."
                 return false
             }
             fatal.append("Touch ID was not given")
         } catch {
             if made == nil {
-                writeError = words(error)
+                wizardError = words(error)
                 return false
             }
             fatal.append(words(error))
         }
         if let half = made, !fatal.isEmpty {
-            // All or nothing: a create that could not be finished leaves no project, repos, copies or room behind.
-            let gone = await rollBack(half)
-            writeError =
-                fatal.joined(separator: "; ") + "."
-                + (gone ? " Nothing was left behind." : " It was archived; delete it from Archived.")
+            // The undo normally ran inside the create's Touch ID; when the create itself broke off, ask once more.
+            if rollbackTail == nil {
+                rollbackTail =
+                    (try? await host.elevated("Undo the half-made project \(name).", done: "undone", keepsEdit: true) {
+                        await self.rollBack(half)
+                    }) ?? "Touch ID was not given to undo it, so it is still in your list."
+            }
+            wizardError = fatal.joined(separator: "; ") + ". " + (rollbackTail ?? "")
             await reload()
             return false
         }
         guard let made else { return false }
+        // The wizard finds the project by its id: keep it in the list even if the read below fails.
+        if !projects.contains(where: { $0.id == made.id }) { projects.append(made) }
         colours.set(colour, for: made.slug)
         kinds.set(kind, for: made.slug)
         pollAttempt = 0
@@ -845,16 +872,6 @@ public final class ProjectsModel {
         return last.map(words) ?? "unknown"
     }
 
-    /// Undoes a half-made project: archive, then delete for good where the Core can (API 112). True when it is gone.
-    private func rollBack(_ p: ProjectItem) async -> Bool {
-        guard let service else { return false }
-        try? await service.archive(project: p.id)
-        do {
-            try await service.delete(project: p.id)
-            return true
-        } catch { return false }
-    }
-
     /// "Add Repos…" in a project: adds the picked repos behind one Touch ID. Repos the project has are left out.
     @discardableResult
     func addRepos(to project: ProjectItem, _ picks: [PickRepo]) async -> Bool {
@@ -920,7 +937,7 @@ public final class ProjectsModel {
     /// One change to a project (runner, limits, link name…) behind Touch ID; true when the Core took it.
     @discardableResult
     func change(_ project: ProjectItem, _ patch: ProjectPatch, why: String) async -> Bool {
-        guard let service, !busy, mayWrite(), !patch.isEmpty else { return false }
+        guard let service, mayWrite(), !patch.isEmpty, writeFree() else { return false }
         busy = true
         defer { busy = false }
         do {
@@ -934,6 +951,8 @@ public final class ProjectsModel {
             return false
         }
         await reload()
+        // The person just gave Touch ID: the colours picked on this Mac go up now, never on a plain reload.
+        if core110 { await migrateColours() }
         return true
     }
 
@@ -962,7 +981,7 @@ public final class ProjectsModel {
 
     /// Make a repo the primary one of its project.
     func makePrimary(_ project: ProjectItem, _ repo: RepoItem) async {
-        guard let service, !busy, mayWrite() else { return }
+        guard let service, mayWrite(), writeFree() else { return }
         busy = true
         defer { busy = false }
         do {
@@ -998,7 +1017,7 @@ public final class ProjectsModel {
     }
 
     func removeRepo(_ project: ProjectItem, _ repo: RepoItem) async {
-        guard let service, !busy, mayWrite() else { return }
+        guard let service, mayWrite(), writeFree() else { return }
         busy = true
         defer { busy = false }
         do {

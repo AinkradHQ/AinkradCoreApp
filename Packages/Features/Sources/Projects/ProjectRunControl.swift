@@ -185,7 +185,7 @@ extension ProjectsModel {
     @discardableResult
     func saveGeneral(_ project: ProjectItem, name: String, description: String, slug: String? = nil) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
-        guard let service, !busy, mayWrite() else { return false }
+        guard let service, mayWrite(), writeFree() else { return false }
         let newSlug = slug.flatMap { $0 == project.slug ? nil : $0 }
         if let problem = ProjectRules.nameProblem(name) ?? newSlug.flatMap(ProjectRules.slugProblem) {
             writeError = problem
@@ -236,18 +236,23 @@ extension ProjectsModel {
     }
 
     func archive(_ project: ProjectItem) async {
-        guard let service, !busy, mayWrite() else { return }
+        guard let service, mayWrite(), writeFree() else { return }
         busy = true
         defer { busy = false }
+        // The Core does not stop a run on archive (it refuses a running project): stop it first, behind the same Touch ID.
+        let running = isRunningOrStarting(project)
         do {
             try await host.elevated(
                 "Archive \(project.name). Its run stops and it leaves the Projects list.", done: "archived",
                 keepsEdit: false
-            ) { try await service.archive(project: project.id) }
+            ) {
+                if running { _ = try? await service.control(project: project.id, .stop) }
+                try await service.archive(project: project.id)
+            }
         } catch is AdminDeclined {
             return
         } catch {
-            host.shell.showToast(runWords(error), kind: .warn)
+            host.shell.showToast(words(error), kind: .warn)
             return
         }
         closeProject()
@@ -273,7 +278,7 @@ extension ProjectsModel {
         } catch is AdminDeclined {
             return
         } catch {
-            host.shell.showToast(runWords(error), kind: .warn)
+            host.shell.showToast(words(error), kind: .warn)
             return
         }
         await reload()

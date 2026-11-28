@@ -106,6 +106,7 @@ struct ProjectsOptionsTests {
         let old = ProjectItem(
             id: 2, slug: "old", name: "old", description: "", expose: true, repos: [], updatedAt: Date(), archived: true
         )
+        m.runnerSupported = true  // the Core 0.10 routes
         await m.unarchive(old)
         #expect(s.unarchived == [2])
         #expect(host.reasons.last?.contains("old") == true)

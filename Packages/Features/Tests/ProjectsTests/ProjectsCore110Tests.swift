@@ -338,6 +338,10 @@ struct Core110ModelTests {
         m.colours.set(.violet, for: "quill")
         m.core110 = true
         await m.reload()
+        // A plain reload never asks for Touch ID; the migration rides a write the person gave it for.
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(!m.colours.migrated && s.patches.isEmpty)
+        await m.migrateColours()
         #expect(await until { m.colours.migrated })
         #expect(s.patches.map(\.colour) == ["copper"])
         #expect(host.reasons.last?.contains("colours you picked") == true)

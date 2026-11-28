@@ -39,9 +39,10 @@ protocol ProjectsService: Sendable {
     func create(slug: String, name: String, description: String, runner: String?) async throws -> ProjectItem
     /// A project made from GitHub repos (`owner/name`) in one step: the Core reads each repo's real default branch.
     func createFromGithub(slug: String, name: String, repos: [String]) async throws -> ProjectItem
-    /// API 112: the Brain room to link and every kind, in the create itself (no room race, no second write).
+    /// API 112: the Brain room to link, every kind and the colour, in the create itself (no room race, no second write).
     func create(
-        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?,
+        color: String?
     ) async throws -> ProjectItem
     func createFromGithub(slug: String, name: String, repos: [String], room: String?, kinds: [String]?) async throws
         -> ProjectItem
@@ -119,7 +120,8 @@ extension ProjectsService {
         try await create(slug: slug, name: name)
     }
     func create(
-        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?,
+        color: String?
     ) async throws -> ProjectItem {
         try await create(slug: slug, name: name, description: description, runner: runner)
     }
@@ -198,15 +200,16 @@ struct LiveProjectsService: ProjectsService {
     }
 
     func create(
-        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?,
+        color: String?
     ) async throws -> ProjectItem {
         try await run {
             Self.item(
                 try await client.createProject(
                     body: .json(
                         .init(
-                            description: description.isEmpty ? nil : description, kinds: kinds, name: name,
-                            room: room, runner: runner == "auto" ? nil : runner, slug: slug))
+                            color: color, description: description.isEmpty ? nil : description, kinds: kinds,
+                            name: name, room: room, runner: runner == "auto" ? nil : runner, slug: slug))
                 ).ok.body.json)
         }
     }

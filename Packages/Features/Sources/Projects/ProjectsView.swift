@@ -161,7 +161,7 @@ struct GalleryView: View {
             symbol: "wifi.exclamationmark", title: "Showing the list from \(model.listAge() ?? "a while ago").",
             text: Self.plain(why), tone: .warn
         ) {
-            Button("Try again") { model.resync() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            Button("Try Again") { model.resync() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
         .accessibilityIdentifier("projects-stale")
@@ -179,15 +179,19 @@ struct GalleryView: View {
             .scrollIndicators(.never)
         case .notConnected:
             centered(
-                CoreStateCard(
+                GalleryState(
                     symbol: "wifi.slash", title: "Not connected",
                     line: "Projects live on your Core. They show up here once this Mac is connected.",
-                    primary: CoreAction("Connect this Mac") { model.host.shell.launcher.entry("settings")?.run() }))
+                    actions: [
+                        .init(title: "Connect This Mac", prominent: true) {
+                            model.host.shell.launcher.entry("settings")?.run()
+                        }
+                    ]))
         case .failed(let why):
             centered(
-                CoreStateCard(
+                GalleryState(
                     symbol: "exclamationmark.triangle", title: "Projects did not load", line: Self.plain(why),
-                    primary: CoreAction("Try again") { model.resync() }))
+                    actions: [.init(title: "Try Again", prominent: true) { model.resync() }]))
         case .ready where !hasAny:
             ProjectsEmptyHero(model: model)
         case .ready:
@@ -228,17 +232,17 @@ struct GalleryView: View {
     /// Nothing to show for the segment or the Filter: the words, and what can be done about it.
     @ViewBuilder private var nothingHere: some View {
         if !model.filterText.isEmpty {
-            VStack(spacing: Space.s3) {
-                Text("No project matches “\(model.filterText)”.").foregroundStyle(GlassInk.secondary)
-                HStack(spacing: Space.s2) {
-                    Button("Clear filter") { model.filter = "" }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
-                    Button("Create “\(model.filterText)”") { model.newProject(name: model.filterText) }
-                        .buttonStyle(CoreButtonStyle(.prominent, size: .small))
-                        .disabled(model.newProjectBlock != nil)
-                        .help(model.newProjectBlock ?? "Start a project with this name")
-                }
-            }
-            .frame(maxWidth: .infinity).padding(.top, Space.s2)
+            GalleryState(
+                symbol: "magnifyingglass", title: "No project matches “\(model.filterText)”",
+                line: "Clear the filter, or start a project with this name.",
+                actions: [
+                    .init(title: "Clear Filter", prominent: false) { model.filter = "" },
+                    .init(
+                        title: "Create “\(model.filterText)”", prominent: true, disabled: model.newProjectBlock != nil
+                    ) { model.newProject(name: model.filterText) },
+                ]
+            )
+            .frame(maxWidth: .infinity).padding(.top, Space.s6)
         } else if model.segment != .all {
             Text(model.segment == .running ? "Nothing is running right now." : "No archived projects.")
                 .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity).padding(.top, Space.s6)

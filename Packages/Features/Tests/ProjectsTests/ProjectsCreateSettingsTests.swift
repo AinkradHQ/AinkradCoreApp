@@ -157,7 +157,7 @@ struct CreateTests {
         let ssh = PickRepo(org: "Pasted links", name: "r", url: "git@github.com:o/r.git")
         let ok = await m.create(name: "Atlas", slug: "atlas", colour: .blue, repos: [ssh])
         #expect(!ok && host.reasons.isEmpty && s.calls.isEmpty)
-        #expect(m.writeError?.contains("SSH") == true)
+        #expect(m.wizardError?.contains("SSH") == true)
     }
 
     @Test func reposTheCoreRefusesAreListedWithTheirReason() async {
@@ -169,7 +169,7 @@ struct CreateTests {
         ]
         let ok = await m.create(name: "Atlas", slug: "atlas", colour: .blue, repos: pasted, wizard: true)
         // A refused repo rolls the project back; the reason names the repo.
-        #expect(!ok && m.wizardProjectID == nil && m.writeError?.contains("web could not be added") == true)
+        #expect(!ok && m.wizardProjectID == nil && m.wizardError?.contains("web could not be added") == true)
     }
 
     @Test func aTakenLinkMadeFromTheNameGetsANumberAndAnExplicitOneIsAnError() async {
@@ -181,7 +181,7 @@ struct CreateTests {
         let (m2, s2, _) = await make()
         s2.takenSlugs = ["atlas"]
         let bad = await m2.create(name: "Atlas", slug: "atlas", colour: .blue)
-        #expect(!bad && m2.writeError == "That link name is taken. Pick another.")
+        #expect(!bad && m2.wizardError == "That link name is taken. Pick another.")
     }
 
     @Test func aPublicLinkOrRunnerTheCoreRefusesIsToldNotDropped() async {
@@ -189,9 +189,9 @@ struct CreateTests {
         s.refusePatch = CoreError.http(
             status: 400, code: "bad_request", message: "the runner is auto, this_mac or home_server")
         let ok = await m.create(
-            name: "Atlas", slug: "atlas", colour: .blue, expose: true, runner: "this_mac", wizard: true)
+            name: "Atlas", slug: "atlas", colour: .blue, expose: false, runner: "this_mac", wizard: true)
         // Settings the Core refuses roll the project back too, with the Core's words.
-        #expect(!ok && m.writeError?.contains("runner is auto") == true)
+        #expect(!ok && m.wizardError?.contains("runner is auto") == true)
     }
 
     @Test func aPickedGithubRepoNeedsNoLinkCheck() async {

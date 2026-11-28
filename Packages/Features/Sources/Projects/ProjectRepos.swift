@@ -166,7 +166,7 @@ private struct RepoDetail: View {
                 Button("Connect GitHub") { model.connectGithub() }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             } else if why != .sshNotSupported {
-                Button("Try again") { model.fetchRepo(project, repo) }
+                Button("Try Again") { model.fetchRepo(project, repo) }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
             }
         }

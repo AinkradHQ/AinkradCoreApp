@@ -58,7 +58,11 @@ extension ProjectsModel {
 
     /// Unarchive on an archived project: it is active again, with its repos, secrets and notes.
     func unarchive(_ project: ProjectItem) async {
-        guard let service, !busy, mayWrite() else { return }
+        guard let service, mayWrite(), writeFree() else { return }
+        guard canUnarchive else {
+            host.shell.showToast("This Core cannot bring a project back from here. Update the Core.", kind: .warn)
+            return
+        }
         busy = true
         defer { busy = false }
         do {
@@ -68,7 +72,7 @@ extension ProjectsModel {
         } catch is AdminDeclined {
             return
         } catch {
-            host.shell.showToast(runWords(error), kind: .warn)
+            host.shell.showToast(words(error), kind: .warn)
             return
         }
         await reload()

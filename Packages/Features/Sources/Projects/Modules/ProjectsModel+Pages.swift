@@ -42,20 +42,29 @@ extension ProjectsModel {
 
     /// Deletes the project for good (API 112): archived first when it is not, then deleted, behind one Touch ID.
     func deleteForever(_ p: ProjectItem) async {
-        guard core112, let service, !busy, mayWrite() else { return }
+        guard core112, let service, mayWrite(), writeFree() else { return }
+        if isRunningOrStarting(p) {
+            host.shell.showToast("Stop \(p.name) first, then delete it.", kind: .warn)
+            return
+        }
         busy = true
         defer { busy = false }
         do {
             try await host.elevated(
                 "Delete \(p.name) for good, with its copies and runs.", done: "deleted", keepsEdit: false
             ) {
-                if !p.archived { try await service.archive(project: p.id) }
+                // A Touch ID retry runs this again: a project it already archived is fine, not a failure.
+                if !p.archived {
+                    do { try await service.archive(project: p.id) } catch {
+                        if ProjectConflict.of(error) != .archived { throw error }
+                    }
+                }
                 try await service.delete(project: p.id)
             }
         } catch is AdminDeclined {
             return
         } catch {
-            host.shell.showToast(runWords(error), kind: .warn)
+            host.shell.showToast(words(error), kind: .warn)
             return
         }
         PreviewStore.shared.remove(p.id)

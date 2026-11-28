@@ -97,9 +97,9 @@ struct CardMenu: View {
         Menu("Change kind") {
             ForEach(ProjectKind.allCases) { k in
                 Button {
-                    model.setKind(k, for: project)
+                    model.tapKind(k, for: project)
                 } label: {
-                    Label(k.short, systemImage: k == project.kind ? "checkmark" : k.symbol)
+                    Label(k.short, systemImage: project.allKinds.contains(k) ? "checkmark" : k.symbol)
                 }
             }
         }

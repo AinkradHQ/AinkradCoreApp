@@ -54,14 +54,14 @@ struct WizardBrainChoice: View {
             if let places = model.places {
                 HStack(spacing: Space.s2) {
                     WizardChoiceTile(
-                        symbol: "plus.square", title: "New place · Best",
-                        line: "A place named “\(name.trimmingCharacters(in: .whitespaces))”, just for this project.",
+                        symbol: "plus.square", title: "New room · Best",
+                        line: "A room named “\(name.trimmingCharacters(in: .whitespaces))”, just for this project.",
                         selected: !existing
                     ) { existing = false }
                     WizardChoiceTile(
-                        symbol: "square.stack", title: "Use an existing place",
-                        line: "Link a place you already keep notes in.", selected: existing,
-                        why: places.isEmpty ? "Every place already belongs to a project." : nil
+                        symbol: "square.stack", title: "Use an existing room",
+                        line: "Link a room you already keep notes in.", selected: existing,
+                        why: places.isEmpty ? "Every room already belongs to a project." : nil
                     ) {
                         existing = true
                         if place == nil { place = places.first }
@@ -77,7 +77,7 @@ struct WizardBrainChoice: View {
                     .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -6))))
                 }
             } else {
-                Text("This Core has no Brain, so the project gets no place. You can turn the Brain on later.")
+                Text("This Core has no Brain, so the project gets no room. You can turn the Brain on later.")
                     .foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             }
         }

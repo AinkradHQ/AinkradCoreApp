@@ -5,12 +5,19 @@ import Foundation
 /// missing GitHub connection has its own code), so the cause is read from the sentence.
 enum ProjectConflict: Equatable {
     case slugTaken, linkLocked, archived, notArchived, repoExists, primaryRepo, noConnection, connectionOff
+    case running, roomLinked
     case other(String)
 
     init(code: String?, message: String) {
         let m = message.lowercased()
         if code == "no_connection" {
             self = .noConnection
+        } else if code == "project_running" {
+            self = .running
+        } else if code == "room_linked" {
+            self = .roomLinked
+        } else if code == "not_archived" {
+            self = .notArchived
         } else if m.contains("connection is disabled") {
             self = .connectionOff
         } else if m.contains("slug exists") {
@@ -48,6 +55,9 @@ enum ProjectConflict: Equatable {
             "The link name can’t change now: it is taken, or the project is running or holds secrets."
         case .archived: "This project is archived. Unarchive it first."
         case .notArchived: "This project is not archived."
+        case .running: "It is still running. Stop it first."
+        case .roomLinked:
+            "That Brain place already belongs to another project, maybe an archived one. Pick another place, or make a new one."
         case .repoExists: "This project already has that repo."
         case .primaryRepo: "Make another repo primary before removing this one."
         case .noConnection: "GitHub is not connected. Connect GitHub in Settings, Connections."
