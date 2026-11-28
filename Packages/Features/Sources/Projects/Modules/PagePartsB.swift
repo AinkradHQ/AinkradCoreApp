@@ -97,7 +97,12 @@ struct PgChart: View {
                 area.addLine(to: CGPoint(x: size.width, y: size.height))
                 area.addLine(to: CGPoint(x: 0, y: size.height))
                 area.closeSubpath()
-                ctx.fill(area, with: .color(tint.opacity(0.16)))
+                // 0.16 at the line, fading to nothing at the floor: a flat fill read as a heavy grey slab by day.
+                ctx.fill(
+                    area,
+                    with: .linearGradient(
+                        Gradient(colors: [tint.opacity(0.16), tint.opacity(0.02)]), startPoint: .zero,
+                        endPoint: CGPoint(x: 0, y: size.height)))
                 ctx.stroke(line, with: .color(tint), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             }
             .frame(height: Space.s8 * 2)

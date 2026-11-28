@@ -6,6 +6,7 @@ struct DocTile: View {
     let title: String
     let symbol: String
     let group: String
+    var excerpt = ""
     let action: () -> Void
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -22,6 +23,9 @@ struct DocTile: View {
                 Spacer(minLength: 0)
                 Text(title).coreFont(size: MacTextSize.headline, weight: .semibold).lineLimit(2)
                     .multilineTextAlignment(.leading)
+                if !excerpt.isEmpty {
+                    Text(excerpt).foregroundStyle(GlassInk.secondary).lineLimit(2).multilineTextAlignment(.leading)
+                }
             }
             .padding(Space.s3).frame(maxWidth: .infinity, minHeight: Space.s8 * 3, alignment: .topLeading)
             .coreCard(hovering ? GlassInk.wellHover : GlassInk.well, radius: Radius.cardMac)

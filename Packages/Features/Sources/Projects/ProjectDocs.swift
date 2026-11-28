@@ -10,13 +10,15 @@ import SwiftUI
 
 /// The four groups of the page.
 enum DocGroup: Int, CaseIterable, Identifiable {
-    case plans, specs, runbooks, other
+    case plans, specs, runbooks, chapters, research, other
     var id: Int { rawValue }
     var title: String {
         switch self {
         case .plans: "Plans"
         case .specs: "Specs"
         case .runbooks: "Runbooks"
+        case .chapters: "Chapters"
+        case .research: "Research"
         case .other: "Other"
         }
     }
@@ -25,12 +27,28 @@ enum DocGroup: Int, CaseIterable, Identifiable {
         case .plans: "list.bullet.rectangle"
         case .specs: "doc.text"
         case .runbooks: "checklist"
+        case .chapters: "book"
+        case .research: "magnifyingglass"
         case .other: "doc"
         }
     }
 
     /// The first of `#plan(s)`, `#spec(s)`, `#runbook(s)` in the text (any case), else Other.
     /// ponytail: a `#tag` inside a code block counts too; the Core's own tag list would be exact once the list route carries tags.
+    /// A book project (kind Docs) groups by what the title says: Chapters, Research, Other.
+    static func ofBook(title: String) -> DocGroup {
+        let t = title.lowercased()
+        return t.hasPrefix("chapter") ? .chapters : t.hasPrefix("research") ? .research : .other
+    }
+
+    /// The first words of a note that are not a heading or a tag line, for a tile.
+    static func excerpt(_ text: String) -> String {
+        let line = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { l in
+            !l.isEmpty && !l.hasPrefix("#") && !l.hasPrefix("```")
+        }
+        return String(line.joined(separator: " ").prefix(160))
+    }
+
     static func of(text: String) -> DocGroup {
         var found = Set<DocGroup>()
         for word in text.split(whereSeparator: { $0.isWhitespace }) where word.first == "#" {
@@ -50,6 +68,7 @@ struct DocItem: Identifiable, Equatable {
     var id: String
     var title: String
     var group: DocGroup
+    var excerpt = ""
 }
 
 @MainActor @Observable
@@ -107,15 +126,24 @@ final class ProjectDocs {
             let read = Array(notes.prefix(Self.tagReadLimit))
             // Eight reads at a time: a project with many notes does not open a hundred requests at once.
             var groups: [String: DocGroup] = [:]
+            var excerpts: [String: String] = [:]
+            let book = project.allKinds == [.other]
             for chunk in stride(from: 0, to: read.count, by: 8).map({ Array(read[$0..<min($0 + 8, read.count)]) }) {
-                await withTaskGroup(of: (String, DocGroup)?.self) { all in
+                await withTaskGroup(of: (String, DocGroup, String)?.self) { all in
                     for n in chunk {
-                        all.addTask { (try? await service.note(n.id)).map { (n.id, DocGroup.of(text: $0.text)) } }
+                        all.addTask {
+                            (try? await service.note(n.id)).map {
+                                (n.id, book ? DocGroup.ofBook(title: n.title) : DocGroup.of(text: $0.text), DocGroup.excerpt($0.text))
+                            }
+                        }
                     }
-                    for await r in all { if let r { groups[r.0] = r.1 } }
+                    for await r in all { if let r { (groups[r.0], excerpts[r.0]) = (r.1, r.2) } }
                 }
             }
-            for i in docs.indices { docs[i].group = groups[docs[i].id] ?? .other }
+            for i in docs.indices {
+                docs[i].group = groups[docs[i].id] ?? (book ? DocGroup.ofBook(title: docs[i].title) : .other)
+                docs[i].excerpt = excerpts[docs[i].id] ?? ""
+            }
         } catch {
             phase = .failed("Unable to load the docs. Check the connection to the Core and try again.")
         }

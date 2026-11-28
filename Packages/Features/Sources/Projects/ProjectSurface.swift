@@ -22,27 +22,32 @@ struct StatusDot: View {
 /// The project's colour: one small rounded square per accent, the picked one carries a tick.
 struct ColourSwatches: View {
     @Binding var selection: ProjectColour
-    /// Eight swatches and a "More…" that shows the rest in a second row (Settings); false shows all of them in one row.
-    var compact = false
+    /// Eight swatches and a "More…" that opens the rest in a second row. A picked colour past the eighth takes the eighth's
+    /// place, so the row stays one row of eight in every screen.
+    var compact = true
     @State private var more = false
     private static let first = 8
 
     private var all: [ProjectColour] { ProjectColour.allCases }
-    private var shown: Bool { !compact || more || all.firstIndex(of: selection).map { $0 >= Self.first } == true }
+    private var row: [ProjectColour] {
+        var r = Array(all.prefix(Self.first))
+        if !r.contains(selection) { r[Self.first - 1] = selection }
+        return r
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             HStack(spacing: Space.s2) {
-                ForEach(compact ? Array(all.prefix(Self.first)) : all, id: \.self) { swatch($0) }
-                if compact && !shown {
+                ForEach(row, id: \.self) { swatch($0) }
+                if !more {
                     Button("More…") { withAnimation(Motion.out(Motion.ui)) { more = true } }
                         .buttonStyle(CoreButtonStyle(.plain, size: .small))
                         .help("Show the other colours")
                 }
             }
-            if compact && shown {
+            if more {
                 HStack(spacing: Space.s2) {
-                    ForEach(Array(all.dropFirst(Self.first)), id: \.self) { swatch($0) }
+                    ForEach(all.filter { !row.contains($0) }, id: \.self) { swatch($0) }
                 }
                 .transition(.opacity)
             }

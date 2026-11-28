@@ -36,7 +36,7 @@ struct BrainPage: View {
             return
                 "The room has no written summary yet. \(ProjectItem.count(n, "thing")) and \(ProjectItem.count(rules, "rule")) are remembered below."
         }
-        if project.live?.roomID == nil { return "This project has no Brain room linked yet." }
+        if project.live?.roomID == nil { return "This project has no Brain room linked yet. The Brain makes a room for a new project by itself; link one that exists, or make one in the Brain." }
         return "New room, nothing in it yet. It fills from the repos’ instruction files, AI sessions and docs you add."
     }
 

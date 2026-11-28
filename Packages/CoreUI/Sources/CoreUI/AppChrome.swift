@@ -140,6 +140,8 @@ public struct AppActionTile: View {
         self.pulse = pulse
         self.run = run
     }
+    /// Graphite is a light tile with a dark label at night (the grey fill with white text read as disabled).
+    private var graphite: Bool { hue == CoreAccent.graphite.fill }
     public var body: some View {
         Button(action: run) {
             HStack(spacing: Space.s2) {
@@ -148,10 +150,10 @@ public struct AppActionTile: View {
                     .corePulse(pulse)
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
             }
-            .foregroundStyle(prominent || pulse ? .white : GlassInk.primary)
+            .foregroundStyle(prominent || pulse ? (graphite ? CoreAccent.buttonInk(.graphite) : .white) : GlassInk.primary)
             .padding(.horizontal, Space.s3).frame(height: MacSize.controlMd + 4)
             .background(
-                prominent || pulse ? hue.opacity(hovering ? 0.9 : 1) : hovering ? GlassInk.wellHover : GlassInk.well,
+                prominent || pulse ? (graphite ? CoreAccent.buttonFill(.graphite) : hue).opacity(hovering ? 0.9 : 1) : hovering ? GlassInk.wellHover : GlassInk.well,
                 in: coreShape(Radius.control)
             )
             .contentShape(coreShape(Radius.control))
