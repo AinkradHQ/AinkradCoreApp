@@ -3,6 +3,7 @@ import Testing
 
 @testable import Projects
 
+@MainActor
 struct ProjectPagesBTests {
     @Test func kindsToggleSeveralButOtherOnlyAlone() {
         typealias M = ProjectsModel
@@ -19,7 +20,7 @@ struct ProjectPagesBTests {
     }
 
     @Test func runningSavesAsOneChange() {
-        var p = ProjectItem(id: 1, slug: "a", name: "A", description: "", expose: false, repos: [], updatedAt: nil)
+        var p = ProjectItem(id: 1, slug: "a", name: "A", description: "", expose: false, repos: [], updatedAt: Date())
         p.runner = "auto"
         var l = p.limits
         #expect(ProjectsModel.runningPatch(from: p, runner: "auto", limits: l).isEmpty)
