@@ -25,8 +25,11 @@ enum SettingsSave: Hashable, Sendable {
 struct SettingsKindTile: View {
     let kind: ProjectKind
     let on: Bool
+    /// One type only (an older Core): a check on the chosen tile, no empty boxes on the others.
+    var single = false
     let action: () -> Void
     @State private var hover = false
+    @Environment(\.coreAccent) private var accent
 
     static func name(_ k: ProjectKind) -> String {
         switch k {
@@ -49,20 +52,22 @@ struct SettingsKindTile: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.s3) {
-                Image(systemName: kind.symbol).foregroundStyle(on ? GlassInk.blue : GlassInk.secondary)
+                Image(systemName: kind.symbol).foregroundStyle(on ? GlassInk.accentInk(accent) : GlassInk.secondary)
                     .frame(width: Space.s5).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(Self.name(kind)).coreFont(size: MacTextSize.body, weight: .semibold)
                     Text(Self.adds(kind)).coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
                 }
                 Spacer(minLength: 0)
-                coreShape(4).fill(on ? GlassInk.blue : GlassInk.track).frame(width: Space.s4, height: Space.s4)
-                    .overlay {
-                        if on { Image(systemName: "checkmark").coreFont(size: 9, weight: .bold).foregroundStyle(.white) }
-                    }
+                if on || !single {
+                    coreShape(4).fill(on ? GlassInk.accent(accent) : GlassInk.track).frame(width: Space.s4, height: Space.s4)
+                        .overlay {
+                            if on { Image(systemName: "checkmark").coreFont(size: 9, weight: .bold).foregroundStyle(.white) }
+                        }
+                }
             }
             .padding(.horizontal, Space.s3).padding(.vertical, Space.s2 + 2)
-            .background(coreShape(Radius.row).fill(on ? GlassInk.blue.opacity(0.16) : hover ? GlassInk.wellHover : GlassInk.well))
+            .background(coreShape(Radius.row).fill(on ? GlassInk.accent(accent).opacity(0.22) : hover ? GlassInk.wellHover : GlassInk.well))
             .contentShape(coreShape(Radius.row))
         }
         .buttonStyle(.plain)

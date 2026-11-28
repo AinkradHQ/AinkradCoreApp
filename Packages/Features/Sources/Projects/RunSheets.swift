@@ -403,7 +403,8 @@ struct SetupHistorySheet: View {
                         }
                     }
                 }
-                .frame(height: Space.s8 * 9)
+                // Fits its rows (about 56 pt each) up to a ceiling, so one version is not a tall empty dialog.
+                .frame(height: min(Space.s8 * 9, CGFloat(max(1, run.versions.count)) * 56 + Space.s2))
                 if let e = run.writeError { CoreFieldError(e) }
                 CoreDialogFooter(cancel: CoreAction("Close", key: .cancel, run: close), primary: nil)
             }

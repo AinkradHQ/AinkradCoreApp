@@ -152,8 +152,11 @@ struct ModuleLogs: View {
         case .line(let l):
             let level = LogLevel.of(l.text)
             HStack(alignment: .firstTextBaseline, spacing: Space.s3) {
-                Text(l.at.map(RunLogsModel.clock) ?? "").foregroundStyle(GlassInk.secondary).monospacedDigit()
-                    .frame(width: 64, alignment: .leading)
+                // No empty column when the lines carry no time.
+                if let at = l.at {
+                    Text(RunLogsModel.clock(at)).foregroundStyle(GlassInk.secondary).monospacedDigit()
+                        .frame(width: 64, alignment: .leading)
+                }
                 Text(l.service).foregroundStyle(GlassInk.secondary).lineLimit(1).frame(width: 64, alignment: .leading)
                 Text(l.text).foregroundStyle(ink(level)).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

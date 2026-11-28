@@ -42,7 +42,7 @@ struct StageCover: View {
 
     private func line(_ s: String) -> some View {
         Text(s).foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: Space.s8 * 13)
+            .frame(maxWidth: Space.s8 * 20)
     }
 
     private var noRepos: some View {
@@ -86,14 +86,18 @@ struct StageCover: View {
             title(
                 app
                     ? "Ready to build" : kind == .infra ? "The stack is stopped" : "\(project.name) is stopped")
-            if let why = project.live?.stopWords { line(why) }
-            if let at = project.live?.lastActivity { line("Last visited \(runsAgo(at, now: model.now())).") }
+            // One sentence about why it stopped (and when it was last visited), then what Start does.
+            let seen = project.live?.lastActivity.map { "Last visited \(runsAgo($0, now: model.now()))." }
+            let said = [project.live?.stopWords, seen].compactMap { $0 }.joined(separator: " ")
+            if !said.isEmpty { line(said) }
             line(
                 app
                     ? "Build and run it on \(where_)."
                     : kind == .infra
                         ? "Start the stack to bring \(n > 0 ? "all \(n) services" : "its services") up on \(where_)."
-                        : "Start it to see the live site here. \(ProjectRules.idleSentence(minutes: project.idleMinutes, never: project.idleNever))"
+                        : project.live?.stopWords == nil
+                            ? "Start it to see the live site here. \(ProjectRules.idleSentence(minutes: project.idleMinutes, never: project.idleNever))"
+                            : "Start it to see the live site here."
             )
             startButton(prominent: true)
         }

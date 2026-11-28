@@ -64,6 +64,7 @@ private struct CoreButtonBody: View {
     @Environment(\.coreForcedInteraction) private var forced
     @Environment(\.coreKeycap) private var keycap
     @Environment(\.isFocused) private var isFocused
+    @Environment(\.coreAccent) private var accent
     @State private var hovering = false
 
     private var pressed: Bool { configuration.isPressed || forced == .pressed }
@@ -72,7 +73,7 @@ private struct CoreButtonBody: View {
     var body: some View {
         // White on the blue and red fills; the glass ink on the wells (dark by day).
         let solid = kind == .prominent || kind == .danger
-        let ink: Color = kind == .quietDanger ? GlassInk.redInk : solid ? .white : GlassInk.primary
+        let ink: Color = kind == .quietDanger ? GlassInk.redInk : kind == .prominent ? CoreAccent.buttonInk(accent) : solid ? .white : GlassInk.primary
         HStack(spacing: Space.s2) {
             configuration.label
             // The key that runs this button, shown on it (Ahmed, 2026-11-05 and again 2026-11-21: every action keyboard
@@ -136,7 +137,7 @@ private struct ButtonSurface: ViewModifier {
     func body(content: Content) -> some View {
         let shape = coreShape(radius)
         let hue: Color =
-            kind == .danger ? GlassInk.red : kind == .prominent ? GlassInk.accent(accent) : GlassInk.slate
+            kind == .danger ? GlassInk.red : kind == .prominent ? CoreAccent.buttonFill(accent) : GlassInk.slate
         content
             .background {
                 switch kind {
@@ -230,5 +231,18 @@ extension View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
+    }
+}
+
+extension CoreAccent {
+    /// The main button's fill and label. Graphite at night is a light fill with a dark label: the mid-grey fill with white
+    /// text read as disabled next to the secondary wells. Every other accent keeps its fill and a white label.
+    static func buttonFill(_ own: CoreAccent?) -> Color {
+        let a = own ?? AccentPrefs.shared.accent
+        return a == .graphite ? GlassInk.adaptive(Color(red: 0.90, green: 0.91, blue: 0.93), day: a.fill) : a.fill
+    }
+    static func buttonInk(_ own: CoreAccent?) -> Color {
+        (own ?? AccentPrefs.shared.accent) == .graphite
+            ? GlassInk.adaptive(Color(red: 0.09, green: 0.10, blue: 0.12), day: .white) : .white
     }
 }

@@ -57,7 +57,7 @@ enum ProjectConflict: Equatable {
         case .notArchived: "This project is not archived."
         case .running: "It is still running. Stop it first."
         case .roomLinked:
-            "That Brain place already belongs to another project, maybe an archived one. Pick another place, or make a new one."
+            "That Brain room already belongs to another project, maybe an archived one. Pick another room, or make a new one."
         case .repoExists: "This project already has that repo."
         case .primaryRepo: "Make another repo primary before removing this one."
         case .noConnection: "GitHub is not connected. Connect GitHub in Settings, Connections."

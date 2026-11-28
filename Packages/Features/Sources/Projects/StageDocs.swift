@@ -19,13 +19,20 @@ struct DocsStageView: View {
         Group {
             switch docs.phase {
             case .loading: Text("Loading docs…").foregroundStyle(GlassInk.secondary)
-            case .failed(let why): Text(why).foregroundStyle(GlassInk.secondary)
+            case .failed(let why):
+                VStack(spacing: Space.s3) {
+                    Text(why).foregroundStyle(GlassInk.secondary)
+                    if model.lore == nil {
+                        Button("Connect This Mac") { model.host.shell.launcher.entry("settings")?.run() }
+                            .buttonStyle(CoreButtonStyle(.prominent))
+                    }
+                }
             case .ready:
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: Space.s3 + 2) {
                         ForEach(docs.grouped().flatMap { g, rows in rows.map { (g, $0) } }.prefix(5), id: \.1.id) {
                             g, d in
-                            DocTile(title: d.title, symbol: g.symbol, group: g.title) { docs.open(d.id) }
+                            DocTile(title: d.title, symbol: g.symbol, group: g.title, excerpt: d.excerpt) { docs.open(d.id) }
                                 .frame(height: 150)
                         }
                         newTile

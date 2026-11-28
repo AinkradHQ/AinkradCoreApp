@@ -165,8 +165,9 @@ struct ModuleSettings: View {
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2) {
                     ForEach(ProjectKind.allCases) { k in
-                        SettingsKindTile(kind: k, on: kinds.contains(k)) { model.tapKind(k, for: project) }
-                            .disabled(model.readOnly || model.busy)
+                        SettingsKindTile(kind: k, on: kinds.contains(k), single: !model.core112) { model.tapKind(k, for: project) }
+                            // The chosen tile keeps its look when nothing can change: it reads as selected, not as disabled.
+                            .disabled((model.readOnly || model.busy) && !kinds.contains(k))
                     }
                 }
                 if let e = model.writeError { CoreFieldError(e) }

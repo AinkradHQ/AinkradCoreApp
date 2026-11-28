@@ -7,6 +7,8 @@ struct ModuleCard<Content: View>: View {
     let module: ProjectModule
     var title: String? = nil
     var sub: String? = nil
+    /// A "+" in the header (Repos: Add Repos…).
+    var add: (label: String, run: () -> Void)? = nil
     @ViewBuilder let content: Content
     @State private var hovering = false
     @Environment(\.spaceProject) private var space
@@ -27,6 +29,9 @@ struct ModuleCard<Content: View>: View {
                 .contentShape(coreShape(Radius.control))
             }
             .buttonStyle(.plain).onHover { hovering = $0 }
+            .overlay(alignment: .trailing) {
+                if let add { CoreIconButton(symbol: "plus", label: add.label, action: add.run) }
+            }
             .animation(Motion.out(Motion.hover), value: hovering)
             .help(module.help).accessibilityLabel("Open \(module.title)")
             content.padding(.horizontal, Space.s2)
@@ -127,7 +132,7 @@ extension Overview {
                     Text("Core remembers \(ProjectItem.count(n, "thing")) about this project.")
                         .foregroundStyle(GlassInk.secondary)
                 } else if !hasRoom {
-                    Text("This project has no Brain room yet. Link one and it fills from AI sessions and docs.")
+                    Text("No Brain room yet. The Brain makes one by itself; link one that exists to fill it from AI sessions and docs.")
                         .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                     NoRoomActions(model: model, project: project)
                 } else {
@@ -294,7 +299,11 @@ extension Overview {
 
     var reposCard: some View {
         let ordered = project.repos.filter { $0.copy.isFailed } + project.repos.filter { !$0.copy.isFailed }
-        return ModuleCard(model: model, module: .repos, sub: project.repos.isEmpty ? nil : "\(project.repos.count)") {
+        return ModuleCard(
+            model: model, module: .repos, sub: project.repos.isEmpty ? nil : "\(project.repos.count)",
+            add: model.readOnly || project.archived
+                ? nil : ("Add Repos…", { NewProjectDialogs.openAddRepos(model, project) })
+        ) {
             if project.repos.isEmpty {
                 Text(project.kind == .other ? "No code attached. Add a repo if the docs live in one." : "No repos yet.")
                     .foregroundStyle(GlassInk.secondary)

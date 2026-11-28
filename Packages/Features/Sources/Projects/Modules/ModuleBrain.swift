@@ -166,7 +166,7 @@ struct ModuleBrain: View {
                 ModuleQuiet(
                     symbol: "brain", title: "No room yet",
                     line:
-                        "This project has no Brain room linked. Link one and the Brain's rules and decisions show here."
+                        "No Brain room linked. The Brain makes a room for a new project by itself; link one that exists, or make one in the Brain."
                 ) { NoRoomActions(model: model, project: project) }
             }
         }

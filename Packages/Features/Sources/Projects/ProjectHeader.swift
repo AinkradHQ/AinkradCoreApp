@@ -47,7 +47,7 @@ struct ProjectHeader: View {
                     ForEach(project.allKinds) { KindChip(kind: $0) }
                     SpaceStateBadge(project: project, now: model.now())
                 }
-                Text(facts).foregroundStyle(GlassInk.secondary).lineLimit(1)
+                Text(dimReason ?? facts).foregroundStyle(GlassInk.secondary).lineLimit(1)
             }
             Spacer(minLength: Space.s2)
             if !project.archived, project.kind.runs, project.tag == .running {
@@ -76,6 +76,14 @@ struct ProjectHeader: View {
             .help(why(main, can: can, block: block)).accessibilityIdentifier("project-main-action")
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Why a docs-only project's New Doc or New AI Session is dim, said in words under the name (not only in a tooltip).
+    private var dimReason: String? {
+        guard project.allKinds == [.other], !project.archived else { return nil }
+        if model.lore == nil { return "Not connected to a Core. Connect this Mac to write docs or start AI sessions." }
+        if model.readOnly { return "This device can look at projects but not change them." }
+        return model.canStartSession(project) ? nil : model.sessionBlock(project)
     }
 
     /// One line: where it lives, what it is built for, what it runs; and, while it runs, when it stops by itself.
@@ -111,7 +119,10 @@ struct ProjectHeader: View {
     }
 
     private func why(_ a: MainAction, can: Bool, block: String?) -> String {
-        if !enabled(a, can: can, block: block) { return block ?? project.startBlock ?? Self.cannot }
+        if !enabled(a, can: can, block: block) {
+            if a.kind == .newDoc { return model.lore == nil ? "Docs need this Mac to be connected to a Core." : Self.cannot }
+            return block ?? project.startBlock ?? Self.cannot
+        }
         switch a.kind {
         case .start: return "\(a.title) \(project.name)"
         case .runAgain: return "Build and run \(project.name) again"
