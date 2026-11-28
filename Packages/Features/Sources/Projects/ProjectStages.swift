@@ -30,7 +30,7 @@ struct SettingUp: View {
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: Space.s1) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { _, s in
-                    CoreRow(s.0) { badge(s.1).breathing(s.1 == .active) }
+                    CoreRow(s.0) { badge(s.1).coreBreathing(s.1 == .active) }
                         .coreCard(s.1 == .active ? GlassInk.wellHover : .clear, radius: Radius.row)
                 }
             }

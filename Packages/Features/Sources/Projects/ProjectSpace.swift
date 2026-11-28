@@ -106,8 +106,8 @@ private struct TopBar: View {
             } label: {
                 Label(main.title, systemImage: main.symbol)
             }
-            .buttonStyle(CoreButtonStyle(.prominent)).breathing(main.busy)
-            .disabled(main.busy || !enabled(main, can: can))
+            .buttonStyle(CoreButtonStyle(.prominent, busy: main.busy))
+            .disabled(!enabled(main, can: can))
             .help(why(main, can: can)).accessibilityIdentifier("project-main-action")
         }
         .frame(maxWidth: .infinity)
