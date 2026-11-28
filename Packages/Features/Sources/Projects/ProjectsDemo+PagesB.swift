@@ -24,7 +24,15 @@ extension ProjectsDemo {
             list[0].kindName = "web"
         }
         if scene == "v2b-settings-old-core" { list[0].kindName = "web" }
-        if scene == "v2b-services" || scene == "v2b-services-failed" { list[0].live?.metrics = DemoLive.metrics() }
+        if scene == "v2b-builds" {
+            list[0].live?.steps = [
+                StartStep(title: "Getting the code", state: .done, detail: "4 s"),
+                StartStep(title: "Resolving packages", state: .done, detail: "22 s"),
+                StartStep(title: "Building for iOS", state: .done, detail: "2 min 31 s"),
+                StartStep(title: "Signing", state: .done, detail: "9 s"),
+                StartStep(title: "Installing on the simulator", state: .done, detail: "6 s"),
+            ]
+        }
         if scene == "v2b-live-stopped" {
             var l = DemoLive.make(.stopped)
             l.stopWords = "It stopped after a while with no visits."
@@ -69,6 +77,8 @@ extension ProjectsDemo {
             configs?.failing = scene == "v2b-builds-error"
         case "v2b-services", "v2b-services-empty", "v2b-services-failed":
             model.openID = scene == "v2b-services-empty" ? 4 : scene == "v2b-services-failed" ? 3 : 1
+            model.core110 = true
+            await model.refreshLive(1)
             if scene == "v2b-services-failed" {
                 (model.runService as? DemoRunService)?.services[3] = DemoLive.make(.failed).services
                 await model.refreshLive(3)

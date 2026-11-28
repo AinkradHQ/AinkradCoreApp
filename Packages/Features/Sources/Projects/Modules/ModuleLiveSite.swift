@@ -53,7 +53,7 @@ struct ModuleLiveSite: View {
 
     private var stageIsland: some View {
         Island(
-            title: "Live site", sub: project.link,
+            title: project.link, sub: project.expose ? "public" : "only your devices",
             accessory: {
                 CoreSegmented(
                     "Width", segments: Device.allCases.map { CoreSegment($0, $0.rawValue) },
@@ -226,7 +226,7 @@ struct ModuleLiveSite: View {
     // MARK: inspector
 
     private var inspector: some View {
-        Island("Inspector") {
+        Island("Live site") {
             VStack(alignment: .leading, spacing: 0) {
                 PgBlock("Link") {
                     HStack(spacing: Space.s2) {

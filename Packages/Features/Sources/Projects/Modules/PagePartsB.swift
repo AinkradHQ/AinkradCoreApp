@@ -19,7 +19,7 @@ struct PgSplit<List: View, Detail: View>: View {
             }
             .frame(width: Self.listWidth)
             ScrollView {
-                detail.id(key).transition(.opacity).padding(Space.s4)
+                VStack(alignment: .leading, spacing: 0) { detail }.id(key).transition(.opacity).padding(Space.s4)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
