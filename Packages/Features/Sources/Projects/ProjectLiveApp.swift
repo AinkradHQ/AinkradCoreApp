@@ -371,7 +371,7 @@ struct StartStepsList: View {
                 ForEach(Array(steps.enumerated()), id: \.offset) { _, s in
                     HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
                         Image(systemName: symbol(s)).foregroundStyle(tint(s)).frame(width: Space.s4)
-                            .breathing(s.state == .active).accessibilityHidden(true)
+                            .coreBreathing(s.state == .active).accessibilityHidden(true)
                         Text(s.title).foregroundStyle(s.state == .pending ? GlassInk.secondary : GlassInk.primary)
                         if let d = s.detail { Text(d).foregroundStyle(GlassInk.secondary).lineLimit(2) }
                     }

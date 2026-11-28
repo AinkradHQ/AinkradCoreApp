@@ -145,7 +145,7 @@ public struct AppActionTile: View {
             HStack(spacing: Space.s2) {
                 Image(systemName: symbol).coreFont(size: MacTextSize.body, weight: .semibold)
                     .coreEnterBounce(hovering)
-                    .symbolEffect(.pulse, options: .repeating, isActive: pulse && !reduce)
+                    .corePulse(pulse)
                 Text(title).coreFont(size: MacTextSize.body, weight: .semibold).lineLimit(1)
             }
             .foregroundStyle(prominent || pulse ? .white : GlassInk.primary)

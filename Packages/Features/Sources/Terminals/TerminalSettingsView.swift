@@ -218,6 +218,7 @@ private struct PreviewCursor: View {
     let color: Color
     let size: Double
     @State private var dim = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
     var body: some View {
         let h = size * 1.25
         let w = size * 0.6
@@ -229,8 +230,8 @@ private struct PreviewCursor: View {
             }
         }
         .foregroundStyle(color)
-        .opacity(blink && dim ? 0.15 : 1)
-        .coreLoop(blink ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : .default, value: dim)
+        .opacity(blink && dim && !reduce ? 0.15 : 1)
+        .coreLoop(blink ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : nil, value: dim)
         .onAppear { dim = true }
         .accessibilityHidden(true)
     }
