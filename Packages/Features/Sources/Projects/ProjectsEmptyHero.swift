@@ -16,10 +16,10 @@ struct ProjectsEmptyHero: View {
                     .accessibilityAddTraits(.isHeader)
                 Text("Pick one. Your code, notes and AI sessions then live together in one project.")
                     .foregroundStyle(palette.text2).multilineTextAlignment(.center)
-                    .frame(maxWidth: Space.s8 * 14).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 420).fixedSize(horizontal: false, vertical: true)
             }
             .coreRise(shown, 0)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 196), spacing: Space.s3, alignment: .top)], spacing: Space.s3) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 196), spacing: 12, alignment: .top)], spacing: 12) {
                 ForEach(Array(Self.tiles.enumerated()), id: \.element.kind) { i, t in
                     KindTile(
                         kind: t.kind, title: t.title, line: t.line, hue: GlassInk.accent(paneAccent)
