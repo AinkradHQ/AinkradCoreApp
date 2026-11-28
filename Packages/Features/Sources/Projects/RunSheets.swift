@@ -274,7 +274,7 @@ struct SetupSheet: View {
                         .disabled(run.versions.count < 2)
                         .help(
                             run.versions.count < 2 ? "There is one version so far" : "Every saved version of the setup")
-                    Button("Draft from Repo") {
+                    Button("Draft From Repo") {
                         let i = image
                         Task { if await run.draftFromRepo(image: i, projectName: project.name) { close() } }
                     }

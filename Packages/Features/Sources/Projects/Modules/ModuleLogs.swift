@@ -56,6 +56,8 @@ struct ModuleLogs: View {
     }
 
     private var live: Bool { run.status?.state == "running" || run.status?.state == "starting" }
+    /// Whether the run is going (the Core says so even before its log stream connects).
+    private var running: Bool { live || project.tag == .running || project.tag == .starting }
     private var shownLog: RunLogsModel? { live ? logs ?? fixed : fixed ?? logs }
     private var names: [String] { run.spec?.services.map(\.name) ?? project.live?.services.map(\.name) ?? [] }
 
@@ -77,9 +79,9 @@ struct ModuleLogs: View {
             } label: {
                 Label("Follow", systemImage: "arrow.down.to.line")
             }
-            .buttonStyle(CoreButtonStyle(following && live ? .prominent : .secondary, size: .small))
-            .disabled(!live)
-            .help(!live ? "The run has stopped" : following ? "Stop following the newest line" : "Follow the newest line").accessibilityValue(
+            .buttonStyle(CoreButtonStyle(following && running ? .prominent : .secondary, size: .small))
+            .disabled(!running)
+            .help(!running ? "The run has stopped" : !live ? "Connecting…" : following ? "Stop following the newest line" : "Follow the newest line").accessibilityValue(
                 following ? "On" : "Off")
             CoreIconButton(symbol: "doc.on.doc", label: "Copy the visible lines") {
                 NSPasteboard.general.clearContents()

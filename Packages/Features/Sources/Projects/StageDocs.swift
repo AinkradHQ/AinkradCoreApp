@@ -19,23 +19,27 @@ struct DocsStageView: View {
         Group {
             switch docs.phase {
             case .loading: Text("Loading docs…").foregroundStyle(GlassInk.secondary)
-            case .failed(let why):
-                VStack(spacing: Space.s3) {
-                    Text(why).foregroundStyle(GlassInk.secondary)
-                    if model.lore == nil {
-                        Button("Connect This Mac") { model.host.shell.launcher.entry("settings")?.run() }
-                            .buttonStyle(CoreButtonStyle(.prominent))
-                    }
+            case .failed:
+                // The side list says why and offers Try Again; this stage only offers what the list does not.
+                if model.lore == nil {
+                    Button("Connect This Mac") { model.host.shell.launcher.entry("settings")?.run() }
+                        .buttonStyle(CoreButtonStyle(.prominent))
                 }
             case .ready:
+                // No docs: the list beside the stage already says so and offers New Doc.
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: Space.s3 + 2) {
-                        ForEach(docs.grouped().flatMap { g, rows in rows.map { (g, $0) } }.prefix(5), id: \.1.id) {
-                            g, d in
-                            DocTile(title: d.title, symbol: g.symbol, group: g.title, excerpt: d.excerpt) { docs.open(d.id) }
-                                .frame(height: 150)
+                    VStack(spacing: Space.s3) {
+                        LazyVGrid(columns: columns, spacing: Space.s3 + 2) {
+                            ForEach(docs.grouped().flatMap { g, rows in rows.map { (g, $0) } }.prefix(5), id: \.1.id) {
+                                g, d in
+                                DocTile(title: d.title, symbol: g.symbol, group: g.title, excerpt: d.excerpt) { docs.open(d.id) }
+                                    .frame(height: 150)
+                            }
+                            if !docs.docs.isEmpty { newTile }
                         }
-                        newTile
+                        if docs.docs.count > 5 {
+                            Text("+\(docs.docs.count - 5) more in the list").foregroundStyle(GlassInk.secondary)
+                        }
                     }
                     .padding(Space.s4 + 2)
                 }

@@ -39,7 +39,7 @@ struct BranchSheet: View {
         CoreDialogPanel("", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 DialogHead(
-                    title: "Change the Branch of \(repo.name)",
+                    title: "Change the branch of \(repo.name)",
                     line:
                         "Sessions and runs of \(project.name) start from this branch. The Core fetches it again to follow it."
                 )

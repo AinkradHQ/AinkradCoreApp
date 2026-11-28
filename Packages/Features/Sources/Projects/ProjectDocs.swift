@@ -1,5 +1,5 @@
 // ProjectDocs — the Docs page of a project's space (plan R6-06): the project's Lore notes grouped by tag (plans, specs,
-// runbooks, other), a search inside the project, "Import from repo…" (R4-02's `LoreImport.fromRepo`), New Doc, and a click
+// runbooks, other), a search inside the project, "Import From Repo…" (R4-02's `LoreImport.fromRepo`), New Doc, and a click
 // opens the note in the Lore space. Note text is outside data: it is read only to find its `#tags`, and titles and snippets
 // are shown as plain text, never as links.
 import CoreKit
@@ -249,7 +249,7 @@ struct DocsPage: View {
                 Button {
                     docs.importFromRepo()
                 } label: {
-                    Label("Import from repo…", systemImage: "square.and.arrow.down")
+                    Label("Import From Repo…", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(!docs.canImport)
                 .help(

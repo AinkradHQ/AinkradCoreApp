@@ -31,6 +31,8 @@ struct WizardReview<Panel: View>: View {
 
     private var creating: CreateProgress? { model.creating }
     private var made: ProjectItem? { model.project(model.wizardProjectID) }
+    /// Repos the Core did not add that need the person; one it already had is not a problem.
+    private var problems: Int { model.wizardMissed.filter { !$0.why.contains("already") }.count }
     private var started: Bool { made != nil || creating != nil }
 
     var body: some View {
@@ -39,7 +41,7 @@ struct WizardReview<Panel: View>: View {
             if started {
                 WizardSetupList(
                     creating: creating, made: made, copy: made.map { WizardProgress($0.repos) },
-                    requested: chosen.count, missed: model.wizardMissed.count
+                    requested: chosen.count, missed: problems
                 )
                 .transition(.opacity.combined(with: .offset(y: coreMove(reduce, 8))))
                 if let now = nowLine {
@@ -96,7 +98,7 @@ struct WizardReview<Panel: View>: View {
 
     private var title: String {
         if made != nil, creating == nil {
-            return WizardProgress(made?.repos ?? []).title(name: name, missed: model.wizardMissed.count)
+            return WizardProgress(made?.repos ?? []).title(name: name, missed: problems)
         }
         return started ? "Setting up \(name)" : "Ready to create \(name)"
     }
@@ -139,7 +141,7 @@ struct WizardReview<Panel: View>: View {
     }
 
     private func missedRow(_ m: MissedRepo) -> some View {
-        CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
+        CoreRow(m.name, subtitle: m.why, symbol: m.why.contains("already") ? "checkmark.circle" : "exclamationmark.triangle") {
             if m.why.contains("SSH") {
                 // Trying again cannot help a link the Core refuses: go back to paste an https one.
                 Button("Use https…") { go(.code) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
@@ -167,7 +169,7 @@ struct WizardReview<Panel: View>: View {
             case .ready: EmptyView()
             case .fetching: Text("Copying…").foregroundStyle(palette.text2)
             case .unknown:
-                Button("Fetch now") { model.fetchRepo(p, r) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                Button("Fetch Now") { model.fetchRepo(p, r) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
             case .failed(let why, _):
                 if why.needsConnection {
                     Button("Connect GitHub") { model.connectGithub() }

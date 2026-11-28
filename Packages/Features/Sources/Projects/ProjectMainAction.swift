@@ -52,11 +52,18 @@ extension ProjectItem {
         }
     }
 
-    /// The secret a failure is about: one the setup is missing whose name the failure says. Never a guess from the draft alone.
+    /// The secret a failure is about, spelled as the setup or the failure writes it: one the setup lists whose name the
+    /// failure says, or else an env-style name (STRIPE_SECRET) the failure calls missing.
     var failedSecret: String? {
         let said = ([live?.failure, live?.failureFix] + (live?.steps.map(\.detail) ?? [])).compactMap { $0 }
-            .joined(separator: " ").lowercased()
-        return draft?.secrets.first { said.contains($0.lowercased()) }
+            .joined(separator: " ")
+        for s in draft?.secrets ?? [] {
+            if let r = said.range(of: s, options: .caseInsensitive) { return String(said[r]) }
+        }
+        guard said.localizedCaseInsensitiveContains("missing") || said.localizedCaseInsensitiveContains("secret") else {
+            return nil
+        }
+        return said.range(of: "\\b[A-Z][A-Z0-9]*(_[A-Z0-9]+)+\\b", options: .regularExpression).map { String(said[$0]) }
     }
 
     /// The word of the state in the top bar. It is always the state, never the link: a crashed or unknown project must not

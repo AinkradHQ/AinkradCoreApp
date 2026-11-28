@@ -61,9 +61,9 @@ struct ProjectHeader: View {
             } label: {
                 if compact { Image(systemName: "sparkles") } else { Label("New AI Session", systemImage: "sparkles") }
             }
-            .buttonStyle(CoreButtonStyle(.secondary)).disabled(!model.canStartSession(project))
+            .buttonStyle(CoreButtonStyle(.secondary)).disabled(!sessionReady)
             .help(
-                model.canStartSession(project) ? "Start an AI session in \(project.name)" : model.sessionBlock(project)
+                sessionReady ? "Start an AI session in \(project.name)" : sessionWhy
             )
             .accessibilityLabel("New AI Session").accessibilityIdentifier("project-new-session")
             Button {
@@ -77,6 +77,11 @@ struct ProjectHeader: View {
         }
         .fixedSize(horizontal: false, vertical: true)
     }
+
+    /// A docs project with no Core has nowhere to write or start a session, whatever the repos say.
+    private var coreMissing: Bool { project.allKinds == [.other] && model.lore == nil }
+    private var sessionReady: Bool { model.canStartSession(project) && !coreMissing }
+    private var sessionWhy: String { coreMissing ? "Not connected to a Core. Connect this Mac first." : model.sessionBlock(project) }
 
     /// Why a docs-only project's New Doc or New AI Session is dim, said in words under the name (not only in a tooltip).
     private var dimReason: String? {

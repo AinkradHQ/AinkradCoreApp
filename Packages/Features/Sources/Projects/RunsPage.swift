@@ -235,7 +235,7 @@ struct ConfigurationsTab: View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
             Image(systemName: "info.circle").foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
             Text("Uses the \(runs.envs.joined(separator: " and ")) environments.").foregroundStyle(GlassInk.secondary)
-            Button("Edit environment") { runs.tab = .environment }
+            Button("Edit Environment") { runs.tab = .environment }
                 .buttonStyle(CoreButtonStyle(.plain, size: .small))
         }
         .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)

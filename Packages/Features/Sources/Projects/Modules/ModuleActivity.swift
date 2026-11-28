@@ -35,7 +35,7 @@ struct ActivityEvent: Identifiable, Equatable {
                 out.append(
                     ActivityEvent(
                         id: "run\(r.id)", kind: .runs, tone: failed ? .fail : .run,
-                        title: failed ? "Start failed\(name)" : "Started\(name)",
+                        title: failed ? (name.isEmpty ? "Start failed" : "\(name.dropFirst()) failed to start") : "Started\(name)",
                         detail: failed ? (r.error ?? ProjectsModel.reason(r.stopReason)) : "on \(r.runner)", at: at))
             }
             if let at = r.stoppedAt, r.state == "stopped" {

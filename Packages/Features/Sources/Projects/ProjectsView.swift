@@ -218,9 +218,10 @@ struct GalleryView: View {
                 .onGeometryChange(for: Int.self) { g in
                     max(1, Int((g.size.width - Space.s4 * 2 + Space.s6) / (340 + Space.s6)))
                 } action: { model.galleryColumns = $0 }
-                if model.shown.isEmpty { nothingHere }
             }
             .scrollIndicators(.never)
+            // Nothing to show: the words sit in the middle of the area, not at its top.
+            .overlay { if model.shown.isEmpty { nothingHere.frame(maxWidth: .infinity, maxHeight: .infinity) } }
             // The arrow keys' card scrolls into view.
             .onChange(of: model.cursor) { _, id in
                 guard let id else { return }
@@ -242,10 +243,10 @@ struct GalleryView: View {
                     ) { model.newProject(name: model.filterText) },
                 ]
             )
-            .frame(maxWidth: .infinity).padding(.top, Space.s6)
+            .frame(maxWidth: .infinity)
         } else if model.segment != .all {
             Text(model.segment == .running ? "Nothing is running right now." : "No archived projects.")
-                .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity).padding(.top, Space.s6)
+                .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity)
         }
     }
 

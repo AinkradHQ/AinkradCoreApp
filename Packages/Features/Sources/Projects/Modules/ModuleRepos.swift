@@ -80,7 +80,7 @@ struct ModuleRepos: View {
             if project.repos.isEmpty {
                 ModuleQuiet(
                     symbol: "arrow.triangle.branch", title: "No repos yet",
-                    line: "Add a repo and the Core keeps a copy of it here. AI sessions and runs get a clone of it.")
+                    line: "Add a repo and the Core keeps a copy of it here. AI sessions and runs get a copy of it.")
             } else {
                 ModuleSplit(pickID: current.map { String($0.id) }) {
                     ModuleList(

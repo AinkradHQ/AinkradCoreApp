@@ -16,6 +16,8 @@ struct ModuleSettings: View {
     @State private var touched = SettingsSave.name
     /// A refusal under the section's own field, not in whichever block comes first.
     @State private var errors: [SettingsSave: String] = [:]
+    /// A type was tapped here: only then is the model's write error this block's to show (the others keep their own).
+    @State private var kindTapped = false
 
     init(model: ProjectsModel, project: ProjectItem) {
         self.model = model
@@ -165,12 +167,12 @@ struct ModuleSettings: View {
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: Space.s2), GridItem(.flexible())], spacing: Space.s2) {
                     ForEach(ProjectKind.allCases) { k in
-                        SettingsKindTile(kind: k, on: kinds.contains(k), single: !model.core112) { model.tapKind(k, for: project) }
+                        SettingsKindTile(kind: k, on: kinds.contains(k), single: !model.core112) { kindTapped = true; model.tapKind(k, for: project) }
                             // The chosen tile keeps its look when nothing can change: it reads as selected, not as disabled.
                             .disabled((model.readOnly || model.busy) && !kinds.contains(k))
                     }
                 }
-                if let e = model.writeError { CoreFieldError(e) }
+                if kindTapped, let e = model.writeError { CoreFieldError(e) }
             }
         }
     }

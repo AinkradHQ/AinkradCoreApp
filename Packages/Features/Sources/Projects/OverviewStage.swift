@@ -25,8 +25,9 @@ struct OverviewStage: View {
                     Text("Last known \(model.listAge() ?? "a while ago")").foregroundStyle(GlassInk.secondary)
                         .padding(.horizontal, Space.s3).padding(.vertical, Space.s1 + 1)
                         .coreCard(GlassInk.card, radius: Radius.control)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .padding(Space.s3).allowsHitTesting(false)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        // Centred and lifted: the preview's frame is inset, and a corner chip straddled its edge.
+                        .padding(.bottom, Space.s6).allowsHitTesting(false)
                 }
                 if covered {
                     StageCover(model: model, project: project, kind: view).transition(.opacity)

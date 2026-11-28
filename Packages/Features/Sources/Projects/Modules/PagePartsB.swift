@@ -74,7 +74,8 @@ struct PgChart: View {
     let title: String
     let values: [Double]
     let latest: String
-    var tint: Color = GlassInk.blue
+    /// One series colour for every chart, so CPU and Memory read alike; green shows on both themes.
+    var tint: Color = GlassInk.green
     var floor = 1.0
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
@@ -103,7 +104,7 @@ struct PgChart: View {
                     with: .linearGradient(
                         Gradient(colors: [tint.opacity(0.16), tint.opacity(0.02)]), startPoint: .zero,
                         endPoint: CGPoint(x: 0, y: size.height)))
-                ctx.stroke(line, with: .color(tint), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                ctx.stroke(line, with: .color(tint), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
             .frame(height: Space.s8 * 2)
             .overlay {

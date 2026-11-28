@@ -123,8 +123,8 @@ struct RepoPicker: View {
     /// The search text, when it is a repo link that is not in the list yet.
     private var typedLink: PickRepo? {
         guard let r = ProjectRules.repo(fromLink: query) else { return nil }
-        if pasted.contains(where: { $0.url == r.url }) { return nil }
-        if case .ready(let all) = catalogState, all.contains(where: { $0.url == r.url }) { return nil }
+        if pasted.contains(where: { ProjectRules.same($0.url, r.url) }) { return nil }
+        if case .ready(let all) = catalogState, all.contains(where: { ProjectRules.same($0.url, r.url) }) { return nil }
         return PickRepo(org: "Pasted links", name: r.name, url: r.url)
     }
 
@@ -191,10 +191,10 @@ struct RepoPicker: View {
         .clipShape(coreShape(Radius.cardMac))
     }
 
-    /// "Show more" for the next page, and the word that GitHub holds more than the Core reads.
+    /// "Show More" for the next page, and the word that GitHub holds more than the Core reads.
     @ViewBuilder private var more: some View {
         if model.catalogHasMore {
-            Button("Show more") { Task { await model.moreCatalog() } }
+            Button("Show More") { Task { await model.moreCatalog() } }
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.catalogBusy)
                 .padding(Space.s2)
         }
@@ -224,6 +224,11 @@ struct RepoPicker: View {
     /// Return in the search field: a typed link becomes a picked row.
     private func addTypedLink() {
         guard let link = typedLink else { return }
+        if let listed = model.listed(link.url) {
+            picked.insert(listed.id)
+            query = ""
+            return
+        }
         pasted.append(link)
         picked.insert(link.id)
         query = ""

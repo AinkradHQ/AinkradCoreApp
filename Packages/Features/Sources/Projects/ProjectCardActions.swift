@@ -43,7 +43,7 @@ struct CardHoverActions: View {
                 if connect { model.connectGithub() } else { model.retryCopies(project) }
             } label: {
                 Label(
-                    connect ? "Connect GitHub" : "Try copying again",
+                    connect ? "Connect GitHub" : "Try Copying Again",
                     systemImage: connect ? "link" : "arrow.clockwise")
             }
             .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly && !connect)
@@ -87,7 +87,7 @@ struct CardMenu: View {
                 if model.copyNeedsConnection(project) {
                     Button("Connect GitHub") { model.connectGithub() }
                 }
-                Button("Try copying again") { model.retryCopies(project) }.disabled(model.readOnly)
+                Button("Try Copying Again") { model.retryCopies(project) }.disabled(model.readOnly)
             }
         }
         Button("Show in Brain") { model.openProject(project.id, section: .brain) }
@@ -104,7 +104,7 @@ struct CardMenu: View {
             }
         }
         .disabled(model.readOnly || project.archived)
-        if model.canCopyLink(project) { Button("Copy link") { model.copyLink(project) } }
+        if model.canCopyLink(project) { Button("Copy Link") { model.copyLink(project) } }
         Button("Settings") { model.openProject(project.id, section: .settings) }
         if !project.archived {
             Divider()

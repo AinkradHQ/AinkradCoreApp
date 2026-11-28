@@ -117,7 +117,7 @@ struct EnvironmentTab: View {
             CoreTextField("Name", placeholder: "NAME", text: $newKey, mono: true)
                 .frame(width: Space.s8 * 5)
             CoreSecureField("Value", placeholder: "Value", text: $newValue, onSubmit: add)
-            Button("Add variable", action: add)
+            Button("Add Variable", action: add)
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(runs.model.readOnly || runs.busy)
         }
         .padding(.top, Space.s2)
@@ -240,12 +240,12 @@ private struct VarRow: View {
             }
         } else {
             out.append(
-                CoreDropdownItem("Unlink from Secrets", symbol: "link", enabled: !runs.model.readOnly) {
+                CoreDropdownItem("Unlink From Secrets", symbol: "link", enabled: !runs.model.readOnly) {
                     Task { await runs.unlink(v) }
                 })
         }
         out.append(
-            CoreDropdownItem("Delete variable", symbol: "trash", destructive: true, enabled: !runs.model.readOnly) {
+            CoreDropdownItem("Delete Variable", symbol: "trash", destructive: true, enabled: !runs.model.readOnly) {
                 Task { await runs.deleteVar(v) }
             })
         return out

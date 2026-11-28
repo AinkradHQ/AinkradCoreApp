@@ -30,7 +30,7 @@ struct ModuleBuilds: View {
                     "Builds shown",
                     segments: [CoreSegment(false, "All"), CoreSegment(true, "Failed")],
                     selection: Binding(get: { failedOnly }, set: { failedOnly = $0 }))
-                buildAndRun(prominent: true)
+                buildAndRun(prominent: false)
             }
         ) {
             content
