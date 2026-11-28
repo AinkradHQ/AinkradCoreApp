@@ -2,14 +2,14 @@ import CoreUI
 import SwiftUI
 
 /// What a made-up site says, by project name (the demo's four web projects each have their own; others get a plain one).
-struct DemoSiteContent {
+struct DemoSiteContent: Sendable {
     let nav: [String]
     let action: String
     let headline: String
     let line: String
     let button: String
     let items: [String]
-    let price: (Int) -> String
+    let price: @Sendable (Int) -> String
 
     static func of(_ name: String) -> DemoSiteContent {
         switch name {

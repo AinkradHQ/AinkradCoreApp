@@ -370,7 +370,7 @@ public final class ProjectsDemo {
             list[3].run = nil
             list[3].live = nil
             list[3].draft = RunDraft(source: "docker-compose.yml", services: ["web", "api", "db"], secrets: [])
-        case "dialog-branch-error": list[0].repos[2].branch = "release/9"
+        case "dialog-branch-error": list[0].repos[2] = Self.lanternaRepo(2, "lanterna-admin", branch: "release/9", head: "91aa0c4", minutes: 180, failing: true)
         case "page-settings-kind": list[0].kinds = [.app, .web]
         default: break
         }
@@ -382,7 +382,9 @@ public final class ProjectsDemo {
         for i in list.indices { DemoData.adapt(&list[i]) }
         await model.useNow(Service(list, archived: scene != "gallery-empty"))
         model.runService = DemoRunService()
-        model.configsService = scene == "page-run-old-core" ? nil : DemoConfigsService()
+        let configs = DemoConfigsService()
+        configs.kinds = Dictionary(uniqueKeysWithValues: list.map { ($0.id, DemoData.kinds($0)[0]) })
+        model.configsService = scene == "page-run-old-core" ? nil : configs
         let byProject = Dictionary(uniqueKeysWithValues: list.map { ($0.id, DemoLogSource(lines: DemoData.source($0))) })
         model.logSources = { id, _ in byProject[id] ?? DemoLogSource() }
         model.demoRunTab = nil

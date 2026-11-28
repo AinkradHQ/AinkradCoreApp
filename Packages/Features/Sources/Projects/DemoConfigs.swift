@@ -5,7 +5,7 @@ import Foundation
 /// Debug only: the Runs page's configurations, environments, variables and runs on made-up data (two configurations beside the
 /// Default). Writes change nothing; nothing reaches a Core.
 final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
-    private let items = [
+    private let webItems = [
         RunConfigItem(
             id: 1, name: "Admin dev server", command: "npm run dev", workdir: "./lanterna-admin", runner: "automatic",
             port: 3000, restart: true),
@@ -14,18 +14,44 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
             runner: "automatic", port: nil, restart: false),
     ]
 
+    /// The kind of each demo project (set from the scene's list): an app builds, an infra stack applies; neither runs web servers.
+    var kinds: [Int64: ProjectKind] = [:]
+    private func items(_ project: Int64) -> [RunConfigItem] {
+        switch kinds[project] {
+        case .app?:
+            return [
+                RunConfigItem(
+                    id: 1, name: "Debug build", command: "xcodebuild -scheme Tidepool build", workdir: "./tidepool-ios",
+                    runner: "automatic", port: nil, restart: false),
+                RunConfigItem(
+                    id: 2, name: "Android build", command: "./gradlew assembleDebug", workdir: "./tidepool-android",
+                    runner: "automatic", port: nil, restart: false),
+            ]
+        case .infra?:
+            return [
+                RunConfigItem(
+                    id: 1, name: "Apply the stack", command: "terraform apply -auto-approve", workdir: "./harbor-infra",
+                    runner: "automatic", port: nil, restart: false),
+                RunConfigItem(
+                    id: 2, name: "Restart the gateway", command: "systemctl restart gateway", workdir: "./harbor-os",
+                    runner: "automatic", port: nil, restart: false),
+            ]
+        default: return webItems
+        }
+    }
+
     /// Scenes of the Builds page: a history of its own, or a Core that cannot answer.
     var historyOverride: [RunRecord]?
     var failing = false
 
     func configs(project: Int64) async throws -> [RunConfigItem] {
         if failing { throw CoreError.protocolViolation("The Core did not answer in time (timeout).") }
-        return items
+        return items(project)
     }
-    func createConfig(project: Int64, name: String, command: String) async throws -> RunConfigItem { items[0] }
-    func updateConfig(project: Int64, id: Int64, _ patch: RunConfigPatch) async throws -> RunConfigItem { items[0] }
+    func createConfig(project: Int64, name: String, command: String) async throws -> RunConfigItem { webItems[0] }
+    func updateConfig(project: Int64, id: Int64, _ patch: RunConfigPatch) async throws -> RunConfigItem { webItems[0] }
     func deleteConfig(project: Int64, id: Int64) async throws {}
-    func duplicateConfig(project: Int64, id: Int64) async throws -> RunConfigItem { items[0] }
+    func duplicateConfig(project: Int64, id: Int64) async throws -> RunConfigItem { webItems[0] }
     func start(project: Int64, config: Int64, environment: String?, replace: Bool) async throws -> RunRecord {
         Self.record("r_new", "starting", config, minutes: 0)
     }
