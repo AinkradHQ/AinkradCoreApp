@@ -58,6 +58,7 @@ extension ProjectsModel {
             host.shell.showToast(runWords(error), kind: .warn)
             return
         }
+        PreviewStore.shared.remove(p.id)
         closeProject()
         host.shell.closePane(Self.paneID(p.id))
         await reload()

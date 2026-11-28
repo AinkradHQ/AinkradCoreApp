@@ -12,9 +12,29 @@ final class PreviewStore {
     static let shared = PreviewStore()
     private var images: [Int64: NSImage] = [:]
     private var asked: Set<Int64> = []
+    /// The Core the pictures belong to (its host): a project id is only unique inside one Core, so a picture of one Core's
+    /// project 3 is never shown for another Core's. Set with the connection.
+    private(set) var core = "local"
+    /// The widest a kept picture is: the cards and the stage show it small.
+    static let maxWidth: CGFloat = 640
     @ObservationIgnored private let dir: URL? = FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask
     ).first?.appendingPathComponent("Ainkrad/ProjectPreviews", isDirectory: true)
+
+    /// The file of a picture: `<core>-<id>.png`, the Core's host made safe for a file name.
+    static func fileName(core: String, id: Int64) -> String {
+        let safe = String(core.map { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" ? $0 : "_" })
+        return "\(safe.isEmpty ? "local" : safe)-\(id).png"
+    }
+
+    /// Pictures of another Core are not this one's: the ones in memory go.
+    func use(core: String?) {
+        let next = core ?? "local"
+        guard next != self.core else { return }
+        self.core = next
+        images = [:]
+        asked = []
+    }
 
     /// The picture, or nil while none is known (the view draws the illustration). Reading starts the disk load once.
     func image(_ id: Int64) -> NSImage? {
@@ -23,22 +43,47 @@ final class PreviewStore {
     }
 
     private func load(_ id: Int64) async {
-        guard !asked.contains(id), let url = dir?.appendingPathComponent("\(id).png") else { return }
+        guard !asked.contains(id), let url = dir?.appendingPathComponent(Self.fileName(core: core, id: id)) else {
+            return
+        }
         asked.insert(id)
+        let core = core
         let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
-        if images[id] == nil, let data, let img = NSImage(data: data) { images[id] = img }
+        if images[id] == nil, core == self.core, let data, let img = NSImage(data: data) { images[id] = img }
     }
 
-    /// A new picture of the live view: shown at once, written to disk in the background.
+    /// A new picture of the live view: shrunk, shown at once, written to disk in the background.
     func save(_ image: NSImage, for id: Int64) {
+        let image = Self.scaled(image)
         asked.insert(id)
         images[id] = image
         guard let dir, let tiff = image.tiffRepresentation else { return }
+        let file = dir.appendingPathComponent(Self.fileName(core: core, id: id))
         Task.detached(priority: .utility) {
             guard let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return }
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try? png.write(to: dir.appendingPathComponent("\(id).png"), options: .atomic)
+            try? png.write(to: file, options: .atomic)
         }
+    }
+
+    /// The picture of a project that is gone (deleted for good): its id may be given to a new one.
+    func remove(_ id: Int64) {
+        images[id] = nil
+        asked.insert(id)
+        guard let url = dir?.appendingPathComponent(Self.fileName(core: core, id: id)) else { return }
+        Task.detached(priority: .utility) { try? FileManager.default.removeItem(at: url) }
+    }
+
+    /// `image` at most `maxWidth` wide (the snapshot of a wide page is far bigger than any card).
+    static func scaled(_ image: NSImage) -> NSImage {
+        let w = image.size.width
+        guard w > maxWidth else { return image }
+        let size = NSSize(width: maxWidth, height: image.size.height * maxWidth / w)
+        let out = NSImage(size: size)
+        out.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .copy, fraction: 1)
+        out.unlockFocus()
+        return out
     }
 
     #if DEBUG
@@ -119,7 +164,10 @@ final class LiveWebModel {
         case failed(String)
     }
     var state = State.loading
-    @ObservationIgnored weak var web: WKWebView?
+    /// The one web view of the project, kept while its space is open: the Overview and the Live site page show this same view
+    /// (one cookie jar, no reload on a switch of page).
+    @ObservationIgnored var web: WKWebView?
+    @ObservationIgnored var isPreview = false
 
     /// A picture of what the page shows now, once it has something to show.
     func snapshot(into id: Int64) {
@@ -141,9 +189,15 @@ struct LiveWebView: NSViewRepresentable {
     /// The page zoom: the stage lays the site out at a device width and shrinks it to fit the frame.
     var zoom: CGFloat = 1
 
-    func makeCoordinator() -> Coordinator { Coordinator(model: model, host: url.host) }
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, url: url) }
 
     func makeNSView(context: Context) -> WKWebView {
+        let wantsPreview = url.scheme == PreviewProxy.scheme
+        if let kept = model.web, model.isPreview == wantsPreview {
+            kept.navigationDelegate = context.coordinator
+            if kept.url == nil || model.state != .live { load(kept) }
+            return kept
+        }
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
         if url.scheme == PreviewProxy.scheme, let p = preview {
@@ -156,8 +210,13 @@ struct LiveWebView: NSViewRepresentable {
         web.navigationDelegate = context.coordinator
         web.setValue(false, forKey: "drawsBackground")
         model.web = web
-        web.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 20))
+        model.isPreview = wantsPreview
+        load(web)
         return web
+    }
+
+    private func load(_ web: WKWebView) {
+        web.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 20))
     }
 
     func updateNSView(_ web: WKWebView, context: Context) {
@@ -170,10 +229,10 @@ struct LiveWebView: NSViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         let model: LiveWebModel
-        let host: String?
-        init(model: LiveWebModel, host: String?) {
+        let origin: URL
+        init(model: LiveWebModel, url: URL) {
             self.model = model
-            self.host = host
+            origin = url
         }
         func webView(_ w: WKWebView, didFinish navigation: WKNavigation!) {
             Task { @MainActor in
@@ -196,12 +255,31 @@ struct LiveWebView: NSViewRepresentable {
             _ w: WKWebView, decidePolicyFor action: WKNavigationAction,
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
-            if action.navigationType == .linkActivated, let url = action.request.url, url.host != host {
-                if url.scheme == "https" || url.scheme == "http" { NSWorkspace.shared.open(url) }
+            switch Self.decide(action.request.url, from: origin, mainFrame: action.targetFrame?.isMainFrame ?? true) {
+            case .allow: decisionHandler(.allow)
+            case .browser(let url):
+                NSWorkspace.shared.open(url)
                 decisionHandler(.cancel)
-            } else {
-                decisionHandler(.allow)
+            case .block: decisionHandler(.cancel)
             }
+        }
+
+        enum Navigation: Equatable {
+            case allow, block
+            case browser(URL)
+        }
+
+        /// What a navigation of the page may do: stay on the page's own origin (the preview scheme, or the project's host), a
+        /// web link elsewhere goes to the browser, and anything else (a script moving the stage to a file, another scheme)
+        /// is refused. A frame inside the page is its own business; only the page itself is held to this.
+        static func decide(_ url: URL?, from origin: URL, mainFrame: Bool) -> Navigation {
+            guard mainFrame else { return .allow }
+            guard let url, let scheme = url.scheme?.lowercased() else { return .block }
+            if scheme == "about" { return .allow }
+            let web = ["http", "https"]
+            let same = scheme == origin.scheme?.lowercased() || (web.contains(scheme) && web.contains(origin.scheme ?? ""))
+            if same, url.host?.lowercased() == origin.host?.lowercased() { return .allow }
+            return web.contains(scheme) ? .browser(url) : .block
         }
     }
 }

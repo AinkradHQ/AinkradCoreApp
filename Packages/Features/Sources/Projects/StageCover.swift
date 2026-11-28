@@ -22,7 +22,7 @@ struct StageCover: View {
             case .ready(let draft): ReadyToStart(model: model, project: project, draft: draft)
             case .ran:
                 switch project.run?.state ?? .stopped {
-                case .running: EmptyView()
+                case .running: if project.crash != nil, !project.stale { failed } else { EmptyView() }
                 case .starting: starting
                 case .stopped: stopped
                 case .failed: failed
@@ -31,7 +31,9 @@ struct StageCover: View {
         }
         .multilineTextAlignment(.center).padding(Space.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(GlassInk.shade(0.4))
+        // A scrim under the words: whatever the stage shows behind them (a bright window, a pale site) never fights the text.
+        .background(.ultraThinMaterial)
+        .background(GlassInk.shade(0.55))
     }
 
     private func title(_ s: String) -> some View {
@@ -100,7 +102,9 @@ struct StageCover: View {
     private var failed: some View {
         let step = steps.first { $0.state == .failed }
         let why =
-            step.map { "The build failed at “\($0.title)”" } ?? project.live?.failure ?? "The last start failed."
+            step.map { "The build failed at “\($0.title)”" }
+            ?? project.crash.map { $0.restarts > 0 ? "\($0.service) kept crashing and was stopped" : $0.words }
+            ?? project.live?.failure ?? "The last start failed."
         let detail = step?.detail ?? project.live?.failureFix ?? ""
         return VStack(spacing: Space.s4) {
             HStack(alignment: .top, spacing: Space.s3) {
@@ -118,7 +122,7 @@ struct StageCover: View {
             .accessibilityElement(children: .combine)
             HStack(spacing: Space.s2) {
                 Button {
-                    model.module = .logs
+                    model.go(.logs, in: project.id)
                 } label: {
                     Label("Show Log", systemImage: "text.alignleft")
                 }
