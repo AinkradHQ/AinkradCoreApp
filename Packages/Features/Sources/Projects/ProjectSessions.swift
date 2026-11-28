@@ -98,7 +98,7 @@ struct SessionsPage: View {
                 }
                 if !all.isEmpty {
                     Text(
-                        "New sessions start in their own clone of this project’s repos, with the \(project.name) room’s approved instructions."
+                        "New sessions start in their own copy of this project’s repos, with the \(project.name) room’s approved instructions."
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }

@@ -94,7 +94,14 @@ struct WebStage: View {
             }
             .padding(.horizontal, Space.s2).frame(height: 20)
             .background(Color(red: 0.9, green: 0.886, blue: 0.855), in: coreShape(6))
-            Image(systemName: "arrow.clockwise").coreFont(size: 10)
+            Button {
+                web.state = .loading
+                web.web?.reload()
+            } label: {
+                Image(systemName: "arrow.clockwise").coreFont(size: 10).frame(width: 20, height: 20).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain).disabled(previewURL == nil || isDemo).help("Reload the page")
+            .accessibilityLabel("Reload the page")
         }
         .coreFont(size: MacTextSize.meta)
         .foregroundStyle(Color(red: 0.37, green: 0.35, blue: 0.32))

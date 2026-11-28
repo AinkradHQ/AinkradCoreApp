@@ -98,7 +98,7 @@ struct ReposPage: View {
                     }
                 }
                 Text(
-                    "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes \(insights.supported ? FetchInterval.line(insights.tuning.fetchInterval) : "every 15 minutes") by itself; every AI session and run gets its own clone."
+                    "GitHub holds the source. The Core keeps one copy of each repo and fetches new changes \(insights.supported ? FetchInterval.line(insights.tuning.fetchInterval) : "every 15 minutes") by itself; every AI session and run gets its own copy."
                 )
                 .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -166,7 +166,7 @@ private struct RepoDetail: View {
                 Button("Connect GitHub") { model.connectGithub() }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small))
             } else if why != .sshNotSupported {
-                Button("Try again") { model.fetchRepo(project, repo) }
+                Button("Try Again") { model.fetchRepo(project, repo) }
                     .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.readOnly)
             }
         }

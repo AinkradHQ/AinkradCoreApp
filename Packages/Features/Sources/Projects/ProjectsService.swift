@@ -82,6 +82,8 @@ struct ProjectPatch: Equatable, Sendable {
     var kind: String?
     /// Every kind of the project, first one first (API 112).
     var kinds: [String]?
+    /// The environment a Run starts in when none is picked; the Core keeps it as `default_environment`.
+    var defaultEnvironment: String?
 
     var isEmpty: Bool { self == ProjectPatch() }
 }
@@ -226,7 +228,7 @@ struct LiveProjectsService: ProjectsService {
 
     func update(project: Int64, patch p: ProjectPatch) async throws {
         // `color` is not in the synced client: a patch that sets it goes as raw JSON.
-        if p.colour != nil || p.kind != nil || p.kinds != nil {
+        if p.colour != nil || p.kind != nil || p.kinds != nil || p.defaultEnvironment != nil {
             _ = try await signed("PATCH", "/api/v1/projects/\(project)", body: Self.patchBody(p))
             return
         }
@@ -279,6 +281,7 @@ struct LiveProjectsService: ProjectsService {
         if let v = p.colour { o["color"] = v }
         if let v = p.kind { o["kind"] = v }
         if let v = p.kinds { o["kinds"] = v }
+        if let v = p.defaultEnvironment { o["default_environment"] = v }
         return try JSONSerialization.data(withJSONObject: o)
     }
 
@@ -527,11 +530,13 @@ struct LiveProjectsService: ProjectsService {
         var colours: [Int64: String] = [:]
         var kinds: [Int64: String] = [:]
         var kindLists: [Int64: [ProjectKind]] = [:]
+        var slugLocks: [Int64: String] = [:]
         for o in (json as? [[String: Any]]) ?? (json as? [String: Any]).map({ [$0] }) ?? [] {
             if let id = (o["id"] as? NSNumber)?.int64Value, let c = o["color"] as? String, !c.isEmpty {
                 colours[id] = c
             }
             if let id = (o["id"] as? NSNumber)?.int64Value, let k = o["kind"] as? String, !k.isEmpty { kinds[id] = k }
+            if let id = (o["id"] as? NSNumber)?.int64Value, let l = o["slug_locked"] as? String { slugLocks[id] = l }
             if let id = (o["id"] as? NSNumber)?.int64Value, let ks = o["kinds"] as? [String] {
                 kindLists[id] = ks.compactMap(ProjectKind.init(rawValue:))
             }
@@ -545,6 +550,7 @@ struct LiveProjectsService: ProjectsService {
             p.colourName = colours[$0.id]
             p.kindName = kinds[$0.id]
             p.kinds = kindLists[$0.id] ?? []
+            p.slugLocked = slugLocks[$0.id]
             return p
         }
     }

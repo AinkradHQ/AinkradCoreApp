@@ -170,6 +170,8 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
     var kind = ProjectKind.web
     /// All of its kinds when the Core keeps several (API 112); empty on an older Core (`allKinds` falls back to `kind`).
     var kinds: [ProjectKind] = []
+    /// Why the link name cannot change now (API 112): `running` or `has_secrets`; nil when it can.
+    var slugLocked: String?
     /// A service of it crashed (`project.service_crashed`) and it has not run again since.
     var crash: ServiceCrash?
 
@@ -239,7 +241,7 @@ struct ProjectItem: Identifiable, Equatable, Sendable {
         case .stopped: ("Stopped", Tone.queue, "stop.circle")
         case .failed: ("Failed", Tone.fail, "exclamationmark.triangle")
         case .settingUp:
-            copyFailed ? ("Can’t copy", Tone.fail, "exclamationmark.triangle") : ("Setting up", Tone.warn, "gearshape")
+            copyFailed ? ("Copy failed", Tone.fail, "exclamationmark.triangle") : ("Setting up", Tone.warn, "gearshape")
         case .new: ("New", Tone.queue, "sparkle")
         }
     }
@@ -317,6 +319,10 @@ enum ProjectRules {
     /// "after 30 min with no visits", or that it never stops.
     static func idleWords(minutes: Int, never: Bool) -> String {
         never ? "never" : "after \(minutes) min with no visits"
+    }
+    /// The same as a sentence: "It stops after 30 min with no visits." or, with the idle stop off, "It does not stop by itself."
+    static func idleSentence(minutes: Int, never: Bool) -> String {
+        never ? "It does not stop by itself." : "It stops \(idleWords(minutes: minutes, never: false))."
     }
     static func host(_ slug: String) -> String { "\(slug).\(domain)" }
 
@@ -482,7 +488,16 @@ struct RepoPage: Equatable, Sendable {
 protocol RepoCatalog: Sendable {
     /// Nil when there is no GitHub connection (or this Core cannot list repos): the picker then says "Connect GitHub".
     func page(query: String, page: Int) async throws -> RepoPage?
+    /// Makes the one GitHub connection the workspace's default (a write, so the app asks for Touch ID first).
+    func makeDefault(connection: Int64) async throws
 }
+
+extension RepoCatalog {
+    func makeDefault(connection: Int64) async throws {}
+}
+
+/// Connected to GitHub, but never made the default and with exactly one connection: listing needs that one made the default.
+struct CatalogNeedsDefault: Error, Equatable { let connection: Int64 }
 
 struct NoRepoCatalog: RepoCatalog {
     func page(query: String, page: Int) async throws -> RepoPage? { nil }

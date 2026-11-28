@@ -116,7 +116,7 @@ struct NoRepoSessionTests {
         let m = ProjectsModel(host: FakeHost(), defaults: UserDefaults(suiteName: "kind-sess-\(UUID())")!)
         m.use(FakeService())
         _ = await until { m.load == .ready }
-        m.sessionStarter = { _ in nil }
+        m.sessionStarter = { _, _ in nil }
         m.core111 = core111
         let p = ProjectItem(
             id: 1, slug: "book", name: "Book", description: "", expose: false, repos: [], updatedAt: Date())

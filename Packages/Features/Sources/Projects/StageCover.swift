@@ -91,7 +91,7 @@ struct StageCover: View {
                     ? "Build and run it on \(where_)."
                     : kind == .infra
                         ? "Start the stack to bring \(n > 0 ? "all \(n) services" : "its services") up on \(where_)."
-                        : "Start it to see the live site here. It stops by itself after \(project.idleNever ? "no idle time" : "\(project.idleMinutes) idle minutes")."
+                        : "Start it to see the live site here. \(ProjectRules.idleSentence(minutes: project.idleMinutes, never: project.idleNever))"
             )
             startButton(prominent: true)
         }
@@ -133,12 +133,15 @@ struct StageCover: View {
                     .help("Set the secret the setup is missing")
                 } else if model.canStartSession(project) {
                     Button {
-                        model.newSession(in: project)
+                        model.newSession(
+                            in: project,
+                            prompt: ProjectsModel.fixPrompt(
+                                project: project.name, what: "The last start", details: [why, detail]))
                     } label: {
                         Label("Ask AI to Fix", systemImage: "sparkles")
                     }
-                    .buttonStyle(CoreButtonStyle(.secondary))
-                    .help("Start an AI session in \(project.name) to look at why it failed")
+                    .buttonStyle(CoreButtonStyle(.secondary, busy: model.startingSession.contains(project.id)))
+                    .help("Start an AI session that begins with this failure")
                 }
                 startButton(prominent: true)
             }

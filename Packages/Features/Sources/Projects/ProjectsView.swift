@@ -160,7 +160,7 @@ struct GalleryView: View {
             symbol: "wifi.exclamationmark", title: "Showing the list from \(model.listAge() ?? "a while ago").",
             text: Self.plain(why), tone: .warn
         ) {
-            Button("Try again") { model.resync() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            Button("Try Again") { model.resync() }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
         }
         .padding(.horizontal, Space.s4).padding(.bottom, Space.s3)
         .accessibilityIdentifier("projects-stale")
@@ -186,7 +186,7 @@ struct GalleryView: View {
             centered(
                 CoreStateCard(
                     symbol: "exclamationmark.triangle", title: "Projects did not load", line: Self.plain(why),
-                    primary: CoreAction("Try again") { model.resync() }))
+                    primary: CoreAction("Try Again") { model.resync() }))
         case .ready where !hasAny:
             ProjectsEmptyHero(model: model)
         case .ready:

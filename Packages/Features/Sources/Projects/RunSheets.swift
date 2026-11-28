@@ -135,7 +135,7 @@ struct SecretSheet: View {
         CoreDialogPanel("", width: Space.s8 * 14) {
             VStack(alignment: .leading, spacing: Space.s4) {
                 DialogHead(
-                    title: replacing ? "Replace Secret" : "Set Secret",
+                    title: replacing ? "Replace secret" : "Set secret",
                     line: "Sealed in the Core and given to the run at start. Never shown again.")
                 if nameFixed {
                     VStack(alignment: .leading, spacing: Space.s1) {
@@ -150,6 +150,10 @@ struct SecretSheet: View {
                 CoreSelect("Kind", selection: $kind, options: Self.kinds)
                 valueField
                 CoreTextField("Note (optional)", placeholder: "What it is for", text: $note)
+                if !ready, nameProblem == nil, fileProblem == nil {
+                    Text(kind == "file" ? "Choose a file first." : value.isEmpty ? "Enter a value first." : "Give it a name first.")
+                        .foregroundStyle(GlassInk.secondary)
+                }
                 CoreDialogFooter(
                     cancel: CoreAction("Cancel", key: .cancel, run: close),
                     primary: CoreAction(replacing ? "Replace" : "Set", key: .primary, run: save), busy: run.busy,

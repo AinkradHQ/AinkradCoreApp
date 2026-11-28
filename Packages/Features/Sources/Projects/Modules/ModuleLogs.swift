@@ -77,8 +77,9 @@ struct ModuleLogs: View {
             } label: {
                 Label("Follow", systemImage: "arrow.down.to.line")
             }
-            .buttonStyle(CoreButtonStyle(following ? .prominent : .secondary, size: .small))
-            .help(following ? "Stop following the newest line" : "Follow the newest line").accessibilityValue(
+            .buttonStyle(CoreButtonStyle(following && live ? .prominent : .secondary, size: .small))
+            .disabled(!live)
+            .help(!live ? "The run has stopped" : following ? "Stop following the newest line" : "Follow the newest line").accessibilityValue(
                 following ? "On" : "Off")
             CoreIconButton(symbol: "doc.on.doc", label: "Copy the visible lines") {
                 NSPasteboard.general.clearContents()
@@ -98,6 +99,12 @@ struct ModuleLogs: View {
                         symbol: "text.alignleft", title: "No logs yet",
                         line: "Lines appear here while the project runs, and the last run's stay after it stops.")
                 }
+            }
+        }
+        .onAppear {
+            if let s = model.logService {
+                service = s
+                model.logService = nil
             }
         }
         .task(id: project.id) { await run.watch() }

@@ -70,6 +70,10 @@ final class FakeConfigsService: RunConfigsService, @unchecked Sendable {
     var linked: [String: String] = ["DB": "database_url"]
     private(set) var calls: [String] = []
     var refuseReveal = false
+    /// The Default's variables (API 112), by environment is not modelled: one set.
+    var defaultPlain: [String: String] = ["PORT": "8080"]
+    var failDefaultVars = false
+    var updateError: (any Error)?
     var runnerList: [RunnerOption] = []
 
     func configs(project: Int64) async throws -> [RunConfigItem] { lock.withLock { items } }
@@ -84,9 +88,26 @@ final class FakeConfigsService: RunConfigsService, @unchecked Sendable {
         }
     }
     func updateConfig(project: Int64, id: Int64, _ patch: RunConfigPatch) async throws -> RunConfigItem {
-        lock.withLock {
+        if let updateError { throw updateError }
+        return lock.withLock {
             calls.append("update \(patch.json.keys.sorted().joined(separator: ","))")
             return items[0]
+        }
+    }
+    func defaultVars(project: Int64, env: String) async throws -> [RunVarItem] {
+        if failDefaultVars { throw RunFailure(sentence: "The Core did not answer.", code: "timeout") }
+        return lock.withLock { defaultPlain.map { RunVarItem(key: $0.key, secret: nil, size: $0.value.count) } }
+    }
+    func setDefaultVar(project: Int64, env: String, key: String, value: String?, secret: String?) async throws {
+        lock.withLock {
+            calls.append("setDefault \(key) \(env)")
+            if let value { defaultPlain[key] = value }
+        }
+    }
+    func deleteDefaultVar(project: Int64, env: String, key: String) async throws {
+        lock.withLock {
+            calls.append("deleteDefault \(key)")
+            defaultPlain[key] = nil
         }
     }
     func deleteConfig(project: Int64, id: Int64) async throws {

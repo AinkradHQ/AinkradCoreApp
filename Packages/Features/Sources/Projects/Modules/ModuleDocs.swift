@@ -2,7 +2,7 @@ import AppKit
 import CoreUI
 import SwiftUI
 
-/// The Documents focused page (details v2): the project's documents grouped by kind with search and New Doc, the picked one as
+/// The Docs focused page (details v2): the project's docs grouped by kind with search and New Doc, the picked one as
 /// a preview (title, meta, text) with Open, and "Ask the AI" to start an AI session about it. Reuses `ProjectDocs`.
 struct ModuleDocs: View {
     let model: ProjectsModel
@@ -46,12 +46,12 @@ struct ModuleDocs: View {
         }
         .task(id: project.id) { await docs.load() }
         .task(id: project.id) { await insights.loadDocs() }
-        .accessibilityIdentifier("project-page-Documents")
+        .accessibilityIdentifier("project-page-Docs")
     }
 
     private var side: some View {
         ModulePage(
-            title: "Documents",
+            title: "Docs",
             tools: {
                 if docs.canImport {
                     // An icon in the 340 pt panel; the words are in its tooltip.
@@ -69,7 +69,8 @@ struct ModuleDocs: View {
                 } label: {
                     Label("New Doc", systemImage: "plus")
                 }
-                .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(model.readOnly || model.lore == nil)
+                .buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: model.creatingDoc.contains(project.id)))
+                .disabled(model.readOnly || model.lore == nil || model.creatingDoc.contains(project.id))
                 .help(model.lore == nil ? "Not connected to the Core" : "Write a new doc in \(project.name)")
             }
         ) {
@@ -79,21 +80,23 @@ struct ModuleDocs: View {
 
     @ViewBuilder private var content: some View {
         switch docs.phase {
-        case .loading: PgQuiet("Loading documents…").padding(.horizontal, Space.s5)
+        case .loading: PgQuiet("Loading docs…").padding(.horizontal, Space.s5)
         case .failed(let why):
-            ModuleQuiet(symbol: "exclamationmark.triangle", title: "Unable to Load Documents", line: why) {
+            ModuleQuiet(symbol: "exclamationmark.triangle", title: "Unable to load docs", line: why) {
                 Button("Try Again") { Task { await docs.load() } }.buttonStyle(CoreButtonStyle(.prominent))
             }
         case .ready where docs.docs.isEmpty && aiDocs.isEmpty:
             ModuleQuiet(
-                symbol: "doc.text", title: "No Documents Yet",
+                symbol: "doc.text", title: "No docs yet",
                 line: "Write the first one, or import the Markdown docs from this project’s repos."
             ) {
                 HStack(spacing: Space.s2) {
                     if docs.canImport {
                         Button("Import from Repo…") { docs.importFromRepo() }.buttonStyle(CoreButtonStyle(.secondary))
                     }
-                    Button("New Doc") { docs.newDoc() }.buttonStyle(CoreButtonStyle(.prominent))
+                    Button("New Doc") { docs.newDoc() }
+                        .buttonStyle(CoreButtonStyle(.prominent, busy: model.creatingDoc.contains(project.id)))
+                        .disabled(model.creatingDoc.contains(project.id))
                 }
             }
         case .ready:

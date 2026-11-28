@@ -21,8 +21,8 @@ enum ProjectKind: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .web: "Web"
         case .app: "App"
-        case .infra: "Infrastructure"
-        case .other: "Not software"
+        case .infra: "Infra"
+        case .other: "Docs"
         }
     }
 
@@ -46,7 +46,7 @@ enum ProjectKind: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The tile's title in the wizard.
-    var tileTitle: String { self == .other ? "Anything else" : short }
+    var tileTitle: String { short }
 
     /// "Looks like …": how the wizard names this kind in its one-line correction.
     var lookWord: String {

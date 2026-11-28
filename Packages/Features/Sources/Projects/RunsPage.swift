@@ -43,6 +43,10 @@ struct RunsPage: View {
                 .coreRise(settled, 0)
             }
             .onAppear { settled = true }
+            // An edit made less than a second ago still saves when the page closes, and one held back by a lost connection
+            // saves when the Core is back.
+            .onDisappear { Task { [runs] in await runs.flushAll() } }
+            .onChange(of: model.stale == nil) { _, back in if back, runs.hasPending { Task { await runs.flushAll() } } }
             .task(id: project.id) { await runs.load() }
             // The Core says a run changed: the runs are read again now.
             .task(id: model.runTick) {
@@ -103,6 +107,7 @@ func runsMono(_ s: String) -> some View {
 /// "started 2 minutes ago", "4 minutes ago".
 func runsAgo(_ d: Date?, now: Date = Date()) -> String {
     guard let d else { return "" }
+    if abs(now.timeIntervalSince(d)) < 60 { return "just now" }
     let f = RelativeDateTimeFormatter()
     f.unitsStyle = .full
     return f.localizedString(for: d, relativeTo: now)

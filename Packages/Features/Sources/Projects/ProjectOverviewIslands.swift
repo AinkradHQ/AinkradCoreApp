@@ -91,7 +91,7 @@ extension Overview {
                     Text(
                         counted > 0
                             ? "\(ProjectItem.count(counted, "AI session")) in this project."
-                            : "No AI sessions yet. New ones start in their own clone of this project's repos."
+                            : "No AI sessions yet. New ones start in their own copy of this project's repos."
                     )
                     .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                 }
@@ -393,7 +393,7 @@ enum SessionBadge {
     static func badge(_ s: ProjectLive.Session.State) -> StateBadge {
         switch s {
         case .needsYou: StateBadge("Needs you", tone: .warn, symbol: "hand.raised")
-        case .running: StateBadge("Running", tone: .run, symbol: "play.circle")
+        case .running: StateBadge("Working", tone: .run, symbol: "play.circle")
         case .done: StateBadge("Done", tone: .queue, symbol: "checkmark.circle")
         }
     }

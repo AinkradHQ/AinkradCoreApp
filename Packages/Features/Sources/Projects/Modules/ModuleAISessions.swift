@@ -60,10 +60,14 @@ struct ModuleAISessions: View {
             } label: {
                 Label("New AI Session", systemImage: "plus")
             }
-            .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(!model.canStartSession(project))
+            .buttonStyle(CoreButtonStyle(.prominent, size: .small, busy: model.startingSession.contains(project.id)))
+            .disabled(!model.canStartSession(project))
             .help(model.sessionBlock(project)).accessibilityIdentifier("module-new-session")
         } content: {
-            if entries.isEmpty {
+            if entries.isEmpty, let why = model.liveFailures[project.id]?["sessions"] {
+                LoadFailed(what: "the AI sessions", why: why) { Task { await model.refreshLive(project.id) } }
+                    .padding(Space.s4)
+            } else if entries.isEmpty {
                 ModuleQuiet(
                     symbol: "sparkles", title: "No AI sessions yet",
                     line: "A session works in its own copy of this project's repos, with the project's Brain room.")
@@ -112,7 +116,12 @@ struct ModuleAISessions: View {
         return s.state == .needsYou ? "\(when) · waiting for your answer" : when
     }
 
-    private func open(_ s: ProjectLive.Session) { if let id = s.id { model.sessionOpener?(id) } }
+    /// Opens the session in AI Sessions; a window that cannot open one by id opens the AI Sessions app instead.
+    private func open(_ s: ProjectLive.Session) {
+        if let id = s.id, let opener = model.sessionOpener { opener(id) } else {
+            model.host.shell.launcher.entry("agents")?.run()
+        }
+    }
 
     @ViewBuilder private func detail(_ s: ProjectLive.Session) -> some View {
         ModuleHead(caption: caption(s), title: s.title) {
@@ -121,7 +130,7 @@ struct ModuleAISessions: View {
             } label: {
                 Label("Open Session", systemImage: "arrow.up.forward.square")
             }
-            .buttonStyle(CoreButtonStyle(.prominent)).disabled(s.id == nil || model.sessionOpener == nil)
+            .buttonStyle(CoreButtonStyle(.prominent)).disabled(s.id == nil)
             .help(s.id == nil ? "This session has no page in AI Sessions yet" : "Read and steer it in AI Sessions")
         }
         ModuleFacts(facts: [("Tool", s.harness), ("Runner", s.runner), ("Branch", s.branch), ("Cost", s.cost)])

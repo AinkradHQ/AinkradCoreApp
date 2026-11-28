@@ -51,7 +51,8 @@ struct DocsStageView: View {
             .foregroundStyle(GlassInk.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             .coreCard(GlassInk.well, radius: Radius.cardMac)
         }
-        .buttonStyle(.plain).frame(height: 150).disabled(model.readOnly || model.lore == nil)
+        .buttonStyle(.plain).frame(height: 150)
+        .disabled(model.readOnly || model.lore == nil || model.creatingDoc.contains(project.id))
         .help(model.lore == nil ? "Docs are not available on this Core" : "Write a new doc in \(project.name)")
     }
 }
@@ -59,12 +60,22 @@ struct DocsStageView: View {
 extension ProjectsModel {
     /// A new, empty doc in the project, opened in Lore.
     func newDoc(in project: ProjectItem) {
-        Task {
-            guard let n = try? await lore?.create(text: "", project: String(project.id)) else {
-                host.shell.showToast("Could not create the doc. Try again.", kind: .warn)
-                return
-            }
-            openNote?(n.id)
+        Task { if let why = await createDoc(in: project) { host.shell.showToast(why, kind: .warn) } }
+    }
+
+    /// Makes the doc and opens it; one at a time per project, so a double click makes one doc. The answer is what to tell the
+    /// person when it did not end with the doc open, nil when it did.
+    func createDoc(in project: ProjectItem) async -> String? {
+        guard let lore, !creatingDoc.contains(project.id) else { return nil }
+        creatingDoc.insert(project.id)
+        defer { creatingDoc.remove(project.id) }
+        do {
+            let n = try await lore.create(text: "", project: String(project.id))
+            guard let openNote else { return "The doc is made. Open Docs to find it; this window cannot open it." }
+            openNote(n.id)
+            return nil
+        } catch {
+            return "Could not create the doc: \(words(error))"
         }
     }
 }

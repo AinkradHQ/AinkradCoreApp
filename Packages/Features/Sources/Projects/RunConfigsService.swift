@@ -27,6 +27,13 @@ struct RunConfigPatch: Equatable, Sendable {
     var port: Int?
     var restart: Bool?
 
+    /// This patch, with what it leaves unset taken from an older one.
+    func filled(from older: RunConfigPatch) -> RunConfigPatch {
+        RunConfigPatch(
+            name: name ?? older.name, command: command ?? older.command, workdir: workdir ?? older.workdir,
+            runner: runner ?? older.runner, port: port ?? older.port, restart: restart ?? older.restart)
+    }
+
     var json: [String: Any] {
         var o: [String: Any] = [:]
         if let name { o["name"] = name }
@@ -105,11 +112,21 @@ protocol RunConfigsService: Sendable {
     func logs(project: Int64, run: String, after: Int) async throws -> RunLogPage
     /// Stops one live run by id (admin, step-up).
     func stop(project: Int64, run: String) async throws
+    /// The Default's variables of one environment (API 112): `…/run-envs/{name}/env`, the project's own run setup. Values are
+    /// write-only, like a configuration's: the Core never returns one.
+    func defaultVars(project: Int64, env: String) async throws -> [RunVarItem]
+    func setDefaultVar(project: Int64, env: String, key: String, value: String?, secret: String?) async throws
+    func deleteDefaultVar(project: Int64, env: String, key: String) async throws
 }
 
 extension RunConfigsService {
     func logs(project: Int64, run: String, after: Int) async throws -> RunLogPage { RunLogPage(next: after) }
     func stop(project: Int64, run: String) async throws {}
+    func defaultVars(project: Int64, env: String) async throws -> [RunVarItem] { [] }
+    func setDefaultVar(project: Int64, env: String, key: String, value: String?, secret: String?) async throws {
+        throw RunWire.bad
+    }
+    func deleteDefaultVar(project: Int64, env: String, key: String) async throws { throw RunWire.bad }
 }
 
 struct RunnerOption: Equatable, Sendable {
@@ -219,6 +236,26 @@ struct LiveRunConfigsService: RunConfigsService {
 
     func stop(project: Int64, run: String) async throws {
         _ = try await call("POST", "\(Self.base(project))/runs/\(LiveProjectRunService.seg(run))/stop")
+    }
+
+    func defaultVars(project: Int64, env: String) async throws -> [RunVarItem] {
+        try RunConfigsWire.vars(try await call("GET", Self.defaultEnvPath(project, env)))
+    }
+
+    func setDefaultVar(project: Int64, env: String, key: String, value: String?, secret: String?) async throws {
+        var o: [String: Any] = [:]
+        if let value { o["value"] = value }
+        if let secret { o["secret"] = secret }
+        let body = try JSONSerialization.data(withJSONObject: o)
+        _ = try await call("PUT", "\(Self.defaultEnvPath(project, env))/\(LiveProjectRunService.seg(key))", body)
+    }
+
+    func deleteDefaultVar(project: Int64, env: String, key: String) async throws {
+        _ = try await call("DELETE", "\(Self.defaultEnvPath(project, env))/\(LiveProjectRunService.seg(key))")
+    }
+
+    static func defaultEnvPath(_ p: Int64, _ env: String) -> String {
+        "\(base(p))/run-envs/\(LiveProjectRunService.seg(env))/env"
     }
 
     private static func base(_ id: Int64) -> String { "/api/v1/projects/\(id)" }

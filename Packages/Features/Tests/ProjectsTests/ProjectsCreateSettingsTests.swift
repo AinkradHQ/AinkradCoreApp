@@ -307,7 +307,7 @@ struct GalleryTests {
                 state: "failed", reason: "timeout")
         ]
         #expect(p.tag == .settingUp && p.copyFailed)
-        #expect(p.badge.label == "Can’t copy" && p.subtitle == "Couldn’t copy 1 repo")
+        #expect(p.badge.label == "Copy failed" && p.subtitle == "Couldn’t copy 1 repo")
         p.repos[0] = RepoItem(
             id: 1, name: "r", remoteURL: "https://x/r", branch: "main", primary: true, fetchedAt: nil, fetchError: nil,
             state: "fetching")

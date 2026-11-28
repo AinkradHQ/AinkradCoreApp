@@ -134,7 +134,7 @@ struct ReadyToStart: View {
                         RunDialogs.openSecret(run, project: project, name: draft.secrets.first, replacing: false)
                     } label: {
                         Label(
-                            draft.secrets.count > 1 ? "Set Secrets… (\(draft.secrets.count))" : "Set Secret…",
+                            draft.secrets.count > 1 ? "Set Secrets… (\(draft.secrets.count))" : "Set Secrets…",
                             systemImage: "key")
                     }
                     .buttonStyle(CoreButtonStyle(.secondary)).disabled(model.readOnly)

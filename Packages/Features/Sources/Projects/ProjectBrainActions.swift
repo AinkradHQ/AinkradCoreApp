@@ -52,7 +52,7 @@ extension ProjectsModel {
         guard let service, mayWrite() else { return }
         do {
             try await host.elevated(
-                "Link the Brain place \(place.name) to \(project.name).", done: "linked", keepsEdit: false
+                "Link the Brain room \(place.name) to \(project.name).", done: "linked", keepsEdit: false
             ) { try await service.linkPlace(project: project.id, room: place.id) }
         } catch is AdminDeclined {
             return
@@ -142,7 +142,7 @@ struct NoRoomActions: View {
                     ? "There is no free Brain room to link. The Brain makes one for a new project by itself."
                     : "Link an existing Brain room to \(project.name)")
             Button("Open Brain") { model.host.shell.launcher.entry("brain")?.run() }
-                .buttonStyle(CoreButtonStyle(.secondary))
+                .buttonStyle(CoreButtonStyle(.secondary)).help("Opens the Brain. It does not pick this project’s room for you.")
         }
         .task { await model.loadPlaces() }
     }

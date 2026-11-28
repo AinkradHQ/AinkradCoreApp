@@ -394,10 +394,10 @@ struct Core110ModelTests {
         ]
         m.serviceCrashed(fields)
         let t = host.shell.toast
-        #expect(t?.actionTitle == "Open logs" && t?.kind == .warn && t?.undo != nil)
-        #expect(t?.message == "Tidepool: api crashed (exit code 137, restarted 3 times)")
+        #expect(t?.actionTitle == "Open Logs" && t?.kind == .warn && t?.undo != nil)
+        #expect(t?.message == "Tidepool: api kept crashing and was stopped")
         let p = m.project(1)!
-        #expect(p.crash?.service == "api" && p.badge.label == "Crashed" && p.subtitle.hasPrefix("api crashed"))
+        #expect(p.crash?.service == "api" && p.badge.label == "Crashed" && p.subtitle.hasPrefix("api kept crashing"))
         t?.undo?()
         #expect(m.section == .run)
         // It ran again after the crash: the badge goes.

@@ -198,10 +198,10 @@ private struct PublicLinkIsland: View {
     private var words: String {
         guard project.expose else { return "Only your devices can open it." }
         var s =
-            "Anyone with the link can open it while it runs. It stops \(ProjectRules.idleWords(minutes: project.idleMinutes, never: project.idleNever))."
+            "Anyone with the link can open it while it runs. \(ProjectRules.idleSentence(minutes: project.idleMinutes, never: project.idleNever))"
         if let due = run.status?.idleStopAt, run.status?.state == "running" {
             let min = max(0, Int(due.timeIntervalSince(model.now()) / 60))
-            s += " Stops in about \(min) min unless someone visits."
+            s += " It stops in about \(min) min unless someone visits."
         }
         if let at = run.status?.lastActivityAt {
             s += " Last visited \(runsAgo(at, now: model.now()))."

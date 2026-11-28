@@ -32,26 +32,35 @@ final class RunConfigsModel {
     /// The Default's setup (the newest run spec, what the header Start runs) and the project's secrets: Edit Setup and the
     /// Secrets list of the Environment tab write through this one (secrets belong to the project, not to one environment).
     let setup: RunPageModel
-    private(set) var envs: [String] = []
+    internal(set) var envs: [String] = []
     /// The environment the Environment tab edits, and the configuration whose variables it shows.
     var env = ""
     var envConfig: Int64?
-    private(set) var vars: [RunVarItem] = []
-    private(set) var revealed: [String: String] = [:]
+    /// `envConfig` when the Environment tab edits the Default (API 112): the project's own variables, no configuration.
+    static let defaultID: Int64 = 0
+    var envIsDefault: Bool { envConfig == Self.defaultID }
+    internal(set) var vars: [RunVarItem] = []
+    internal(set) var revealed: [String: String] = [:]
+    /// Why the variables could not be read (shown with Try Again), nil when they were.
+    internal(set) var varsError: String?
     var comparing = false
     var compareWith = ""
-    private(set) var diff: [EnvDiffItem] = []
+    internal(set) var diff: [EnvDiffItem] = []
     var secretNames: [String] { setup.secrets.map(\.name).sorted() }
     private(set) var history: [RunRecord] = []
+    /// Why the runs could not be read just now (the list shown is the last one that was).
+    private(set) var historyError: String?
     private(set) var runnerOptions: [RunnerOption] = []
     private(set) var loaded = false
     private(set) var loadError: String?
-    private(set) var busy = false
+    internal(set) var busy = false
     /// A refusal for the write in flight, in words.
-    private(set) var writeError: String?
+    internal(set) var writeError: String?
     /// What each configuration has changed and not saved yet (a second configuration's edit never rides on the first's).
     private var pending: [Int64: RunConfigPatch] = [:]
     private var saveTasks: [Int64: Task<Void, Never>] = [:]
+    /// Configurations whose edits are held back because the Core could not be reached; saved when it is back.
+    var hasPending: Bool { !pending.isEmpty }
     /// The project's default environment (Project Settings), when it names one that exists.
     private(set) var defaultEnv: String?
     /// The environment the person picked next to Run, until the page closes.
@@ -69,12 +78,14 @@ final class RunConfigsModel {
         setup = RunPageModel(model: model, projectID: projectID)
     }
 
-    private var service: (any RunConfigsService)? { model.configsService }
+    var service: (any RunConfigsService)? { model.configsService }
 
     // MARK: derived
 
     var selectedConfig: RunConfigItem? { configs.first { $0.id == selected } }
-    var envConfigItem: RunConfigItem? { configs.first { $0.id == envConfig } ?? configs.first }
+    var envConfigItem: RunConfigItem? { configs.first { $0.id == envConfig } ?? (envIsDefault ? nil : configs.first) }
+    /// There is something to edit variables of: a configuration, or the Default on a Core that keeps its variables (API 112).
+    var envReady: Bool { envIsDefault ? model.core112 : envConfigItem != nil }
     /// Every live run, newest first: a project has one live run per configuration.
     var liveRuns: [RunRecord] { history.filter(\.live) }
     func liveRun(of config: RunConfigItem) -> RunRecord? { liveRuns.first { $0.configID == config.id } }
@@ -92,6 +103,9 @@ final class RunConfigsModel {
     }
 
     /// "3 variables · values are hidden", for the Environment tab.
+    /// The name of what the Environment tab edits: a configuration, or the Default.
+    var envOwnerName: String { envIsDefault ? Self.defaultName : envConfigItem?.name ?? "" }
+
     var varsLine: String {
         "\(ProjectItem.count(vars.count, "variable")) · values are hidden"
     }
@@ -108,7 +122,9 @@ final class RunConfigsModel {
             envs = try await service.environments(project: projectID)
             if let s = selected, !configs.contains(where: { $0.id == s }) { selected = nil }
             await setup.load()
-            if envConfig == nil || !configs.contains(where: { $0.id == envConfig }) { envConfig = configs.first?.id }
+            if envConfig == nil || (!envIsDefault && !configs.contains(where: { $0.id == envConfig })) {
+                envConfig = configs.first?.id ?? (model.core112 ? Self.defaultID : nil)
+            }
             defaultEnv = (try? await model.insightsService?.tuning(project: projectID))?.defaultEnvironment
             if env.isEmpty || !envs.contains(env) { env = runEnv }
             if compareWith.isEmpty || !envs.contains(compareWith) || compareWith == env { compareWith = other }
@@ -125,23 +141,14 @@ final class RunConfigsModel {
     /// The first environment that is not the one open.
     private var other: String { envs.first { $0 != env } ?? env }
 
-    func loadVars() async {
-        revealed = [:]
-        guard let service, let c = envConfigItem, !env.isEmpty else {
-            vars = []
-            diff = []
-            return
-        }
-        vars = (try? await service.vars(project: projectID, config: c.id, env: env)) ?? []
-        if comparing, compareWith != env {
-            diff = (try? await service.diff(project: projectID, config: c.id, a: env, b: compareWith)) ?? []
-        }
-    }
-
     /// The runs again. The Core says when one changes (`project.run_*`, through `ProjectsModel.runTick`), so this runs then; the
     /// slow loop below is only the safety net for a missed event.
     func refreshHistory() async {
-        if let service, let h = try? await service.history(project: projectID) { history = h }
+        guard let service else { return }
+        do {
+            history = try await service.history(project: projectID)
+            historyError = nil
+        } catch { historyError = words(error) }
     }
 
     /// While the Live runs or History tab is open: the runs every half minute, and at once when the Core says one changed.
@@ -244,26 +251,46 @@ final class RunConfigsModel {
         }
     }
 
-    /// Saves what `edit` held back for one configuration; on a refusal the page reads the Core's version again and says why.
+    /// Saves what `edit` held back for one configuration, behind the same Touch ID as every other write. A refusal makes the page
+    /// read the Core's version again and say why; a Core that cannot be reached keeps the edit to try again when it is back.
     func flush(_ id: Int64) async {
         guard let service, model.mayWrite() else { return }
         let patch = pending[id] ?? RunConfigPatch()
         pending[id] = nil
         guard !patch.json.isEmpty else { return }
         do {
-            _ = try await service.updateConfig(project: projectID, id: id, patch)
+            _ = try await model.host.elevated("Change a run configuration of \(model.open?.name ?? "the project").", done: "saved", keepsEdit: true) {
+                try await service.updateConfig(project: projectID, id: id, patch)
+            }
             writeError = nil
+        } catch is AdminDeclined {
+            pending[id] = (pending[id] ?? RunConfigPatch()).filled(from: patch)
+            writeError = "Not saved: Touch ID was not given. Change it again to save."
         } catch {
+            if LiveProjectsService.network(error) != nil {
+                pending[id] = (pending[id] ?? RunConfigPatch()).filled(from: patch)
+                writeError = "Not saved yet: \(words(error)). It saves when the Core is back."
+                return
+            }
             writeError = words(error)
             await load()
         }
     }
 
+    /// Saves every held-back edit now: when the page closes, and when the Core is back.
+    func flushAll() async {
+        for task in saveTasks.values { task.cancel() }
+        saveTasks = [:]
+        for id in pending.keys.sorted() { await flush(id) }
+    }
+
     // MARK: runs
 
     /// Starts `c` in the open environment. A live run of the same configuration is replaced; the others keep running.
-    func start(_ c: RunConfigItem, project: ProjectItem) async {
+    /// `environment` is the one a past run used (Build Again, Run again); it falls back to the one picked when that is gone.
+    func start(_ c: RunConfigItem, project: ProjectItem, environment: String? = nil) async {
         await flush(c.id)
+        let runEnv = environment.flatMap { envs.contains($0) ? $0 : nil } ?? self.runEnv
         guard let service, !busy, model.mayWrite() else { return }
         busy = true
         writeError = nil
@@ -347,6 +374,7 @@ final class RunConfigsModel {
 
     func pickConfig(_ id: Int64) async {
         envConfig = id
+        if id == Self.defaultID { comparing = false }
         await loadVars()
     }
 
@@ -361,104 +389,27 @@ final class RunConfigsModel {
         await loadVars()
     }
 
-    // MARK: variables
-
-    /// The name as the Core takes it: upper case, spaces as `_`.
-    static func varName(_ raw: String) -> String {
-        raw.trimmingCharacters(in: .whitespaces).uppercased().replacingOccurrences(of: " ", with: "_")
-    }
-
-    func addVar(key: String, value: String) async -> Bool {
-        let k = Self.varName(key)
-        guard !k.isEmpty else {
-            model.host.shell.showToast("Give the variable a name first", kind: .warn)
-            return false
-        }
-        return await setVar(k, value: value, secret: nil, done: "Added \(k)")
-    }
-
-    func link(_ v: RunVarItem, to secret: String) async {
-        _ = await setVar(v.key, value: nil, secret: secret, done: "\(v.key) now comes from Secrets")
-    }
-
-    /// Back to a plain value: the value is gone with the link, so it is empty until set again.
-    func unlink(_ v: RunVarItem) async {
-        _ = await setVar(v.key, value: "", secret: nil, done: "\(v.key) is a plain value now")
-    }
-
-    func setValue(_ v: RunVarItem, _ value: String) async {
-        _ = await setVar(v.key, value: value, secret: nil, done: nil)
-    }
-
-    @discardableResult
-    private func setVar(_ key: String, value: String?, secret: String?, done: String?) async -> Bool {
-        guard let c = envConfigItem else { return false }
-        var ok = false
-        await write { service in
-            try await service.setVar(
-                project: self.projectID, config: c.id, env: self.env, key: key, value: value, secret: secret)
-            await self.loadVars()
-            if let done { self.model.host.shell.showToast(done) }
-            ok = true
-        }
-        return ok
-    }
-
-    func deleteVar(_ v: RunVarItem) async {
-        guard let c = envConfigItem else { return }
-        await write { service in
-            try await service.deleteVar(project: self.projectID, config: c.id, env: self.env, key: v.key)
-            await self.loadVars()
-            self.model.host.shell.showToast("Deleted \(v.key)")
-        }
-    }
-
-    /// Show or hide a plain value. The value is read from the Core when shown and dropped when hidden.
-    func toggleReveal(_ v: RunVarItem) async {
-        if revealed[v.key] != nil {
-            revealed[v.key] = nil
-            return
-        }
-        guard let service, let c = envConfigItem, v.secret == nil else { return }
-        do {
-            revealed[v.key] = try await service.reveal(project: projectID, config: c.id, env: env, key: v.key)
-        } catch {
-            let why = words(error)
-            writeError = "Could not show \(v.key): \(why)"
-            model.host.shell.showToast(writeError ?? "", kind: .warn)
-        }
-    }
-
-    func importEnv(_ text: String) async -> Bool {
-        guard let c = envConfigItem else { return false }
-        var ok = false
-        await write { service in
-            let r = try await service.importEnv(project: self.projectID, config: c.id, env: self.env, text: text)
-            await self.loadVars()
-            let skipped = r.skipped > 0 ? ", \(r.skipped) skipped" : ""
-            self.model.host.shell.showToast(
-                "Imported \(ProjectItem.count(r.imported, "variable")) into \(self.env)\(skipped)")
-            ok = true
-        }
-        return ok
-    }
-
     func clearWriteError() { writeError = nil }
 
     // MARK: plumbing
 
-    private func write(_ op: @escaping (any RunConfigsService) async throws -> Void) async {
+    func write(
+        _ why: String = "Change the run setup of this project.", _ op: @escaping (any RunConfigsService) async throws -> Void
+    ) async {
         guard let service, !busy, model.mayWrite() else { return }
         busy = true
         writeError = nil
         defer { busy = false }
-        do { try await op(service) } catch {
+        do {
+            try await model.host.elevated(why, done: "saved", keepsEdit: true) { try await op(service) }
+        } catch is AdminDeclined {
+        } catch {
             writeError = words(error)
             model.host.shell.showToast(writeError ?? "", kind: .warn)
         }
     }
 
-    private func words(_ error: any Error) -> String {
+    func words(_ error: any Error) -> String {
         if let f = error as? RunFailure { return f.sentence }
         return model.words(error)
     }
