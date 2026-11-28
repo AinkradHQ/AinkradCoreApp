@@ -488,6 +488,9 @@ public final class ProjectsModel {
 
     func words(_ error: any Error) -> String {
         if case .rateLimited(let after)? = CoreError.unwrapping(error) { host.rateLimited(retryAfter: after) }
+        if let net = LiveProjectsService.network(error) {
+            return net.code == .timedOut ? "the Core took too long to answer" : "the connection to the Core dropped"
+        }
         guard let e = CoreFailure.of(error) ?? CoreError.unwrapping(error) else { return error.localizedDescription }
         // Any write the Core refuses for scope marks this device read-only, wherever it came from.
         if e == .forbiddenScope {
@@ -618,11 +621,8 @@ public final class ProjectsModel {
                 }
                 self.creating = CreateProgress(stage: .repos, added: batch.count, total: repos.count)
                 for (i, r) in ordered.enumerated().dropFirst(batch.count) where fatal.isEmpty {
-                    do {
-                        try await service.addRepo(
-                            project: p.id, name: r.name, url: r.url, branch: r.defaultBranch ?? "main", primary: i == 0)
-                    } catch {
-                        fatal.append("\(r.name) could not be added (\(self.words(error)))")
+                    if let why = await self.addRepoPatiently(service, project: p.id, r, primary: i == 0) {
+                        fatal.append("\(r.name) could not be added (\(why))")
                     }
                     self.creating?.added += 1
                 }
@@ -694,6 +694,34 @@ public final class ProjectsModel {
             }
         }
         return try await make(candidate)
+    }
+
+    /// Adds one repo, riding out a busy Core: a timeout or dropped connection is tried again (3 tries, 2 s then 4 s apart),
+    /// and a repo the Core turns out to have added anyway counts as added. Nil when it is in the project; else why not.
+    func addRepoPatiently(_ service: any ProjectsService, project: Int64, _ r: PickRepo, primary: Bool) async -> String?
+    {
+        var last: (any Error)?
+        for attempt in 0..<3 {
+            if attempt > 0 { try? await Task.sleep(for: .seconds(Double(attempt) * 2)) }
+            do {
+                try await service.addRepo(
+                    project: project, name: r.name, url: r.url, branch: r.defaultBranch ?? "main", primary: primary)
+                return nil
+            } catch {
+                last = error
+                // Already there (an earlier try landed after its answer was lost): done.
+                if let now = try? await service.project(id: project),
+                    now.repos.contains(where: { ProjectRules.same($0.remoteURL, r.url) })
+                {
+                    return nil
+                }
+                let transient =
+                    LiveProjectsService.network(error) != nil
+                    || CoreError.unwrapping(error).map { if case .rateLimited = $0 { true } else { false } } == true
+                if !transient { break }
+            }
+        }
+        return last.map(words) ?? "unknown"
     }
 
     /// Undoes a half-made project: archive, then delete for good where the Core can (API 112). True when it is gone.

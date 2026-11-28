@@ -431,7 +431,25 @@ struct LiveProjectsService: ProjectsService {
 
     /// Whatever the generated client threw, as the `CoreError` inside it.
     private func run<T>(_ body: () async throws -> T) async throws -> T {
-        do { return try await body() } catch { throw CoreFailure.of(error) ?? Self.unknown }
+        do { return try await body() } catch {
+            if let core = CoreFailure.of(error) { throw core }
+            // A slow or dropped connection is said as such, never as an answer the app "does not know".
+            if let net = Self.network(error) { throw net }
+            throw Self.unknown
+        }
+    }
+
+    /// The URLError inside whatever the generated client wrapped, if the request never got its answer.
+    static func network(_ error: any Error) -> URLError? {
+        var current: (any Error)? = error
+        for _ in 0..<6 {
+            guard let e = current else { return nil }
+            if let u = e as? URLError { return u }
+            current =
+                (e as NSError).userInfo[NSUnderlyingErrorKey] as? any Error
+                ?? Mirror(reflecting: e).children.lazy.compactMap { $0.value as? any Error }.first
+        }
+        return nil
     }
 
     static func item(_ p: Components.Schemas.ProjectInfo) -> ProjectItem {
