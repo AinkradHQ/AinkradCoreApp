@@ -6,6 +6,14 @@ import SwiftUI
 enum SiteWidth: String, CaseIterable, Sendable {
     case desktop, tablet, phone
     var title: String { rawValue.capitalized }
+    /// The width the site is laid out at, as on that kind of device; the frame shrinks it to fit.
+    var layoutWidth: CGFloat {
+        switch self {
+        case .desktop: 1920
+        case .tablet: 1024
+        case .phone: 390
+        }
+    }
     /// Share of the stage the browser takes.
     var share: CGFloat {
         switch self {
@@ -46,7 +54,21 @@ struct WebStage: View {
         GeometryReader { g in
             VStack(spacing: 0) {
                 bar
-                site.frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Laid out at the device's width, then shrunk to the frame: a preview, not a stretched page.
+                GeometryReader { f in
+                    let zoom = f.size.width / width.layoutWidth
+                    ZStack(alignment: .bottomLeading) {
+                        // Pictures and the demo page are drawn at the device width and shrunk; the live page itself
+                        // lays out at that width through its page zoom, so clicks land where they look.
+                        still
+                            .frame(width: width.layoutWidth, height: f.size.height / zoom, alignment: .top)
+                            .scaleEffect(zoom, anchor: .topLeading)
+                            .frame(width: f.size.width, height: f.size.height, alignment: .topLeading)
+                        liveView(zoom: zoom)
+                        if running { note }
+                    }
+                }
+                .clipped()
             }
             .frame(width: g.size.width * width.share)
             .background(Color(red: 0.984, green: 0.98, blue: 0.965))
@@ -80,32 +102,28 @@ struct WebStage: View {
         .background(Color(red: 0.945, green: 0.937, blue: 0.918))
     }
 
-    /// The running site (the live view, the demo page), else its last picture; a note in the corner when it cannot be opened.
-    @ViewBuilder private var site: some View {
-        ZStack(alignment: .bottomLeading) {
-            #if DEBUG
-            if running, model.demoPage {
-                DemoSitePage(name: project.name, colour: model.colour(project))
-            } else {
-                live
-            }
-            #else
-            live
-            #endif
-            if running { note }
+    /// What is drawn at the device width: the demo page while it runs (Debug), else the last picture of the site.
+    @ViewBuilder private var still: some View {
+        #if DEBUG
+        if running, model.demoPage {
+            DemoSitePage(name: project.name, colour: model.colour(project))
+        } else {
+            ProjectPicture(project: project, colour: model.colour(project), illustrate: false)
         }
+        #else
+        ProjectPicture(project: project, colour: model.colour(project), illustrate: false)
+        #endif
     }
 
-    @ViewBuilder private var live: some View {
-        ZStack {
-            ProjectPicture(project: project, colour: model.colour(project), illustrate: false)
-            if let url = previewURL {
-                LiveWebView(
-                    url: url, model: web, preview: model.previewFetch.map { (project.id, model.previewCoreHost, $0) }
-                ).opacity(web.state == .live ? 1 : 0)
-                    .animation(Motion.out(Motion.ui), value: web.state)
-                    .task(id: url) { await keepSnapshot() }
-            }
+    /// The live page over the picture, once it has loaded.
+    @ViewBuilder private func liveView(zoom: CGFloat) -> some View {
+        if let url = previewURL, !isDemo {
+            LiveWebView(
+                url: url, model: web, preview: model.previewFetch.map { (project.id, model.previewCoreHost, $0) },
+                zoom: zoom
+            ).opacity(web.state == .live ? 1 : 0)
+                .animation(Motion.out(Motion.ui), value: web.state)
+                .task(id: url) { await keepSnapshot() }
         }
     }
 

@@ -138,6 +138,8 @@ struct LiveWebView: NSViewRepresentable {
     /// The project's preview (the private one, when `url` is of the app's own scheme): its id, how to send a signed request and
     /// the Core's host, for redirects.
     var preview: (project: Int64, coreHost: String?, fetch: PreviewFetch)?
+    /// The page zoom: the stage lays the site out at a device width and shrinks it to fit the frame.
+    var zoom: CGFloat = 1
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model, host: url.host) }
 
@@ -159,6 +161,7 @@ struct LiveWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ web: WKWebView, context: Context) {
+        if abs(web.pageZoom - zoom) > 0.001 { web.pageZoom = zoom }
         if web.url?.host != url.host, web.url != url, !web.isLoading {
             model.state = .loading
             web.load(URLRequest(url: url))

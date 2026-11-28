@@ -32,9 +32,14 @@ struct ProjectHeader: View {
 
     private func row(compact: Bool, can: Bool, block: String?, main: MainAction) -> some View {
         HStack(spacing: Space.s3) {
-            BackButton("Projects") {
+            Button {
                 if let onBack { onBack() } else { model.closeProject() }
+            } label: {
+                Label("Projects", systemImage: "chevron.left")
             }
+            .buttonStyle(CoreButtonStyle(.plain, size: .small))
+            .help("Back to Projects (Esc)")
+            .accessibilityLabel("Back to Projects")
             ProjectMark(name: project.name, colour: model.colour(project), size: Space.s8 + Space.s1)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: Space.s2) {
