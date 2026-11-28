@@ -23,7 +23,9 @@ struct ModuleDocs: View {
     private var aiDocs: [SessionDocItem] { insights.docs ?? [] }
     private var listed: [DocItem] { docs.hits ?? docs.docs }
     private var currentID: String? {
-        if let selected, listed.contains(where: { $0.id == selected }) || aiDocs.contains(where: { $0.note == selected }) {
+        if let selected,
+            listed.contains(where: { $0.id == selected }) || aiDocs.contains(where: { $0.note == selected })
+        {
             return selected
         }
         return listed.first?.id ?? aiDocs.first?.note
@@ -33,18 +35,34 @@ struct ModuleDocs: View {
             ?? aiDocs.first { $0.note == currentID }.map { $0.title.isEmpty ? $0.path : $0.title } ?? "Untitled"
     }
 
+    @State private var stageKind: ProjectKind? = .other
+
     var body: some View {
+        // The approved details v2 page: the documents as large tiles on the stage, and the list beside it to search, open,
+        // write a new one or ask the AI.
+        HStack(alignment: .top, spacing: Space.s4) {
+            OverviewStage(model: model, project: project, kind: $stageKind)
+            side.frame(width: 340)
+        }
+        .task(id: project.id) { await docs.load() }
+        .task(id: project.id) { await insights.loadDocs() }
+        .accessibilityIdentifier("project-page-Documents")
+    }
+
+    private var side: some View {
         ModulePage(
-            title: "Documents", sub: docs.phase == .ready && !docs.docs.isEmpty ? "\(docs.docs.count) in this project" : nil,
+            title: "Documents",
             tools: {
-                if !docs.docs.isEmpty { FilterField(text: Bindable(docs).query, label: "Search documents") }
                 if docs.canImport {
+                    // An icon in the 340 pt panel; the words are in its tooltip.
                     Button {
                         docs.importFromRepo()
                     } label: {
-                        Label("Import from Repo…", systemImage: "square.and.arrow.down")
+                        Image(systemName: "square.and.arrow.down")
                     }
-                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Bring this project’s Markdown docs in from its repos")
+                    .accessibilityLabel("Import from Repo")
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help(
+                        "Bring this project’s Markdown docs in from its repos")
                 }
                 Button {
                     docs.newDoc()
@@ -57,10 +75,6 @@ struct ModuleDocs: View {
         ) {
             content
         }
-        .task(id: project.id) { await docs.load() }
-        .task(id: project.id) { await insights.loadDocs() }
-        .task(id: currentID) { await loadText() }
-        .accessibilityIdentifier("project-page-Documents")
     }
 
     @ViewBuilder private var content: some View {
@@ -83,28 +97,42 @@ struct ModuleDocs: View {
                 }
             }
         case .ready:
-            PgSplit(key: currentID ?? "") {
-                if let hits = docs.hits {
-                    if hits.isEmpty { PgQuiet("No document matches “\(docs.query)”.").padding(Space.s3) }
-                    ForEach(hits) { row($0.id, $0.title, "doc.text") }
-                } else {
-                    ForEach(docs.grouped(), id: \.0) { g, rows in
-                        PgGroup(g.title)
-                        ForEach(rows) { row($0.id, $0.title, g.symbol) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.s1) {
+                    if !docs.docs.isEmpty {
+                        FilterField(text: Bindable(docs).query, label: "Search documents").frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, Space.s1)
                     }
-                    if !aiDocs.isEmpty {
-                        PgGroup("From AI sessions")
-                        ForEach(aiDocs) { row($0.note, $0.title.isEmpty ? $0.path : $0.title, "sparkles") }
+                    if let hits = docs.hits {
+                        if hits.isEmpty { PgQuiet("No document matches “\(docs.query)”.").padding(Space.s3) }
+                        ForEach(hits) { row($0.id, $0.title, "doc.text") }
+                    } else {
+                        ForEach(docs.grouped(), id: \.0) { g, rows in
+                            PgGroup(g.title)
+                            ForEach(rows) { row($0.id, $0.title, g.symbol) }
+                        }
+                        if !aiDocs.isEmpty {
+                            PgGroup("From AI sessions")
+                            ForEach(aiDocs) { row($0.note, $0.title.isEmpty ? $0.path : $0.title, "sparkles") }
+                        }
+                    }
+                    PgBlock("Ask the AI") {
+                        Text("Draft or improve these documents with an AI session in this project.")
+                            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                        Button("Start AI Session") { model.newSession(in: project) }
+                            .buttonStyle(CoreButtonStyle(.prominent, size: .small))
+                            .disabled(!model.canStartSession(project))
+                            .help(model.sessionBlock(project))
                     }
                 }
-            } detail: {
-                detail
+                .padding(.horizontal, Space.s3)
             }
+            .scrollIndicators(.automatic)
         }
     }
 
     private func row(_ id: String, _ title: String, _ symbol: String) -> some View {
-        CoreRow(title, symbol: symbol, selected: currentID == id, action: { selected = id }) {}
+        CoreRow(title, symbol: symbol, selected: currentID == id, action: { docs.open(id) }) {}
     }
 
     private func loadText() async {
@@ -148,8 +176,13 @@ struct ModuleDocs: View {
                             model.host.shell.showToast("Prompt copied. Paste it into the new session.")
                             model.newSession(in: project)
                         }
-                        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(!model.canStartSession(project))
-                        .help(model.canStartSession(project) ? "Start an AI session in \(project.name) with this prompt on the clipboard" : model.sessionBlock(project))
+                        .buttonStyle(CoreButtonStyle(.prominent, size: .small)).disabled(
+                            !model.canStartSession(project)
+                        )
+                        .help(
+                            model.canStartSession(project)
+                                ? "Start an AI session in \(project.name) with this prompt on the clipboard"
+                                : model.sessionBlock(project))
                     }
                 }
                 .padding(Space.s3).frame(maxWidth: .infinity, alignment: .leading)

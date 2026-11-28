@@ -10,10 +10,13 @@ struct ModuleLiveSite: View {
     let project: ProjectItem
     @State private var web = LiveWebModel()
     @State private var device = Device.desktop
+    @State private var stageKind: ProjectKind? = .web
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     enum Device: String, CaseIterable, Hashable {
-        case desktop = "Desktop", tablet = "Tablet", phone = "Phone"
+        case desktop = "Desktop"
+        case tablet = "Tablet"
+        case phone = "Phone"
         var width: CGFloat? {
             switch self {
             case .desktop: nil
@@ -42,8 +45,9 @@ struct ModuleLiveSite: View {
     private var can: Bool { model.canControl(project) && project.startBlock == nil }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Space.s2) {
-            stageIsland
+        // The approved details v2 page: the Overview's stage, full height (browser frame, widths, covers), and the inspector.
+        HStack(alignment: .top, spacing: Space.s4) {
+            OverviewStage(model: model, project: project, kind: $stageKind)
             inspector.frame(width: 340)
         }
         .accessibilityIdentifier("project-page-Live site")
@@ -61,7 +65,8 @@ struct ModuleLiveSite: View {
                 )
                 .disabled(!showsSite).help("Show the site at the width of a desktop, a tablet or a phone")
                 CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { model.copyLink(project) }
-                    .disabled(!project.expose).help(project.expose ? "Copy the link" : "Turn the public link on to copy it")
+                    .disabled(!project.expose).help(
+                        project.expose ? "Copy the link" : "Turn the public link on to copy it")
                 CoreIconButton(symbol: "arrow.up.forward.square", label: "Open in the browser") {
                     if let u = URL(string: "https://\(project.link)") { NSWorkspace.shared.open(u) }
                 }
@@ -105,9 +110,11 @@ struct ModuleLiveSite: View {
 
     @ViewBuilder private var live: some View {
         if let url = previewURL {
-            LiveWebView(url: url, model: web, preview: model.previewFetch.map { (project.id, model.previewCoreHost, $0) })
-                .opacity(web.state == .live ? 1 : 0)
-                .animation(Motion.out(Motion.ui), value: web.state)
+            LiveWebView(
+                url: url, model: web, preview: model.previewFetch.map { (project.id, model.previewCoreHost, $0) }
+            )
+            .opacity(web.state == .live ? 1 : 0)
+            .animation(Motion.out(Motion.ui), value: web.state)
         }
     }
 
@@ -233,18 +240,24 @@ struct ModuleLiveSite: View {
                         runsMono(project.link)
                         Spacer(minLength: 0)
                         CoreIconButton(symbol: "doc.on.doc", label: "Copy the link") { model.copyLink(project) }
-                            .disabled(!project.expose).help(project.expose ? "Copy the link" : "Turn the public link on to copy it")
+                            .disabled(!project.expose).help(
+                                project.expose ? "Copy the link" : "Turn the public link on to copy it")
                     }
                     HStack(alignment: .center, spacing: Space.s2) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Public")
-                            Text(project.expose ? "Anyone with the link can open it while it runs" : "Off: only your devices can open it")
-                                .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
+                            Text(
+                                project.expose
+                                    ? "Anyone with the link can open it while it runs"
+                                    : "Off: only your devices can open it"
+                            )
+                            .foregroundStyle(GlassInk.secondary).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 0)
                         CoreSwitch(
                             "",
-                            isOn: Binding(get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
+                            isOn: Binding(
+                                get: { project.expose }, set: { on in Task { await model.setExpose(project, on) } })
                         )
                         .disabled(model.readOnly || model.exposing.contains(project.id)).accessibilityLabel("Public")
                     }
