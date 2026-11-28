@@ -111,7 +111,7 @@ struct ModuleBrain: View {
     let model: ProjectsModel
     let project: ProjectItem
     @State private var insights: ProjectInsightsModel
-    @State private var pick: String? = BrainSection.decisions.rawValue
+    @State private var pick: String?
     @State private var query = ""
 
     init(model: ProjectsModel, project: ProjectItem) {
@@ -125,10 +125,14 @@ struct ModuleBrain: View {
         BrainContent(room: project.live?.room, rules: insights.rules, knowledge: insights.knowledge)
     }
     private var ids: [String] { BrainSection.allCases.map(\.rawValue) }
-    private var section: BrainSection { BrainSection(rawValue: ModuleNav.effective(pick, in: ids) ?? "") ?? .about }
+    /// The one picked, else the first section that holds something (the Overview of the room when it is all empty).
+    private var section: BrainSection {
+        if let p = pick, let s = BrainSection(rawValue: p) { return s }
+        return BrainSection.allCases.first { content.count($0) > 0 } ?? .about
+    }
 
     var body: some View {
-        ModulePage(title: "Brain · \(project.name) room") {
+        ModulePage(title: linked ? "Brain · \(project.name) room" : "Brain") {
             if linked {
                 if section != .about { ModuleSearch(placeholder: "Search the Brain", text: $query) }
                 Button {

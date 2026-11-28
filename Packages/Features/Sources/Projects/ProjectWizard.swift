@@ -191,7 +191,7 @@ struct ProjectWizard: View {
                 }
                 .transition(.opacity.combined(with: .offset(y: coreMove(reduce, -6))))
             } else {
-                Button("More options…") { d.moreOptions = true }
+                Button("More Options…") { d.moreOptions = true }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small))
                     .help("Change the link name or add a description")
                     .accessibilityIdentifier("project-new-more")
@@ -231,7 +231,7 @@ struct ProjectWizard: View {
                     Button("Connect GitHub", action: connectGithub).buttonStyle(.coreProminent)
                         .help("Your draft is kept. Come back with New Project.")
                 }
-                Button("Start with no code") {
+                Button("Start With No Code") {
                     d.noCode = true
                     go(.review)
                 }
@@ -244,7 +244,7 @@ struct ProjectWizard: View {
                 onSubmit: addLink
             )
             .accessibilityIdentifier("project-new-paste")
-            Button("Add link", action: addLink).buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            Button("Add Link", action: addLink).buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 .disabled(linkText.trimmingCharacters(in: .whitespaces).isEmpty)
                 .help(linkText.trimmingCharacters(in: .whitespaces).isEmpty ? "Paste a repo link first." : "")
         }
@@ -281,6 +281,11 @@ struct ProjectWizard: View {
             return
         }
         linkError = nil
+        if let listed = model.listed(r.url) {
+            d.picked.insert(listed.id)
+            linkText = ""
+            return
+        }
         let repo = PickRepo(org: "Pasted links", name: r.name, url: r.url)
         if !d.pasted.contains(where: { ProjectRules.same($0.url, repo.url) }) { d.pasted.append(repo) }
         d.picked.insert(d.pasted.first { ProjectRules.same($0.url, repo.url) }?.id ?? repo.id)

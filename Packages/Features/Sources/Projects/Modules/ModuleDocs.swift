@@ -92,7 +92,7 @@ struct ModuleDocs: View {
             ) {
                 HStack(spacing: Space.s2) {
                     if docs.canImport {
-                        Button("Import from Repo…") { docs.importFromRepo() }.buttonStyle(CoreButtonStyle(.secondary))
+                        Button("Import From Repo…") { docs.importFromRepo() }.buttonStyle(CoreButtonStyle(.secondary))
                     }
                     Button("New Doc") { docs.newDoc() }
                         .buttonStyle(CoreButtonStyle(.prominent, busy: model.creatingDoc.contains(project.id)))

@@ -34,6 +34,18 @@ struct LiveRunsTab: View {
                         text: "Read the log of its last run in History, fix what stops it, then start it again.",
                         tone: .fail)
                 }
+                if project.tag == .failed, !runs.crashLoop {
+                    CoreNotice(
+                        symbol: "exclamationmark.triangle", title: "The last run failed",
+                        text: project.crash?.words ?? project.live?.failure ?? "It stopped before it was running.",
+                        tone: .fail)
+                    Button {
+                        runs.model.go(.logs, in: project.id)
+                    } label: {
+                        Label("Open Logs", systemImage: "text.alignleft")
+                    }
+                    .buttonStyle(CoreButtonStyle(.secondary, size: .small)).help("Read the log of the last run")
+                }
                 Text("Start one:").foregroundStyle(GlassInk.secondary)
                 starters
             }
@@ -187,7 +199,7 @@ struct HistoryTab: View {
                                         }
                                     }
                                 } label: {
-                                    Label("Run again", systemImage: "arrow.clockwise")
+                                    Label("Run Again", systemImage: "arrow.clockwise")
                                 }
                                 .buttonStyle(CoreButtonStyle(.plain, size: .small))
                                 .disabled(runs.busy || !runs.model.canControl(project))

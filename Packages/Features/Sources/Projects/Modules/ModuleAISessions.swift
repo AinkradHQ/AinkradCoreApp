@@ -130,8 +130,8 @@ struct ModuleAISessions: View {
             } label: {
                 Label("Open Session", systemImage: "arrow.up.forward.square")
             }
-            .buttonStyle(CoreButtonStyle(.prominent)).disabled(s.id == nil)
-            .help(s.id == nil ? "This session has no page in AI Sessions yet" : "Read and steer it in AI Sessions")
+            .buttonStyle(CoreButtonStyle(.prominent))
+            .help("Read and steer it in AI Sessions")
         }
         ModuleFacts(facts: [("Tool", s.harness), ("Runner", s.runner), ("Branch", s.branch), ("Cost", s.cost)])
         if s.state == .needsYou {

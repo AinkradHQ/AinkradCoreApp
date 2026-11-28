@@ -16,31 +16,42 @@ struct ProjectsEmptyHero: View {
                     .accessibilityAddTraits(.isHeader)
                 Text("Pick one. Your code, notes and AI sessions then live together in one project.")
                     .foregroundStyle(palette.text2).multilineTextAlignment(.center)
-                    .frame(maxWidth: 420).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
             }
             .coreRise(shown, 0)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 196), spacing: 12, alignment: .top)], spacing: 12) {
-                ForEach(Array(Self.tiles.enumerated()), id: \.element.kind) { i, t in
-                    KindTile(
-                        kind: t.kind, title: t.title, line: t.line, hue: GlassInk.accent(paneAccent)
-                    ) { model.newProject(kind: t.kind) }
-                    .coreRise(shown, i + 1)
+            // An adaptive LazyVGrid ignores its column spacing (it rendered ~2 pt): fixed HStacks keep the gap.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: Space.s4) { tiles(0..<4, rise: 1) }
+                VStack(spacing: Space.s4) {
+                    HStack(alignment: .top, spacing: Space.s4) { tiles(0..<2, rise: 1) }
+                    HStack(alignment: .top, spacing: Space.s4) { tiles(2..<4, rise: 3) }
                 }
             }
             if !model.readOnly {
-                Button("Not sure yet? Start with a name") { model.newProject() }
+                Button("Not Sure Yet? Start With a Name") { model.newProject() }
                     .buttonStyle(CoreButtonStyle(.plain, size: .small))
                     .help("New Project  ⌘N")
                     .coreRise(shown, 5)
                     .accessibilityIdentifier("projects-empty-new")
             }
         }
-        .frame(maxWidth: Space.s8 * 28)
+        .frame(maxWidth: Space.s8 * 32)
         .padding(Space.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { shown = true }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("projects-empty")
+    }
+
+    @ViewBuilder private func tiles(_ r: Range<Int>, rise: Int) -> some View {
+        ForEach(Array(r), id: \.self) { i in
+            let t = Self.tiles[i]
+            KindTile(kind: t.kind, title: t.title, line: t.line, hue: GlassInk.accent(paneAccent)) {
+                model.newProject(kind: t.kind)
+            }
+            .frame(width: Space.s8 * 7, height: Space.s8 * 7)
+            .coreRise(shown, rise + i - r.lowerBound)
+        }
     }
 
     static let tiles: [(kind: ProjectKind, title: String, line: String)] = [

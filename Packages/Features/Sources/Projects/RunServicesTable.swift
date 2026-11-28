@@ -92,7 +92,12 @@ struct ServicesTable: View {
             case .up? where r.health == "none": StateBadge("Running", tone: .done, symbol: "checkmark.circle")
             case .up?: StateBadge("Healthy", tone: .done, symbol: "checkmark.circle")
             case .exited?: StateBadge("Exited", tone: .fail, symbol: "exclamationmark.triangle")
-            case .down?, nil: Text("Not running").foregroundStyle(GlassInk.secondary).lineLimit(1)
+            case .down?, nil:
+                if project.tag == .failed {
+                    StateBadge("Failed", tone: .fail, symbol: "exclamationmark.triangle")
+                } else {
+                    Text("Not running").foregroundStyle(GlassInk.secondary).lineLimit(1)
+                }
             }
         }
         .help(Self.detail(r))

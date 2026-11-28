@@ -627,7 +627,19 @@ public final class ProjectsModel {
     func chosen(_ picked: Set<String>, pasted: [PickRepo]) -> [PickRepo] {
         var all = catalogSeen
         if case .ready(let r) = catalogState { all += r.filter { n in !all.contains { $0.id == n.id } } }
-        return (all + pasted).filter { picked.contains($0.id) }
+        // One repo once, however its link was written (https, ssh, .git, case): the listed one wins over a pasted copy.
+        var out: [PickRepo] = []
+        for r in (all + pasted) where picked.contains(r.id) && !out.contains(where: { ProjectRules.same($0.url, r.url) }) {
+            out.append(r)
+        }
+        return out
+    }
+
+    /// The repo of the GitHub list a link points at, if the list has it.
+    func listed(_ url: String) -> PickRepo? {
+        var all = catalogSeen
+        if case .ready(let r) = catalogState { all += r }
+        return all.first { ProjectRules.same($0.url, url) }
     }
 
     /// "Where it runs": the runners the Core has (Mac runners serve this_mac, Linux ones home_server).

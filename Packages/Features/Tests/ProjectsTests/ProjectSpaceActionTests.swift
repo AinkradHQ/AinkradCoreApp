@@ -97,7 +97,9 @@ struct FailureFixTests {
     @Test func aSecretFixNeedsTheFailureToNameTheSecret() {
         var p = project(run: .failed, draft: RunDraft(source: "compose", services: ["web"], secrets: ["stripe_secret"]))
         p.live = ProjectLive(failure: "api stopped", failureFix: "STRIPE_SECRET is not set.")
-        #expect(p.failedSecret == "stripe_secret")
+        #expect(p.failedSecret == "STRIPE_SECRET")
+        p.live = ProjectLive(failure: "Missing PAYMENTS_TOKEN")
+        #expect(p.failedSecret == "PAYMENTS_TOKEN")
         p.live = ProjectLive(steps: [StartStep(title: "Building the app", state: .failed, detail: "no such module")])
         #expect(p.failedSecret == nil)
     }

@@ -70,6 +70,7 @@ struct RunLogView: View {
                 Text(l.service).foregroundStyle(GlassInk.secondary).lineLimit(1)
                     .frame(width: Space.s8 * 2, alignment: .leading)
                 Text(l.text).textSelection(.enabled).lineLimit(compact ? 1 : nil)
+                    .foregroundStyle(LogLevel.of(l.text) == .error ? GlassInk.redInk : GlassInk.primary)
             }
             .font(.system(size: MacTextSize.meta, design: .monospaced))
             .frame(maxWidth: .infinity, alignment: .leading)

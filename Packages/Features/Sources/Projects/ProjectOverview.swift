@@ -98,6 +98,7 @@ struct Overview: View {
             await model.refreshLive(project.id)
             await loadRuns()
             await insights.loadKnowledge()
+            await insights.loadChanges()
         }
     }
 

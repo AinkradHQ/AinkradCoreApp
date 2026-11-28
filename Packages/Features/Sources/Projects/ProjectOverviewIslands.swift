@@ -157,8 +157,8 @@ extension Overview {
 
     var servicesCard: some View {
         let list = live?.services ?? []
-        let up = list.filter { $0.state == .up }.count
-        let ordered = list.filter { $0.state == .exited } + list.filter { $0.state != .exited }
+        let up = list.filter { $0.state == .up && !crashedNow($0) }.count
+        let ordered = list.filter { $0.state == .exited || crashedNow($0) } + list.filter { $0.state != .exited && !crashedNow($0) }
         let shown = Array(ordered.prefix(4))
         return ModuleCard(
             model: model, module: .services,
@@ -193,8 +193,12 @@ extension Overview {
             : project.setup == .needsSetup ? "No setup yet. Use Set Up… at the top." : "Reading the setup…"
     }
 
+    /// The Core says this service crashed: it is down whatever its last sample said.
+    private func crashedNow(_ s: ProjectLive.Service) -> Bool { project.crash?.service == s.name && !project.stale }
+
     private func serviceTile(_ s: ProjectLive.Service) -> some View {
-        VStack(alignment: .leading, spacing: Space.s1 + 2) {
+        let s = crashedNow(s) && s.state == .up ? ProjectLive.Service(name: s.name, memory: s.memory, state: .exited, restarts: project.crash?.restarts ?? s.restarts) : s
+        return VStack(alignment: .leading, spacing: Space.s1 + 2) {
             HStack(spacing: Space.s2) {
                 StatusDot(colour: tileColour(s))
                 Text(s.name).coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
@@ -272,7 +276,7 @@ extension Overview {
                     }
                     .frame(height: 44, alignment: .bottom)
                     OverviewRow(
-                        title: "Built \(runsAgo(last.startedAt, now: model.now()))",
+                        title: last.live ? "Building…" : "Built \(runsAgo(last.stoppedAt ?? last.startedAt, now: model.now()))",
                         subtitle: [last.runner, last.environment].compactMap { $0 }.joined(separator: " · "),
                         action: { model.go(.builds, in: project.id) }
                     ) { Self.runBadge(last.state) }
@@ -320,7 +324,7 @@ extension Overview {
                         .help(r.remoteURL)
                     }
                     if ordered.count > Self.repoRows {
-                        moreButton("Show all \(ordered.count)") { model.go(.repos, in: project.id) }
+                        moreButton("Show All \(ordered.count)") { model.go(.repos, in: project.id) }
                     }
                 }
             }
@@ -339,7 +343,14 @@ extension Overview {
     // MARK: Activity
 
     var activityCard: some View {
-        let lines = ActivityLine.timeline(repos: project.repos, runs: runs, names: names, limit: 4)
+        // The same source as the Activity page (runs, repo copies, edits, links, imports), newest four.
+        let lines = ActivityFeed.events(repos: project.repos, runs: runs, names: names, changes: insights.changes)
+            .sorted { $0.at > $1.at }.prefix(4).map { e in
+                ActivityLine(
+                    title: e.title,
+                    symbol: e.tone == .fail ? "exclamationmark.triangle" : e.kind == .runs && e.tone == .run ? "bolt" : "checkmark",
+                    at: e.at)
+            }
         return ModuleCard(model: model, module: .activity) {
             if lines.isEmpty {
                 Text("Nothing yet.").foregroundStyle(GlassInk.secondary)

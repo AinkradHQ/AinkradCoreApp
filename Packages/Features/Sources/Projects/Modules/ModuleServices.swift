@@ -95,9 +95,12 @@ struct ModuleServices: View {
         case (.up, "unhealthy"?): GlassInk.red
         case (.up, _): GlassInk.green
         case (.exited, _): GlassInk.red
-        default: GlassInk.secondary
+        default: failed ? GlassInk.red : GlassInk.secondary
         }
     }
+
+    /// The project's last start failed: services that are not up failed with it.
+    private var failed: Bool { project.tag == .failed }
 
     private func line(_ r: Row) -> String {
         var bits: [String] = []
@@ -105,12 +108,13 @@ struct ModuleServices: View {
             bits.append(s.image)
             if let p = s.port { bits.append(":\(p)" + (s.isPublic ? " public" : "")) }
         }
-        if r.state == nil { bits.append("not running") } else if r.state == .exited { bits.append("stopped") }
+        if r.state == nil { bits.append(failed ? "failed to start" : "not running") } else if r.state == .exited { bits.append("stopped") }
         return bits.joined(separator: " · ")
     }
 
     private func health(_ s: ProjectLive.Service?) -> String {
-        guard let s else { return "Not running" }
+        guard let s else { return failed ? "Failed" : "Not running" }
+        if failed, s.state != .up { return "Failed" }
         if s.state == .exited { return "Stopped" }
         if s.state == .down { return "Down" }
         switch s.health {
@@ -147,13 +151,6 @@ struct ModuleServices: View {
                         : "Only a public port of a running project opens from here. This port is on \(project.live?.runner ?? model.coreName)."
                 )
             }
-            Button {
-                model.control(.restart, project)
-            } label: {
-                Label("Restart All", systemImage: "arrow.clockwise")
-            }
-            .buttonStyle(CoreButtonStyle(.prominent)).disabled(!running || !can)
-            .help(running ? "The Core restarts the whole run, not one service" : "Start \(project.name) first")
         }
         PgFacts(rows: facts(r))
         if up, let m = project.live?.metrics[r.name] {
@@ -162,8 +159,7 @@ struct ModuleServices: View {
                     title: "CPU · last hour", values: m.cpu,
                     latest: m.cpu.last.map { String(format: "%.0f %%", $0) } ?? "–", floor: 10)
                 PgChart(
-                    title: "Memory", values: m.memory, latest: m.memory.last.map(Self.bytes) ?? "–",
-                    tint: GlassInk.green, floor: 1)
+                    title: "Memory", values: m.memory, latest: m.memory.last.map(Self.bytes) ?? "–", floor: 1)
             }
         } else if up {
             PgQuiet("CPU and memory appear once the Core has readings.")
@@ -171,11 +167,12 @@ struct ModuleServices: View {
         PgBlock("Recent lines") {
             let lines = (project.live?.logs ?? []).filter { $0.service == r.name }.suffix(6)
             if lines.isEmpty {
-                PgQuiet(up ? "No lines from \(r.name) yet." : "\(r.name) is not running, so it has no lines to show.")
+                PgQuiet(up ? "No lines from \(r.name) yet." : failed ? "\(r.name) failed to start. Show Logs says why." : "\(r.name) is not running, so it has no lines to show.")
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
                         Text(LogText.plain(l.text)).font(.system(size: MacTextSize.meta, design: .monospaced)).lineLimit(1)
+                            .foregroundStyle(LogLevel.of(l.text) == .error ? GlassInk.redInk : GlassInk.primary)
                             .truncationMode(.tail)
                     }
                 }

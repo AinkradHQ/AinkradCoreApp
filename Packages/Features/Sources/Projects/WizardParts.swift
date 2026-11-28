@@ -144,7 +144,7 @@ struct WizardPreviewCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(shownName).coreFont(size: MacTextSize.title, weight: .semibold).lineLimit(1)
                         .contentTransition(.opacity)
-                    Text(host ?? (kind.hasPublicLink ? "Link made from the name" : kind.title)).font(
+                    Text(host ?? (kind.hasPublicLink ? "Link made from the name" : kind.short)).font(
                         .system(size: MacTextSize.meta, design: host == nil ? .default : .monospaced)
                     )
                     .foregroundStyle(palette.text2).lineLimit(1).truncationMode(.middle)
@@ -152,7 +152,7 @@ struct WizardPreviewCard: View {
             }
             .opacity(lit(.what))
             section("Kind", lit: lit(.what)) {
-                Label(kind.title, systemImage: kind.symbol).lineLimit(1).contentTransition(.opacity)
+                Label(kind.short, systemImage: kind.symbol).lineLimit(1).contentTransition(.opacity)
             }
             section("Code", lit: lit(.code)) {
                 if repos.isEmpty {

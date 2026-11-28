@@ -85,7 +85,8 @@ struct StageCover: View {
         return VStack(spacing: Space.s3) {
             title(
                 app
-                    ? "Ready to build" : kind == .infra ? "The stack is stopped" : "\(project.name) is stopped")
+                    ? (project.run?.lastRun.map { "Last build \(project.run?.state == .failed ? "failed" : "passed") \($0)" }
+                        ?? "Ready to build") : kind == .infra ? "The stack is stopped" : "\(project.name) is stopped")
             // One sentence about why it stopped (and when it was last visited), then what Start does.
             let seen = project.live?.lastActivity.map { "Last visited \(runsAgo($0, now: model.now()))." }
             let said = [project.live?.stopWords, seen].compactMap { $0 }.joined(separator: " ")

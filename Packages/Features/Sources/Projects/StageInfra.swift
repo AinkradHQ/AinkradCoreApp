@@ -53,7 +53,9 @@ struct InfraStage: View {
             let d = depth(i)
             let inCol = (0..<count).filter { depth($0) == d }
             let r = inCol.firstIndex(of: i) ?? 0
-            let x = cols == 1 ? size.width / 2 : inset + (size.width - 2 * inset) * CGFloat(d) / CGFloat(cols - 1)
+            // Columns sit a fixed gap apart around the centre, not stretched to the far edges.
+            let gap = cols == 1 ? 0 : min((size.width - 2 * inset) / CGFloat(cols - 1), nodeSize.width + Space.s8 * 2)
+            let x = size.width / 2 + (CGFloat(d) - CGFloat(cols - 1) / 2) * gap
             let y = size.height * (CGFloat(r) + 0.5) / CGFloat(inCol.count)
             return CGPoint(x: x, y: y)
         }
