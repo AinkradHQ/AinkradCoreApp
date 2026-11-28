@@ -5,14 +5,22 @@ import Foundation
 /// Debug only: the Runs page's configurations, environments, variables and runs on made-up data (two configurations beside the
 /// Default). Writes change nothing; nothing reaches a Core.
 final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
-    private let webItems = [
-        RunConfigItem(
-            id: 1, name: "Admin dev server", command: "npm run dev", workdir: "./lanterna-admin", runner: "automatic",
-            port: 3000, restart: true),
-        RunConfigItem(
-            id: 2, name: "Queue worker", command: "php artisan queue:work", workdir: "./lanterna-api",
-            runner: "automatic", port: nil, restart: false),
-    ]
+    /// The repo names of each demo project, so a configuration's folder is one of the project's own repos.
+    var repoNames: [Int64: [String]] = [:]
+    private func dir(_ project: Int64, _ suffix: String) -> String {
+        let names = repoNames[project] ?? []
+        return "./" + (names.first { $0.hasSuffix(suffix) } ?? names.first ?? "app")
+    }
+    private func webItems(_ project: Int64) -> [RunConfigItem] {
+        [
+            RunConfigItem(
+                id: 1, name: "Admin dev server", command: "npm run dev", workdir: dir(project, "admin"),
+                runner: "automatic", port: 3000, restart: true),
+            RunConfigItem(
+                id: 2, name: "Queue worker", command: "php artisan queue:work", workdir: dir(project, "api"),
+                runner: "automatic", port: nil, restart: false),
+        ]
+    }
 
     /// The kind of each demo project (set from the scene's list): an app builds, an infra stack applies; neither runs web servers.
     var kinds: [Int64: ProjectKind] = [:]
@@ -30,13 +38,15 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
         case .infra?:
             return [
                 RunConfigItem(
-                    id: 1, name: "Apply the stack", command: "terraform apply -auto-approve", workdir: "./harbor-infra",
-                    runner: "automatic", port: nil, restart: false),
+                    id: 1, name: "Apply the stack", command: "terraform apply -auto-approve",
+                    workdir: dir(project, "infra"), runner: "automatic", port: nil, restart: false),
                 RunConfigItem(
-                    id: 2, name: "Restart the gateway", command: "systemctl restart gateway", workdir: "./harbor-os",
-                    runner: "automatic", port: nil, restart: false),
+                    id: 2, name: "Restart the gateway", command: "systemctl restart gateway",
+                    workdir: dir(project, "os"), runner: "automatic", port: nil, restart: false),
             ]
-        default: return webItems
+        // A docs project has no runs: nothing to start, so nothing in its activity but what happens to the docs.
+        case .other?: return []
+        default: return webItems(project)
         }
     }
 
@@ -48,10 +58,10 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
         if failing { throw CoreError.protocolViolation("The Core did not answer in time (timeout).") }
         return items(project)
     }
-    func createConfig(project: Int64, name: String, command: String) async throws -> RunConfigItem { webItems[0] }
-    func updateConfig(project: Int64, id: Int64, _ patch: RunConfigPatch) async throws -> RunConfigItem { webItems[0] }
+    func createConfig(project: Int64, name: String, command: String) async throws -> RunConfigItem { webItems(project)[0] }
+    func updateConfig(project: Int64, id: Int64, _ patch: RunConfigPatch) async throws -> RunConfigItem { webItems(project)[0] }
     func deleteConfig(project: Int64, id: Int64) async throws {}
-    func duplicateConfig(project: Int64, id: Int64) async throws -> RunConfigItem { webItems[0] }
+    func duplicateConfig(project: Int64, id: Int64) async throws -> RunConfigItem { webItems(project)[0] }
     func start(project: Int64, config: Int64, environment: String?, replace: Bool) async throws -> RunRecord {
         Self.record("r_new", "starting", config, minutes: 0)
     }
@@ -87,6 +97,7 @@ final class DemoConfigsService: RunConfigsService, @unchecked Sendable {
 
     func history(project: Int64) async throws -> [RunRecord] {
         if let historyOverride { return historyOverride }
+        if kinds[project] == .other { return [] }
         return switch project {
         case 1:
             [
