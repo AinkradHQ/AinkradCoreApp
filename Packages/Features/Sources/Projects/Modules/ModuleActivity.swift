@@ -23,7 +23,7 @@ struct ActivityEvent: Identifiable, Equatable {
 
 /// The full timeline: what the app knows (runs, repo copies, who changed what), by day, newest first.
 /// The Core serves no dated Brain events and no dated session events yet, so those filters show only what the changes route says.
-enum ActivityFeed {
+@MainActor enum ActivityFeed {
     static func events(repos: [RepoItem], runs: [RunRecord], names: [Int64: String], changes: ChangesInfo?)
         -> [ActivityEvent]
     {

@@ -32,7 +32,7 @@ enum SessionGroups {
         return [
             ("Needs you", ProjectLive.Session.State.needsYou), ("Working", .running), ("Done this week", .done),
         ]
-        .map { ModuleGroupData(title: $0.0, items: kept.filter { $0.session.state == $0.1 }) }
+        .map { g in ModuleGroupData(title: g.0, items: kept.filter { $0.session.state == g.1 }) }
         .filter { !$0.items.isEmpty }
     }
 }
