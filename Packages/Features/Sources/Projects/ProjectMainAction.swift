@@ -81,8 +81,9 @@ extension ProjectItem {
     }
 
     /// Why Stop and Restart cannot be pressed (the Core is not answering, or this device cannot change); nil when they can.
-    func controlBlock(canControl: Bool) -> String? {
+    func controlBlock(canControl: Bool, busy: Bool = false) -> String? {
         if stale { return "The Core is not answering. This will work again once it is back." }
+        if busy { return "A start, stop or restart is under way. This works again once it is done." }
         return canControl ? nil : "Not available while this device cannot change projects or the Core is unreachable"
     }
 }
@@ -94,7 +95,14 @@ struct SpaceStateBadge: View {
     let now: Date
     var body: some View {
         let b = project.spaceBadge(now: now)
-        StateBadge(b.label, tone: b.tone, symbol: b.symbol)
+        // Not software has no state to badge: only when it was last edited, as plain words.
+        Group {
+            if project.allKinds == [.other], !project.archived {
+                Text(b.label).foregroundStyle(GlassInk.secondary).lineLimit(1)
+            } else {
+                StateBadge(b.label, tone: b.tone, symbol: b.symbol)
+            }
+        }
             .id(b.label)
             .transition(.opacity)
             .animation(Motion.out(Motion.ui), value: b.label)

@@ -61,7 +61,7 @@ struct DefaultDetail: View {
                 if setup.drafted, let spec = setup.spec { DraftLine(project: project, run: setup, spec: spec) }
                 SetupContent(project: project, run: setup, showLogs: { name in
                     runs.model.logService = name
-                    runs.model.module = .logs
+                    runs.model.go(.logs, in: project.id)
                 })
                 note
             }

@@ -36,7 +36,7 @@ struct RunPage: View {
         .onAppear { settled = true }
         .task(id: project.id) { await run.watch() }
         // The Core says a run or its setup changed: read it now, not at the next minute.
-        .task(id: model.runTick) {
+        .task(id: model.tick(project.id)) {
             if run.loaded {
                 await run.load()
                 await run.refreshRun()
@@ -243,7 +243,7 @@ private struct LogsIsland: View {
             }
         }
         // The Core's stream while it runs; it starts again when a run starts or stops.
-        .task(id: "\(project.id) \(live) \(model.runTick)") {
+        .task(id: "\(project.id) \(live) \(model.tick(project.id))") {
             guard live, let m = run.makeLogs() else {
                 logs = nil
                 if fixed == nil, project.live?.logs.isEmpty == false {

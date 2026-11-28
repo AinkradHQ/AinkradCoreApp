@@ -139,6 +139,8 @@ final class RunLogsModel {
     @ObservationIgnored var pollEvery: Duration = .seconds(3)
     @ObservationIgnored var now: () -> Date = { Date() }
     @ObservationIgnored var useStream = true
+    /// Asked after every page: false once the run is over, so a log that has ended is read once and not polled for ever.
+    @ObservationIgnored var keepReading: @MainActor () -> Bool = { true }
     @ObservationIgnored private var next = 0
     @ObservationIgnored private var counter = 0
     @ObservationIgnored private var lastAppend = Date.distantPast
@@ -276,6 +278,10 @@ final class RunLogsModel {
                 failure = (error as? RunFailure)?.sentence ?? "The log could not be read. Trying again."
             }
             polls += 1
+            if !keepReading() {
+                feed = .ended
+                return
+            }
             try? await Task.sleep(for: pollEvery)
         }
     }

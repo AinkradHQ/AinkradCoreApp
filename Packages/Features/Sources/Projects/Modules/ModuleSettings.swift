@@ -68,6 +68,11 @@ struct ModuleSettings: View {
         }
         .task(id: project.id) { await insights.loadTuning() }
         .task { await model.loadRunners() }
+        // Leaving the space (Esc, Back) asks first while there is something unsaved here.
+        .onChange(of: changed || slug != project.slug || limitsDraft != nil || runnerDraft != nil, initial: true) { _, dirty in
+            model.setDraft(project.id, dirty: dirty)
+        }
+        .onDisappear { model.setDraft(project.id, dirty: false) }
         .onChange(of: project.name) { old, new in if name == old { name = new } }
         .onChange(of: project.description) { old, new in if description == old { description = new } }
         .onChange(of: project.slug) { old, new in if slug == old { slug = new } }

@@ -148,8 +148,7 @@ extension ProjectsModel {
     }
 
     func openLogs(_ id: Int64) {
-        show()
-        openProject(id, section: .run)
+        openProject(id, module: .logs)
     }
 
     /// The crash to show on a project: nothing once its run has started again after it.

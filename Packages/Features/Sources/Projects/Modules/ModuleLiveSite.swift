@@ -8,7 +8,7 @@ import SwiftUI
 struct ModuleLiveSite: View {
     let model: ProjectsModel
     let project: ProjectItem
-    @State private var web = LiveWebModel()
+    private var web: LiveWebModel { model.liveWeb(for: project.id) }
     @State private var device = Device.desktop
     @State private var stageKind: ProjectKind? = .web
     @Environment(\.accessibilityReduceMotion) private var reduce
@@ -207,7 +207,7 @@ struct ModuleLiveSite: View {
             StartStepsList(steps: project.live?.steps ?? [])
             HStack(spacing: Space.s2) {
                 Button {
-                    model.module = .logs
+                    model.go(.logs, in: project.id)
                 } label: {
                     Label("Show Log", systemImage: "text.alignleft")
                 }
@@ -227,7 +227,7 @@ struct ModuleLiveSite: View {
         card(
             "square.stack.3d.up", "\(project.name) is not set up to run yet",
             "Add its repos and a setup from the Overview, then start it here.", "Go to Overview", false
-        ) { model.module = .overview }
+        ) { model.go(.overview, in: project.id) }
     }
 
     // MARK: inspector

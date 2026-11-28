@@ -135,7 +135,7 @@ private struct LiveRunCard: View {
             }
         }
         .frame(minHeight: Space.s8 * 6)
-        .task(id: "\(run.id) \(runs.model.runTick)") {
+        .task(id: "\(run.id) \(runs.model.tick(runs.projectID))") {
             guard let m = runs.logs(of: run, stream: stream) else { return }
             logs = m
             await m.run()

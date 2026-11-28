@@ -150,7 +150,7 @@ struct ModuleBrain: View {
             } else if linked {
                 let c = content
                 ModuleSplit(pickID: section.rawValue) {
-                    ModuleList(ids: ids, pick: $pick, onOpen: {}) {
+                    ModuleList(ids: ids, pick: $pick, onOpen: open) {
                         ForEach(BrainSection.allCases) { s in
                             ModuleRow(
                                 id: s.rawValue, title: s.rawValue, selected: s == section, action: { pick = s.rawValue }

@@ -36,7 +36,7 @@ struct ModuleBuilds: View {
             content
         }
         .task(id: project.id) { await runs.load() }
-        .task(id: model.runTick) { if runs.loaded { await runs.refreshHistory() } }
+        .task(id: model.tick(project.id)) { if runs.loaded { await runs.refreshHistory() } }
         .accessibilityIdentifier("project-page-Builds")
     }
 

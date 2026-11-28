@@ -9,11 +9,12 @@ struct ModuleCard<Content: View>: View {
     var sub: String? = nil
     @ViewBuilder let content: Content
     @State private var hovering = false
+    @Environment(\.spaceProject) private var space
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
             Button {
-                model.module = module
+                model.go(module, in: space)
             } label: {
                 HStack(spacing: Space.s2) {
                     Image(systemName: module.symbol).foregroundStyle(GlassInk.secondary).accessibilityHidden(true)
@@ -168,7 +169,7 @@ extension Overview {
                         ForEach(Array(shown.enumerated()), id: \.offset) { _, s in serviceTile(s) }
                     }
                     if ordered.count > shown.count {
-                        moreButton("+\(ordered.count - shown.count) more · Open Services") { model.module = .services }
+                        moreButton("+\(ordered.count - shown.count) more · Open Services") { model.go(.services, in: project.id) }
                     }
                 }
             }
@@ -176,6 +177,7 @@ extension Overview {
     }
 
     private var servicesWords: String {
+        if project.repos.isEmpty { return "No setup yet. Add repos first." }
         if let d = project.draft {
             let n = ProjectItem.count(d.services.count, "service")
             return project.tag == .running || project.tag == .starting
@@ -189,15 +191,21 @@ extension Overview {
     private func serviceTile(_ s: ProjectLive.Service) -> some View {
         VStack(alignment: .leading, spacing: Space.s1 + 2) {
             HStack(spacing: Space.s2) {
-                StatusDot(
-                    colour: s.state == .up ? GlassInk.green : s.state == .exited ? GlassInk.red : GlassInk.secondary)
+                StatusDot(colour: tileColour(s))
                 Text(s.name).coreFont(size: MacTextSize.meta + 1, weight: .semibold).lineLimit(1)
                 Spacer(minLength: 0)
-                if s.state == .up { Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit() }
+                if s.state == .up, !project.stale { Text(s.memory).foregroundStyle(GlassInk.secondary).monospacedDigit() }
             }
+            if project.stale {
+                Text("–").coreFont(size: MacTextSize.meta).foregroundStyle(GlassInk.secondary)
+            } else
             if s.state == .up, let m = live?.metrics[s.name], m.memory.count > 1 {
-                Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes", tint: GlassInk.blue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: Space.s2) {
+                    Text(s.health == "unhealthy" ? "Up · not healthy" : "Up").coreFont(size: MacTextSize.meta)
+                        .foregroundStyle(GlassInk.secondary).lineLimit(1)
+                    Sparkline(values: m.memory, label: "\(s.name) memory, recent minutes", tint: GlassInk.blue)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text(s.state == .up ? Self.serviceLine(s) : s.state == .exited ? Self.serviceLine(s) : "Not started")
                     .coreFont(size: MacTextSize.meta).foregroundStyle(
@@ -209,6 +217,17 @@ extension Overview {
         .padding(.horizontal, Space.s3).padding(.vertical, Space.s2 + 2).frame(maxWidth: .infinity, alignment: .leading)
         .coreCard(GlassInk.well, radius: Radius.cardMac - 2)
         .accessibilityElement(children: .combine)
+    }
+
+    /// A service tile's square: green up, orange up but not healthy, red down or crashed, grey when nothing is known.
+    private func tileColour(_ s: ProjectLive.Service) -> Color {
+        if project.stale { return GlassInk.secondary }
+        if project.crash?.service == s.name { return GlassInk.red }
+        switch s.state {
+        case .up: return s.health == "unhealthy" ? GlassInk.amber : GlassInk.green
+        case .exited: return GlassInk.red
+        case .down: return GlassInk.secondary
+        }
     }
 
     /// "Up · healthy", "Exited · restarted 3 times", "Down".
@@ -243,14 +262,14 @@ extension Overview {
                             let d = r.startedAt.flatMap { s in r.stoppedAt.map { $0.timeIntervalSince(s) } } ?? 0
                             coreShape(3).fill(failed ? GlassInk.red : GlassInk.green)
                                 .frame(height: failed ? 18 : longest > 0 && d > 0 ? 14 + 30 * CGFloat(d / longest) : 36)
-                                .frame(maxWidth: .infinity)
+                                .frame(width: 16)
                         }
                     }
                     .frame(height: 44, alignment: .bottom)
                     OverviewRow(
                         title: "Built \(runsAgo(last.startedAt, now: model.now()))",
                         subtitle: [last.runner, last.environment].compactMap { $0 }.joined(separator: " · "),
-                        action: { model.module = .builds }
+                        action: { model.go(.builds, in: project.id) }
                     ) { Self.runBadge(last.state) }
                 }
             } else {
@@ -262,10 +281,9 @@ extension Overview {
 
     static func runBadge(_ state: String) -> StateBadge {
         switch state {
-        case "running": StateBadge("Running", tone: .run, symbol: "play.circle")
-        case "starting": StateBadge("Starting", tone: .warn, symbol: "gearshape")
+        case "running", "starting": StateBadge("Building", tone: .warn, symbol: "gearshape")
         case "failed": StateBadge("Failed", tone: .fail, symbol: "exclamationmark.triangle")
-        default: StateBadge("Finished", tone: .queue, symbol: "stop.circle")
+        default: StateBadge("Passed", tone: .run, symbol: "checkmark.circle")
         }
     }
 
@@ -283,7 +301,7 @@ extension Overview {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(ordered.prefix(ordered.count > Self.repoRows ? Self.repoRows - 1 : Self.repoRows)) { r in
-                        OverviewRow(title: r.name, subtitle: repoLine(r), action: { model.module = .repos }) {
+                        OverviewRow(title: r.name, subtitle: repoLine(r), action: { model.go(.repos, in: project.id) }) {
                             if r.fetchError != nil {
                                 StateBadge("Copy failed", tone: .fail, symbol: "exclamationmark.triangle")
                             } else if r.primary, project.repos.count > 1 {
@@ -293,7 +311,7 @@ extension Overview {
                         .help(r.remoteURL)
                     }
                     if ordered.count > Self.repoRows {
-                        moreButton("Show all \(ordered.count)") { model.module = .repos }
+                        moreButton("Show all \(ordered.count)") { model.go(.repos, in: project.id) }
                     }
                 }
             }

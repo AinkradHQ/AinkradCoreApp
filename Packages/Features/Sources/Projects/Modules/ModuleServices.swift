@@ -86,7 +86,7 @@ struct ModuleServices: View {
             }
         }
         .task(id: project.id) { await run.load() }
-        .task(id: model.runTick) { if run.loaded { await run.refreshRun() } }
+        .task(id: model.tick(project.id)) { if run.loaded { await run.refreshRun() } }
         .accessibilityIdentifier("project-page-Services")
     }
 
@@ -132,20 +132,18 @@ struct ModuleServices: View {
         ) {
             Button {
                 model.logService = r.name
-                model.module = .logs
+                model.go(.logs, in: project.id)
             } label: {
                 Label("Show Logs", systemImage: "text.alignleft")
             }
             .buttonStyle(CoreButtonStyle(.secondary)).help("Read the log of \(r.name)")
             if let port = r.spec?.port {
-                let open = r.spec?.isPublic == true && project.expose && running
-                Button("Open Port \(String(port))") {
-                    if let u = URL(string: "https://\(project.link)") { NSWorkspace.shared.open(u) }
-                }
+                let open = r.spec?.isPublic == true && running && model.siteTarget(project) != .none
+                Button("Open Port \(String(port))") { model.openSite(project) }
                 .buttonStyle(CoreButtonStyle(.secondary)).disabled(!open)
                 .help(
                     open
-                        ? "Open the public link"
+                        ? (project.expose ? "Open the public link" : "Open the live site page, the private preview")
                         : "Only a public port of a running project opens from here. This port is on \(project.live?.runner ?? model.coreName)."
                 )
             }

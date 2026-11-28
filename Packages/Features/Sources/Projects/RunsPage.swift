@@ -49,7 +49,7 @@ struct RunsPage: View {
             .onChange(of: model.stale == nil) { _, back in if back, runs.hasPending { Task { await runs.flushAll() } } }
             .task(id: project.id) { await runs.load() }
             // The Core says a run changed: the runs are read again now.
-            .task(id: model.runTick) {
+            .task(id: model.tick(project.id)) {
                 if runs.loaded {
                     await runs.refreshHistory()
                     await runs.setup.refreshRun()

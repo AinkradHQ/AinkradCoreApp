@@ -58,8 +58,40 @@ public final class ProjectsModel {
     var filter = ""
     /// The project whose space is open (nil: the gallery).
     var openID: Int64?
-    /// Details v2: the module the space shows (the rail's selection). `section` is the old name for it.
-    var module = ProjectModule.overview
+    /// Details v2: the module each space shows (the rail's selection), by project id; key 0 is "no space open". Every pane
+    /// keeps its own, so two spaces never change page together.
+    internal(set) var modules: [Int64: ProjectModule] = [:]
+    /// The open Projects-pane space's module. `section` is the old name for it.
+    var module: ProjectModule {
+        get { modules[openID ?? 0] ?? .overview }
+        set { modules[openID ?? 0] = newValue }
+    }
+    func moduleOf(_ id: Int64) -> ProjectModule { modules[id] ?? .overview }
+    func go(_ m: ProjectModule, in id: Int64) { modules[id] = m }
+    /// How many spaces (the Projects pane, `project-*` panes) are showing each project now; their runs are kept fresh.
+    @ObservationIgnored private var viewing: [Int64: Int] = [:]
+    /// Projects whose Settings hold changes that are not saved.
+    @ObservationIgnored var drafts: Set<Int64> = []
+    func spaceAppeared(_ id: Int64) { viewing[id, default: 0] += 1 }
+    func spaceGone(_ id: Int64) {
+        guard let n = viewing[id] else { return }
+        viewing[id] = n > 1 ? n - 1 : nil
+        if n <= 1 { dropLiveWeb(id) }
+    }
+    /// The live view of each open project, shared by the Overview and the Live site page (one cookie jar, no reload on a switch).
+    @ObservationIgnored private var liveWebs: [Int64: LiveWebModel] = [:]
+    func liveWeb(for id: Int64) -> LiveWebModel {
+        if let m = liveWebs[id] { return m }
+        let m = LiveWebModel()
+        liveWebs[id] = m
+        return m
+    }
+    func dropLiveWeb(_ id: Int64) {
+        liveWebs[id]?.web?.stopLoading()
+        liveWebs[id] = nil
+    }
+    /// Every project a space shows: the Projects pane's and each pane of its own.
+    var openProjectIDs: Set<Int64> { Set(viewing.keys).union(openID.map { [$0] } ?? []) }
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
     /// The gallery's All · Running · Archived switch.
@@ -93,15 +125,16 @@ public final class ProjectsModel {
     @ObservationIgnored var liveParts: [Int64: LiveParts] = [:]
     /// Runner id to its name, for "on core-oracle".
     @ObservationIgnored var runnerNames: [String: String] = [:]
-    /// Bumps when the Core says a run or its setup changed, so the Run pages read again at once.
-    internal(set) var runTick = 0
+    /// Bumps, per project, when the Core says a run or its setup changed, so that project's pages read again at once.
+    internal(set) var runTicks: [Int64: Int] = [:]
+    func tick(_ id: Int64) -> Int { runTicks[id] ?? 0 }
     /// Projects whose New Doc or New AI Session is being made now: a second click waits for the first.
-    /// The service the Logs page shows first (Show Logs on a service); read once when the page opens.
-    /// What could not be read for a project's pages, by name (`sessions`, `room`), in words; cleared when the read works.
-    internal(set) var liveFailures: [Int64: [String: String]] = [:]
-    internal(set) var logService: String?
     internal(set) var creatingDoc: Set<Int64> = []
     internal(set) var startingSession: Set<Int64> = []
+    /// What could not be read for a project's pages, by name (`sessions`, `room`), in words; cleared when the read works.
+    internal(set) var liveFailures: [Int64: [String: String]] = [:]
+    /// The service the Logs page shows first (Show Logs on a service); read once when the page opens.
+    internal(set) var logService: String?
     /// The last read of the Core failed: what is shown is how it last looked.
     @ObservationIgnored var coreSilent = false
     /// Starts an AI session in a project, with a first message when given (the app wires it to the AI Sessions app); returns the
@@ -160,13 +193,7 @@ public final class ProjectsModel {
     /// Opens a project's space on its Overview (from another app's link).
     public func openSpace(_ id: String) {
         guard let pid = Int64(id) else { return }
-        if ProjectsOptions.openIn == .newWorkspace, let p = project(pid) {
-            section = .overview
-            openInOwnPane(p)
-            return
-        }
-        section = .overview
-        show(project: pid)
+        openProject(pid)
     }
 
     public convenience init(host: any AdminHost) { self.init(host: host, defaults: .standard) }
@@ -190,38 +217,40 @@ public final class ProjectsModel {
         logSources = { LiveRunLogSource(connection: connection, project: $0, run: $1) }
         catalog = LiveRepoCatalog(connection: connection)
         previewCoreHost = connection.endpoint.host
+        PreviewStore.shared.use(core: connection.endpoint.host)
         previewFetch = { method, target, headers, body in
             let r = try await connection.signedExchange(method: method, target: target, headers: headers, body: body)
             return PreviewReply(status: r.status, headers: r.headers, body: r.body)
         }
+        // One reload, after the Core has said what it speaks (a reload per minor made three that overwrote one another).
+        service = LiveProjectsService(connection: connection)
+        load = .loading
+        epoch += 1
         Task { [weak self] in
             let new = await connection.serverSupports(minor: coreMinorProjects)
-            if let self, new != self.core110 {
-                self.core110 = new
-                if new { await self.reload() }
-            }
             let has111 = await connection.serverSupports(minor: coreMinorKinds)
-            if let self, has111 != self.core111 {
-                self.core111 = has111
-                if has111 { await self.reload() }
-            }
             let has112 = await connection.serverSupports(minor: 112)
-            if let self, has112 != self.core112 { self.core112 = has112 }
             let ok = await connection.serverSupports(minor: coreMinorV010)
-            self?.runnerSupported = ok
-            self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
-            self?.insightsService = ok ? LiveProjectInsightsService(connection: connection) : nil
+            guard let self else { return }
+            self.core110 = new
+            self.core111 = has111
+            self.core112 = has112
+            self.runnerSupported = ok
+            self.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
+            self.insightsService = ok ? LiveProjectInsightsService(connection: connection) : nil
+            await self.reload()
         }
-        use(LiveProjectsService(connection: connection))
     }
 
     func use(_ service: any ProjectsService) {
         self.service = service
+        epoch += 1
         load = .loading
         Task { await reload() }
     }
 
     public func detach() {
+        epoch += 1
         service = nil
         lore = nil
         runService = nil
@@ -233,8 +262,25 @@ public final class ProjectsModel {
         configsService = nil
         insightsService = nil
         projects = []
+        archivedList = []
+        runStates = [:]
         setupStates = [:]
         liveParts = [:]
+        runnerNames = [:]
+        runners = []
+        modules = [:]
+        runTicks = [:]
+        for id in Array(liveWebs.keys) { dropLiveWeb(id) }
+        PreviewStore.shared.use(core: nil)
+        catalog = NoRepoCatalog()
+        catalogState = .loading
+        catalogSeen = []
+        places = nil
+        wizardDraft = nil
+        wizardProjectID = nil
+        creating = nil
+        stale = nil
+        loadedAt = nil
         limits = nil
         limitsState = .loading
         pollTask?.cancel()
@@ -248,22 +294,81 @@ public final class ProjectsModel {
     public var isConnected: Bool { service != nil }
     public func resync() { if service != nil { Task { await reload() } } }
 
-    /// An event from the Core that may change what the gallery shows.
+    /// How long events are gathered before the Core is read again: a burst of them costs one read.
+    @ObservationIgnored var eventDelay: Duration = .milliseconds(300)
+    @ObservationIgnored private var eventFlags = EventFlags()
+    @ObservationIgnored private var eventTask: Task<Void, Never>?
+    private struct EventFlags {
+        var list = false, run = false, sessions = false
+        var any: Bool { list || run || sessions }
+    }
+
+    /// An event from the Core that may change what the gallery or an open space shows.
     public func event(kind: String) {
-        if kind.hasPrefix("project.") { resync() }
-        // A run or its setup changed, or an AI session did: the open project's pages read again now, not at the next poll.
-        if kind.hasPrefix("project.run_") || kind == "project.spec_saved" || kind.hasPrefix("agent"), let id = openID {
-            if kind.hasPrefix("project.") { runTick += 1 }
-            Task {
-                await refreshRun(id)
-                await refreshSetup(id)
-                await refreshLive(id)
-            }
+        let run = kind.hasPrefix("project.run_") || kind == "project.spec_saved"
+        let sessions = ["agent.created", "agent.state", "agent.ended"].contains(kind)
+        guard kind.hasPrefix("project.") || sessions else { return }
+        eventFlags.list = eventFlags.list || kind.hasPrefix("project.")
+        eventFlags.run = eventFlags.run || run
+        eventFlags.sessions = eventFlags.sessions || sessions
+        guard eventTask == nil else { return }
+        eventTask = Task { [weak self] in
+            try? await Task.sleep(for: self?.eventDelay ?? .zero)
+            await self?.flushEvents()
         }
     }
 
+    /// The gathered events, answered once: the list, and every open space (the Projects pane's and the panes of their own).
+    func flushEvents() async {
+        let f = eventFlags
+        eventFlags = EventFlags()
+        eventTask = nil
+        guard f.any else { return }
+        let ids = openProjectIDs
+        if f.run { for id in ids { runTicks[id, default: 0] += 1 } }
+        let listed = f.list ? Task { await reload() } : nil
+        for id in ids {
+            if f.run {
+                await refreshRun(id)
+                await refreshSetup(id)
+                await refreshLive(id)
+            } else if f.sessions {
+                await refreshSessions(id)
+            }
+        }
+        await listed?.value
+    }
+
+    @ObservationIgnored private var reloadTask: Task<Void, Never>?
+    @ObservationIgnored private var reloadDirty = false
+    /// Counts up when the connection changes: a read that started before it is dropped, never shown.
+    @ObservationIgnored private var epoch = 0
+
+    /// One read of the list at a time: one asked for while another is under way runs again after it (so it sees the newest
+    /// state), and every caller returns only when that run is done. Reads never overlap, so an older answer never lands
+    /// over a newer one.
     func reload() async {
+        guard service != nil else { return }
+        if let task = reloadTask {
+            reloadDirty = true
+            await task.value
+            return
+        }
+        let task = Task { [weak self] in
+            while let self, self.service != nil {
+                self.reloadDirty = false
+                await self.reloadOnce()
+                if !self.reloadDirty { break }
+            }
+            self?.reloadTask = nil
+        }
+        reloadTask = task
+        await task.value
+    }
+
+    private func reloadOnce() async {
         guard let service else { return }
+        let epoch = epoch
         do {
             var all = try await service.projects()
             // "Show archived projects" (Settings > Projects > Options): they come after the active ones in the same order.
@@ -279,9 +384,10 @@ public final class ProjectsModel {
                 for await (id, r) in group { if let r { out[id] = r } }
                 return out
             }
+            guard epoch == self.epoch else { return }
             runStates = runs
             // The setup of a project that never ran (and of the open one): spec present means ready to start.
-            let wanted = list.filter { !$0.repos.isEmpty && !$0.archived && (runs[$0.id] == nil || $0.id == openID) }
+            let wanted = list.filter { !$0.repos.isEmpty && !$0.archived && (runs[$0.id] == nil || openProjectIDs.contains($0.id)) }
             let rs = runService
             let reads = await withTaskGroup(of: (Int64, SetupRead?).self) { group in
                 for p in wanted { group.addTask { (p.id, await Self.readSetup(rs, p.id)) } }
@@ -289,6 +395,7 @@ public final class ProjectsModel {
                 for await (id, r) in group { if let r { out[id] = r } }
                 return out
             }
+            guard epoch == self.epoch else { return }
             for (id, r) in reads { setupStates[id] = r }
             coreSilent = false
             projects = list.map(applying)
@@ -300,6 +407,7 @@ public final class ProjectsModel {
             pollWhileCopying()
             if core110 { Task { await migrateColours() } }
         } catch {
+            guard epoch == self.epoch else { return }
             // A list already on screen stays, marked as old; only a first load that failed shows the failure.
             if projects.isEmpty {
                 load = .failed(words(error))
@@ -323,7 +431,7 @@ public final class ProjectsModel {
                 LauncherEntry(
                     id: "project-\(p.id)", title: p.name, sub: p.description.isEmpty ? "Project" : p.description,
                     symbol: "folder", keywords: ["project", p.slug]
-                ) { [weak self] in self?.show(project: p.id) })
+                ) { [weak self] in self?.openProject(p.id) })
         }
         registeredProjects = ids
     }
@@ -527,7 +635,10 @@ public final class ProjectsModel {
 
     // MARK: derived
 
-    func project(_ id: Int64?) -> ProjectItem? { id.flatMap { id in projects.first { $0.id == id } } }
+    /// Archived projects too: their cards stay on the gallery, and the keys that read `project(_:)` must find them.
+    func project(_ id: Int64?) -> ProjectItem? {
+        id.flatMap { id in projects.first { $0.id == id } ?? archivedList.first { $0.id == id } }
+    }
     var open: ProjectItem? { project(openID) }
     /// The colour the Core holds (API 110), else the one picked on this Mac, else one made from the link name.
     func colour(_ p: ProjectItem) -> ProjectColour {
@@ -954,13 +1065,18 @@ public final class ProjectsModel {
 
     /// Opens a project's space where Settings, Projects, Options says: in a pane of its own beside the gallery (the default), or
     /// in the Projects pane in place of the gallery.
-    func openProject(_ id: Int64, section page: ProjectSection = .overview) {
-        section = page
+    func openProject(_ id: Int64, module page: ProjectModule = .overview) {
+        modules[id] = page
         if ProjectsOptions.openIn == .newWorkspace, let p = project(id) {
             openInOwnPane(p)
             return
         }
         withAnimation(Motion.out(Motion.move)) { openID = id }
+        host.shell.openPane(projectsPane())
+    }
+
+    func openProject(_ id: Int64, section page: ProjectSection) {
+        openProject(id, module: Self.module(of: page))
     }
 
     static func paneID(_ id: Int64) -> String { "project-\(id)" }
@@ -1001,16 +1117,19 @@ public final class ProjectsModel {
     /// ⌘N while the gallery is up: the same as the New Project button.
     func newItem() { if openID == nil { newProject() } }
 
-    func show(project id: Int64? = nil) {
-        if let id { openID = id }
-        let shell = host.shell
+    private func projectsPane() -> PaneSpec {
         var spec = PaneSpec(
             id: "projects", title: "Projects", sub: "Home Core", symbol: "square.grid.2x2", minWidth: 720
         ) { ProjectsView(model: self) }
         spec.tab = "Projects"
         spec.fullScreenOnly = true
         spec.onNew = { [weak self] in self?.newItem() }
-        shell.openPane(spec)
+        return spec
+    }
+
+    func show(project id: Int64? = nil) {
+        if let id { openID = id }
+        host.shell.openPane(projectsPane())
         Task { await reload() }
     }
 

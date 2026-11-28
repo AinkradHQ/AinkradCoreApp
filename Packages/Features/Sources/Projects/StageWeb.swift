@@ -134,10 +134,14 @@ struct WebStage: View {
         }
     }
 
+    /// One picture once the page is up, and a fresh one every five minutes after (the pictures are small; the page is not
+    /// looked at again to take them).
     private func keepSnapshot() async {
+        while !Task.isCancelled, web.state != .live { try? await Task.sleep(for: .seconds(3)) }
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(web.state == .live ? 60 : 3))
+            try? await Task.sleep(for: .seconds(2))
             if web.state == .live { web.snapshot(into: project.id) }
+            try? await Task.sleep(for: .seconds(300))
         }
     }
 
