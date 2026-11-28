@@ -57,9 +57,7 @@ public final class ProjectsModel {
     var filter = ""
     /// The project whose space is open (nil: the gallery).
     var openID: Int64?
-    /// The page of the open project's space.
-    var section = ProjectSection.overview
-    /// Details v2: the module the space shows (the rail's selection). Replaces `section` once the space moves to it.
+    /// Details v2: the module the space shows (the rail's selection). `section` is the old name for it.
     var module = ProjectModule.overview
     /// The gallery card the arrow keys are on.
     var cursor: Int64?
@@ -109,6 +107,8 @@ public final class ProjectsModel {
     internal(set) var core110 = false
     /// The Core speaks API minor 111 (the project kind). Older, the kind is kept on this Mac.
     internal(set) var core111 = false
+    /// The Core speaks API minor 112: room and kinds at create, 50-repo from-github, delete, several kinds.
+    internal(set) var core112 = false
     @ObservationIgnored let kinds: ProjectKinds
     /// Sends one signed request to the project preview route, and the Core's host (for redirects). Set with the connection.
     @ObservationIgnored var previewFetch: PreviewFetch?
@@ -196,6 +196,8 @@ public final class ProjectsModel {
                 self.core111 = has111
                 if has111 { await self.reload() }
             }
+            let has112 = await connection.serverSupports(minor: 112)
+            if let self, has112 != self.core112 { self.core112 = has112 }
             let ok = await connection.serverSupports(minor: coreMinorV010)
             self?.runnerSupported = ok
             self?.configsService = ok ? LiveRunConfigsService(connection: connection) : nil
@@ -589,7 +591,10 @@ public final class ProjectsModel {
                 // GitHub repos first: the Core's from-github route takes up to 10 in one call (with GitHub's own default
                 // branches); the rest are added one by one, each counted on the wizard's setup list.
                 let ordered = github + repos.filter { $0.fullName == nil }
-                let batch = ordered.prefix(while: { $0.fullName != nil }).prefix(10)
+                // A Core with API 112 makes a project from up to 50 GitHub repos in one all-or-nothing call.
+                let batch = ordered.prefix(while: { $0.fullName != nil }).prefix(self.core112 ? 50 : 10)
+                let room = self.core112 ? place?.id : nil
+                let kindList = self.core112 ? [kind.rawValue] : nil
                 if !batch.isEmpty {
                     patch.description = description.isEmpty ? nil : description
                     patch.runner = runner == nil || runner == "auto" ? nil : runner
@@ -600,10 +605,12 @@ public final class ProjectsModel {
                             triedSlugs.append(candidate)
                             if !batch.isEmpty {
                                 return try await service.createFromGithub(
-                                    slug: candidate, name: name, repos: batch.compactMap(\.fullName))
+                                    slug: candidate, name: name, repos: batch.compactMap(\.fullName), room: room,
+                                    kinds: kindList)
                             }
                             return try await service.create(
-                                slug: candidate, name: name, description: description, runner: runner)
+                                slug: candidate, name: name, description: description, runner: runner, room: room,
+                                kinds: kindList)
                         }
                     } catch {
                         // The Core may have made it and only the answer was lost (a timeout, an answer this app could
@@ -616,7 +623,7 @@ public final class ProjectsModel {
                 guard let p = made else { return }
                 // The chosen Brain place first: the Brain gives a project with no place its own new one a few seconds
                 // after it is made, so linking before the repos keeps it from making a second.
-                if let place {
+                if let place, room == nil {
                     do { try await service.linkPlace(project: p.id, room: place.id) } catch {
                         fatal.append("the Brain place \(place.name) could not be linked (\(self.words(error)))")
                     }
