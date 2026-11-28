@@ -48,7 +48,7 @@ struct WizardReview<Panel: View>: View {
                 attention
             } else {
                 // A create that failed comes back here: say why, plainly, above the choices that can fix it.
-                if let e = model.writeError {
+                if let e = model.wizardError {
                     CoreNotice(
                         symbol: "exclamationmark.triangle", title: "\(name) was not created", text: e, tone: .warn
                     )
@@ -111,7 +111,7 @@ struct WizardReview<Panel: View>: View {
         switch c.stage {
         case .project: return c.total > 0 ? "Making the project and its first repos…" : "Making the project…"
         case .repos: return "Adding the rest of the repos…"
-        case .finishing: return "Linking the Brain place and saving the settings…"
+        case .finishing: return "Linking the Brain room and saving the settings…"
         }
     }
 
@@ -125,14 +125,14 @@ struct WizardReview<Panel: View>: View {
             if case .fetching = r.copy { return false }
             return true
         }
-        if !bad.isEmpty || !model.wizardMissed.isEmpty || !model.wizardIssues.isEmpty || model.writeError != nil {
+        if !bad.isEmpty || !model.wizardMissed.isEmpty || !model.wizardIssues.isEmpty || model.wizardError != nil {
             VStack(alignment: .leading, spacing: Space.s1) {
                 if let made { ForEach(bad) { r in repoRow(made, r) } }
                 ForEach(model.wizardMissed) { m in missedRow(m) }
                 ForEach(model.wizardIssues, id: \.self) {
                     Text($0).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
                 }
-                if let e = model.writeError { CoreFieldError(e) }
+                if let e = model.wizardError { CoreFieldError(e) }
             }
             .transition(.opacity)
         }
@@ -140,8 +140,11 @@ struct WizardReview<Panel: View>: View {
 
     private func missedRow(_ m: MissedRepo) -> some View {
         CoreRow(m.name, subtitle: m.why, symbol: "exclamationmark.triangle") {
-            if let made, !m.why.contains("already"), let pick = chosen.first(where: { $0.name == m.name }) {
-                Button("Try again") {
+            if m.why.contains("SSH") {
+                // Trying again cannot help a link the Core refuses: go back to paste an https one.
+                Button("Use https…") { go(.code) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+            } else if let made, !m.why.contains("already"), let pick = chosen.first(where: { $0.name == m.name }) {
+                Button("Try Again") {
                     Task {
                         if await model.addRepos(to: made, [pick]) { model.wizardMissed.removeAll { $0.id == m.id } }
                     }
@@ -149,7 +152,11 @@ struct WizardReview<Panel: View>: View {
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small)).disabled(model.busy)
                 .help(model.busy ? "Wait for the other change to finish." : "Add \(m.name) again")
             } else {
-                Text("Not added").foregroundStyle(palette.error)
+                if m.why.contains("already") {
+                    Text("Already added").foregroundStyle(palette.text2)
+                } else {
+                    Text("Not added").foregroundStyle(palette.error)
+                }
             }
         }
     }
@@ -166,7 +173,7 @@ struct WizardReview<Panel: View>: View {
                     Button("Connect GitHub") { model.connectGithub() }
                         .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 } else {
-                    Button("Try again") { model.fetchRepo(p, r) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
+                    Button("Try Again") { model.fetchRepo(p, r) }.buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 }
             }
         }

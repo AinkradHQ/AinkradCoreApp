@@ -39,6 +39,28 @@ final class FakeService: ProjectsService, @unchecked Sendable {
     private(set) var branches: [String] = []
     var failList: (any Error)?
     private(set) var listReads = 0
+    /// QA lane 1: a project that was there already, a create whose answer is lost, refusals of archive and delete, places.
+    func seed(_ p: ProjectItem) { lock.withLock { list.append(p) } }
+    var loseAnswerFor: Set<String> = []
+    var failCreate: (any Error)?
+    var archiveError: (any Error)?
+    var deleteError: (any Error)?
+    var placesList: [BrainPlace]?
+    private(set) var lastColor: String?
+    func places() async throws -> [BrainPlace]? { placesList }
+    func delete(project: Int64) async throws {
+        try lock.withLock {
+            calls.append("delete")
+            if let deleteError { throw deleteError }
+        }
+    }
+    func create(
+        slug: String, name: String, description: String, runner: String?, room: String?, kinds: [String]?,
+        color: String?
+    ) async throws -> ProjectItem {
+        lock.withLock { lastColor = color }
+        return try await create(slug: slug, name: name)
+    }
     func projects() async throws -> [ProjectItem] {
         try lock.withLock {
             listReads += 1
@@ -49,14 +71,17 @@ final class FakeService: ProjectsService, @unchecked Sendable {
     func create(slug: String, name: String) async throws -> ProjectItem {
         try lock.withLock {
             calls.append("create \(slug)")
+            if let failCreate { throw failCreate }
             if slug == refuseSlug { throw CocoaError(.fileWriteFileExists) }
             if takenSlugs.contains(slug) {
                 throw CoreError.http(status: 409, code: "conflict", message: "a project of that slug exists")
             }
-            let p = ProjectItem(
+            var p = ProjectItem(
                 id: Int64(list.count + 1), slug: slug, name: name, description: "", expose: true, repos: [],
                 updatedAt: Date())
+            p.createdAt = Date()
             list.append(p)
+            if loseAnswerFor.contains(slug) { throw URLError(.timedOut) }
             return p
         }
     }
@@ -89,6 +114,9 @@ final class FakeService: ProjectsService, @unchecked Sendable {
                 )
             }
             if let v = patch.description { calls.append("description \(v)") }
+            if let v = patch.colour { calls.append("colour \(v)") }
+            if let v = patch.kind { calls.append("kind \(v)") }
+            if let v = patch.kinds { calls.append("kinds \(v.joined(separator: ","))") }
         }
     }
     func fetch(project: Int64, repo: Int64) async throws {
@@ -128,8 +156,9 @@ final class FakeService: ProjectsService, @unchecked Sendable {
         }
     }
     func archive(project: Int64) async throws {
-        lock.withLock {
+        try lock.withLock {
             calls.append("archive")
+            if let archiveError { throw archiveError }
             list.removeAll { $0.id == project }
         }
     }
@@ -235,7 +264,7 @@ struct ModelTests {
         s.refuseSlug = "tidepool"
         let ok = await m.create(name: "Tidepool", slug: "tidepool", colour: .blue)
         #expect(!ok)
-        #expect(m.writeError != nil)
+        #expect(m.wizardError != nil)
         #expect(m.openID == nil)
         #expect(m.projects.isEmpty)
     }
@@ -246,7 +275,7 @@ struct ModelTests {
         #expect(!ok)
         #expect(host.reasons.isEmpty)
         #expect(s.calls.isEmpty)
-        #expect(m.writeError == "The link has to start with a letter.")
+        #expect(m.wizardError == "The link has to start with a letter.")
     }
 
     @Test func aDeclinedTouchIDCreatesNothing() async {
@@ -256,7 +285,7 @@ struct ModelTests {
         #expect(await m.create(name: "Tidepool", slug: "tidepool", colour: .blue) == false)
         #expect(s.calls.isEmpty)
         // Declining says so: the wizard never comes back without a reason.
-        #expect(m.writeError?.contains("Touch ID") == true)
+        #expect(m.wizardError?.contains("Touch ID") == true)
     }
 
     @Test func aRepoThatFailsRollsTheWholeProjectBack() async {
@@ -267,7 +296,7 @@ struct ModelTests {
         // All or nothing: the half-made project is archived (deleted on a Core that can), and the reason is said.
         #expect(!ok)
         #expect(s.calls.contains { $0.hasPrefix("archive") })
-        #expect(m.writeError?.contains("tidepool-web") == true)
+        #expect(m.wizardError?.contains("tidepool-web") == true)
     }
 
     @Test func pausedWritesAreRefusedWithAToast() async {

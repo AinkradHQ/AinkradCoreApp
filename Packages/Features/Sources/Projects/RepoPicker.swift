@@ -245,10 +245,14 @@ private struct RepoPickRow: View {
             run?()
         } label: {
             HStack(spacing: Space.s3) {
-                Image(systemName: on ? "checkmark.square.fill" : "square")
-                    .coreFont(size: MacTextSize.title)
-                    .foregroundStyle(on ? GlassInk.accent(accent) : GlassInk.secondary)
-                    .contentTransition(.symbolEffect(.replace))
+                // The on state: accent fill and a white tick. A repo the project already has is the same, quieter.
+                ZStack {
+                    coreShape(Radius.chip).fill(on ? (run == nil ? GlassInk.secondary : GlassInk.accent(accent)) : .clear)
+                    coreShape(Radius.chip).strokeBorder(on ? .clear : GlassInk.secondary, lineWidth: 1.5)
+                    if on { Image(systemName: "checkmark").coreFont(size: MacTextSize.meta, weight: .bold).foregroundStyle(.white) }
+                }
+                .frame(width: Space.s4 + 2, height: Space.s4 + 2)
+                .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(repo.name).coreFont(size: MacTextSize.body, weight: .medium).lineLimit(1)
                     if !detail.isEmpty {

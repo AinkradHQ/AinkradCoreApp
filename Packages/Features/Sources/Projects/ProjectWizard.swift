@@ -2,7 +2,7 @@ import CoreUI
 import SwiftUI
 
 /// Every New Project: the guided wizard, three steps. What & name (the kind, the name, the colour), Code (optional, skipped
-/// for "Anything else"), then Review (Brain place, runner and link as rows that open their choice in place). The project's
+/// for "Anything else"), then Review (Brain room, runner and link as rows that open their choice in place). The project's
 /// card builds on the right the whole way, on every step, so the dialog never changes shape.
 struct ProjectWizard: View {
     let model: ProjectsModel
@@ -80,7 +80,7 @@ struct ProjectWizard: View {
                     WizardPreviewCard(
                         name: d.name, colour: d.colour,
                         host: d.name.isEmpty || d.slugProblem != nil || !d.kind.hasPublicLink
-                            ? nil : ProjectRules.host(d.slug),
+                            ? nil : ProjectRules.host(made?.slug ?? d.slug),
                         repos: (made?.repos.map(\.name)) ?? chosen.map(\.name), runner: d.runner,
                         publicLink: d.publicLink, place: d.existingPlace ? d.place?.name : nil, kind: d.kind,
                         step: d.step
@@ -94,10 +94,10 @@ struct ProjectWizard: View {
         .animation(Motion.out(Motion.ui), value: d.moreOptions)
         .animation(Motion.out(Motion.ui), value: d.corrected)
         .onChange(of: d.name) { _, new in
-            model.clearWriteError()
+            model.clearWizardError()
             if !d.colourPicked { d.colour = .standard(for: ProjectRules.slug(from: new)) }
         }
-        .onChange(of: d.slugText) { _, _ in model.clearWriteError() }
+        .onChange(of: d.slugText) { _, _ in model.clearWizardError() }
         .onChange(of: suggestion) { _, _ in d.follow(suggestion, hasRepos: readable) }
         .onChange(of: d.kind) { _, _ in
             if d.runner.unavailable(
@@ -106,7 +106,7 @@ struct ProjectWizard: View {
                 d.runner = .auto
             }
         }
-        .onDisappear { model.wizardDraft = d.hasContent || made != nil ? d : nil }
+        .onDisappear { model.wizardDraft = model.draftToKeep(d, made: made != nil) }
         .task {
             d.follow(suggestion, hasRepos: readable)
             await model.loadPlaces()
@@ -123,9 +123,8 @@ struct ProjectWizard: View {
 
     // MARK: header
 
+    /// The step line only: the review's own title says what is being made, so it is never said twice.
     private var headline: String {
-        if model.creating != nil || model.busy { return "Setting up \(d.name)" }
-        if let made { return WizardProgress(made.repos).settled ? "\(d.name) is ready" : "Setting up \(d.name)" }
         return "Step \((d.steps.firstIndex(of: d.step) ?? 0) + 1) of \(d.steps.count) · \(d.step.title)"
     }
 
@@ -134,7 +133,7 @@ struct ProjectWizard: View {
             HStack(spacing: Space.s1) {
                 ForEach(d.steps, id: \.self) { s in
                     coreShape(Radius.chip / 3).fill(
-                        started || s.rawValue <= d.step.rawValue ? palette.primary : palette.track
+                        s.rawValue <= d.step.rawValue ? palette.primary : palette.track
                     )
                     .frame(width: Space.s8 + Space.s3, height: Space.s1)
                 }
@@ -184,7 +183,7 @@ struct ProjectWizard: View {
                             set: {
                                 d.slugText = $0
                                 d.slugEdited = true
-                            }), error: d.slugProblem ?? model.writeError,
+                            }), error: d.slugProblem ?? model.wizardError,
                         onSubmit: { if d.nameReady { go(d.next(.what)) } }
                     )
                     .accessibilityIdentifier("project-new-link")
@@ -226,7 +225,7 @@ struct ProjectWizard: View {
             Text(githubWords).foregroundStyle(palette.text2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Space.s2) {
                 if githubFailed, !githubNeedsConnection {
-                    Button("Try again") { Task { await model.loadCatalog() } }
+                    Button("Try Again") { Task { await model.loadCatalog() } }
                         .buttonStyle(CoreButtonStyle(.secondary))
                 } else {
                     Button("Connect GitHub", action: connectGithub).buttonStyle(.coreProminent)
@@ -320,8 +319,8 @@ struct ProjectWizard: View {
         if started {
             if made != nil, model.creating == nil, !model.busy {
                 CoreDialogFooter(
-                    cancel: CoreAction("Start another", run: startAnother),
-                    primary: CoreAction("Open project", key: .primary) { model.openWizardProject() })
+                    cancel: CoreAction("Start Another", run: startAnother),
+                    primary: CoreAction("Open Project", key: .primary) { model.openWizardProject() })
             } else {
                 CoreDialogFooter(cancel: nil, primary: CoreAction("Setting up…") {}, busy: true)
             }
@@ -340,7 +339,7 @@ struct ProjectWizard: View {
             case .review:
                 CoreDialogFooter(
                     cancel: CoreAction("Back") { go(d.previous(.review)) },
-                    primary: CoreAction("Create project", key: .primary, run: create), busy: model.busy)
+                    primary: CoreAction("Create Project", key: .primary, run: create), busy: model.busy)
             }
         }
     }

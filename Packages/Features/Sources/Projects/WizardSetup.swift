@@ -1,7 +1,7 @@
 import CoreUI
 import SwiftUI
 
-/// The create, told as it happens: the project, its repos, the Brain place and settings, then the Core copying the code.
+/// The create, told as it happens: the project, its repos, the Brain room and settings, then the Core copying the code.
 /// Done steps show a check, the running one breathes with its own bar, later ones wait dimmed. One count per step, from
 /// the same numbers the card and the header use: every repo asked for is counted, so a repo the Core refused shows.
 struct WizardSetupList: View {
@@ -35,7 +35,7 @@ struct WizardSetupList: View {
                     value: Double(added) / Double(requested), symbol: "tray.full")
             }
             row(
-                "Brain place and settings", nil,
+                "Brain room and settings", nil,
                 phase: stage == .finishing ? .running : made != nil && creating == nil ? .done : .waiting,
                 value: nil, symbol: "brain")
             if copyTotal > 0 {

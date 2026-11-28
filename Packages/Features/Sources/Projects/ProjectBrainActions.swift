@@ -22,7 +22,7 @@ extension ProjectsModel {
             await refreshLive(project.id)
         } catch is AdminDeclined {
         } catch {
-            host.shell.showToast(runWords(error), kind: .warn)
+            host.shell.showToast(words(error), kind: .warn)
         }
     }
 
@@ -39,7 +39,7 @@ extension ProjectsModel {
         } catch is AdminDeclined {
             return ""
         } catch {
-            return (error as? RunFailure)?.sentence ?? runWords(error)
+            return (error as? RunFailure)?.sentence ?? words(error)
         }
         host.shell.showToast(approved ? "Instructions saved and approved" : "Instructions saved")
         await refreshLive(project.id)
@@ -57,7 +57,7 @@ extension ProjectsModel {
         } catch is AdminDeclined {
             return
         } catch {
-            host.shell.showToast(runWords(error), kind: .warn)
+            host.shell.showToast(words(error), kind: .warn)
             return
         }
         await reload()

@@ -81,7 +81,9 @@ struct WizardDraft {
     var hasContent: Bool { !name.isEmpty || !picked.isEmpty }
 
     /// The steps on the way: a project that is not software skips the code unless the person asked for it.
-    var steps: [WizardStep] { WizardStep.allCases.filter { $0 != .code || kind != .other || wantsCode } }
+    var steps: [WizardStep] {
+        WizardStep.allCases.filter { $0 != .code || kind != .other || wantsCode || !picked.isEmpty }
+    }
     func next(_ s: WizardStep) -> WizardStep { steps.first { $0.rawValue > s.rawValue } ?? .review }
     func previous(_ s: WizardStep) -> WizardStep { steps.last { $0.rawValue < s.rawValue } ?? .what }
 
@@ -134,7 +136,7 @@ extension WizardDraft {
                 id: .brain, symbol: existingPlace ? "square.stack" : "plus.square", label: "Brain",
                 value: !brainOn
                     ? "No Brain on this Core"
-                    : existingPlace ? (place?.name ?? "Existing place") : "New place “\(name)”",
+                    : existingPlace ? (place?.name ?? "Existing room") : "New room “\(name)”",
                 changeable: brainOn),
         ]
         if kind.runs {

@@ -11,7 +11,7 @@ enum NewProjectDialogs {
         _ m: ProjectsModel, name: String, picked: Set<String> = [], step: WizardStep = .what, pasted: [PickRepo] = [],
         kind: ProjectKind? = nil, editing: WizardRow? = nil
     ) {
-        m.clearWriteError()
+        m.clearWizardError()
         let fresh = name.isEmpty && picked.isEmpty && pasted.isEmpty && kind == nil && step == .what
         var draft: WizardDraft
         if fresh, let kept = m.wizardDraft {
@@ -23,10 +23,11 @@ enum NewProjectDialogs {
             m.wizardDraft = nil
             m.wizardProjectID = nil
         }
+        m.wizardFinished = false
         let shell = m.host.shell
         // Not dismissible by the shell: the wizard owns Esc and the close, and gives neither while it is making the project.
         shell.present(
-            ShellDialog(id: "project-new", dismissible: false, onClose: { [weak m] in m?.clearWriteError() }) {
+            ShellDialog(id: "project-new", dismissible: false, onClose: { [weak m] in m?.clearWizardError() }) {
                 ProjectWizard(model: m, draft: draft, editing: editing) { shell.closeDialog() }
             })
     }

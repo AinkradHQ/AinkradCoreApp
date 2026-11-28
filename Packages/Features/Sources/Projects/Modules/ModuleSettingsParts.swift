@@ -101,7 +101,8 @@ struct ArchiveDeleteBlock: View {
                     line(
                         "Delete permanently",
                         "Removes the project, its copies and runs. Your repos stay on GitHub and the Brain room stays.",
-                        button: "Delete…", symbol: "trash", danger: true
+                        button: "Delete…", symbol: "trash", danger: true,
+                        block: model.isRunningOrStarting(project) ? "Stop it first." : nil
                     ) { withAnimation(Motion.out(Motion.ui)) { confirming = true } }
                     if confirming { confirm }
                 }
@@ -110,7 +111,8 @@ struct ArchiveDeleteBlock: View {
     }
 
     private func line(
-        _ title: String, _ sub: String, button: String, symbol: String, danger: Bool, action: @escaping () -> Void
+        _ title: String, _ sub: String, button: String, symbol: String, danger: Bool, block: String? = nil,
+        action: @escaping () -> Void
     ) -> some View {
         HStack(alignment: .top, spacing: Space.s3) {
             VStack(alignment: .leading, spacing: 2) {
@@ -121,8 +123,8 @@ struct ArchiveDeleteBlock: View {
             Button(action: action) { Label(button, systemImage: symbol) }
                 .buttonStyle(CoreButtonStyle(.secondary, size: .small))
                 .foregroundStyle(danger ? GlassInk.red : GlassInk.primary)
-                .disabled(model.readOnly || model.busy)
-                .help(model.readOnly ? "This device can look at projects but not change them." : sub)
+                .disabled(model.readOnly || model.busy || block != nil)
+                .help(model.readOnly ? "This device can look at projects but not change them." : block ?? sub)
         }
     }
 
