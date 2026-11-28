@@ -59,7 +59,9 @@ extension ProjectsDemo {
         case "space-infra-starting":
             make(&list[1], .infra, "Tidepool Platform", ["tidepool-infra", "tidepool-os"])
             list[1].run = RunSummary(state: .starting, services: 5)
-            list[1].live = DemoLive.make(.starting, progress: 0.4)
+            var l = DemoLive.make(.starting, progress: 0.6)
+            l.progressLine = "Starting the services · 3 of 5 up"
+            list[1].live = l
         case "space-infra-failed":
             make(&list[2], .infra, "Tidepool Platform", ["tidepool-infra", "tidepool-os"])
             var l = DemoLive.make(.failed)
@@ -88,12 +90,18 @@ extension ProjectsDemo {
                 let up = { (n: String, mem: String) in
                     ProjectLive.Service(name: n, memory: mem, state: .up, health: "healthy")
                 }
+                // Five services in the stack, three of them up: the header, the stage and the card say the same.
                 (model.runService as? DemoRunService)?.services[2] = [
-                    up("network", "42 MB"), up("vault", "118 MB"),
+                    up("network", "42 MB"), up("vault", "118 MB"), up("db", "402 MB"),
                     ProjectLive.Service(name: "queue", memory: "–", state: .down),
+                    ProjectLive.Service(name: "gateway", memory: "–", state: .down),
                 ]
                 await model.refreshLive(2)
             }
+        case "overview-starting-steps":
+            // The Core lists the services it is starting: two of the five are up, as the step says.
+            (model.runService as? DemoRunService)?.services[2] = DemoLive.make(.starting, progress: 0.4).services
+            await model.refreshLive(2)
         case "space-app-failed", "space-infra-failed", "space-web-failed": model.openID = 3
         case "space-other-docs", "space-other-empty":
             model.lore = DemoDocsLore(scene == "space-other-docs" ? DemoDocsLore.harbour : [])

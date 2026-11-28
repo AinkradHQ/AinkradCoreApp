@@ -21,11 +21,11 @@ extension ProjectsDemo {
         return (p[1], state)
     }
 
-    private static func repos(_ p: inout ProjectItem, _ names: [String]) {
+    private static func repos(_ p: inout ProjectItem, _ names: [String], org: String = "tidepool-labs") {
         p.repos = names.enumerated().map {
             RepoItem(
                 id: p.id * 10 + Int64($0.offset), name: $0.element,
-                remoteURL: "https://github.com/tidepool-labs/\($0.element)", branch: "main", primary: $0.offset == 0,
+                remoteURL: "https://github.com/\(org)/\($0.element)", branch: "main", primary: $0.offset == 0,
                 fetchedAt: Date().addingTimeInterval(-600), fetchError: nil)
         }
     }
@@ -49,8 +49,10 @@ extension ProjectsDemo {
                 p.description = "Order tracking for couriers"
                 repos(&p, ["tidepool-ios", "tidepool-android"])
             } else {
-                repos(&p, ["lanterna-web", "lanterna-ios"])
+                repos(&p, ["lanterna-web", "lanterna-ios"], org: "lanterna-co")
             }
+            // The module an iOS build cannot find is the project's own.
+            let module = kind == "app" ? "Tidepool" : "Lanterna"
             let step = { (t: String, s: RunStep.State, d: String?) in StartStep(title: t, state: s, detail: d) }
             switch state {
             case .running:
@@ -68,15 +70,15 @@ extension ProjectsDemo {
                 live.failureFix = "Read the log, fix what stops the build, then build it again."
                 live.steps = [
                     step("Getting the code", .done, nil),
-                    step("Building for iOS", .failed, "error: no such module ‘Tidepool’"),
+                    step("Building for iOS", .failed, "error: no such module ‘\(module)’"),
                     step("Signing", .pending, nil), step("Installing on the simulator", .pending, nil),
                 ]
             case .stopped: live.steps = []
             }
         case "infra":
-            p.name = "Harbor Platform"
+            p.name = "Tidepool Platform"
             p.description = "The servers behind it all"
-            repos(&p, ["harbor-infra", "harbor-os"])
+            repos(&p, ["tidepool-infra", "tidepool-os"])
             p.draft = RunDraft(source: "main.tf", services: ["gateway", "api", "queue", "db", "vault"], secrets: [])
         case "other":
             p.name = "Harbour Book"

@@ -125,7 +125,7 @@ public final class ProjectsDemo {
             "page-run-logs", "dialog-history", "dialog-secret-file", "dialog-instructions", "overview-starting-honest",
             // Core API 110: the private live preview, start steps, metrics, Core colour, branch change, crash alerts.
             "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
-            "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+            "overview-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
             "dialog-branch-error", "gallery-crashed", "overview-crashed",
             // One run model (the Default and its configurations), Environment with secrets, Repos, Settings.
             "page-run-config", "page-run-env", "page-run-live", "page-run-history", "page-run-old-core",
@@ -135,9 +135,17 @@ public final class ProjectsDemo {
     /// The scenes that show a Core with API 110; every other scene is an older Core, exactly as before.
     static let core110Scenes: Set<String> = [
         "overview-private-live", "overview-preview-busy", "overview-starting-steps", "overview-failed-step",
-        "overview-metrics", "page-run-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
+        "overview-metrics", "page-settings-core-colour", "page-repos-branch", "dialog-branch",
         "dialog-branch-error", "gallery-crashed", "overview-crashed",
     ]
+
+    /// The scenes that show a current Core's Settings: it holds several kinds and serves the insights (Fetch interval).
+    static let settingsScenes: Set<String> = [
+        "page-settings", "page-settings-stopped", "page-settings-core-colour", "page-settings-limits-edit",
+        "page-settings-kind", "v2b-settings", "v2b-settings-error",
+    ]
+    /// The scenes whose Core serves the insights routes (the Activity page reads who changed what from them).
+    static let insightsScenes = settingsScenes.union(["mod-activity", "mod-activity-docs"])
 
     let model: ProjectsModel
     public init(model: ProjectsModel) { self.model = model }
@@ -227,6 +235,8 @@ public final class ProjectsDemo {
     public func showInteractive(_ scene: String) async { await show(scene) }
 
     public func show(_ scene: String) async {
+        // The picker keeps what it read for the whole wizard; a scene with no GitHub connection starts from nothing.
+        if scene == "new-code-no-github" { model.detach() }
         let shell = model.host.shell
         shell.dialog = nil
         shell.overlay = nil
@@ -262,7 +272,7 @@ public final class ProjectsDemo {
         model.liveParts = [:]
         model.runStates = [:]
         model.core110 = Self.core110Scenes.contains(scene)
-        model.core112 = scene == "page-settings-kind"
+        model.core112 = Self.settingsScenes.contains(scene)
         model.core111 = Self.core111Scenes.contains(scene)
         model.previewFetch = model.core110 ? { @Sendable _, _, _, _ in throw CancellationError() } : nil
         // Every scene starts from the standard Look; the look scenes change it below.
@@ -361,18 +371,21 @@ public final class ProjectsDemo {
                 StartStep(title: "Checking they are healthy", state: .pending),
             ]
             list[2].live = l
-        case "overview-metrics", "page-run-metrics":
+        case "overview-metrics":
             list[0].live?.metrics = DemoLive.metrics()
-        case "page-settings-core-colour": list[0].colourName = "teal"
+        // A colour past the first eight swatches: the row shows it in the eighth place, as a pick made under "More…".
+        case "page-settings-core-colour": list[0].colourName = "rose"
         case "overview-never-opened":
             // Never started, never opened: the setup is read ("Ready to start") and there is no picture yet.
             PreviewStore.shared.forget()
             list[3].run = nil
             list[3].live = nil
             list[3].draft = RunDraft(source: "docker-compose.yml", services: ["web", "api", "db"], secrets: [])
-        case "dialog-branch-error": list[0].repos[2] = Self.lanternaRepo(2, "lanterna-admin", branch: "release/9", head: "91aa0c4", minutes: 180, failing: true)
         case "page-settings-kind": list[0].kinds = [.app, .web]
         default: break
+        }
+        if Self.settingsScenes.contains(scene) {
+            for i in list.indices where list[i].kinds.isEmpty { list[i].kinds = [.web] }
         }
         Self.kindSample(scene, &list)
         Self.spaceSample(scene, &list)
@@ -384,6 +397,8 @@ public final class ProjectsDemo {
         model.runService = DemoRunService()
         let configs = DemoConfigsService()
         configs.kinds = Dictionary(uniqueKeysWithValues: list.map { ($0.id, DemoData.kinds($0)[0]) })
+        configs.repoNames = Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0.repos.map(\.name)) })
+        model.insightsService = Self.insightsScenes.contains(scene) ? DemoInsightsService(kinds: configs.kinds) : nil
         model.configsService = scene == "page-run-old-core" ? nil : configs
         let byProject = Dictionary(uniqueKeysWithValues: list.map { ($0.id, DemoLogSource(lines: DemoData.source($0))) })
         model.logSources = { id, _ in byProject[id] ?? DemoLogSource() }
@@ -483,9 +498,6 @@ public final class ProjectsDemo {
                     "id": "1", "run": "r_demo", "service": "api", "exit_code": "1", "restarts": "3", "config": "web",
                     "environment": "development",
                 ])
-        case "page-run-metrics":
-            model.openID = 1
-            model.module = .services
         case "page-settings-core-colour":
             model.openID = 1
             model.section = .settings
@@ -493,11 +505,16 @@ public final class ProjectsDemo {
             model.openID = 1
             model.section = .repos
             try? await Task.sleep(for: .milliseconds(500))
-            if scene != "page-repos-branch", let p = model.open, let r = p.repos.first(where: { $0.fetchError != nil }) ?? p.repos.first {
-                RepoDialogs.openBranch(model, p, r)
+            if scene != "page-repos-branch", let p = model.open,
+                let r = p.repos.first(where: { $0.fetchError != nil }) ?? p.repos.first
+            {
+                // The repo stays on its branch; the dialog is opened on the branch that was tried, which the Core refuses.
+                var tried = r
+                if scene == "dialog-branch-error" { tried.branch = "release/9" }
+                RepoDialogs.openBranch(model, p, tried)
                 if scene == "dialog-branch-error" {
                     model.writeError = model.branchWords(
-                        CoreError.badRequest(message: "no such branch"), branch: r.branch, repo: r.name)
+                        CoreError.badRequest(message: "no such branch"), branch: tried.branch, repo: r.name)
                 }
             }
         case "overview-stale":
